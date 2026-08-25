@@ -1,0 +1,17 @@
+{
+  "source": "ninjatrader | tradingview | other",
+  "type": "execution | signal | trade_opened | trade_closed",
+  "account": "SIM101",
+  "instrument": "NQ",
+  "side": "long | short",
+  "entryTime": "2026-07-12T08:30:00.000Z",
+  "exitTime": "2026-07-12T08:35:00.000Z",
+  "entryPrice": 20000,
+  "exitPrice": 20010,
+  "quantity": 1,
+  "points": 10,
+  "pnl": 200,
+  "result": "target | stoploss",
+  "strategy": "Breakout",
+  "comment": "Volitelné"
+}

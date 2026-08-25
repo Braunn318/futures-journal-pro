@@ -1,0 +1,72 @@
+FUTURES JOURNAL PRO 4.2.1 – AUTOMATIZACE
+========================================
+
+DŮLEŽITÉ
+- Původní finální verze 4.1.7 zůstává jako bezpečná záloha.
+- Verze 4.2.1 přidává automatický sběr obchodů, ale nemění vzhled ani ruční deník.
+- Aplikace musí být spuštěná, aby přijímala obchody z NinjaTraderu.
+
+1. NINJATRADER 8
+----------------
+1) Spusť Futures Journal PRO a přihlas se.
+2) Otevři menu Integrace.
+3) Klikni na „Stáhnout připravený NinjaTrader konektor“.
+   Aplikace do souboru automaticky vloží správný API klíč.
+4) V NinjaTraderu otevři Tools > Import > NinjaScript Add-On.
+5) Pokud NinjaTrader vyžaduje ZIP, vlož soubor FuturesJournalCapture.cs do složky:
+   Dokumenty\NinjaTrader 8\bin\Custom\AddOns\FuturesJournalCapture.cs
+   a v NinjaScript Editoru spusť Compile.
+6) Restartuj NinjaTrader.
+7) V aplikaci v Integracích zkontroluj „Stav služby – Běží na portu 17654“.
+8) Klikni na „Otestovat vstup a výstup“. Musí vzniknout jeden testovací obchod.
+9) V části „Přiřazení účtů ke kartám“ nastav např. SIM101 -> Simulace.
+
+Automaticky se přenáší:
+- účet, instrument a kontraktní měsíc,
+- Long/Short,
+- čas a cena vstupu i výstupu,
+- počet kontraktů,
+- částečné vstupy a výstupy,
+- otočení pozice,
+- body, P/L a komise,
+- screenshot při vstupu a výstupu.
+
+2. TRADINGVIEW
+--------------
+TradingView neposílá webhook na localhost, proto je nutný veřejný relay.
+
+A) Cloudflare Worker
+1) Vytvoř Cloudflare Worker a KV namespace.
+2) Nahraj soubor CONNECTORS\TradingViewRelayWorker\worker.js.
+3) Připoj KV namespace pod názvem FJ_QUEUE.
+4) Nastav tajnou proměnnou RELAY_TOKEN.
+5) Ve Futures Journal PRO > Integrace vlož adresu Workeru a stejný token.
+6) Zapni relay.
+
+B) TradingView
+1) Otevři Pine Editor a vlož FuturesJournalAlertConnector.pine.
+2) Přidej strategii do grafu.
+3) Vytvoř alert s podmínkou „Any alert() function call“.
+4) Webhook URL nastav:
+   https://ADRESA-WORKERU/webhook?token=TVUJ_TOKEN
+5) Alerty se stáhnou automaticky každých 10 sekund.
+
+3. SCREENSHOTY
+--------------
+V Integracích zvol:
+- Vypnuto,
+- Hlavní monitor,
+- Všechny monitory.
+Do jednoho obchodu se v aplikaci uloží nejvýše první tři obrázky.
+
+4. DATA A ZÁLOHY
+----------------
+Data jsou v uživatelském profilu Windows v adresáři aplikace Futures Journal PRO.
+Pravidelně používej funkci „Aktualizovat zálohu na SSD“.
+
+5. ŘEŠENÍ POTÍŽÍ
+----------------
+- Stav služby neběží: restartuj aplikaci.
+- NinjaTrader vrací HTTP 401: znovu stáhni připravený konektor, protože API klíč se změnil.
+- Obchod není v deníku: zkontroluj Automatický import a přiřazení účtu ke kartě.
+- TradingView nic neposílá: ověř URL Workeru, token a typ alertu „Any alert() function call“.

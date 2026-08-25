@@ -1,0 +1,21 @@
+Futures Journal PRO 4.3.8 – změny oproti 4.3.7
+
+1) OPRAVA: KOMISE U STOP LOSS OBCHODU ŠTRÁTU CHYBNĚ SNIŽOVALA
+   Automatický výpočet (zavedený v 4.3.3/4.3.4) vždy počítal "hrubý zisk
+   mínus komise" bez ohledu na to, jestli šlo o Target, nebo Stop Loss.
+   U zisku je to správně (komise zisk snižuje), ale u ztráty je to obráceně
+   – komise je náklad navíc, takže ztrátu MÁ zvětšovat, ne zmenšovat.
+   Potvrzeno na reálném příkladu: obchod -1,75 bodu, 1 kontrakt MES (hrubá
+   ztráta $8,75), komise $3 – aplikace dřív spočítala čistou ztrátu jako
+   $5,75 (chybně nižší), teď správně $11,75 (hrubá ztráta + komise).
+
+   Zisk (Target): čistý = hrubý − komise (beze změny, bylo správně).
+   Ztráta (Stop Loss): čistý = hrubý + komise (opraveno).
+   Break Even: čistý = −komise (obchod bez pohybu ceny pořád stojí komisi).
+
+   Platí pro první cíl (TP1) i pro každý další ručně přidaný cíl (TP2, Break
+   Even...) v témže formuláři.
+
+2) Přepnutí pole "Výsledek" (Target/Stop Loss/Break Even) teď rovnou přepočítá
+   zisk/ztrátu podle výše uvedené opravené logiky – dřív bylo potřeba po
+   přepnutí ještě sáhnout na jiné pole, aby se přepočet spustil.

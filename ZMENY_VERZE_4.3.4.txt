@@ -1,0 +1,18 @@
+Futures Journal PRO 4.3.4 – změny oproti 4.3.3
+
+1) AUTOMATICKÝ VÝPOČET I U DALŠÍCH CÍLŮ (TP2, Break Even...), NE JEN U PRVNÍHO
+   V 4.3.3 fungoval propojený výpočet (cena vstupu/výstupu → body → zisk podle
+   hodnoty bodu a komise) jen u prvního cíle nahoře ve formuláři. Řádky
+   přidané tlačítkem "＋ Přidat další cíl" auto-výpočet neměly vůbec – musely
+   se vyplňovat úplně ručně, včetně bodů a zisku.
+
+   Teď se chová úplně stejně jako první cíl:
+   - Stačí vyplnit jen cenu výstupu daného cíle – body se dopočítají ze
+     společné ceny vstupu obchodu.
+   - Ze společné hodnoty bodu instrumentu (šablona nebo vestavěná tabulka),
+     bodů a počtu kontraktů daného cíle se dopočítá zisk/ztráta.
+   - Přidáno pole "Komise" i pro každý další cíl zvlášť (dřív ho tam vůbec
+     nebylo) – odečítá se od hrubého zisku stejně jako u prvního cíle.
+   - Všechna pole lze i tak kdykoliv přepsat ručně, stejně jako dřív.
+   - Funguje úplně stejně u ručně zadaných obchodů i u obchodů z NinjaTraderu/
+     cTraderu – žádný rozdíl mezi automatickým a ručním zadáním.

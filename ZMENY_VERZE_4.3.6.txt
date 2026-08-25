@@ -1,0 +1,33 @@
+Futures Journal PRO 4.3.6 – změny oproti 4.3.5
+
+1) OPRAVA INSTALAČNÍHO SKRIPTU (VYTVORIT_INSTALATOR.bat)
+   Řádek "title" obsahoval české znaky s diakritikou ("vytvoření instalátoru"),
+   zatímco zbytek skriptu záměrně používal jen ASCII text bez diakritiky
+   ("zdrojovych", "soucasti" apod.). Na některých Windows (potvrzeno na
+   německé lokalizaci) tohle cmd.exe rozbilo natolik, že se objevila chyba
+   "Der Befehl 'le' ist entweder falsch geschrieben..." (příkaz "le" nenalezen)
+   hned na začátku – ten text vznikl chybnou interpretací kódování řádku
+   s diakritikou, ne skutečným příkazem "le". Opraveno – celý skript je teď
+   od začátku do konce jen v ASCII, beze změny funkčnosti.
+
+2) VERZE V TEXTU SE UŽ NEZASEKNE NA STARÉM ČÍSLE
+   Skript dřív měl číslo verze (např. "4.3.0") napevno napsané ve dvou
+   místech a při každé nové verzi aplikace jsem ho zapomínal ručně
+   přepisovat. Teď se číslo verze čte přímo ze souboru package.json při
+   každém spuštění skriptu, takže v textu i v názvu výsledného instalátoru
+   bude vždy odpovídat skutečné verzi aplikace bez ručních zásahů.
+
+3) NPM VAROVÁNÍ (deprecated: inflight, rimraf, glob) – VYSVĚTLENÍ
+   Tahle hlášení při "npm install" NEJSOU chybou instalace – jsou to jen
+   varování npm o starších vnitřních závislostech nástroje electron-builder
+   (ne přímo Futures Journal PRO). electron-builder je nainstalovaný
+   v aktuálně nejnovější verzi (26.15.3, dovoluje to i současné nastavení
+   v package.json), a tahle konkrétní varování pocházejí z JEHO vlastního
+   seznamu závislostí, který zatím sami autoři electron-builderu
+   neaktualizovali. Instalaci ani chod aplikace to nijak neovlivňuje –
+   dají se bezpečně ignorovat.
+   Electron samotný je momentálně na verzi 39.x (nejnovější v této řadě:
+   39.8.10, taky se stáhne automaticky). Nejnovější řada je už 43.x, ale
+   přeskočit rovnou 4 hlavní verze je riziko, které bez možnosti to sám
+   reálně sestavit a otestovat na Windows nechci nasadit naslepo – zůstává
+   proto zatím na ověřené 39.x řadě.

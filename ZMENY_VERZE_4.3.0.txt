@@ -1,0 +1,8 @@
+Futures Journal PRO 4.3.0
+- čistý instalační projekt bez opravných skriptů předchozích verzí
+- opravené zabalení celé složky app včetně app/index.html
+- více kontrolovaných cest při načítání hlavní aplikace
+- tray ikona a nabídka pro otevření nebo úplné ukončení
+- automatické spuštění po přihlášení do Windows
+- ochrana proti spuštění více kopií
+- zachovaná minutová kontrola otevřených pozic v NinjaTrader konektoru

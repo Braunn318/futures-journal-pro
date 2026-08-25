@@ -1,0 +1,10 @@
+name = "futures-journal-relay"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[[kv_namespaces]]
+binding = "FJ_QUEUE"
+id = "SEM_VLOZ_KV_NAMESPACE_ID"
+
+[vars]
+RELAY_TOKEN = "SEM_VLOZ_DLOUHY_TAJNY_TOKEN"

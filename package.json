@@ -1,0 +1,53 @@
+{
+  "name": "futures-journal-pro",
+  "version": "4.3.10",
+  "description": "Futures Journal PRO 4.3.10 – kritická oprava: přepočet komise mohl u instrumentu bez nastavené hodnoty bodu vynulovat skutečný zisk/ztrátu. Komise se teď navíc automaticky přepočítá i při změně počtu kontraktů.",
+  "main": "main.js",
+  "author": "Jája S",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "start:debug": "electron . --enable-logging"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "cz.futuresjournal.pro",
+    "productName": "Futures Journal PRO",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "CONNECTORS/**/*",
+      "NAVOD_AUTOMATIZACE.txt"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "app/assets/bull_bear_icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Futures Journal PRO",
+      "uninstallDisplayName": "Futures Journal PRO",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "artifactName": "Futures-Journal-PRO-Setup-${version}.${ext}",
+    "asar": false
+  }
+}

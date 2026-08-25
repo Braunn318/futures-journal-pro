@@ -1,0 +1,80 @@
+//@version=6
+strategy("Futures Journal PRO Connector", overlay=true, process_orders_on_close=true, pyramiding=0)
+
+// Ukázková strategie. Vstupní podmínky nahraďte vlastními.
+fast = ta.sma(close, 9)
+slow = ta.sma(close, 21)
+longSignal = ta.crossover(fast, slow)
+shortSignal = ta.crossunder(fast, slow)
+
+accountName = input.string("TradingView", "Název účtu / karty")
+pointValue = input.float(1.0, "Hodnota bodu", minval=0.0)
+commissionPerTrade = input.float(0.0, "Komise za uzavřený obchod", minval=0.0)
+
+if longSignal
+    strategy.entry("LONG", strategy.long)
+if shortSignal
+    strategy.entry("SHORT", strategy.short)
+
+var float savedEntryPrice = na
+var int savedEntryTime = na
+var float savedQty = na
+var string savedSide = ""
+
+prevPos = nz(strategy.position_size[1])
+currPos = strategy.position_size
+opened = prevPos == 0 and currPos != 0
+closed = prevPos != 0 and currPos == 0
+reversed = prevPos != 0 and currPos != 0 and math.sign(prevPos) != math.sign(currPos)
+
+jsonEscape(string s) => str.replace_all(str.replace_all(s, "\\", "\\\\"), '"', '\\"')
+
+sendOpened(float entryPrice, float qty, string side) =>
+    payload = '{"source":"tradingview","type":"trade_opened","account":"' + jsonEscape(accountName) +
+      '","instrument":"' + jsonEscape(syminfo.ticker) +
+      '","instrumentFull":"' + jsonEscape(syminfo.tickerid) +
+      '","side":"' + side +
+      '","entryTime":"' + str.format_time(time, "yyyy-MM-dd'T'HH:mm:ssXXX") +
+      '","entryPrice":' + str.tostring(entryPrice) +
+      ',"quantity":' + str.tostring(math.abs(qty)) + '}'
+    alert(payload, alert.freq_all)
+
+sendClosed(float entryPrice, int entryTime, float qty, string side, float exitPrice) =>
+    direction = side == "long" ? 1.0 : -1.0
+    pointsSigned = (exitPrice - entryPrice) * direction
+    gross = pointsSigned * pointValue * math.abs(qty)
+    net = gross - commissionPerTrade
+    result = net >= 0 ? "target" : "stoploss"
+    payload = '{"source":"tradingview","type":"trade_closed","account":"' + jsonEscape(accountName) +
+      '","instrument":"' + jsonEscape(syminfo.ticker) +
+      '","instrumentFull":"' + jsonEscape(syminfo.tickerid) +
+      '","side":"' + side +
+      '","entryTime":"' + str.format_time(entryTime, "yyyy-MM-dd'T'HH:mm:ssXXX") +
+      '","exitTime":"' + str.format_time(time, "yyyy-MM-dd'T'HH:mm:ssXXX") +
+      '","entryPrice":' + str.tostring(entryPrice) +
+      ',"exitPrice":' + str.tostring(exitPrice) +
+      ',"quantity":' + str.tostring(math.abs(qty)) +
+      ',"points":' + str.tostring(math.abs(pointsSigned)) +
+      ',"grossPnl":' + str.tostring(gross) +
+      ',"commission":' + str.tostring(commissionPerTrade) +
+      ',"pnl":' + str.tostring(net) +
+      ',"result":"' + result + '"}'
+    alert(payload, alert.freq_all)
+
+if closed or reversed
+    if not na(savedEntryPrice) and not na(savedEntryTime)
+        sendClosed(savedEntryPrice, savedEntryTime, savedQty, savedSide, close)
+    savedEntryPrice := na
+    savedEntryTime := na
+    savedQty := na
+    savedSide := ""
+
+if opened or reversed
+    savedEntryPrice := strategy.position_avg_price
+    savedEntryTime := time
+    savedQty := currPos
+    savedSide := currPos > 0 ? "long" : "short"
+    sendOpened(savedEntryPrice, savedQty, savedSide)
+
+plot(fast, "Fast SMA")
+plot(slow, "Slow SMA")

@@ -1,0 +1,2713 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Futures Trading Journal</title>
+<style>
+:root{
+  --bg-start:#080c18;--bg-end:#111a30;
+  --sidebar-bg:#0b1222;
+  --panel:#121a2d;--panel2:#18223a;--input-bg:#0d1527;
+  --card-bg-rgb:18,26,45;--card-bg-alpha:.94;
+  --text:#eef3ff;--text2:#cfd8ee;--muted:#98a6c7;
+  --green:#2ecc71;--green-rgb:46,204,113;
+  --red:#ff5c67;--red-rgb:255,92,103;
+  --blue:#5ba7ff;--blue-rgb:91,167,255;
+  --yellow:#f6c453;--yellow-rgb:246,196,83;
+  --orange:#f6a623;--orange-rgb:246,166,35;
+  --line:#273452;
+  --tint-rgb:255,255,255;
+  --overlay-rgb:4,8,18;
+  --shadow-rgb:0,0,0;
+  --hover-border:#34507d;
+  --btn-text:#ffffff;
+  --btn-primary-text:#06101f;
+  --btn-danger-text:#220408;
+  --login-bg-start:#17233d;--login-bg-end:#070b14;--login-card-bg-rgb:15,22,38;
+}
+html[data-theme="light"]{
+  --bg-start:#eef2fb;--bg-end:#dfe7f7;
+  --sidebar-bg:#ffffff;
+  --panel:#ffffff;--panel2:#eef2fb;--input-bg:#ffffff;
+  --card-bg-rgb:255,255,255;--card-bg-alpha:.96;
+  --text:#101830;--text2:#38425e;--muted:#5b6a8e;
+  --green:#1f9d57;--green-rgb:31,157,87;
+  --red:#e2434f;--red-rgb:226,67,79;
+  --blue:#2f6fe0;--blue-rgb:47,111,224;
+  --yellow:#b8790a;--yellow-rgb:184,121,10;
+  --orange:#c67200;--orange-rgb:198,114,0;
+  --line:#d7deef;
+  --tint-rgb:16,24,48;
+  --overlay-rgb:238,242,251;
+  --shadow-rgb:60,72,110;
+  --hover-border:#a9b8dd;
+  --btn-text:#101830;
+  --btn-primary-text:#ffffff;
+  --btn-danger-text:#ffffff;
+  --login-bg-start:#dfe7f7;--login-bg-end:#c6d2ec;--login-card-bg-rgb:255,255,255;
+}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,var(--bg-start),var(--bg-end));color:var(--text)}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+.sidebar{background:var(--sidebar-bg);border-right:1px solid var(--line);padding:24px 18px;position:sticky;top:0;height:100vh}
+.brand{font-size:21px;font-weight:800;margin-bottom:18px}.brand span{color:var(--blue)}
+.journal-switcher{margin-bottom:18px}
+.journal-switcher label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.journal-switcher select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:9px;border-radius:9px}
+.journal-switcher .journal-actions{display:flex;gap:6px;margin-top:7px}
+.journal-switcher .journal-actions button{flex:1;padding:7px 8px;font-size:12px}
+.nav button{width:100%;text-align:left;border:0;background:transparent;color:var(--muted);padding:12px 14px;border-radius:10px;margin:4px 0}
+.nav button.active,.nav button:hover{background:var(--panel2);color:var(--text)}
+.main{padding:26px;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px}
+h1{font-size:28px;margin:0}.sub{color:var(--muted);margin-top:5px}
+.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--panel2);color:var(--btn-text)}
+.btn.primary{background:var(--blue);color:var(--btn-primary-text);font-weight:800}.btn.danger{background:var(--red);color:var(--btn-danger-text)}
+.grid{display:grid;gap:16px}.stats{grid-template-columns:repeat(6,minmax(130px,1fr))}
+.card{background:rgba(var(--card-bg-rgb),var(--card-bg-alpha));border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 12px 30px rgba(var(--shadow-rgb),.18)}
+.metric .label{color:var(--muted);font-size:13px}.metric .value{font-size:27px;font-weight:800;margin-top:6px}
+.pos{color:var(--green)}.neg{color:var(--red)}.neutral{color:var(--yellow)}
+.charts{grid-template-columns:1fr 1.7fr;margin-top:16px}.chart-wrap{height:320px;position:relative}
+canvas{width:100%;height:100%}
+.section{display:none}.section.active{display:block}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px}.toolbar input,.toolbar select{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px;border-radius:10px}
+.trade-list{display:grid;gap:14px}.trade{display:grid;grid-template-columns:1.2fr .8fr 1fr auto;gap:16px;align-items:center}
+.trade .title{font-size:18px;font-weight:800}.trade .meta{color:var(--muted);font-size:13px;margin-top:5px}.pill{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:800;font-size:12px}
+.pill.win{background:rgba(var(--green-rgb),.15);color:var(--green)}.pill.loss{background:rgba(var(--red-rgb),.15);color:var(--red)}.pill.be{background:rgba(var(--yellow-rgb),.18);color:var(--yellow)}
+.pill.journal-pill{background:rgba(var(--blue-rgb),.15);color:var(--blue);font-weight:700}
+.trade-legs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.leg-pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;background:rgba(var(--tint-rgb),.06);border:1px solid var(--line)}
+.leg-pill.pos{color:var(--green);border-color:rgba(var(--green-rgb),.35)}.leg-pill.neg{color:var(--red);border-color:rgba(var(--red-rgb),.35)}.leg-pill.neutral{color:var(--yellow);border-color:rgba(var(--yellow-rgb),.35)}
+.trade-select-wrap{display:flex;align-items:center;margin-right:4px}
+.trade-select{width:17px;height:17px;cursor:pointer}
+.template-row{display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr auto;gap:8px;align-items:center;margin-top:8px}
+.template-row input,.template-row select{padding:8px}
+input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--input-bg);border:1px solid var(--line);border-radius:8px}
+@media(max-width:900px){.template-row{grid-template-columns:1fr 1fr}}
+.leg-row{display:grid;grid-template-columns:0.7fr 0.9fr 0.9fr 0.9fr 0.7fr 0.9fr 0.8fr 0.6fr auto;gap:6px;align-items:center;margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:10px;background:rgba(var(--tint-rgb),.02)}
+.leg-row input,.leg-row select{padding:7px;font-size:13px}
+.leg-row .leg-tag{font-size:11px;color:var(--muted);font-weight:700}
+@media(max-width:900px){.leg-row{grid-template-columns:1fr 1fr}}
+.thumbs{display:flex;gap:7px}.thumbs img{width:64px;height:48px;object-fit:cover;border-radius:7px;border:1px solid var(--line)}
+.comment{color:var(--text2);font-size:14px;line-height:1.45}
+.actions{display:flex;gap:7px}.icon{padding:8px 10px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px}
+.calendar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.dow{text-align:center;color:var(--muted);font-size:12px;padding:6px}
+.day{min-height:105px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px;position:relative}
+.day.empty{opacity:.25}.day .num{font-weight:800}.day .pnl{font-size:12px;margin-top:7px}.day .count{font-size:11px;color:var(--muted);margin-top:4px}
+.day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
+.day-flag{position:absolute;top:6px;right:8px;font-size:14px}
+.limitbox{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px}
+textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.full{grid-column:1/-1}
+.modal{position:fixed;inset:0;background:rgba(var(--shadow-rgb),.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;pointer-events:none}
+.modal.open{pointer-events:auto}
+.modal.open{display:flex}.modalbox{width:min(900px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
+.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.image-preview{display:flex;gap:10px;flex-wrap:wrap}.image-preview img{width:120px;height:90px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+.alert{padding:11px 13px;border-radius:10px;margin-bottom:14px;display:none}.alert.show{display:block}.alert.red{background:rgba(var(--red-rgb),.15);color:var(--red)}.alert.green{background:rgba(var(--green-rgb),.15);color:var(--green)}
+.table-scroll{overflow:auto}table{width:100%;border-collapse:collapse;min-width:900px}th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+.portfolio-panel{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.portfolio-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:transparent;color:var(--text);font-weight:800;padding:8px 4px}
+.portfolio-body{display:grid;gap:8px;padding:8px 4px 0}.portfolio-body.collapsed{display:none}
+.portfolio-row{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:12px}.portfolio-row strong{color:var(--text)}
+.status-toast{position:fixed;right:22px;bottom:22px;z-index:50;padding:12px 16px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);box-shadow:0 10px 30px rgba(var(--shadow-rgb),.35);display:none;max-width:420px;white-space:pre-line;line-height:1.4;cursor:pointer}.status-toast.show{display:block}
+@media(max-width:1000px){#integrations>.grid{grid-template-columns:1fr!important}.journal-switcher{min-width:220px;margin:0 12px}.stats{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}.trade{grid-template-columns:1fr}.app{grid-template-columns:1fr}.sidebar{height:auto;position:static;display:flex;align-items:center;justify-content:space-between;padding:14px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.brand{margin:0}.main{padding:16px}}
+@media(max-width:600px){.formgrid,.settings-grid,.limitbox{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.calendar{gap:4px}.day{min-height:78px;padding:6px}.day .pnl{font-size:10px}}
+@media print{.sidebar,.topbar .btn,.toolbar,.actions{display:none!important}.app{display:block}.main{padding:0}.section{display:block!important;page-break-after:always}.modal{display:none!important}}
+
+.hero-banner{height:240px;border-radius:18px;overflow:hidden;position:relative;margin-bottom:16px;border:1px solid var(--line);box-shadow:0 16px 40px rgba(var(--shadow-rgb),.35)}
+.hero-banner img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(var(--overlay-rgb),.82),rgba(var(--overlay-rgb),.18),rgba(var(--overlay-rgb),.72));display:flex;flex-direction:column;justify-content:center;align-items:center;text-shadow:0 3px 14px rgba(var(--shadow-rgb),.6)}
+.hero-title{font-size:42px;font-weight:900;letter-spacing:2px}.hero-title span{color:var(--orange)}.hero-sub{margin-top:8px;color:var(--text2);font-size:16px;letter-spacing:1px}
+.login-overlay{position:fixed;inset:0;z-index:2147483647;background:radial-gradient(circle at 50% 10%,var(--login-bg-start),var(--login-bg-end) 60%);display:flex;align-items:center;justify-content:center;padding:20px}
+.login-overlay.hidden{display:none}
+.login-card{width:min(430px,100%);position:relative;z-index:2;pointer-events:auto;background:rgba(var(--login-card-bg-rgb),.97);border:1px solid var(--line);border-radius:22px;padding:28px;box-shadow:0 30px 80px rgba(var(--shadow-rgb),.55);text-align:center}
+.login-card img{width:120px;height:120px;border-radius:24px;object-fit:cover;border:2px solid var(--orange);margin-bottom:14px}
+.login-card h1{font-size:26px}.login-card input{width:100%;margin-top:12px;position:relative;z-index:3;pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:12px}
+.login-error{color:var(--red);min-height:22px;margin-top:8px;font-size:13px}
+@media(max-width:700px){.hero-banner{height:180px}.hero-title{font-size:28px}}
+
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+body{font-family:Inter,Segoe UI,Arial,sans-serif}
+.card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover{transform:translateY(-1px);border-color:var(--hover-border);box-shadow:0 16px 38px rgba(var(--shadow-rgb),.24)}
+.hero-banner:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,rgba(var(--blue-rgb),.12),transparent 42%),linear-gradient(90deg,rgba(var(--blue-rgb),.15),transparent 48%,rgba(var(--orange-rgb),.12));pointer-events:none}
+.hero-title{filter:drop-shadow(0 0 16px rgba(var(--blue-rgb),.18))}
+.hero-title span{filter:drop-shadow(0 0 14px rgba(var(--orange-rgb),.32))}
+
+
+/* Kompaktní širokoúhlý banner – dashboard je vidět bez rolování */
+.dashboard-banner{width:100%;height:150px;position:relative;overflow:hidden;border:1px solid var(--line);border-radius:14px;margin-bottom:14px;background:var(--sidebar-bg);box-shadow:0 10px 26px rgba(var(--shadow-rgb),.22)}
+.dashboard-banner img{width:100%;height:100%;display:block;object-fit:cover;object-position:center 48%}
+.dashboard-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(var(--overlay-rgb),.18),rgba(var(--overlay-rgb),.02),rgba(var(--overlay-rgb),.18));pointer-events:none}
+@media(max-width:1000px){#integrations>.grid{grid-template-columns:1fr!important}.dashboard-banner{height:110px}}
+@media(max-width:600px){.dashboard-banner{height:78px;border-radius:10px}}
+
+
+/* Dashboard 3.0.4: jedna obrazovka bez spodní řady metrik */
+#dashboard .charts{margin-top:14px}
+#dashboard .chart-wrap{height:300px}
+#dashboard .card{padding:16px}
+.main{padding-top:18px;padding-bottom:18px}
+.topbar{margin-bottom:16px}
+@media(max-height:900px) and (min-width:1001px){
+  .dashboard-banner{height:128px}
+  #dashboard .chart-wrap{height:270px}
+  .main{padding-top:14px;padding-bottom:14px}
+  .topbar{margin-bottom:12px}
+}
+
+
+.account-filter-card{margin-bottom:16px}.account-filter-title{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.account-filter-grid{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));gap:10px;margin-top:14px;align-items:end}
+.optional-badge{font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 7px;vertical-align:middle}
+.money-dual{display:inline-flex;flex-direction:column;line-height:1.15}.money-dual .main-money{font-weight:inherit}.money-dual .secondary-money{font-size:10px;color:var(--muted);font-weight:600;margin-top:3px}.move-trade-info{margin-bottom:12px;color:var(--muted);font-size:13px}
+.trade-plan-editor{margin-top:10px}.trade-plan-details{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.trade-plan-details summary{cursor:pointer;color:var(--blue);font-weight:700}.trade-plan-content{margin-top:8px;color:#cfd8ee;font-size:13px;line-height:1.55}
+@media(max-width:1150px){.account-filter-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.home-cards,.account-filter-grid{grid-template-columns:1fr}}
+
+
+.home-image-only{
+  position:relative;
+  width:100%;
+  height:calc(100vh - 52px);
+  min-height:640px;
+  overflow:hidden;
+  background:#050914;
+}
+.home-image-only img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  object-position:center center;
+  image-rendering:auto;
+  filter:contrast(1.06) saturate(1.1) brightness(.98);
+}
+@media(max-width:900px){
+  .home-image-only{height:calc(100vh - 44px);min-height:520px}
+}
+
+
+.integration-top{grid-template-columns:1.2fr .8fr}
+.integration-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.mapping-row{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;align-items:center;margin-top:8px}
+.open-position{padding:9px 0;border-bottom:1px solid var(--line)}
+.open-position:last-child{border-bottom:0}
+@media(max-width:1000px){.integration-top{grid-template-columns:1fr}.mapping-row{grid-template-columns:1fr}}
+
+@media(max-width:850px){}
+
+
+.portfolio-detail-toolbar{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:12px;align-items:end;margin:14px 0 18px}
+.instrument-portfolio-detail{display:grid;grid-template-columns:minmax(320px,.9fr) minmax(380px,1.1fr);gap:18px;align-items:stretch;margin-top:16px}
+.instrument-portfolio-chart{height:520px;background:rgba(11,18,34,.55);border:1px solid var(--line);border-radius:14px;padding:16px}
+#instrumentPortfolioPie{width:100%;height:100%}
+.instrument-portfolio-list{display:flex;flex-direction:column;gap:9px;max-height:520px;overflow:auto;padding-right:8px}
+.instrument-portfolio-row{display:grid;grid-template-columns:14px 1fr auto auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:rgba(11,18,34,.55)}
+.instrument-portfolio-row strong{font-size:14px}
+.instrument-portfolio-row .share{color:var(--muted);min-width:60px;text-align:right}
+.instrument-portfolio-row .pnl{min-width:110px;text-align:right;font-weight:800}
+.instrument-dot{width:12px;height:12px;border-radius:50%}
+@media(max-width:850px){.portfolio-detail-toolbar{grid-template-columns:1fr}.instrument-portfolio-detail{grid-template-columns:1fr}.instrument-portfolio-chart{height:300px}.instrument-portfolio-list{max-height:none}}
+
+
+.instrument-section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.fixed-section-card{min-height:540px}
+
+</style>
+<script>
+// Aplikuje uložený vzhled (téma) ještě před vykreslením stránky, aby nebylo
+// vidět bliknutí špatného tématu. Stejná logika je znovu k dispozici i v hlavním
+// skriptu níže (pro přepínání za běhu), tady jde jen o co nejrychlejší start.
+(function(){
+  try{
+    const raw = localStorage.getItem('FJ_theme');
+    const theme = raw ? JSON.parse(raw) : { mode: 'dark' };
+    document.documentElement.setAttribute('data-theme', theme.mode === 'light' ? 'light' : 'dark');
+    if (theme.mode === 'custom' && theme.custom) {
+      Object.entries(theme.custom).forEach(([k, v]) => {
+        if (v) document.documentElement.style.setProperty(k, v);
+      });
+    }
+  }catch(e){ /* při chybě zůstane výchozí tmavé téma */ }
+})();
+</script>
+</head>
+<body>
+</div>
+
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <img src="assets/bull_bear_icon.png" alt="Futures Journal PRO">
+    <h1>Futures Journal PRO</h1>
+    <div class="sub" id="loginHint">Přihlášení do obchodního deníku</div>
+    <input type="password" id="loginPassword" placeholder="Zadej heslo" autocomplete="current-password" autofocus tabindex="1">
+    <input type="password" id="loginPassword2" placeholder="Zopakuj heslo" autocomplete="new-password" style="display:none" tabindex="2">
+    <div class="login-error" id="loginError"></div>
+    <button class="btn primary" id="loginButton" type="button" tabindex="3" style="width:100%;position:relative;z-index:3;pointer-events:auto">Přihlásit se</button>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">Futures <span>Journal</span></div>
+    <div class="journal-switcher">
+      <label>Aktivní deník</label>
+      <select id="journalSelect"></select>
+      <div class="journal-actions">
+        <button class="btn" id="newJournalBtn">＋ Nový</button>
+        <button class="btn" id="renameJournalBtn">✏️ Přejmenovat</button>
+        <button class="btn danger" id="deleteJournalBtn">🗑️</button>
+      </div>
+    </div>
+    <div class="nav">
+      <button class="active" data-section="home">🏠 Úvod</button>
+      <button data-section="openPositions">📈 Otevřené pozice</button>
+      <button data-section="accountOverview">📊 Přehled účtu</button>
+      <button data-section="instrumentPortfolio">🥧 Podíl instrumentů</button>
+      <button data-section="journal">📒 Deník</button>
+      <button data-section="calendar">📅 Kalendář</button>
+      <button data-section="reports">📑 Reporty</button>
+      <button data-section="integrations">🔌 Integrace</button>
+      <button data-section="settings">⚙️ Nastavení</button>
+    </div>
+  </aside>
+
+  <main class="main">
+<div class="topbar">
+      <div><h1 id="pageTitle">Dashboard</h1><div class="sub">Obchodní deník pro futures</div></div>
+      <button class="btn primary" id="addTradeBtn">＋ Přidat obchod</button>
+    </div>
+
+    
+    
+    <section id="home" class="section active">
+      <div class="home-image-only">
+        <img src="assets/bull_bear_home_4k.jpg" alt="Býk a medvěd – Futures Journal PRO">
+      </div>
+    </section>
+
+
+    <section id="openPositions" class="section">
+      <div class="card">
+        <div class="instrument-section-head">
+          <div>
+            <h2>Otevřené pozice</h2>
+            <p class="sub">Aktuálně otevřené pozice zachycené z NinjaTraderu.</p>
+          </div>
+          <button class="btn danger" id="clearInvalidPositions">Vymazat neplatné pozice</button>
+        </div>
+        <div class="table-scroll" style="margin-top:16px">
+          <table>
+            <thead><tr><th>Instrument</th><th>Pozice</th><th>Čas vstupu</th><th>Cena vstupu</th><th>Aktuální cena</th><th>Zisk / ztráta</th></tr></thead>
+            <tbody id="captureOpenPositions"><tr><td colspan="6" class="sub">Žádné otevřené pozice.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="accountOverview" class="section">
+
+      <div class="card account-filter-card">
+        <div class="account-filter-title">
+          <div><h2>Přehled účtu</h2><p class="sub">Vyber přesně, která data chceš zobrazit.</p></div>
+          <button class="btn" id="clearAccountFilters">Vymazat filtry</button>
+        </div>
+        <div class="account-filter-grid">
+          <div class="field"><label>Rozsah</label><select id="accountRangeMode">
+            <option value="all">Kompletní portfolio</option>
+            <option value="day">Jeden den</option>
+            <option value="interval">Interval datumů</option>
+          </select></div>
+          <div class="field account-day-field"><label>Datum</label><input type="date" id="accountDay"></div>
+          <div class="field account-interval-field"><label>Od</label><input type="date" id="accountFrom"></div>
+          <div class="field account-interval-field"><label>Do</label><input type="date" id="accountTo"></div>
+          <div class="field"><label>Deník / karta</label><select id="accountJournal"><option value="">Všechny deníky</option></select></div>
+          <div class="field"><label>Instrument</label><select id="accountInstrument"><option value="">Všechny instrumenty</option></select></div>
+          <div class="field"><label>&nbsp;</label><button class="btn primary" id="applyAccountFilters">Zobrazit</button></div>
+        </div>
+      </div>
+
+      <div id="limitAlert" class="alert red"></div>
+      <div class="grid stats">
+        <div class="card metric"><div class="label">Stav účtu</div><div class="value" id="accountValue">0 Kč</div></div>
+        <div class="card metric"><div class="label">Celkové P/L</div><div class="value" id="totalPnl">0</div></div>
+        <div class="card metric"><div class="label">Úspěšné obchody</div><div class="value pos" id="wins">0</div></div>
+        <div class="card metric"><div class="label">Ztrátové obchody</div><div class="value neg" id="losses">0</div></div>
+        <div class="card metric"><div class="label">Break Even obchody</div><div class="value neutral" id="breakevens">0</div></div>
+        <div class="card metric"><div class="label">Win rate</div><div class="value" id="winrate">0 %</div></div>
+</div>
+      <div class="grid charts">
+        <div class="card"><h3>Poměr Target / Stop Loss</h3><div class="chart-wrap"><canvas id="pieChart"></canvas></div></div>
+        <div class="card"><h3>Equity křivka</h3><div class="chart-wrap"><canvas id="equityChart"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Vybrané obchody</h3>
+        <div id="accountOverviewTrades" class="trade-list"></div>
+      </div>
+
+    </section>
+
+    
+    <section id="instrumentPortfolio" class="section">
+      <div class="card">
+        <div class="instrument-section-head">
+          <div>
+            <h2>Podíl instrumentů v portfoliu</h2>
+            <p class="sub">Procentní rozdělení, počet obchodů a zisk nebo ztráta podle instrumentů.</p>
+          </div>
+        </div>
+
+        <div class="portfolio-detail-toolbar">
+          <div class="field">
+            <label>Deník / karta</label>
+            <select id="instrumentPortfolioJournal">
+              <option value="">Všechny deníky</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Datum od</label>
+            <input type="date" id="instrumentPortfolioFrom">
+          </div>
+          <div class="field">
+            <label>Datum do</label>
+            <input type="date" id="instrumentPortfolioTo">
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button class="btn primary" id="refreshInstrumentPortfolio" type="button">Aktualizovat</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="instrument-portfolio-detail fixed-section-card">
+        <div class="card instrument-portfolio-chart">
+          <canvas id="instrumentPortfolioPie"></canvas>
+        </div>
+        <div class="card instrument-portfolio-list" id="instrumentPortfolioList"></div>
+      </div>
+    </section>
+
+    <section id="journal" class="section">
+      <div class="toolbar">
+        <input id="search" placeholder="Hledat instrument nebo komentář">
+        <select id="filterResult"><option value="">Všechny výsledky</option><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
+        <input type="date" id="filterDate">
+        <button class="btn" id="exportCsv">Export CSV</button>
+        <button class="btn" id="printPdf">Tisk / PDF</button>
+        <button class="btn" id="mergeSelected" title="Sloučí vybrané obchody (např. TP1/TP2/BE ze stejné pozice) do jednoho">🔗 Sloučit vybrané</button>
+      </div>
+      <div class="sub" style="margin:-6px 0 10px">Zaškrtni obchody, které NinjaTrader rozdělil na více cílů (TP1/TP2/BE), a slouč je tlačítkem výše do jednoho obchodu.</div>
+      <div id="tradeList" class="trade-list"></div>
+    </section>
+
+    <section id="calendar" class="section">
+      <div class="card">
+        <div class="calendar-head">
+          <button class="btn" id="prevMonth">◀</button>
+          <h2 id="monthLabel"></h2>
+          <button class="btn" id="nextMonth">▶</button>
+        </div>
+        <div class="toolbar" style="margin-top:4px">
+          <div class="field" style="min-width:220px">
+            <label>Deník / karta</label>
+            <select id="calendarJournal"><option value="">Aktivní deník</option><option value="all">Všechny deníky</option></select>
+          </div>
+        </div>
+        <div class="sub" id="calendarRiskNote" style="margin:-4px 0 10px"></div>
+        <div class="calendar" id="calendarGrid"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Obchody vybraného dne</h3>
+        <div id="dayRiskNote" class="alert"></div>
+        <div id="dayTrades" class="trade-list"><div class="sub">Klikni v kalendáři na den s obchody.</div></div>
+      </div>
+    </section>
+
+    
+    <section id="reports" class="section">
+      <div class="card">
+        <h2>Reporty obchodování</h2>
+        <div class="toolbar">
+          <div class="field"><label>Od</label><input type="date" id="reportFrom"></div>
+          <div class="field"><label>Do</label><input type="date" id="reportTo"></div>
+          <div class="field"><label>Deník / karta</label><select id="reportJournal"><option value="">Všechny deníky</option></select></div>
+          <div class="field"><label>Instrument</label><select id="reportInstrument"><option value="">Všechny instrumenty</option></select></div>
+          <button class="btn primary" id="generateReport">Vytvořit report</button>
+          <button class="btn" id="reportCsv">Export CSV</button>
+          <button class="btn" id="reportPrint">Tisk / PDF</button>
+        </div>
+      </div>
+      <div class="grid stats" style="margin-top:16px">
+        <div class="card metric"><div class="label">Počet obchodů</div><div class="value" id="reportCount">0</div></div>
+        <div class="card metric"><div class="label">Celkové P/L</div><div class="value" id="reportPnl">0</div></div>
+        <div class="card metric"><div class="label">Win rate</div><div class="value" id="reportWinrate">0 %</div></div>
+        <div class="card metric"><div class="label">Profit Factor</div><div class="value" id="reportPf">0</div></div>
+        <div class="card metric"><div class="label">Průměr / obchod</div><div class="value" id="reportAvg">0</div></div>
+      </div>
+      <div class="grid charts" style="margin-top:16px">
+        <div class="card"><h3>Vývoj P/L v čase</h3><div class="chart-wrap"><canvas id="reportChart"></canvas></div></div>
+        <div class="card"><h3>Souhrn podle instrumentů</h3><div class="table-scroll"><table><thead><tr><th>Instrument</th><th>Obchody</th><th>Výhry</th><th>Prohry</th><th>Win rate</th><th>P/L</th></tr></thead><tbody id="reportInstrumentRows"></tbody></table></div></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Souhrn podle deníků / karet</h3>
+        <div class="table-scroll"><table><thead><tr><th>Deník</th><th>Obchody</th><th>Výhry</th><th>Prohry</th><th>Win rate</th><th>P/L</th></tr></thead><tbody id="reportJournalRows"></tbody></table></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Jednotlivé obchody ve výběru</h3>
+        <div id="reportTradeList" class="trade-list"></div>
+      </div>
+    </section>
+
+    
+    
+    <section id="integrations" class="section">
+      <div class="grid integration-top">
+        <div class="card">
+          <h2>NinjaTrader, cTrader a TradingView – automatické obchody</h2>
+          <p class="sub">Exekuce se automaticky párují do otevřených a uzavřených obchodů, včetně částečných fillů a otočení pozice. Stejný lokální endpoint a API klíč používá NinjaTrader konektor, cTrader cBot i TradingView relay.</p>
+          <div class="settings-grid" style="margin-top:16px">
+            <div class="field"><label>Stav služby</label><input id="captureStatusText" readonly></div>
+            <div class="field"><label>Uzavřené obchody čekající na import</label><input id="capturePendingCount" readonly></div>
+            <div class="field full"><label>Lokální endpoint</label><input id="captureEndpoint" readonly></div>
+            <div class="field full"><label>API klíč pro NinjaTrader</label><input id="captureApiKey" readonly></div>
+            <div class="field"><label>Automatické screenshoty</label>
+              <select id="captureScreenshotMode">
+                <option value="none">Vypnuto</option>
+                <option value="primary">Hlavní monitor</option>
+                <option value="all">Všechny monitory</option>
+              </select>
+            </div>
+            <div class="field"><label>Automatický import</label>
+              <select id="captureAutoImportSelect"><option value="ano">Zapnuto</option><option value="ne">Vypnuto</option></select>
+            </div>
+          </div>
+          <div class="integration-actions">
+            <button class="btn primary" id="captureRefresh">Obnovit stav</button>
+            <button class="btn" id="captureTestSequence">Otestovat vstup a výstup</button>
+            <button class="btn" id="captureTestMultiTarget" title="Nasimuluje pozici uzavřenou přes TP1, Break Even a TP2 (pro test slučování)">Otestovat TP1/BE/TP2</button>
+            <button class="btn" id="captureImport">Importovat nyní</button>
+            <button class="btn primary" id="captureInstallNinja">Nainstalovat NinjaTrader konektor automaticky</button>
+            <button class="btn" id="captureExportConnector">Pouze stáhnout NinjaTrader konektor</button>
+            <button class="btn" id="captureTestCTrader" title="Nasimuluje cTrader pozici uzavřenou přes dva cíle (TP1/TP2) se stejným Position.Id">Otestovat cTrader (TP1/TP2)</button>
+            <button class="btn primary" id="captureExportCTrader">Pouze stáhnout cTrader cBot (.cs)</button>
+            <button class="btn" id="captureInstallCTrader" title="Funguje až po prvním ručním vytvoření cBota v cTraderu (viz návod výše) – pak tímto tlačítkem aktualizuješ kód na novou verzi bez kopírování">Aktualizovat cBot (po prvním vytvoření)</button>
+            <button class="btn primary" id="capturePrepareTradingView">Připravit Pine Script a otevřít TradingView</button>
+            <button class="btn primary" id="capturePrepareWorker">Připravit webhook a otevřít Cloudflare</button>
+            <button class="btn" id="captureExportTradingView">Pouze stáhnout TradingView Pine Script</button>
+            <button class="btn" id="captureExportTradingViewWorker">Pouze stáhnout TradingView webhook relay</button>
+            <button class="btn" id="captureOpenConnectors">Otevřít složku konektorů</button>
+            <button class="btn" id="captureNewKey">Nový API klíč</button>
+            <button class="btn danger" id="captureClear">Vymazat frontu</button>
+          </div>
+          <div class="sub" style="margin-top:12px">
+            <b>cTrader – jak zapojit (ověřeno podle aktuální dokumentace cTrader):</b> v cTrader Desktopu vlevo dole klikni na <b>Algo</b>, v kartě <b>cBots</b> klikni <b>New</b>, zvol jazyk C# a „From scratch" / Blank, pojmenuj přesně <b>„FuturesJournalCTraderConnector"</b> a potvrď Create. Otevře se editor s ukázkovým kódem – ten celý smaž (Ctrl+A, Delete) a vlož místo něj obsah staženého souboru (tlačítko „Pouze stáhnout cTrader cBot (.cs)" níže, pak ho otevři v Poznámkovém bloku a zkopíruj). Klikni <b>Build</b> (Ctrl+B) – dole by se měla objevit zelená hláška o úspěchu. Pak se vrať do grafu účtu, který chceš sledovat, klikni na ikonu cBotů, najdi FuturesJournalCTraderConnector a přidej instanci – klikni <b>Start</b>. Konektor používá vestavěné síťové rozhraní cAlgo, takže nepotřebuje neomezený přístup (Full Access) – cTrader se na nic ptát nebude. API klíč je v souboru už doplněný automaticky, stejný jako u NinjaTraderu.
+            <br><br>Tlačítko „Aktualizovat cBot" níže funguje až <b>po tomto prvním ručním vytvoření</b> – najde už existující projekt v Dokumenty\cAlgo\Sources\Robots a přepíše jen jeho kód, takže při příští aktualizaci Futures Journal PRO už nebudeš muset nic ručně kopírovat. Samotný projekt (soubory .csproj/.sln) si spravuje cTrader sám, ty se automaticky nevytváří.
+          </div>
+        </div>
+        <div class="card">
+          <h3>Přiřazení účtů ke kartám</h3>
+          <p class="sub">Například SIM101 → Simulace, APEX-123 → Apex účet.</p>
+          <div id="captureMappingRows"></div>
+          <button class="btn" id="captureSaveMappings" style="margin-top:12px">Uložit přiřazení</button>
+          <div id="captureHiddenAccountsBox" style="margin-top:16px"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>TradingView – webhook relay</h2>
+        <p class="sub">TradingView nemůže posílat na localhost. Připravený Cloudflare Worker přijme veřejný webhook a aplikace si alerty bezpečně stáhne.</p>
+        <div class="settings-grid" style="margin-top:14px">
+          <div class="field full"><label>Veřejná adresa Workeru</label><input id="relayUrl" placeholder="https://futures-journal-relay...workers.dev"></div>
+          <div class="field"><label>Relay token</label><input id="relayToken" placeholder="tajný token"></div>
+          <div class="field"><label>Stav</label><select id="relayEnabled"><option value="ne">Vypnuto</option><option value="ano">Zapnuto</option></select></div>
+        </div>
+        <div class="integration-actions">
+          <button class="btn primary" id="saveRelay">Uložit relay</button>
+          <button class="btn" id="pollRelay">Stáhnout alerty nyní</button>
+        </div>
+        <p class="sub" style="margin-top:10px">Zdroj Workeru a Pine Script jsou ve složce <b>CONNECTORS</b>.</p>
+      </div>
+
+    </section>
+
+    <section id="settings" class="section">
+      <div class="settings-grid">
+        <div class="card">
+          <h3>Vzhled (téma)</h3>
+          <p class="sub">Platí pro celou aplikaci na tomto počítači, nezávisle na deníku. Uloží se jen v tomto zařízení.</p>
+          <div class="field" style="margin-top:10px">
+            <label>Motiv</label>
+            <select id="themeMode">
+              <option value="dark">Tmavý (výchozí)</option>
+              <option value="light">Světlý</option>
+              <option value="custom">Vlastní</option>
+            </select>
+          </div>
+          <div id="customThemeFields" style="display:none;margin-top:14px">
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px">
+              <div>Pozadí – nahoře</div><div>Pozadí – dole</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_bgStart"><input type="color" id="tp_bgEnd">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Postranní panel</div><div>Karty / panely</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_sidebarBg"><input type="color" id="tp_panel">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Text</div><div>Ohraničení</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_text"><input type="color" id="tp_line">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Zvýraznění (accent)</div><div>Zisk (Target)</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_blue"><input type="color" id="tp_green">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Ztráta (Stop Loss)</div><div>Break Even / upozornění</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_red"><input type="color" id="tp_yellow">
+            </div>
+            <button class="btn" id="resetThemeDefaults" style="margin-top:14px">Obnovit výchozí tmavé barvy</button>
+          </div>
+          <button class="btn primary" id="saveTheme" style="margin-top:14px">Uložit vzhled</button>
+        </div>
+        <div class="card">
+          <h3>Zabezpečení aplikace</h3>
+          <p class="sub">Při prvním spuštění si nastavíš vlastní heslo.</p>
+          <button class="btn" id="changePassword">Změnit heslo</button>
+          <button class="btn" id="lockApp" style="margin-left:8px">🔒 Zamknout aplikaci</button>
+        </div>
+        <div class="card">
+          <h3>Účet</h3>
+          <div class="field"><label>Počáteční stav účtu</label><input type="number" id="startingBalance" step="0.01"></div>
+          <div class="field" style="margin-top:12px"><label>Hlavní měna</label><input id="currency" value="USD" disabled></div>
+          <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
+          <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
+        </div>
+        <div class="card">
+          <h3>Řízení rizika (per deník)</h3>
+          <p class="sub">Volitelné denní/celkové limity pro tento konkrétní deník. Prázdné pole = pravidlo je vypnuté. Porušení nebo splnění cíle se poznačí u příslušného dne v Kalendáři.</p>
+          <div class="field" style="margin-top:10px"><label>Max. denní drawdown (v měně účtu)</label><input type="number" id="riskMaxDailyDrawdown" min="0" step="0.01" placeholder="např. 1000"></div>
+          <div class="field" style="margin-top:12px"><label>Max. celkový drawdown účtu (v měně účtu)</label><input type="number" id="riskMaxTotalDrawdown" min="0" step="0.01" placeholder="např. 5000"><div class="sub">Propad od nejvyššího dosaženého stavu účtu (peak) k aktuálnímu stavu.</div></div>
+          <div class="field" style="margin-top:12px"><label>Limit S/L za den (počet obchodů)</label><input type="number" id="riskMaxSlPerDay" min="0" step="1" placeholder="např. 3"></div>
+          <div class="field" style="margin-top:12px"><label>Celk. limit obchodů za den</label><input type="number" id="riskMaxTradesPerDay" min="0" step="1" placeholder="např. 6"></div>
+          <div class="field" style="margin-top:12px"><label>Limit profit obchodů / den</label><input type="number" id="riskMaxProfitTradesPerDay" min="0" step="1" placeholder="např. 4"></div>
+          <div class="field" style="margin-top:12px"><label>Profit target / den (v měně účtu)</label><input type="number" id="riskProfitTargetPerDay" min="0" step="0.01" placeholder="např. 800"><div class="sub">Nejde o porušení pravidla – den se v kalendáři zvýrazní zeleně jako splněný cíl.</div></div>
+          <button class="btn primary" id="saveRiskSettings" style="margin-top:14px">Uložit řízení rizika</button>
+        </div>
+        <div class="card">
+          <h3>Break Even a slučování obchodů</h3>
+          <p class="sub">Obchod s výsledkem blízko nuly se označí jako Break Even místo ztráty. Obchody stejné pozice (např. TP1/TP2/BE z NinjaTraderu) lze slučovat automaticky.</p>
+          <div class="field" style="margin-top:10px"><label>Rozpoznávat Break Even</label><select id="breakEvenEnabled"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+          <div class="field" style="margin-top:12px"><label>Práh Break Even (v měně účtu, ±)</label><input type="number" id="breakEvenThreshold" min="0" step="0.01" value="0"><div class="sub">Obchod s čistým ziskem/ztrátou v tomto rozmezí kolem nuly se zobrazí jako Break Even.</div></div>
+          <div class="field" style="margin-top:12px"><label>Automaticky slučovat cíle stejné pozice (TP1/TP2/BE) při importu</label><select id="autoMergeLegs"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+          <button class="btn primary" id="saveBreakEvenSettings" style="margin-top:14px">Uložit nastavení</button>
+        </div>
+        <div class="card">
+          <h3>Šablony podle instrumentu</h3>
+          <p class="sub">Pro daný instrument lze předvyplnit strategii, dodržení plánu, komentář, hodnotu bodu a výchozí komisi — při ručním přidání i při automatickém importu.</p>
+          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 1.1fr auto;margin-top:12px;font-weight:700;color:var(--muted);font-size:12px">
+            <div>Instrument</div><div>Strategie</div><div>Plán</div><div>Bod ($)</div><div>Komise ($/ks)</div><div>Komentář</div><div></div>
+          </div>
+          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 1.1fr auto">
+            <input id="tplNewInstrument" placeholder="např. MES">
+            <input id="tplNewStrategy" placeholder="Strategie">
+            <select id="tplNewPlan"><option value="">—</option><option value="ano">Ano</option><option value="ne">Ne</option></select>
+            <input id="tplNewPointValue" type="number" step="any" min="0" placeholder="5,00">
+            <input id="tplNewCommission" type="number" step="any" min="0" placeholder="1,90">
+            <input id="tplNewComment" placeholder="Komentář">
+            <button class="btn primary" id="addTemplate" style="padding:8px 10px">＋</button>
+          </div>
+          <div class="sub" style="margin-top:8px">Pár běžných kontraktů má hodnotu bodu předvyplněnou automaticky, i bez šablony: ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5. Přidáním šablony pro daný instrument (i jen s vyplněným polem "Bod") si můžeš tuhle vestavěnou hodnotu přepsat vlastní. Komise ve výchozím stavu vestavěnou hodnotu nemá – dokud ji nevyplníš, nic se nemění.</div>
+          <div id="templateList" style="margin-top:12px"></div>
+          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+            <label>Komise u nových importovaných obchodů (NinjaTrader / cTrader)</label>
+            <select id="useConnectorCommission">
+              <option value="ano">Použít komisi nahlášenou konektorem (výchozí)</option>
+              <option value="ne">Ignorovat konektor – vždy použít komisi ze šablony instrumentu</option>
+            </select>
+            <div class="sub" style="margin-top:6px">NinjaTrader posílá jen "Commission" a nezahrnuje další poplatky (Clearing, Exchange, IP, NFA fee), takže reálná komise může být vyšší, než co pošle konektor. Když přepneš na "Ignorovat konektor", nově importované obchody použijí komisi ze šablony instrumentu (za kontrakt) místo toho.</div>
+            <button class="btn" id="saveConnectorCommissionSetting" style="margin-top:10px">Uložit</button>
+          </div>
+          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+            <label>Přepočítat komisi u už uložených obchodů</label>
+            <div class="sub" style="margin-top:2px">Projde všechny obchody v aktivním deníku a u instrumentů, které mají v šabloně vyplněnou komisi, přepočítá komisi (podle počtu kontraktů) i výsledný zisk/ztrátu. Obchody u instrumentů bez vyplněné komise v šabloně zůstanou beze změny. Nejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova).</div>
+            <button class="btn danger" id="recalcCommissionBtn" style="margin-top:10px">Přepočítat komisi v aktivním deníku</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Záloha a obnova</h3>
+          <p class="sub">Data se ukládají lokálně v tomto prohlížeči.</p>
+          <button class="btn primary" id="updateBackup">💾 Aktualizovat zálohu na SSD</button>
+          <button class="btn" id="restoreBackup" style="display:block;margin-top:10px">♻️ Obnovit ze zálohy</button>
+          <div id="backupPathInfo" class="sub" style="margin-top:10px">Umístění zálohy zatím není zvoleno.</div>
+          <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+          <button class="btn" id="exportJson">Stáhnout zálohu JSON</button>
+          <label class="btn" style="display:inline-block;margin-top:10px">Nahrát zálohu<input id="importJson" type="file" accept=".json" hidden></label>
+          <button class="btn danger" id="clearAll" style="display:block;margin-top:18px">Smazat data aktuálního deníku</button>
+          <button class="btn danger" id="factoryReset" style="display:block;margin-top:10px">⚠️ Kompletní reset aplikace</button>
+          <div class="sub" style="margin-top:8px">Smaže všechny deníky, obchody, nastavení i uloženou cestu k záloze.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="status-toast" id="statusToast"></div>
+
+<div class="modal" id="journalNameModal">
+  <div class="modalbox" style="max-width:520px">
+    <div class="modalhead"><h2 id="journalNameModalTitle">Nový deník</h2><button class="icon" id="closeJournalNameModal">✕</button></div>
+    <div class="field"><label id="journalNameLabel">Název deníku</label><input id="journalNameInput" maxlength="60" placeholder="Např. NQ, ES nebo GC"></div>
+    <div id="journalNameError" class="alert red"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button class="btn" id="cancelJournalName">Zrušit</button>
+      <button class="btn primary" id="saveJournalName">Uložit</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="moveTradeModal">
+  <div class="modalbox" style="max-width:520px">
+    <div class="modalhead"><h2>Přesunout obchod</h2><button class="icon" id="closeMoveTradeModal">✕</button></div>
+    <div id="moveTradeInfo" class="move-trade-info"></div>
+    <div class="field"><label>Cílový deník</label><select id="moveTradeTargetJournal"></select></div>
+    <div id="moveTradeError" class="alert red"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button class="btn" id="cancelMoveTrade">Zrušit</button><button class="btn primary" id="confirmMoveTrade">Přesunout obchod</button></div>
+  </div>
+</div>
+
+<div class="modal" id="mergeTradeModal">
+  <div class="modalbox" style="max-width:640px">
+    <div class="modalhead"><h2>Sloučit obchody</h2><button class="icon" id="closeMergeModal">✕</button></div>
+    <p class="sub">Vybrané obchody budou nahrazeny jedním obchodem. Jednotlivé cíle (TP1, TP2, Break Even…) zůstanou zachyceny jako legy uvnitř sloučeného obchodu.</p>
+    <div id="mergePreviewList" class="trade-list" style="margin-top:12px"></div>
+    <div id="mergeSummary" class="card" style="margin-top:12px"></div>
+    <div id="mergeError" class="alert red"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn" id="cancelMergeTrade">Zrušit</button>
+      <button class="btn primary" id="confirmMergeTrade">Sloučit obchody</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal">
+  <div class="modalbox" style="max-width:440px">
+    <div class="modalhead"><h2>Potvrzení</h2></div>
+    <p id="confirmModalMessage" style="white-space:pre-line"></p>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn" id="confirmModalCancel">Zrušit</button>
+      <button class="btn primary" id="confirmModalOk">Pokračovat</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="promptModal">
+  <div class="modalbox" style="max-width:440px">
+    <div class="modalhead"><h2 id="promptModalTitle">Potvrzení</h2></div>
+    <p id="promptModalMessage"></p>
+    <input type="text" id="promptModalInput" style="width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn" id="promptModalCancel">Zrušit</button>
+      <button class="btn primary" id="promptModalOk">Potvrdit</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="changePasswordModal">
+  <div class="modalbox" style="max-width:440px">
+    <div class="modalhead"><h2>Změnit heslo</h2><button class="icon" id="closeChangePasswordModal">✕</button></div>
+    <div class="field"><label>Současné heslo</label><input type="password" id="cpCurrent" autocomplete="current-password"></div>
+    <div class="field" style="margin-top:12px"><label>Nové heslo (alespoň 4 znaky)</label><input type="password" id="cpNew" autocomplete="new-password"></div>
+    <div class="field" style="margin-top:12px"><label>Zopakuj nové heslo</label><input type="password" id="cpNew2" autocomplete="new-password"></div>
+    <div id="changePasswordError" class="alert red"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn" id="cancelChangePassword">Zrušit</button>
+      <button class="btn primary" id="confirmChangePassword">Uložit nové heslo</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="imageViewerModal">
+  <div class="modalbox" style="max-width:900px">
+    <div class="modalhead"><h2>Screenshot obchodu</h2><button class="icon" id="closeImageViewer">✕</button></div>
+    <img id="imageViewerImg" src="" style="max-width:100%;max-height:70vh;display:block;margin:0 auto;border-radius:10px;border:1px solid var(--line)">
+    <p class="sub" style="margin-top:10px">Tip: v nainstalované aplikaci můžeš na obrázek kliknout i pravým tlačítkem – nabídne se kopírovat / otevřít / uložit.</p>
+    <div id="imageViewerNote" class="sub" style="margin-top:4px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn" id="imgCopyBtn">📋 Kopírovat do schránky</button>
+      <button class="btn" id="imgOpenExternalBtn">🖼️ Otevřít ve výchozím prohlížeči</button>
+      <button class="btn" id="imgSaveAsBtn">💾 Uložit jako…</button>
+      <button class="btn primary" id="closeImageViewerBtn">Zavřít</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="tradeModal">
+  <div class="modalbox">
+    <div class="modalhead"><h2 id="modalTitle">Nový obchod</h2><button class="icon" id="closeModal">✕</button></div>
+    <form id="tradeForm" novalidate>
+      <div class="sub" style="margin-bottom:12px">Všechna pole jsou nepovinná. Obchod lze uložit i bez vyplnění údajů.</div>
+      <input type="hidden" id="tradeId">
+      <div class="formgrid">
+        <div class="field"><label>Instrument</label><input id="instrument" placeholder="např. NQ, ES, CL" list="templateInstrumentList"><datalist id="templateInstrumentList"></datalist><div class="sub" id="templateHint" style="margin-top:4px"></div></div>
+        <div class="field"><label>Datum</label><input id="date" type="date"></div>
+        <div class="field"><label>Čas vstupu</label><input id="entryTime" type="time"></div>
+        <div class="field"><label>Cena vstupu</label><input id="entryPrice" type="number" step="any"></div>
+        <div class="field"><label>Čas výstupu</label><input id="exitTime" type="time"></div>
+        <div class="field"><label>Cena výstupu</label><input id="exitPrice" type="number" step="any"></div>
+        <div class="field"><label>Výsledek</label><select id="result"><option value="target">Target (+)</option><option value="breakeven">Break Even (≈0)</option><option value="stoploss">Stop Loss (−)</option></select></div>
+        <div class="field"><label>Počet bodů</label><input id="points" type="number" step="any"></div>
+        <div class="field"><label>Zisk / ztráta v měně účtu (čistý, po komisi)</label><input id="pnl" type="number" step="any"></div>
+        <div class="field"><label>Komise (v měně účtu)</label><input id="commission" type="number" step="any" min="0" value="0"></div>
+        <div class="field"><label>Počet kontraktů</label><input id="contracts" type="number" step="1" value="1"></div>
+        <div class="field full" id="pnlCalcHint" style="margin-top:-6px"></div>
+        <div class="field" id="extraLegsField" style="grid-column:1/-1">
+          <label>Více cílů u téhož obchodu (TP2, Break Even…) <span class="sub">— nepovinné</span></label>
+          <div class="sub">Pole nahoře (Výsledek/Body/Zisk) je vždy první cíl. Přidej sem další, pokud pozice měla víc výstupů (ať už ručně zadaných, nebo z NinjaTraderu) – uloží se jako jeden obchod s legy, stejně jako u „Sloučit vybrané". U každého cíle stačí vyplnit cenu výstupu (body i zisk/ztráta se dopočítají automaticky ze společné ceny vstupu a hodnoty bodu instrumentu) — pole lze i tak kdykoliv přepsat ručně.</div>
+          <div id="extraLegsList" style="margin-top:8px"></div>
+          <button type="button" class="btn" id="addLegBtn" style="margin-top:8px">＋ Přidat další cíl</button>
+        </div>
+        <div class="field"><label>Strategie</label><input id="strategy" placeholder="Volitelné"></div>
+        <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+        
+        <div class="field full">
+          <label>Obchodní plán k tomuto obchodu <span class="optional-badge">nepovinné</span></label>
+          <div class="formgrid trade-plan-editor">
+            <div class="field"><label>Instrument plánu</label><input id="tradePlanInstrument" placeholder="např. NQ"></div>
+            <div class="field"><label>Maximální počet obchodů</label><input id="tradePlanMaxTrades" type="number" step="1"></div>
+            <div class="field"><label>Limit ztráty</label><input id="tradePlanLossLimit" type="number" step="any"></div>
+            <div class="field"><label>Denní cíl</label><input id="tradePlanProfitTarget" type="number" step="any"></div>
+            <div class="field"><label>Obchodovat od</label><input id="tradePlanFromTime" type="time"></div>
+            <div class="field"><label>Obchodovat do</label><input id="tradePlanToTime" type="time"></div>
+            <div class="field full"><label>Setup / scénář</label><textarea id="tradePlanSetup" placeholder="Volitelné"></textarea></div>
+            <div class="field full"><label>Psychologický checklist</label><textarea id="tradePlanPsychology" placeholder="Volitelné"></textarea></div>
+            <div class="field full"><label>Poznámka k plánu</label><textarea id="tradePlanNote" placeholder="Volitelné"></textarea></div>
+          </div>
+        </div>
+
+        <div class="field full"><label>Komentář <span class="optional-badge">nepovinné</span></label><textarea id="comment" placeholder="Volitelné"></textarea></div>
+        <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="image-preview" id="imagePreview"></div></div>
+      </div>
+      <div id="formAlert" class="alert red"></div>
+      <button class="btn primary" type="submit" style="margin-top:16px">Uložit obchod</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const DB_VERSION=1;
+const JOURNAL_LIST_KEY='FuturesJournal_profiles';
+const ACTIVE_JOURNAL_KEY='FuturesJournal_active';
+let journalProfiles=JSON.parse(localStorage.getItem(JOURNAL_LIST_KEY)||'[]');
+// Přednastavený „Hlavní deník“ se v aplikaci nepoužívá. Zobrazují se pouze deníky vytvořené uživatelem.
+journalProfiles=journalProfiles.filter(j=>!(j?.id==='default'||String(j?.name||'').trim().toLowerCase()==='hlavní deník'));
+localStorage.setItem(JOURNAL_LIST_KEY,JSON.stringify(journalProfiles));
+let activeJournalId=localStorage.getItem(ACTIVE_JOURNAL_KEY)||journalProfiles[0]?.id||'';
+if(!journalProfiles.some(j=>j.id===activeJournalId)) activeJournalId=journalProfiles[0]?.id||'';
+if(activeJournalId)localStorage.setItem(ACTIVE_JOURNAL_KEY,activeJournalId);else localStorage.removeItem(ACTIVE_JOURNAL_KEY);
+
+async function removeLegacyDefaultJournal(){
+ // Odstraní pouze technický soubor starého přednastaveného profilu. Uživatelské deníky ani jejich data nemaže.
+ try{await window.desktopAPI?.deleteJournal?.('default')}catch(e){console.warn('Starý přednastavený deník se nepodařilo odstranit:',e)}
+}
+function currentDBName(){return 'FuturesJournalDB_'+activeJournalId}
+let db={data:{trades:[],settings:[]},close(){}}, trades=[], settings={startingBalance:100000,currency:'USD',usdCzkRate:23,dailyLossLimit:5000,dailyPointLimit:100,breakEvenEnabled:false,breakEvenThreshold:0,autoMergeLegs:true,templates:[],risk:{}};
+let editImages=[], calendarDate=new Date();
+
+async function openDB(){
+ if(!window.desktopAPI?.readJournal)throw new Error('Datové úložiště desktopové aplikace není dostupné.');
+ const result=await window.desktopAPI.readJournal(activeJournalId);
+ if(!result?.ok)throw new Error(result?.error||'Data deníku nelze načíst.');
+ db={data:result.data||{trades:[],settings:[]},close(){}};if(!Array.isArray(db.data.trades))db.data.trades=[];if(!Array.isArray(db.data.settings))db.data.settings=[];
+}
+async function ensureActiveJournalData(){
+ if(db?.data){
+  if(!Array.isArray(db.data.trades))db.data.trades=[];
+  if(!Array.isArray(db.data.settings))db.data.settings=[];
+  return db.data;
+ }
+ if(!window.desktopAPI?.readJournal)throw new Error('Datové úložiště desktopové aplikace není dostupné.');
+ const result=await window.desktopAPI.readJournal(activeJournalId);
+ if(!result?.ok)throw new Error(result?.error||'Aktivní deník nelze načíst.');
+ const data=result.data||{trades:[],settings:[]};
+ if(!Array.isArray(data.trades))data.trades=[];
+ if(!Array.isArray(data.settings))data.settings=[];
+ db={data,close(){}};
+ return db.data;
+}
+async function persistDB(){
+ const data=await ensureActiveJournalData();
+ const result=await window.desktopAPI.writeJournal(activeJournalId,data);
+ if(!result?.ok)throw new Error(result?.error||'Data deníku nelze uložit.');
+}
+async function getAll(name){
+ const data=await ensureActiveJournalData();
+ return structuredClone(data[name]||[]);
+}
+async function put(name,val){
+ const data=await ensureActiveJournalData();
+ const rows=data[name]||(data[name]=[]);
+ const key=name==='trades'?'id':'key';
+ const idx=rows.findIndex(x=>x?.[key]===val?.[key]);
+ if(idx>=0)rows[idx]=structuredClone(val);else rows.push(structuredClone(val));
+ await persistDB();
+}
+async function del(name,keyValue){
+ const data=await ensureActiveJournalData();
+ data[name]=(data[name]||[]).filter(x=>x?.id!==keyValue&&x?.key!==keyValue);
+ await persistDB();
+}
+async function clearStore(name){
+ const data=await ensureActiveJournalData();
+ data[name]=[];
+ await persistDB();
+}
+
+const $=id=>document.getElementById(id);
+
+// ==================== Vzhled (téma) ====================
+const THEME_STORAGE_KEY='FJ_theme';
+const CUSTOM_THEME_KEYS=['--bg-start','--bg-end','--sidebar-bg','--panel','--panel2','--input-bg','--card-bg-rgb','--text','--text2','--muted','--line','--blue','--blue-rgb','--green','--green-rgb','--red','--red-rgb','--yellow','--yellow-rgb','--tint-rgb','--hover-border','--btn-text'];
+function hexToRgbTriple(hex){
+ const h=String(hex||'').replace('#','').trim();
+ const full=h.length===3?h.split('').map(c=>c+c).join(''):h;
+ const n=parseInt(full,16);
+ if(Number.isNaN(n)||full.length!==6)return '0,0,0';
+ return [(n>>16)&255,(n>>8)&255,n&255].join(',');
+}
+function shadeHex(hex,percent){
+ const h=String(hex||'').replace('#','').trim();
+ const full=h.length===3?h.split('').map(c=>c+c).join(''):h;
+ const n=parseInt(full,16);
+ if(Number.isNaN(n)||full.length!==6)return hex;
+ let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+ const amt=Math.round(2.55*percent);
+ r=Math.min(255,Math.max(0,r+amt));g=Math.min(255,Math.max(0,g+amt));b=Math.min(255,Math.max(0,b+amt));
+ return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+function relativeLuminance(hex){
+ const [r,g,b]=hexToRgbTriple(hex).split(',').map(Number);
+ return (0.299*r+0.587*g+0.114*b)/255;
+}
+function loadThemePref(){
+ try{ const raw=localStorage.getItem(THEME_STORAGE_KEY); return raw?JSON.parse(raw):{mode:'dark'}; }
+ catch(e){ return {mode:'dark'}; }
+}
+function saveThemePref(theme){
+ try{ localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme)); }catch(e){}
+}
+function clearInlineThemeOverrides(){
+ CUSTOM_THEME_KEYS.forEach(k=>document.documentElement.style.removeProperty(k));
+}
+function applyBuiltInTheme(mode){
+ clearInlineThemeOverrides();
+ document.documentElement.setAttribute('data-theme', mode==='light'?'light':'dark');
+}
+function computeCustomVars(picks){
+ const isDark=relativeLuminance(picks.panel)<0.5;
+ const shadeAmt=isDark?12:-6;
+ return {
+  '--bg-start':picks.bgStart,'--bg-end':picks.bgEnd,
+  '--sidebar-bg':picks.sidebarBg,
+  '--panel':picks.panel,'--panel2':shadeHex(picks.panel,shadeAmt),'--input-bg':shadeHex(picks.panel,-shadeAmt),
+  '--card-bg-rgb':hexToRgbTriple(picks.panel),
+  '--text':picks.text,'--text2':picks.text,'--muted':shadeHex(picks.text,isDark?-35:35),
+  '--line':picks.line,
+  '--blue':picks.blue,'--blue-rgb':hexToRgbTriple(picks.blue),
+  '--green':picks.green,'--green-rgb':hexToRgbTriple(picks.green),
+  '--red':picks.red,'--red-rgb':hexToRgbTriple(picks.red),
+  '--yellow':picks.yellow,'--yellow-rgb':hexToRgbTriple(picks.yellow),
+  '--tint-rgb':isDark?'255,255,255':'0,0,0',
+  '--hover-border':shadeHex(picks.line,isDark?25:-25),
+  '--btn-text':isDark?'#ffffff':'#101830'
+ };
+}
+function applyCustomTheme(picks, persist=false){
+ document.documentElement.setAttribute('data-theme', relativeLuminance(picks.bgStart)<0.5?'dark':'light');
+ const vars=computeCustomVars(picks);
+ Object.entries(vars).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
+ if(persist) saveThemePref({mode:'custom', custom:vars, picks});
+ return vars;
+}
+const DEFAULT_CUSTOM_PICKS={bgStart:'#080c18',bgEnd:'#111a30',sidebarBg:'#0b1222',panel:'#121a2d',text:'#eef3ff',line:'#273452',blue:'#5ba7ff',green:'#2ecc71',red:'#ff5c67',yellow:'#f6c453'};
+function initTheme(){
+ const theme=loadThemePref();
+ if(theme.mode==='custom' && theme.custom){
+  document.documentElement.setAttribute('data-theme', relativeLuminance((theme.picks&&theme.picks.bgStart)||'#080c18')<0.5?'dark':'light');
+  Object.entries(theme.custom).forEach(([k,v])=>{ if(v) document.documentElement.style.setProperty(k,v); });
+ }else{
+  applyBuiltInTheme(theme.mode);
+ }
+ return theme;
+}
+let currentThemePref=initTheme();
+function fillThemeSettingsUI(){
+ const theme=currentThemePref;
+ const mode=theme.mode==='light'?'light':(theme.mode==='custom'?'custom':'dark');
+ if($('themeMode'))$('themeMode').value=mode;
+ const picks=(theme.mode==='custom'&&theme.picks)?theme.picks:DEFAULT_CUSTOM_PICKS;
+ Object.entries(picks).forEach(([k,v])=>{ if($('tp_'+k)) $('tp_'+k).value=v; });
+ if($('customThemeFields'))$('customThemeFields').style.display=mode==='custom'?'':'none';
+}
+function readCustomPicksFromUI(){
+ const picks={...DEFAULT_CUSTOM_PICKS};
+ Object.keys(picks).forEach(k=>{ if($('tp_'+k)) picks[k]=$('tp_'+k).value; });
+ return picks;
+}
+
+function money(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(n)||0)}
+function moneyCzk(n){return new Intl.NumberFormat('cs-CZ',{style:'currency',currency:'CZK',maximumFractionDigits:2}).format((Number(n)||0)*(Number(settings.usdCzkRate)||23))}
+function dualMoney(n,withSign=false){const v=Number(n)||0,sign=withSign&&v>0?'+':'';return `<span class="money-dual"><span class="main-money">${sign}${money(v)}</span><span class="secondary-money">${sign}${moneyCzk(v)}</span></span>`}
+function dualMoneyText(n,withSign=false){const v=Number(n)||0,sign=withSign&&v>0?'+':'';return `${sign}${money(v)} (${sign}${moneyCzk(v)})`}
+function signed(t,field='pnl'){
+ if(field==='pnl'&&t.pnlRaw!==undefined&&t.pnlRaw!==null&&t.pnlRaw!=='')return Number(t.pnlRaw)||0;
+ const v=Number(t[field]||0);
+ if(t.result==='breakeven')return 0;
+ return t.result==='target'?v:-v;
+}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function sentenceCount(s){return (s.match(/[.!?]+(?=\s|$)/g)||[]).length}
+
+async function load(){
+ trades=await getAll('trades');
+ calendarAllTrades=null;
+ const saved=await getAll('settings');
+ if(saved.length) settings={...settings,...saved[0].value};
+ if(!Array.isArray(settings.templates))settings.templates=[];
+ if(!settings.risk||typeof settings.risk!=='object')settings.risk={};
+ // Jednorázová migrace ze starého jednoduchého denního limitu, pokud nový ještě nebyl nastaven.
+ if(!settings.risk.maxDailyDrawdown && settings.dailyLossLimit) settings.risk.maxDailyDrawdown=settings.dailyLossLimit;
+ fillSettings(); renderAll();
+}
+function fillSettings(){
+ $('startingBalance').value=settings.startingBalance;$('currency').value='USD';$('usdCzkRate').value=settings.usdCzkRate||23;
+ $('breakEvenEnabled').value=settings.breakEvenEnabled?'ano':'ne';
+ $('breakEvenThreshold').value=settings.breakEvenThreshold||0;
+ $('autoMergeLegs').value=settings.autoMergeLegs===false?'ne':'ano';
+ const r=settings.risk||{};
+ $('riskMaxDailyDrawdown').value=r.maxDailyDrawdown||'';
+ $('riskMaxTotalDrawdown').value=r.maxTotalDrawdown||'';
+ $('riskMaxSlPerDay').value=r.maxSlPerDay||'';
+ $('riskMaxTradesPerDay').value=r.maxTradesPerDay||'';
+ $('riskMaxProfitTradesPerDay').value=r.maxProfitTradesPerDay||'';
+ $('riskProfitTargetPerDay').value=r.profitTargetPerDay||'';
+ if($('useConnectorCommission'))$('useConnectorCommission').value=settings.useConnectorCommission===false?'ne':'ano';
+ renderTemplateList();
+ fillThemeSettingsUI();
+}
+async function persistSettings(patch){
+ settings={...settings,...patch};
+ await put('settings',{key:'main',value:settings});
+ // renderAll() obnovuje jen Přehled/Deník/Kalendář/Podíl instrumentů – karta
+ // Nastavení (šablony, vzhled) se jinak neobnoví, dokud se stránka znovu
+ // nenačte. Proto se tu obnovují i tyhle prvky výslovně.
+ renderTemplateList();
+ fillThemeSettingsUI();
+ renderAll();
+}
+// Vestavěná tabulka hodnoty bodu (USD za bod na 1 kontrakt) pro nejběžnější
+// futures kontrakty. Použije se, pokud pro daný instrument neexistuje šablona
+// s vlastní hodnotou bodu. Kód instrumentu se porovnává bez čísla kontraktního
+// měsíce (např. "MES 09-26" i "MES" se chápou jako "MES").
+const BUILTIN_POINT_VALUES={
+ ES:50, MES:5, NQ:20, MNQ:2, YM:5, MYM:0.5, RTY:50, M2K:5
+};
+function normalizeInstrumentCode(instrument){
+ return String(instrument||'').trim().toUpperCase().split(/\s+/)[0];
+}
+function getPointValueForInstrument(instrument){
+ const tpl=findTemplate(instrument);
+ if(tpl && tpl.pointValue!==undefined && tpl.pointValue!==null && tpl.pointValue!=='' && Number(tpl.pointValue)>0) return Number(tpl.pointValue);
+ const code=normalizeInstrumentCode(instrument);
+ if(code && BUILTIN_POINT_VALUES[code]!==undefined) return BUILTIN_POINT_VALUES[code];
+ return null;
+}
+function getDefaultCommissionForInstrument(instrument){
+ const tpl=findTemplate(instrument);
+ if(tpl && tpl.defaultCommission!==undefined && tpl.defaultCommission!==null && tpl.defaultCommission!=='' && Number(tpl.defaultCommission)>=0) return Number(tpl.defaultCommission);
+ return null;
+}
+function findTemplate(instrument){
+ const val=String(instrument||'').trim().toLowerCase();
+ if(!val)return null;
+ const list=settings.templates||[];
+ return list.find(tpl=>val===String(tpl.instrument||'').trim().toLowerCase())
+  ||list.find(tpl=>tpl.instrument&&val.includes(String(tpl.instrument).trim().toLowerCase()));
+}
+function renderTemplateList(){
+ const list=settings.templates||[];
+ const dl=$('templateInstrumentList');
+ if(dl)dl.innerHTML=list.map(t=>`<option value="${esc(t.instrument)}">`).join('');
+ const box=$('templateList');
+ if(!box)return;
+ box.innerHTML=list.length?list.map(t=>`<div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 1.1fr auto">
+  <div><b>${esc(t.instrument)}</b></div>
+  <div>${esc(t.strategy||'—')}</div>
+  <div>${t.planFollowed==='ano'?'Dodržen':t.planFollowed==='ne'?'Nedodržen':'—'}</div>
+  <div>${t.pointValue?('$'+Number(t.pointValue).toFixed(2)):'—'}</div>
+  <div>${t.defaultCommission!=null?('$'+Number(t.defaultCommission).toFixed(2)):'—'}</div>
+  <div class="sub">${esc(t.comment||'—')}</div>
+  <button class="btn danger" data-tpl-id="${esc(t.id)}" style="padding:6px 9px">🗑️</button>
+ </div>`).join(''):'<p class="sub">Zatím žádné šablony.</p>';
+ box.querySelectorAll('[data-tpl-id]').forEach(btn=>btn.onclick=async()=>{
+  await persistSettings({templates:(settings.templates||[]).filter(t=>t.id!==btn.dataset.tplId)});
+ });
+}
+$('addTemplate').onclick=async()=>{
+ const instrument=$('tplNewInstrument').value.trim();
+ if(!instrument){showToast('Vyplň instrument šablony.');return}
+ const pv=$('tplNewPointValue').value;
+ const cm=$('tplNewCommission').value;
+ const tpl={id:crypto.randomUUID(),instrument,strategy:$('tplNewStrategy').value.trim(),planFollowed:$('tplNewPlan').value,comment:$('tplNewComment').value.trim(),pointValue:pv===''?null:Math.abs(Number(pv))||null,defaultCommission:cm===''?null:Math.abs(Number(cm))||0};
+ await persistSettings({templates:[...(settings.templates||[]),tpl]});
+ $('tplNewInstrument').value='';$('tplNewStrategy').value='';$('tplNewPlan').value='';$('tplNewComment').value='';$('tplNewPointValue').value='';$('tplNewCommission').value='';
+ showToast('Šablona byla přidána.');
+};
+if($('saveConnectorCommissionSetting'))$('saveConnectorCommissionSetting').onclick=async()=>{
+ await persistSettings({useConnectorCommission:$('useConnectorCommission').value!=='ne'});
+ showToast('Nastavení komise uloženo.');
+};
+if($('recalcCommissionBtn'))$('recalcCommissionBtn').onclick=async()=>{
+ const withTemplate=(settings.templates||[]).filter(t=>t.defaultCommission!=null && t.defaultCommission!=='');
+ if(!withTemplate.length){showToast('V žádné šabloně není vyplněná komise – není co přepočítat.');return}
+ const ok=await showConfirm(`Přepočítat komisi a zisk/ztrátu u obchodů v aktivním deníku podle šablon (${withTemplate.map(t=>t.instrument).join(', ')})? Doporučujeme mít předtím zálohu.`);
+ if(!ok)return;
+ let changed=0;
+ trades.forEach(t=>{
+  const defCommission=getDefaultCommissionForInstrument(t.instrument);
+  if(defCommission==null)return;
+  if(Array.isArray(t.legs)&&t.legs.length>1){
+   t.legs=t.legs.map(l=>recalcUnitCommission(l,t.instrument,defCommission));
+   const totalPnlRaw=t.legs.reduce((a,l)=>a+(Number(l.pnlRaw)||0),0);
+   t.commission=Math.round(t.legs.reduce((a,l)=>a+(Number(l.commission)||0),0)*100)/100;
+   t.pnlRaw=totalPnlRaw; t.pnl=Math.abs(totalPnlRaw); t.result=classifyResult(totalPnlRaw);
+  }else{
+   const updated=recalcUnitCommission(t,t.instrument,defCommission);
+   t.commission=updated.commission; t.pnlRaw=updated.pnlRaw; t.pnl=updated.pnl; t.result=updated.result;
+  }
+  changed++;
+ });
+ if(!changed){showToast('V aktivním deníku nejsou obchody s instrumentem, který má v šabloně vyplněnou komisi.');return}
+ for(const t of trades)await put('trades',t);
+ await load();
+ showToast(`Přepočítáno obchodů: ${changed}.`);
+};
+function recalcUnitCommission(unit,instrument,defCommissionPerContract){
+ const contracts=Math.abs(Number(unit.contracts))||0;
+ const newCommission=Math.round(defCommissionPerContract*contracts*100)/100;
+ // Hrubý (před-komisní) výsledek se odvozuje z JIŽ ULOŽENÉHO pnlRaw + staré
+ // komise (pnlRaw byl vždy = hrubý - komise, takže hrubý = pnlRaw + stará
+ // komise). Tohle je vždy přesné a nezávisí na hodnotě bodu instrumentu.
+ // PŮVODNĚ se tu hrubý dopočítával z bodů × kontrakty × hodnota bodu – když
+ // instrument neměl hodnotu bodu nastavenou (typicky nový/neznámý kontrakt),
+ // vyšla nula a reálný zisk/ztráta se tiše přepsal na pouhé -komise. Tahle
+ // metoda takový problém mít nemůže.
+ const oldCommission=Number(unit.commission||0);
+ const oldPnlRaw=Number(unit.pnlRaw!==undefined&&unit.pnlRaw!==null&&unit.pnlRaw!==''?unit.pnlRaw:signed(unit));
+ const grossSigned=oldPnlRaw+oldCommission;
+ const newPnlRaw=Math.round((grossSigned-newCommission)*100)/100;
+ return {...unit, commission:newCommission, pnlRaw:newPnlRaw, pnl:Math.abs(newPnlRaw), result:classifyResult(newPnlRaw)};
+}
+$('saveBreakEvenSettings').onclick=async()=>{
+ await persistSettings({
+  breakEvenEnabled:$('breakEvenEnabled').value==='ano',
+  breakEvenThreshold:Math.abs(Number($('breakEvenThreshold').value))||0,
+  autoMergeLegs:$('autoMergeLegs').value==='ano'
+ });
+ showToast('Nastavení Break Even a slučování bylo uloženo.');
+};
+function classifyResult(netPnl){
+ const v=Number(netPnl)||0;
+ if(settings.breakEvenEnabled && Math.abs(v)<=(Number(settings.breakEvenThreshold)||0)) return 'breakeven';
+ return v>=0?'target':'stoploss';
+}
+function renderAll(){renderDashboard();renderTrades();renderCalendar();refreshInstrumentPortfolioCard()}
+
+let instrumentPortfolioRows=[];
+
+async function collectInstrumentPortfolioRows(){
+ const rows=[];
+ for(const p of journalProfiles){
+  try{
+   const r=await window.desktopAPI.readJournal(p.id);
+   if(!r?.ok)continue;
+   const ts=Array.isArray(r.data?.trades)?r.data.trades:[];
+   rows.push(...ts.map(t=>({...t,journalId:p.id,journalName:p.name})));
+  }catch{}
+ }
+ return rows;
+}
+function instrumentPortfolioFilteredRows(){
+ const journal=$('instrumentPortfolioJournal')?.value||'';
+ const from=$('instrumentPortfolioFrom')?.value||'';
+ const to=$('instrumentPortfolioTo')?.value||'';
+ return instrumentPortfolioRows.filter(t=>{
+  if(journal&&t.journalId!==journal)return false;
+  if(from&&t.date&&t.date<from)return false;
+  if(to&&t.date&&t.date>to)return false;
+  return true;
+ });
+}
+function groupInstrumentPortfolio(rows){
+ const grouped={};
+ rows.forEach(t=>{
+  const key=(t.instrument||'Nezadáno').trim()||'Nezadáno';
+  if(!grouped[key])grouped[key]={instrument:key,count:0,weight:0,pnl:0,wins:0,losses:0};
+  grouped[key].count++;
+  grouped[key].pnl+=signed(t);
+  grouped[key].weight+=Math.abs(signed(t));
+  if(t.result==='target')grouped[key].wins++;
+  if(t.result==='stoploss')grouped[key].losses++;
+ });
+ let list=Object.values(grouped);
+ let totalWeight=list.reduce((a,x)=>a+x.weight,0);
+ if(totalWeight===0){list.forEach(x=>x.weight=x.count);totalWeight=list.reduce((a,x)=>a+x.weight,0)}
+ list.sort((a,b)=>b.weight-a.weight);
+ return {list,totalWeight};
+}
+function drawInstrumentPortfolio(){
+ const canvas=$('instrumentPortfolioPie');
+ if(!canvas)return;
+ const {list,totalWeight}=groupInstrumentPortfolio(instrumentPortfolioFilteredRows());
+ const palette=['#5ba7ff','#f6c453','#2ecc71','#ff5c67','#9b7bff','#42d6c8','#ff9d5c','#7bc96f','#d96cff','#7f8ea8','#4ecdc4','#ff6b9d'];
+ const {x,w,h}=setupCanvas(canvas);x.clearRect(0,0,w,h);
+ const listBox=$('instrumentPortfolioList');
+ if(!list.length||!totalWeight){
+  x.fillStyle='#98a6c7';x.textAlign='center';x.font='15px sans-serif';x.fillText('Pro vybraný filtr nejsou data',w/2,h/2);
+  listBox.innerHTML='<div class="sub">Žádné instrumenty.</div>';return;
+ }
+ const cx=w/2,cy=h/2,r=Math.min(w,h)*.36;let start=-Math.PI/2;
+ list.forEach((item,index)=>{
+  const end=start+(item.weight/totalWeight)*Math.PI*2;
+  x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,r,start,end);x.closePath();x.fillStyle=palette[index%palette.length];x.fill();start=end;
+ });
+ x.beginPath();x.arc(cx,cy,r*.57,0,Math.PI*2);x.fillStyle='#121a2d';x.fill();
+ x.textAlign='center';x.fillStyle='white';x.font='800 22px sans-serif';x.fillText(`${list.length}`,cx,cy-2);
+ x.fillStyle='#98a6c7';x.font='13px sans-serif';x.fillText('instrumentů',cx,cy+20);
+ listBox.innerHTML=list.map((item,index)=>{
+  const share=(item.weight/totalWeight)*100;
+  return `<div class="instrument-portfolio-row">
+    <span class="instrument-dot" style="background:${palette[index%palette.length]}"></span>
+    <div><strong>${esc(item.instrument)}</strong><div class="sub">${item.count} obchodů · ${item.wins} ziskových · ${item.losses} ztrátových</div></div>
+    <span class="share">${share.toFixed(1)} %</span>
+    <span class="pnl ${item.pnl>=0?'pos':'neg'}">${dualMoney(item.pnl,true)}</span>
+  </div>`;
+ }).join('');
+}
+async function refreshInstrumentPortfolioCard(){return}
+async function initInstrumentPortfolioSection(){
+ instrumentPortfolioRows=await collectInstrumentPortfolioRows();
+ const select=$('instrumentPortfolioJournal');
+ const current=select.value;
+ select.innerHTML='<option value="">Všechny deníky</option>'+journalProfiles.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ select.value=current;
+ drawInstrumentPortfolio();
+}
+function computeDrawdownByDate(rows=trades){
+ const daily={};rows.forEach(t=>{if(t.date)daily[t.date]=(daily[t.date]||0)+signed(t)});
+ const dates=Object.keys(daily).sort();
+ let equity=Number(settings.startingBalance)||0, peak=equity;
+ const map={};
+ dates.forEach(d=>{
+  equity+=daily[d];
+  if(equity>peak)peak=equity;
+  map[d]=Math.max(0,peak-equity);
+ });
+ return map;
+}
+function evaluateDayRisk(date, drawdownByDate, rows=trades){
+ const r=settings.risk||{};
+ const dayTrades=rows.filter(t=>t.date===date);
+ const violations=[],achievements=[];
+ if(!dayTrades.length)return {violations,achievements};
+ const dailyPnl=dayTrades.reduce((a,t)=>a+signed(t),0);
+ const slCount=dayTrades.filter(t=>t.result==='stoploss').length;
+ const profitCount=dayTrades.filter(t=>t.result==='target').length;
+ const tradesCount=dayTrades.length;
+ if(r.maxDailyDrawdown && dailyPnl<0 && Math.abs(dailyPnl)>=r.maxDailyDrawdown) violations.push(`Max. denní drawdown ${dualMoneyText(r.maxDailyDrawdown)}`);
+ if(r.maxTotalDrawdown && drawdownByDate && (drawdownByDate[date]||0)>=r.maxTotalDrawdown) violations.push(`Max. celkový drawdown účtu ${dualMoneyText(r.maxTotalDrawdown)}`);
+ if(r.maxSlPerDay && slCount>=r.maxSlPerDay) violations.push(`Limit S/L za den (${r.maxSlPerDay})`);
+ if(r.maxTradesPerDay && tradesCount>=r.maxTradesPerDay) violations.push(`Celkový limit obchodů za den (${r.maxTradesPerDay})`);
+ if(r.maxProfitTradesPerDay && profitCount>=r.maxProfitTradesPerDay) violations.push(`Limit profitabilních obchodů za den (${r.maxProfitTradesPerDay})`);
+ if(r.profitTargetPerDay && dailyPnl>=r.profitTargetPerDay) achievements.push(`Splněn profit target ${dualMoneyText(r.profitTargetPerDay)}`);
+ return {violations,achievements};
+}
+function renderDashboard(rows=trades){
+ const safeRows=Array.isArray(rows)?rows:[];
+ const wins=safeRows.filter(t=>t.result==='target'), losses=safeRows.filter(t=>t.result==='stoploss'), breakevens=safeRows.filter(t=>t.result==='breakeven');
+ const total=safeRows.reduce((a,t)=>a+signed(t),0), balance=Number(settings.startingBalance)+total;
+ if($('accountValue'))$('accountValue').innerHTML=dualMoney(balance);
+ if($('totalPnl')){$('totalPnl').innerHTML=dualMoney(total,true);$('totalPnl').className='value '+(total>=0?'pos':'neg')}
+ if($('wins'))$('wins').textContent=wins.length;
+ if($('losses'))$('losses').textContent=losses.length;
+ if($('breakevens'))$('breakevens').textContent=breakevens.length;
+ const winrateDenom=wins.length+losses.length;
+ if($('winrate'))$('winrate').textContent=winrateDenom?((wins.length/winrateDenom)*100).toFixed(1)+' %':'0 %';
+ if($('pieChart'))drawPie(wins.length,losses.length);
+ if($('equityChart'))drawEquityRows(safeRows);
+ const today=new Date().toISOString().slice(0,10);
+ const {violations,achievements}=evaluateDayRisk(today, computeDrawdownByDate());
+ const alertBox=$('limitAlert');
+ if(alertBox){
+  if(violations.length){alertBox.textContent='⚠️ Dnes porušeno: '+violations.join('; ')+'.';alertBox.className='alert red show'}
+  else if(achievements.length){alertBox.textContent='✅ Dnes splněno: '+achievements.join('; ')+'.';alertBox.className='alert green show'}
+  else alertBox.classList.remove('show');
+ }
+}
+function setupCanvas(c){
+ const dpr=devicePixelRatio||1,rect=c.getBoundingClientRect();c.width=rect.width*dpr;c.height=rect.height*dpr;
+ const x=c.getContext('2d');x.scale(dpr,dpr);return {x,w:rect.width,h:rect.height};
+}
+function themeColor(varName){
+ const v=getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+ return v||'#98a6c7';
+}
+function drawPie(wins,losses){
+ const {x,w,h}=setupCanvas($('pieChart')),cx=w/2,cy=h/2,r=Math.min(w,h)*.32,total=wins+losses;
+ const muted=themeColor('--muted'),panel=themeColor('--panel'),text=themeColor('--text'),green=themeColor('--green'),red=themeColor('--red');
+ x.clearRect(0,0,w,h);
+ if(!total){x.fillStyle=muted;x.textAlign='center';x.font='16px sans-serif';x.fillText('Zatím žádné obchody',cx,cy);return}
+ let start=-Math.PI/2;
+ [[wins,green,'Target'],[losses,red,'Stop Loss']].forEach(([v,c])=>{
+  const end=start+(v/total)*Math.PI*2;x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,r,start,end);x.closePath();x.fillStyle=c;x.fill();start=end;
+ });
+ x.beginPath();x.arc(cx,cy,r*.56,0,Math.PI*2);x.fillStyle=panel;x.fill();
+ x.fillStyle=text;x.textAlign='center';x.font='700 26px sans-serif';x.fillText(total,cx,cy+7);
+ x.font='13px sans-serif';x.fillStyle=muted;x.fillText('obchodů',cx,cy+28);
+ x.textAlign='left';x.fillStyle=green;x.fillRect(18,h-44,12,12);x.fillStyle=text;x.fillText(`Target ${wins}`,38,h-33);
+ x.fillStyle=red;x.fillRect(w-120,h-44,12,12);x.fillStyle=text;x.fillText(`SL ${losses}`,w-100,h-33);
+}
+function drawEquityRows(rows){
+ const {x,w,h}=setupCanvas($('equityChart')),pad={l:65,r:20,t:25,b:45};
+ const line=themeColor('--line'),muted=themeColor('--muted'),blue=themeColor('--blue');
+ const daily={};rows.forEach(t=>{if(t.date)daily[t.date]=(daily[t.date]||0)+signed(t)});
+ const dates=Object.keys(daily).sort(),vals=[Number(settings.startingBalance)];
+ dates.forEach(d=>vals.push(vals.at(-1)+daily[d]));
+ const labels=['Start',...dates];let min=Math.min(...vals),max=Math.max(...vals);if(min===max){min-=1;max+=1}
+ x.clearRect(0,0,w,h);x.strokeStyle=line;x.fillStyle=muted;x.font='11px sans-serif';
+ for(let i=0;i<5;i++){const y=pad.t+(h-pad.t-pad.b)*i/4;x.beginPath();x.moveTo(pad.l,y);x.lineTo(w-pad.r,y);x.stroke();x.fillText(Math.round(max-(max-min)*i/4),6,y+4)}
+ if(vals.length<2){x.fillText('Equity se zobrazí po prvním obchodu',pad.l+20,h/2);return}
+ const px=i=>pad.l+(w-pad.l-pad.r)*i/(vals.length-1),py=v=>pad.t+(max-v)/(max-min)*(h-pad.t-pad.b);
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle=blue;x.lineWidth=3;x.stroke();
+ x.fillStyle=blue;vals.forEach((v,i)=>{x.beginPath();x.arc(px(i),py(v),3,0,Math.PI*2);x.fill()});
+ const step=Math.max(1,Math.ceil(labels.length/6));x.fillStyle=muted;x.textAlign='center';
+ labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)x.fillText(l==='Start'?l:l.slice(5),px(i),h-18)});
+}
+function drawEquity(){
+ const {x,w,h}=setupCanvas($('equityChart')),pad={l:65,r:20,t:25,b:45};
+ const line=themeColor('--line'),muted=themeColor('--muted'),blue=themeColor('--blue');
+ const daily={};trades.forEach(t=>daily[t.date]=(daily[t.date]||0)+signed(t));
+ const dates=Object.keys(daily).sort(), vals=[Number(settings.startingBalance)];
+ dates.forEach(d=>vals.push(vals.at(-1)+daily[d]));
+ const labels=['Start',...dates];let min=Math.min(...vals),max=Math.max(...vals);if(min===max){min-=1;max+=1}
+ x.clearRect(0,0,w,h);x.strokeStyle=line;x.fillStyle=muted;x.font='11px sans-serif';
+ for(let i=0;i<5;i++){const y=pad.t+(h-pad.t-pad.b)*i/4;x.beginPath();x.moveTo(pad.l,y);x.lineTo(w-pad.r,y);x.stroke();const v=max-(max-min)*i/4;x.fillText(Math.round(v),6,y+4)}
+ if(vals.length<2){x.fillText('Equity se zobrazí po prvním obchodu',pad.l+20,h/2);return}
+ const px=i=>pad.l+(w-pad.l-pad.r)*i/(vals.length-1),py=v=>pad.t+(max-v)/(max-min)*(h-pad.t-pad.b);
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle=blue;x.lineWidth=3;x.stroke();
+ x.fillStyle=blue;vals.forEach((v,i)=>{x.beginPath();x.arc(px(i),py(v),3,0,Math.PI*2);x.fill()});
+ const step=Math.max(1,Math.ceil(labels.length/6));x.fillStyle=muted;x.textAlign='center';
+ labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)x.fillText(l==='Start'?l:l.slice(5),px(i),h-18)});
+}
+function resultMeta(result){
+ if(result==='breakeven')return {label:'BREAK EVEN',cls:'be',moneyCls:'neutral',sign:'±'};
+ if(result==='target')return {label:'TARGET',cls:'win',moneyCls:'pos',sign:'+'};
+ return {label:'STOP LOSS',cls:'loss',moneyCls:'neg',sign:'−'};
+}
+function legPillHTML(l,i){
+ const m=resultMeta(l.result);
+ const label=l.label||(l.result==='breakeven'?'BE':`Cíl ${i+1}`);
+ return `<span class="leg-pill ${m.moneyCls}">${esc(label)}: ${m.sign}${Math.abs(Number(l.points||0))}b</span>`;
+}
+function tradeHTML(t){
+ const m=resultMeta(t.result);
+ const pnlVal=signed(t,'pnl');
+ const pointsDisplay=t.result==='breakeven'?`±${Math.abs(Number(t.points||0))}`:`${m.sign}${Math.abs(Number(t.points||0))}`;
+ return `<div class="card trade">
+ <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
+ <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
+ <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů · ${dualMoney(pnlVal,true)}</div>
+ ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
+ ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
+ </div>
+ <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Strategie: ${esc(t.strategy||'—')}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
+ <div><div class="comment">${esc(t.comment)}</div>
+ ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
+ ${t.dailyPlan.instrument?`<div><b>Instrument:</b> ${esc(t.dailyPlan.instrument)}</div>`:''}
+ ${t.dailyPlan.maxTrades?`<div><b>Max. obchodů:</b> ${esc(t.dailyPlan.maxTrades)}</div>`:''}
+ ${t.dailyPlan.lossLimit?`<div><b>Limit ztráty:</b> ${esc(t.dailyPlan.lossLimit)}</div>`:''}
+ ${t.dailyPlan.profitTarget?`<div><b>Denní cíl:</b> ${esc(t.dailyPlan.profitTarget)}</div>`:''}
+ ${t.dailyPlan.fromTime||t.dailyPlan.toTime?`<div><b>Čas:</b> ${esc(t.dailyPlan.fromTime||'—')}–${esc(t.dailyPlan.toTime||'—')}</div>`:''}
+ ${t.dailyPlan.setup?`<div><b>Setup:</b> ${esc(t.dailyPlan.setup)}</div>`:''}
+ ${t.dailyPlan.psychology?`<div><b>Psychologie:</b> ${esc(t.dailyPlan.psychology)}</div>`:''}
+ ${t.dailyPlan.note?`<div><b>Poznámka:</b> ${esc(t.dailyPlan.note)}</div>`:''}
+ </div></details>`:''}
+ <div class="thumbs">${(t.images||[]).map(i=>`<img src="${i}" onclick="openImage('${i}')">`).join('')}</div></div>
+ <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
+}
+
+function renderTrades(){
+ const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value;
+ const list=trades.filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
+ $('tradeList').innerHTML=list.length?list.map(tradeHTML).join(''):'<div class="card sub">Zatím zde nejsou žádné obchody.</div>';
+}
+let calendarAllTrades=null;
+async function loadCalendarAllTrades(){
+ if(calendarAllTrades)return calendarAllTrades;
+ calendarAllTrades=[];
+ for(const p of journalProfiles)calendarAllTrades.push(...await readTradesForOverview(p));
+ return calendarAllTrades;
+}
+function getCalendarRows(){
+ const scope=$('calendarJournal')?.value||'';
+ if(!scope)return trades; // Aktivní deník – přesně dosavadní chování
+ if(scope==='all')return calendarAllTrades||[];
+ return (calendarAllTrades||[]).filter(t=>t.journalId===scope);
+}
+async function initCalendarSection(){
+ if($('calendarJournal')&&$('calendarJournal').options.length<=2){
+  $('calendarJournal').innerHTML='<option value="">Aktivní deník</option><option value="all">Všechny deníky</option>'+journalProfiles.filter(p=>p.id!==activeJournalId).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+ }
+ const scope=$('calendarJournal')?.value||'';
+ if(scope)await loadCalendarAllTrades();
+ renderCalendar();
+}
+if($('calendarJournal'))$('calendarJournal').onchange=async()=>{
+ const scope=$('calendarJournal').value;
+ if(scope)await loadCalendarAllTrades();
+ renderCalendar();
+};
+function renderCalendar(){
+ const y=calendarDate.getFullYear(),m=calendarDate.getMonth();
+ $('monthLabel').textContent=new Intl.DateTimeFormat('cs-CZ',{month:'long',year:'numeric'}).format(calendarDate);
+ const names=['Po','Út','St','Čt','Pá','So','Ne'];let html=names.map(n=>`<div class="dow">${n}</div>`).join('');
+ const first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate();
+ const scope=$('calendarJournal')?.value||'';
+ const rows=getCalendarRows();
+ const showRisk=!scope; // řízení rizika je nastavené vždy jen pro jeden konkrétní deník
+ const riskNote=$('calendarRiskNote');
+ if(riskNote)riskNote.textContent=showRisk?'':'Řízení rizika (⚠️/🎯) se zobrazuje jen pro aktivní deník – při zobrazení více deníků najednou by hodnoty z různých nastavení nebyly srovnatelné.';
+ const drawdownByDate=showRisk?computeDrawdownByDate(rows):null;
+ for(let i=0;i<first;i++)html+='<div class="day empty"></div>';
+ for(let day=1;day<=days;day++){
+  const date=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,ts=rows.filter(t=>t.date===date),p=ts.reduce((a,t)=>a+signed(t),0);
+  const {violations,achievements}=showRisk?evaluateDayRisk(date, drawdownByDate, rows):{violations:[],achievements:[]};
+  const flagCls=violations.length?'risk':(achievements.length?'goal':'');
+  const title=[...violations,...achievements].join(' | ');
+  html+=`<div class="day ${ts.length?'has':''} ${flagCls}" ${ts.length?`onclick="showDay('${date}')"`:''} ${title?`title="${esc(title)}"`:''}><div class="num">${day}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}</div>`;
+ }
+ $('calendarGrid').innerHTML=html;
+}
+function goToJournalForDate(date){
+ const scope=$('calendarJournal')?.value||'';
+ if(scope){
+  showToast('Deník zobrazuje jen aktivní deník. Přepni filtr Kalendáře na "Aktivní deník", ať se dá otevřít v Deníku.');
+  return;
+ }
+ const navBtn=[...document.querySelectorAll('.nav button')].find(b=>b.dataset.section==='journal');
+ if(navBtn)navBtn.click();
+ if($('filterDate'))$('filterDate').value=date;
+ if($('filterResult'))$('filterResult').value='';
+ if($('search'))$('search').value='';
+ renderTrades();
+}
+window.showDay=date=>{
+ const scope=$('calendarJournal')?.value||'';
+ const rows=getCalendarRows();
+ const showRisk=!scope;
+ const noteBox=$('dayRiskNote');
+ if(noteBox){
+  if(!showRisk){noteBox.className='alert';noteBox.textContent=''}
+  else{
+   const {violations,achievements}=evaluateDayRisk(date, computeDrawdownByDate(rows), rows);
+   if(violations.length){noteBox.textContent='⚠️ Porušená pravidla tento den: '+violations.join('; ')+'.';noteBox.className='alert red show'}
+   else if(achievements.length){noteBox.textContent='✅ Splněno tento den: '+achievements.join('; ')+'.';noteBox.className='alert green show'}
+   else{noteBox.className='alert';noteBox.textContent=''}
+  }
+ }
+ const dayRows=rows.filter(t=>t.date===date).sort((a,b)=>a.entryTime.localeCompare(b.entryTime));
+ $('dayTrades').innerHTML=(dayRows.length?`<button class="btn primary" onclick="goToJournalForDate('${date}')" style="margin-bottom:12px">📒 Otevřít tento den v Deníku</button>`:'')+dayRows.map(tradeHTML).join('');
+};
+let currentViewedImage='';
+window.openImage=src=>{
+ currentViewedImage=src;
+ $('imageViewerImg').src=src;
+ const note=$('imageViewerNote');
+ if(note)note.textContent=window.desktopAPI?.copyImageToClipboard?'':'Náhled v prohlížeči: tlačítka níže fungují přes schopnosti tvého prohlížeče (v nainstalované aplikaci fungují vždy).';
+ $('imageViewerModal').classList.add('open');
+};
+function closeImageViewer(){$('imageViewerModal').classList.remove('open');currentViewedImage=''}
+$('closeImageViewer').onclick=closeImageViewer;
+$('closeImageViewerBtn').onclick=closeImageViewer;
+$('imageViewerModal').onclick=e=>{if(e.target===$('imageViewerModal'))closeImageViewer()};
+$('imgCopyBtn').onclick=async()=>{
+ if(!currentViewedImage)return;
+ if(window.desktopAPI?.copyImageToClipboard){
+  const r=await window.desktopAPI.copyImageToClipboard(currentViewedImage);
+  if(r?.ok)showToast('Obrázek zkopírován do schránky.');else showToast('Kopírování se nezdařilo: '+(r?.error||'neznámá chyba'));
+  return;
+ }
+ try{
+  const blob=await (await fetch(currentViewedImage)).blob();
+  await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]);
+  showToast('Obrázek zkopírován do schránky.');
+ }catch(e){showToast('Kopírování v prohlížeči se nezdařilo. Zkus pravým tlačítkem na obrázek → Kopírovat obrázek.')}
+};
+$('imgOpenExternalBtn').onclick=async()=>{
+ if(!currentViewedImage)return;
+ if(window.desktopAPI?.openImageExternally){
+  const r=await window.desktopAPI.openImageExternally(currentViewedImage);
+  if(!r?.ok)showToast('Otevření se nezdařilo: '+(r?.error||'neznámá chyba'));
+  return;
+ }
+ window.open(currentViewedImage,'_blank');
+};
+$('imgSaveAsBtn').onclick=async()=>{
+ if(!currentViewedImage)return;
+ if(window.desktopAPI?.saveImageAs){
+  const r=await window.desktopAPI.saveImageAs(currentViewedImage);
+  if(r?.ok)showToast('Obrázek uložen.');else if(!r?.canceled)showToast('Uložení se nezdařilo: '+(r?.error||'neznámá chyba'));
+  return;
+ }
+ const a=document.createElement('a');a.href=currentViewedImage;a.download=`screenshot-${Date.now()}.png`;document.body.appendChild(a);a.click();document.body.removeChild(a);
+};
+
+function openModal(t=null){
+ $('tradeForm').reset();editImages=[];$('imagePreview').innerHTML='';$('tradeId').value=t?.id||'';
+ $('modalTitle').textContent=t?'Upravit obchod':'Nový obchod';
+ resetLegRows();
+ if($('templateHint'))$('templateHint').textContent='';
+ if($('pnlCalcHint'))$('pnlCalcHint').innerHTML='';
+ if($('extraLegsField'))$('extraLegsField').style.display='';
+ if(t){
+  const legs=Array.isArray(t.legs)&&t.legs.length>1?t.legs:null;
+  const leg0=legs?legs[0]:null;
+  ['instrument','date','entryTime','entryPrice'].forEach(k=>$(k).value=t[k]??'');
+  if(leg0){
+   $('exitTime').value=leg0.exitTime??t.exitTime??'';
+   $('exitPrice').value=leg0.exitPrice??t.exitPrice??'';
+   $('result').value=leg0.result||t.result||'target';
+   $('points').value=leg0.points??t.points??'';
+   $('pnl').value=(leg0.pnlRaw!==undefined&&leg0.pnlRaw!==null?Math.abs(leg0.pnlRaw):leg0.pnl)??t.pnl??'';
+   $('contracts').value=leg0.contracts??t.contracts??'';
+   $('commission').value=leg0.commission??0;
+  }else{
+   ['exitTime','exitPrice','result','points','pnl','contracts'].forEach(k=>$(k).value=t[k]??'');
+   $('commission').value=t.commission??0;
+  }
+  ['strategy','planFollowed','comment'].forEach(k=>$(k).value=t[k]??'');
+  if(legs){
+   legs.slice(1).forEach(l=>{
+    const row=appendBlankLegRow();
+    row.querySelector('.leg-label').value=l.label||'';
+    row.querySelector('.leg-exitTime').value=l.exitTime||'';
+    row.querySelector('.leg-exitPrice').value=l.exitPrice??'';
+    row.querySelector('.leg-result').value=l.result||'target';
+    row.querySelector('.leg-points').value=l.points??'';
+    row.querySelector('.leg-pnl').value=(l.pnlRaw!==undefined&&l.pnlRaw!==null?l.pnlRaw:l.pnl)??'';
+    row.querySelector('.leg-commission').value=l.commission??0;
+    row.querySelector('.leg-contracts').value=l.contracts??1;
+   });
+  }
+ const p=t.dailyPlan||{};
+ $('tradePlanInstrument').value=p.instrument||'';
+ $('tradePlanMaxTrades').value=p.maxTrades||'';
+ $('tradePlanLossLimit').value=p.lossLimit||'';
+ $('tradePlanProfitTarget').value=p.profitTarget||'';
+ $('tradePlanFromTime').value=p.fromTime||'';
+ $('tradePlanToTime').value=p.toTime||'';
+ $('tradePlanSetup').value=p.setup||'';
+ $('tradePlanPsychology').value=p.psychology||'';
+ $('tradePlanNote').value=p.note||'';
+ editImages=t.images||[];showPreviews()}
+ else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;
+ ['tradePlanInstrument','tradePlanMaxTrades','tradePlanLossLimit','tradePlanProfitTarget','tradePlanFromTime','tradePlanToTime','tradePlanSetup','tradePlanPsychology','tradePlanNote'].forEach(id=>$(id).value='')}
+ if($('formAlert')){$('formAlert').classList.remove('show');$('formAlert').textContent=''};$('tradeModal').classList.add('open')
+}
+let legRowSeq=0;
+function legRowHTML(id){
+ legRowSeq++;
+ return `<div class="leg-row" data-leg-id="${id}">
+  <input class="leg-label" placeholder="TP${legRowSeq+1}" value="TP${legRowSeq+1}">
+  <input class="leg-exitTime" type="time" title="Čas výstupu">
+  <input class="leg-exitPrice" type="number" step="any" placeholder="Cena výstupu">
+  <select class="leg-result"><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
+  <input class="leg-points" type="number" step="any" placeholder="Body">
+  <input class="leg-pnl" type="number" step="any" placeholder="Zisk/ztráta">
+  <input class="leg-commission" type="number" step="any" min="0" value="0" placeholder="Komise" title="Komise pro tento cíl">
+  <input class="leg-contracts" type="number" step="1" min="1" value="1" placeholder="Ks">
+  <button type="button" class="icon remove-leg" title="Odebrat cíl">🗑️</button>
+ </div>`;
+}
+// Komise je náklad bez ohledu na výsledek obchodu – u zisku ho snižuje,
+// u ztráty ji naopak zvětšuje (nikdy ji nezmenšuje). Vrací hodnotu ve stejném
+// tvaru, v jakém ji formulář dál očekává: kladnou velikost pro Target/Stop
+// Loss (znaménko se doplní podle výsledku při uložení), a přímo znaménkovou
+// hodnotu pro Break Even (ta se ukládá beze změny).
+function netAmountForResult(gross, commission, result){
+ if(result==='stoploss') return gross+commission;
+ if(result==='breakeven') return -commission;
+ return gross-commission; // target
+}
+function recomputeLegRow(row){
+ const entryVal=$('entryPrice').value;
+ const exitVal=row.querySelector('.leg-exitPrice').value;
+ if(entryVal!==''&&exitVal!==''){
+  const e=Number(entryVal), x=Number(exitVal);
+  if(Number.isFinite(e)&&Number.isFinite(x)){
+   const pts=Math.round(Math.abs(x-e)*10000)/10000;
+   row.querySelector('.leg-points').value=pts;
+  }
+ }
+ const pointsField=row.querySelector('.leg-points').value;
+ const points=pointsField===''?null:Math.abs(Number(pointsField))||0;
+ const contracts=Math.abs(Number(row.querySelector('.leg-contracts').value))||0;
+ const pointValue=getPointValueForInstrument($('instrument').value);
+ const result=row.querySelector('.leg-result').value;
+ if(points!=null&&contracts&&pointValue){
+  const gross=points*contracts*pointValue;
+  const commission=Math.abs(Number(row.querySelector('.leg-commission').value))||0;
+  const net=Math.round(netAmountForResult(gross,commission,result)*100)/100;
+  row.querySelector('.leg-pnl').value=net;
+  const op=result==='stoploss'?'plus':'mínus';
+  row.querySelector('.leg-pnl').title=`Automaticky: ${points} bodů × ${contracts} kontrakty × $${pointValue.toFixed(2)}/bod = $${gross.toFixed(2)} hrubého, ${op} komise $${commission.toFixed(2)}.`;
+ }
+}
+function recomputeAllLegRows(){
+ document.querySelectorAll('#extraLegsList .leg-row').forEach(recomputeLegRow);
+}
+function wireLegRow(row){
+ row.querySelector('.remove-leg').onclick=()=>row.remove();
+ row.querySelector('.leg-exitPrice').addEventListener('input',()=>recomputeLegRow(row));
+ row.querySelector('.leg-points').addEventListener('input',()=>recomputeLegRow(row));
+ row.querySelector('.leg-contracts').addEventListener('input',()=>{applyTemplateCommissionToLegRow(row);recomputeLegRow(row)});
+ row.querySelector('.leg-commission').addEventListener('input',()=>recomputeLegRow(row));
+ row.querySelector('.leg-result').addEventListener('change',()=>recomputeLegRow(row));
+}
+function applyTemplateCommissionToLegRow(row){
+ // Komise se odvíjí od počtu kontraktů stejně jako hrubý zisk – když má
+ // instrument v šabloně nastavenou výchozí komisi za kontrakt, při změně
+ // počtu kontraktů se s ním automaticky přepočítá i celková komise.
+ const defCommission=getDefaultCommissionForInstrument($('instrument').value);
+ const contracts=Math.abs(Number(row.querySelector('.leg-contracts').value))||0;
+ if(defCommission!=null && contracts) row.querySelector('.leg-commission').value=Math.round(defCommission*contracts*100)/100;
+}
+function appendBlankLegRow(){
+ const id=crypto.randomUUID();
+ $('extraLegsList').insertAdjacentHTML('beforeend', legRowHTML(id));
+ const row=$('extraLegsList').querySelector(`[data-leg-id="${id}"]`);
+ wireLegRow(row);
+ return row;
+}
+function addLegRow(){
+ const row=appendBlankLegRow();
+ applyTemplateCommissionToLegRow(row);
+ recomputeLegRow(row);
+}
+function resetLegRows(){ if($('extraLegsList'))$('extraLegsList').innerHTML=''; legRowSeq=0 }
+function readLegRows(){
+ return [...document.querySelectorAll('#extraLegsList .leg-row')].map((row,i)=>({
+  label:row.querySelector('.leg-label').value.trim()||`TP${i+2}`,
+  exitTime:row.querySelector('.leg-exitTime').value,
+  exitPrice:Number(row.querySelector('.leg-exitPrice').value)||0,
+  result:row.querySelector('.leg-result').value,
+  points:Math.abs(Number(row.querySelector('.leg-points').value)||0),
+  contracts:Math.abs(Number(row.querySelector('.leg-contracts').value)||1)||1,
+  commission:Math.abs(Number(row.querySelector('.leg-commission').value))||0,
+  pnlTyped:row.querySelector('.leg-pnl').value===''?0:Number(row.querySelector('.leg-pnl').value)||0
+ }));
+}
+if($('addLegBtn'))$('addLegBtn').onclick=()=>addLegRow();
+function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div><img src="${src}"><button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
+window.removeImg=i=>{editImages.splice(i,1);showPreviews()}
+window.editTrade=id=>openModal(trades.find(t=>t.id===id));
+window.deleteTrade=async id=>{if(await showConfirm('Opravdu smazat tento obchod?')){await del('trades',id);await load()}};
+
+function recomputePnlFromInputs(){
+ const contracts=Math.abs(Number($('contracts').value))||0;
+ const points=$('points').value===''?null:Math.abs(Number($('points').value))||0;
+ const pointValue=getPointValueForInstrument($('instrument').value);
+ const result=$('result').value;
+ const hint=$('pnlCalcHint');
+ if(points!=null && contracts && pointValue){
+  const gross=points*contracts*pointValue;
+  const commission=Math.abs(Number($('commission').value))||0;
+  const net=Math.round(netAmountForResult(gross,commission,result)*100)/100;
+  $('pnl').value=net;
+  const op=result==='stoploss'?'plus':'mínus';
+  if(hint)hint.innerHTML=`<span class="sub">Automaticky dopočteno: ${points} bodů × ${contracts} kontrakty × $${pointValue.toFixed(2)}/bod = $${gross.toFixed(2)} hrubého, ${op} komise $${commission.toFixed(2)} = <b>$${net.toFixed(2)}</b> čistého. Pole „Zisk/ztráta" lze i tak přepsat ručně.</span>`;
+ }else if(hint){
+  hint.innerHTML=(points!=null&&contracts&&!pointValue)?`<span class="sub">Hodnota bodu pro „${esc($('instrument').value||'—')}" není známá – přidej ji do šablony instrumentu v Nastavení (karta Nastavení → Šablony podle instrumentu), nebo vyplň Zisk/ztrátu ručně.</span>`:'';
+ }
+}
+function recomputePointsFromPrices(){
+ const entry=$('entryPrice').value, exit=$('exitPrice').value;
+ if(entry===''||exit==='')return;
+ const e=Number(entry), x=Number(exit);
+ if(!Number.isFinite(e)||!Number.isFinite(x))return;
+ const pts=Math.round(Math.abs(x-e)*10000)/10000;
+ $('points').value=pts;
+ recomputePnlFromInputs();
+}
+function applyTemplateCommission(){
+ // Komise se odvíjí od počtu kontraktů stejně jako hrubý zisk – když má
+ // instrument v šabloně nastavenou výchozí komisi za kontrakt, při změně
+ // počtu kontraktů se s ním automaticky přepočítá i celková komise.
+ const defCommission=getDefaultCommissionForInstrument($('instrument').value);
+ const contracts=Math.abs(Number($('contracts').value))||0;
+ if(defCommission!=null && contracts) $('commission').value=Math.round(defCommission*contracts*100)/100;
+}
+['entryPrice','exitPrice'].forEach(id=>$(id)?.addEventListener('input',recomputePointsFromPrices));
+$('points')?.addEventListener('input',recomputePnlFromInputs);
+$('commission')?.addEventListener('input',recomputePnlFromInputs);
+$('contracts')?.addEventListener('input',()=>{applyTemplateCommission();recomputePnlFromInputs();recomputeAllLegRows()});
+$('result')?.addEventListener('change',recomputePnlFromInputs);
+$('entryPrice')?.addEventListener('input',recomputeAllLegRows);
+
+$('instrument').addEventListener('change',()=>{
+ const tpl=findTemplate($('instrument').value);
+ const hint=$('templateHint');
+ if(!tpl){if(hint)hint.textContent='';applyTemplateCommission();recomputePnlFromInputs();recomputeAllLegRows();return}
+ if(hint)hint.textContent=`Šablona nalezena: ${tpl.strategy||'—'}${tpl.comment?' · '+tpl.comment:''}${tpl.pointValue?` · hodnota bodu $${Number(tpl.pointValue).toFixed(2)}`:''}${tpl.defaultCommission!=null?` · komise $${Number(tpl.defaultCommission).toFixed(2)}/ks`:''}`;
+ if(!$('tradeId').value){
+  if(!$('strategy').value)$('strategy').value=tpl.strategy||'';
+  if(tpl.planFollowed)$('planFollowed').value=tpl.planFollowed;
+  if(!$('comment').value)$('comment').value=tpl.comment||'';
+ }
+ applyTemplateCommission();
+ recomputePnlFromInputs();
+ recomputeAllLegRows();
+});
+$('screenshots').addEventListener('change',async e=>{
+ const files=[...e.target.files].slice(0,3-editImages.length);
+ for(const f of files){if(f.size>3_000_000){showToast('Jeden obrázek je větší než 3 MB. Zvol menší soubor.');continue}
+  const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});editImages.push(data)}
+ showPreviews();e.target.value='';
+});
+$('tradeForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const a=$('formAlert');
+ a.classList.remove('show');a.textContent='';
+ try{
+  const data=await ensureActiveJournalData();
+  trades=Array.isArray(data.trades)?data.trades:(data.trades=[]);
+
+  const existing=trades.find(t=>t.id===$('tradeId').value);
+  const id=$('tradeId').value||crypto.randomUUID();
+  const obj={
+   id,
+   images:[...editImages],
+   createdAt:existing?.createdAt||Date.now(),
+   updatedAt:Date.now()
+  };
+
+  ['instrument','date','entryTime','entryPrice','exitTime','exitPrice','result','points','pnl','contracts','strategy','planFollowed','comment']
+   .forEach(k=>obj[k]=$(k)?.value??'');
+  obj.commission=Math.abs(Number($('commission')?.value))||0;
+
+  const typedPnl=$('pnl')?.value===''?0:Number($('pnl').value)||0;
+  obj.pnlRaw=obj.result==='target'?Math.abs(typedPnl):obj.result==='stoploss'?-Math.abs(typedPnl):typedPnl;
+
+  const plan={
+   date:obj.date||new Date().toISOString().slice(0,10),
+   instrument:$('tradePlanInstrument')?.value?.trim()||'',
+   maxTrades:$('tradePlanMaxTrades')?.value||'',
+   lossLimit:$('tradePlanLossLimit')?.value||'',
+   profitTarget:$('tradePlanProfitTarget')?.value||'',
+   fromTime:$('tradePlanFromTime')?.value||'',
+   toTime:$('tradePlanToTime')?.value||'',
+   setup:$('tradePlanSetup')?.value?.trim()||'',
+   psychology:$('tradePlanPsychology')?.value?.trim()||'',
+   note:$('tradePlanNote')?.value?.trim()||''
+  };
+  obj.dailyPlan=Object.entries(plan).some(([k,v])=>k!=='date'&&String(v||'').trim())?plan:null;
+
+  obj.points=obj.points===''?0:Math.abs(Number(obj.points)||0);
+  obj.pnl=obj.pnl===''?0:Math.abs(Number(obj.pnl)||0);
+  obj.contracts=obj.contracts===''?0:Math.abs(Number(obj.contracts)||0);
+
+  const legRows=readLegRows();
+  if(legRows.length){
+   const leg1={
+    label:'TP1', exitTime:obj.exitTime, exitPrice:Number(obj.exitPrice)||0,
+    points:obj.points, pnl:obj.pnl, pnlRaw:obj.pnlRaw,
+    contracts:obj.contracts||1, result:obj.result, commission:obj.commission
+   };
+   const otherLegs=legRows.map(r=>({
+    label:r.label, exitTime:r.exitTime||obj.exitTime, exitPrice:r.exitPrice||0,
+    points:r.points, pnl:Math.abs(r.pnlTyped),
+    pnlRaw:r.result==='target'?Math.abs(r.pnlTyped):r.result==='stoploss'?-Math.abs(r.pnlTyped):r.pnlTyped,
+    contracts:r.contracts, result:r.result, commission:r.commission
+   }));
+   const legs=[leg1,...otherLegs];
+   const totalPnlRaw=legs.reduce((a,l)=>a+(Number(l.pnlRaw)||0),0);
+   const totalPoints=legs.reduce((a,l)=>a+Math.abs(Number(l.points)||0),0);
+   const totalContracts=legs.reduce((a,l)=>a+(Number(l.contracts)||0),0);
+   const totalCommission=legs.reduce((a,l)=>a+(Number(l.commission)||0),0);
+   const lastLeg=[...legs].sort((x,y)=>String(x.exitTime||'').localeCompare(String(y.exitTime||''))).at(-1)||legs[legs.length-1];
+   obj.exitTime=lastLeg.exitTime||obj.exitTime;
+   obj.exitPrice=lastLeg.exitPrice||obj.exitPrice;
+   obj.result=classifyResult(totalPnlRaw);
+   obj.points=Math.round(totalPoints*100)/100;
+   obj.pnl=Math.abs(totalPnlRaw);
+   obj.pnlRaw=totalPnlRaw;
+   obj.commission=Math.round(totalCommission*100)/100;
+   obj.contracts=totalContracts||obj.contracts;
+   obj.legs=legs;
+   if(!obj.comment)obj.comment=`Ručně zadáno s ${legs.length} cíli (${legs.map(l=>l.label).join('/')}).`;
+  }
+  // Pokud byly všechny další cíle v editaci odstraněny, obj.legs zůstává nenastaveno
+  // a obchod se uloží jako jediný cíl – to je záměr (odstranění duplicitního cíle).
+
+  const idx=trades.findIndex(t=>t.id===id);
+  if(idx>=0)trades[idx]=obj;else trades.push(obj);
+  data.trades=trades;
+
+  const result=await window.desktopAPI.writeJournal(activeJournalId,data);
+  if(!result?.ok)throw new Error(result?.error||'Data deníku nelze uložit.');
+
+  db={data,close(){}};
+  $('tradeModal').classList.remove('open');
+  await load();
+  showToast(existing?'Obchod byl upraven.':'Obchod byl uložen.');
+ }catch(err){
+  a.textContent='Obchod se nepodařilo uložit: '+(err?.message||err);
+  a.classList.add('show');
+ }
+});
+
+
+let pendingMoveTrade=null;
+window.openMoveTrade=async(id,sourceJournalId)=>{
+ const source=journalProfiles.find(j=>j.id===sourceJournalId);
+ const sourceResult=await window.desktopAPI.readJournal(sourceJournalId);
+ const trade=(sourceResult?.data?.trades||[]).find(t=>t.id===id);
+ if(!trade){showToast('Obchod se nepodařilo najít.');return}
+ const targets=journalProfiles.filter(j=>j.id!==sourceJournalId);
+ if(!targets.length){showToast('Nejdříve vytvoř další deník, do kterého lze obchod přesunout.');return}
+ pendingMoveTrade={id,sourceJournalId};
+ $('moveTradeInfo').textContent=`${trade.instrument||'Bez instrumentu'} · ${trade.date||'bez data'} · z deníku „${source?.name||'Neznámý deník'}“`;
+ $('moveTradeTargetJournal').innerHTML=targets.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ $('moveTradeError').textContent='';$('moveTradeError').classList.remove('show');
+ $('moveTradeModal').classList.add('open');
+};
+function closeMoveTradeModal(){pendingMoveTrade=null;$('moveTradeModal').classList.remove('open')}
+$('closeMoveTradeModal').onclick=closeMoveTradeModal;
+$('cancelMoveTrade').onclick=closeMoveTradeModal;
+$('moveTradeModal').onclick=e=>{if(e.target===$('moveTradeModal'))closeMoveTradeModal()};
+$('confirmMoveTrade').onclick=async()=>{
+ if(!pendingMoveTrade)return;
+ const targetJournalId=$('moveTradeTargetJournal').value;
+ const err=$('moveTradeError');
+ try{
+  const sourceResult=await window.desktopAPI.readJournal(pendingMoveTrade.sourceJournalId);
+  const targetResult=await window.desktopAPI.readJournal(targetJournalId);
+  if(!sourceResult?.ok)throw new Error(sourceResult?.error||'Zdrojový deník nelze načíst.');
+  if(!targetResult?.ok)throw new Error(targetResult?.error||'Cílový deník nelze načíst.');
+  const sourceData=sourceResult.data||{trades:[],settings:[]};
+  const targetData=targetResult.data||{trades:[],settings:[]};
+  sourceData.trades=Array.isArray(sourceData.trades)?sourceData.trades:[];
+  targetData.trades=Array.isArray(targetData.trades)?targetData.trades:[];
+  const index=sourceData.trades.findIndex(t=>t.id===pendingMoveTrade.id);
+  if(index<0)throw new Error('Obchod už ve zdrojovém deníku není.');
+  const [trade]=sourceData.trades.splice(index,1);
+  if(targetData.trades.some(t=>t.id===trade.id))trade.id=crypto.randomUUID();
+  targetData.trades.push(trade);
+  const writeTarget=await window.desktopAPI.writeJournal(targetJournalId,targetData);
+  if(!writeTarget?.ok)throw new Error(writeTarget?.error||'Obchod nelze uložit do cílového deníku.');
+  const writeSource=await window.desktopAPI.writeJournal(pendingMoveTrade.sourceJournalId,sourceData);
+  if(!writeSource?.ok){targetData.trades=targetData.trades.filter(t=>t.id!==trade.id);await window.desktopAPI.writeJournal(targetJournalId,targetData);throw new Error(writeSource?.error||'Obchod nelze odstranit ze zdrojového deníku.');}
+  const targetName=journalProfiles.find(j=>j.id===targetJournalId)?.name||'cílového deníku';
+  const movedFrom=pendingMoveTrade.sourceJournalId;
+  closeMoveTradeModal();
+  if(movedFrom===activeJournalId)await load();
+  calendarAllTrades=null;
+  await initAccountOverview();await initReports();await initInstrumentPortfolioSection();
+  showToast(`Obchod byl přesunut do deníku „${targetName}“.`);
+ }catch(e){err.textContent='Přesun se nezdařil: '+(e?.message||e);err.classList.add('show')}
+};
+
+// ---- Slučování obchodů (TP1/TP2/Break Even ze stejné pozice) ----
+function legFromTrade(t,label){
+ return {
+  id:t.id,
+  label:label||t.legLabel||'',
+  exitTime:t.exitTime,
+  exitPrice:t.exitPrice,
+  points:Number(t.points||0),
+  pnl:Number(t.pnl||0),
+  pnlRaw:(t.pnlRaw!==undefined&&t.pnlRaw!==null&&t.pnlRaw!=='')?Number(t.pnlRaw):signed(t),
+  contracts:Number(t.contracts||0),
+  commission:Number(t.commission||0),
+  result:t.result,
+  sourceEventId:t.sourceEventId
+ };
+}
+function labelLegs(legs){
+ legs.forEach((l,i)=>{
+  if(l.label)return;
+  l.label=l.result==='breakeven'?'BE':`TP${legs.slice(0,i+1).filter(x=>x.result!=='breakeven').length}`;
+ });
+ return legs;
+}
+function combineTradeObjects(list){
+ // list = pole běžných obchodů (mohou už samy mít legs, pokud byly dřív sloučené)
+ const legs=labelLegs(list.flatMap(t=>Array.isArray(t.legs)&&t.legs.length?t.legs:[legFromTrade(t)]));
+ const sorted=[...list].sort((a,b)=>(String(a.date||'')+String(a.entryTime||'')).localeCompare(String(b.date||'')+String(b.entryTime||'')));
+ const first=sorted[0], lastByExit=[...list].sort((a,b)=>(String(a.date||'')+String(a.exitTime||'')).localeCompare(String(b.date||'')+String(b.exitTime||''))).at(-1);
+ const totalPnlRaw=legs.reduce((a,l)=>a+(Number(l.pnlRaw)||0),0);
+ const totalPoints=legs.reduce((a,l)=>a+Math.abs(Number(l.points)||0),0);
+ const totalContracts=legs.reduce((a,l)=>a+(Number(l.contracts)||0),0)||list.length;
+ const totalCommission=legs.reduce((a,l)=>a+(Number(l.commission)||0),0);
+ const result=classifyResult(totalPnlRaw);
+ const comments=[...new Set(list.map(t=>t.comment).filter(Boolean))];
+ return {
+  id:list.find(t=>t._keepId)?.id||first.id||crypto.randomUUID(),
+  instrument:first.instrument||'',
+  date:lastByExit.date||first.date,
+  entryTime:first.entryTime,
+  entryPrice:first.entryPrice,
+  exitTime:lastByExit.exitTime,
+  exitPrice:lastByExit.exitPrice,
+  result,
+  points:Math.round(totalPoints*100)/100,
+  pnl:Math.abs(totalPnlRaw),
+  pnlRaw:totalPnlRaw,
+  contracts:totalContracts,
+  commission:Math.round(totalCommission*100)/100,
+  strategy:first.strategy||list.find(t=>t.strategy)?.strategy||'',
+  planFollowed:list.every(t=>t.planFollowed==='ano')?'ano':'ne',
+  comment:comments.length?comments.join(' | '):`Sloučeno z ${legs.length} cílů stejné pozice (TP1/TP2/BE).`,
+  images:list.flatMap(t=>t.images||[]).slice(0,3),
+  createdAt:list.reduce((min,t)=>Math.min(min,t.createdAt||Date.now()),Date.now()),
+  updatedAt:Date.now(),
+  legs,
+  positionId:list.find(t=>t.positionId)?.positionId||'',
+  sourceEventId:list.find(t=>t.sourceEventId)?.sourceEventId,
+  sourceEventIds:[...new Set(legs.map(l=>l.sourceEventId).filter(Boolean))],
+  externalAccount:list.find(t=>t.externalAccount)?.externalAccount||'',
+  journalId:first.journalId
+ };
+}
+let pendingMergeTrades=[];
+function openMergePreview(selected){
+ pendingMergeTrades=selected;
+ $('mergePreviewList').innerHTML=selected.map(tradeHTML).join('');
+ const merged=combineTradeObjects(selected);
+ const m=resultMeta(merged.result);
+ $('mergeSummary').innerHTML=`<b>Výsledek po sloučení:</b> <span class="pill ${m.cls}">${m.label}</span>
+  <div style="margin-top:8px">${esc(merged.instrument||'—')} · ${merged.entryTime} @ ${merged.entryPrice} → ${merged.exitTime} @ ${merged.exitPrice}</div>
+  <div style="margin-top:6px;font-weight:800" class="${m.moneyCls}">${Math.abs(merged.points)} bodů · ${dualMoney(merged.pnlRaw,true)}</div>
+  <div class="trade-legs" style="margin-top:8px">${merged.legs.map(legPillHTML).join('')}</div>`;
+ $('mergeError').textContent='';$('mergeError').classList.remove('show');
+ $('mergeTradeModal').classList.add('open');
+}
+function closeMergeModal(){pendingMergeTrades=[];$('mergeTradeModal').classList.remove('open')}
+$('closeMergeModal').onclick=closeMergeModal;
+$('cancelMergeTrade').onclick=closeMergeModal;
+$('mergeTradeModal').onclick=e=>{if(e.target===$('mergeTradeModal'))closeMergeModal()};
+$('mergeSelected').onclick=()=>{
+ const ids=[...document.querySelectorAll('#tradeList .trade-select:checked')].map(cb=>cb.dataset.id);
+ if(ids.length<2){showToast('Zaškrtni alespoň dva obchody, které chceš sloučit.');return}
+ const selected=trades.filter(t=>ids.includes(t.id));
+ openMergePreview(selected);
+};
+$('confirmMergeTrade').onclick=async()=>{
+ const err=$('mergeError');
+ try{
+  if(pendingMergeTrades.length<2)throw new Error('Vyber alespoň dva obchody.');
+  const merged=combineTradeObjects(pendingMergeTrades);
+  const data=await ensureActiveJournalData();
+  data.trades=Array.isArray(data.trades)?data.trades:[];
+  const removeIds=new Set(pendingMergeTrades.map(t=>t.id));
+  data.trades=data.trades.filter(t=>!removeIds.has(t.id));
+  merged.id=crypto.randomUUID();
+  data.trades.push(merged);
+  const w=await window.desktopAPI.writeJournal(activeJournalId,data);
+  if(!w?.ok)throw new Error(w?.error||'Sloučený obchod nelze uložit.');
+  closeMergeModal();
+  await load();
+  showToast(`Sloučeno obchodů: ${removeIds.size} → 1.`);
+ }catch(e){err.textContent='Sloučení se nezdařilo: '+(e?.message||e);err.classList.add('show')}
+};
+
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+ document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+ const target=$(b.dataset.section);if(target)target.classList.add('active');
+ $('pageTitle').textContent=b.textContent.replace(/^[^\s]+\s/,'');
+ const isHome=b.dataset.section==='home';
+ document.querySelector('.topbar').style.display=isHome?'none':'flex';
+ $('addTradeBtn').style.display=(b.dataset.section==='journal'||b.dataset.section==='calendar')?'inline-block':'none';
+ if(b.dataset.section==='accountOverview')setTimeout(initAccountOverview,60); if(b.dataset.section==='instrumentPortfolio')setTimeout(initInstrumentPortfolioSection,60);
+ if(b.dataset.section==='reports')setTimeout(initReports,60);
+ if(b.dataset.section==='calendar')setTimeout(initCalendarSection,60);
+});
+$('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
+$('addTradeBtn').onclick=()=>openModal();$('closeModal').onclick=()=>$('tradeModal').classList.remove('open');
+$('tradeModal').onclick=e=>{if(e.target===$('tradeModal'))$('tradeModal').classList.remove('open')};
+['search','filterResult','filterDate'].forEach(id=>$(id).addEventListener('input',renderTrades));
+$('prevMonth').onclick=()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);renderCalendar()};
+$('nextMonth').onclick=()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);renderCalendar()};
+$('saveSettings').onclick=async()=>{await persistSettings({startingBalance:Number($('startingBalance').value)||0,currency:'USD',usdCzkRate:Number($('usdCzkRate').value)||23});showToast('Nastavení uloženo.')};
+if($('changePassword'))$('changePassword').onclick=()=>{
+ if(!window.FJAuth){showToast('Změna hesla není v tomto prostředí dostupná.');return}
+ if(!window.FJAuth.hasPassword()){showToast('Zatím není nastavené žádné heslo.');return}
+ $('cpCurrent').value='';$('cpNew').value='';$('cpNew2').value='';
+ $('changePasswordError').textContent='';$('changePasswordError').classList.remove('show');
+ $('changePasswordModal').classList.add('open');
+ setTimeout(()=>$('cpCurrent').focus(),30);
+};
+function closeChangePasswordModal(){$('changePasswordModal').classList.remove('open')}
+$('closeChangePasswordModal').onclick=closeChangePasswordModal;
+$('cancelChangePassword').onclick=closeChangePasswordModal;
+$('changePasswordModal').onclick=e=>{if(e.target===$('changePasswordModal'))closeChangePasswordModal()};
+$('confirmChangePassword').onclick=async()=>{
+ const err=$('changePasswordError');
+ err.textContent='';err.classList.remove('show');
+ try{
+  if(!window.FJAuth)throw new Error('Změna hesla není v tomto prostředí dostupná.');
+  const current=$('cpCurrent').value, next=$('cpNew').value, again=$('cpNew2').value;
+  const ok=await window.FJAuth.verifyPassword(current);
+  if(!ok)throw new Error('Současné heslo nesouhlasí.');
+  if(next.length<4)throw new Error('Nové heslo musí mít alespoň 4 znaky.');
+  if(next!==again)throw new Error('Nová hesla se neshodují.');
+  await window.FJAuth.setPassword(next);
+  closeChangePasswordModal();
+  showToast('Heslo bylo změněno.');
+ }catch(e){err.textContent=e?.message||String(e);err.classList.add('show')}
+};
+[$('cpCurrent'),$('cpNew'),$('cpNew2')].forEach(el=>{if(el)el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmChangePassword').click()}})});
+if($('lockApp'))$('lockApp').onclick=()=>{
+ if(!window.FJAuth){showToast('Zamknutí není v tomto prostředí dostupné.');return}
+ window.FJAuth.lock();
+};
+$('saveRiskSettings').onclick=async()=>{
+ const num=id=>{const v=$(id).value;return v===''?0:Math.abs(Number(v))||0};
+ await persistSettings({risk:{
+  maxDailyDrawdown:num('riskMaxDailyDrawdown'),
+  maxTotalDrawdown:num('riskMaxTotalDrawdown'),
+  maxSlPerDay:num('riskMaxSlPerDay'),
+  maxTradesPerDay:num('riskMaxTradesPerDay'),
+  maxProfitTradesPerDay:num('riskMaxProfitTradesPerDay'),
+  profitTargetPerDay:num('riskProfitTargetPerDay')
+ }});
+ showToast('Řízení rizika uloženo pro tento deník.');
+};
+$('themeMode').onchange=()=>{
+ const mode=$('themeMode').value;
+ if($('customThemeFields'))$('customThemeFields').style.display=mode==='custom'?'':'none';
+ if(mode==='custom'){
+  const picks=readCustomPicksFromUI();
+  applyCustomTheme(picks,false);
+ }else{
+  applyBuiltInTheme(mode);
+ }
+ refreshChartsForTheme();
+};
+['tp_bgStart','tp_bgEnd','tp_sidebarBg','tp_panel','tp_text','tp_line','tp_blue','tp_green','tp_red','tp_yellow'].forEach(id=>{
+ if(!$(id))return;
+ $(id).addEventListener('input',()=>{
+  const picks=readCustomPicksFromUI();
+  applyCustomTheme(picks,false);
+  refreshChartsForTheme();
+ });
+});
+$('resetThemeDefaults').onclick=()=>{
+ Object.entries(DEFAULT_CUSTOM_PICKS).forEach(([k,v])=>{ if($('tp_'+k)) $('tp_'+k).value=v; });
+ applyCustomTheme(DEFAULT_CUSTOM_PICKS,false);
+ refreshChartsForTheme();
+};
+$('saveTheme').onclick=()=>{
+ const mode=$('themeMode').value;
+ if(mode==='custom'){
+  const picks=readCustomPicksFromUI();
+  applyCustomTheme(picks,true);
+  currentThemePref=loadThemePref();
+ }else{
+  applyBuiltInTheme(mode);
+  saveThemePref({mode});
+  currentThemePref={mode};
+ }
+ refreshChartsForTheme();
+ showToast('Vzhled uložen.');
+};
+function refreshChartsForTheme(){
+ try{ renderAll(); }catch(e){}
+}
+$('exportCsv').onclick=()=>{
+ const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář'];
+ const rows=trades.map(t=>[t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,t.result==='breakeven'?Math.abs(Number(t.points||0)):(t.result==='target'?t.points:-t.points),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment]);
+ const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');download(new Blob(['\ufeff'+csv],{type:'text/csv'}),'futures-denik.csv')
+};
+$('printPdf').onclick=()=>window.print();
+$('exportJson').onclick=()=>download(new Blob([JSON.stringify({settings,trades},null,2)],{type:'application/json'}),'futures-journal-zaloha.json');
+$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const t of data.trades)await put('trades',t);if(data.settings)await put('settings',{key:'main',value:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
+$('clearAll').onclick=async()=>{if(await showConfirm('Tato akce smaže všechny obchody a nastavení pouze v aktuálním deníku. Pokračovat?')){await clearStore('trades');await clearStore('settings');safeReload()}};
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+
+$('factoryReset').onclick=async()=>{
+ const first=await showConfirm('KOMPLETNÍ RESET smaže všechny deníky, všechny obchody, obrázky a nastavení. Pokračovat?');
+ if(!first)return;
+ const typed=await showPromptText('Pro potvrzení napiš přesně: SMAZAT VŠE','Kompletní reset aplikace');
+ if(typed!=='SMAZAT VŠE'){showToast('Reset byl zrušen. Potvrzovací text nebyl správný.');return}
+ try{
+  if(window.desktopAPI){
+   const result=await window.desktopAPI.factoryReset();
+   if(!result?.ok)throw new Error(result?.error||'Reset se nepodařil.');
+  }else{
+   throw new Error('Kompletní reset je dostupný pouze v desktopové aplikaci.');
+  }
+  localStorage.removeItem(JOURNAL_LIST_KEY);
+  localStorage.removeItem(ACTIVE_JOURNAL_KEY);
+  localStorage.removeItem(PASSWORD_KEY);
+  showToast('Aplikace byla kompletně vymazána a vrátí se do čistého stavu.');
+  safeReload();
+ }catch(err){
+  showToast('Kompletní reset se nepodařilo dokončit: '+err.message);
+ }
+};
+
+window.addEventListener('resize',()=>{if($('dashboard').classList.contains('active'))renderDashboard()});
+
+function saveJournalProfiles(){
+ localStorage.setItem(JOURNAL_LIST_KEY,JSON.stringify(journalProfiles));
+ localStorage.setItem(ACTIVE_JOURNAL_KEY,activeJournalId);
+}
+function safeReload(){
+ // Reload stránky, zatímco má nějaké pole fokus, může v Electronu/Chromiu
+ // občas nechat po znovunačtení dané pole (nebo i jiné) "zaseknuté" – nereaguje
+ // na klik ani psaní, dokud uživatel neklikne jinam. Zrušením fokusu těsně
+ // před reloadem se tomu předchází.
+ try{ document.activeElement?.blur?.(); }catch(e){}
+ setTimeout(()=>location.reload(),0);
+}
+function renderJournalSelector(){
+ const select=$('journalSelect');
+ if(!journalProfiles.length){
+  select.innerHTML='<option value="">Nejprve vytvořte deník</option>';
+  select.value='';
+  select.disabled=true;
+  $('renameJournalBtn').disabled=true;
+  $('deleteJournalBtn').disabled=true;
+  return;
+ }
+ select.disabled=false;
+ $('renameJournalBtn').disabled=false;
+ $('deleteJournalBtn').disabled=false;
+ select.innerHTML=journalProfiles.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ select.value=activeJournalId;
+}
+async function switchJournal(id){
+ if(id===activeJournalId)return;
+ if(db)db.close();
+ activeJournalId=id;saveJournalProfiles();
+ safeReload();
+}
+$('journalSelect').onchange=e=>switchJournal(e.target.value);
+let journalNameMode='new';
+function openJournalNameModal(mode){
+ journalNameMode=mode;
+ const current=journalProfiles.find(x=>x.id===activeJournalId);
+ $('journalNameModalTitle').textContent=mode==='new'?'Nový deník':'Přejmenovat deník';
+ $('journalNameInput').value=mode==='rename'&&current?current.name:'';
+ $('journalNameError').textContent='';
+ $('journalNameError').style.display='none';
+ $('journalNameModal').classList.add('open');
+ setTimeout(()=>{$('journalNameInput').focus();$('journalNameInput').select()},30);
+}
+function closeJournalNameModal(){ $('journalNameModal').classList.remove('open'); }
+async function saveJournalNameFromModal(){
+ const clean=$('journalNameInput').value.trim();
+ const err=$('journalNameError');
+ if(!clean){err.textContent='Zadej název deníku.';err.style.display='block';return}
+ if(journalNameMode==='new'){
+  if(journalProfiles.some(j=>j.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
+  const id='journal_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  journalProfiles.push({id,name:clean});activeJournalId=id;saveJournalProfiles();closeJournalNameModal();safeReload();
+ }else{
+  const j=journalProfiles.find(x=>x.id===activeJournalId);if(!j)return;
+  if(journalProfiles.some(x=>x.id!==j.id&&x.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
+  j.name=clean;saveJournalProfiles();renderJournalSelector();initReports();closeJournalNameModal();showToast('Deník byl přejmenován.');
+ }
+}
+$('newJournalBtn').onclick=()=>openJournalNameModal('new');
+$('renameJournalBtn').onclick=()=>openJournalNameModal('rename');
+$('closeJournalNameModal').onclick=closeJournalNameModal;
+$('cancelJournalName').onclick=closeJournalNameModal;
+$('saveJournalName').onclick=saveJournalNameFromModal;
+$('journalNameInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveJournalNameFromModal()}if(e.key==='Escape')closeJournalNameModal()});
+$('journalNameModal').addEventListener('click',e=>{if(e.target===$('journalNameModal'))closeJournalNameModal()});
+$('deleteJournalBtn').addEventListener('click',async()=>{
+ if(journalProfiles.length<=1){showToast('Poslední deník nelze smazat.');return}
+ const j=journalProfiles.find(x=>x.id===activeJournalId);if(!j)return;
+ if(!(await showConfirm(`Opravdu smazat deník „${j.name}“ včetně všech jeho dat?`)))return;
+ if(db)db.close();
+ const deleted=await window.desktopAPI.deleteJournal(activeJournalId);
+ if(!deleted?.ok){showToast('Deník se nepodařilo smazat: '+(deleted?.error||'Neznámá chyba'));return}
+ journalProfiles=journalProfiles.filter(x=>x.id!==activeJournalId);activeJournalId=journalProfiles[0].id;saveJournalProfiles();safeReload();
+});
+renderJournalSelector();
+
+
+function showToast(message){
+ const el=$('statusToast');el.textContent=message;el.classList.add('show');clearTimeout(showToast.timer);
+ // Delší zprávy (např. instrukce k propojení) potřebují víc času na přečtení.
+ const duration=Math.min(12000,Math.max(2600,message.length*70));
+ showToast.timer=setTimeout(()=>el.classList.remove('show'),duration);
+ el.onclick=()=>{el.classList.remove('show');clearTimeout(showToast.timer)};
+}
+// Náhrada za window.confirm()/window.prompt() – nativní dialogy Electronu na
+// Windows umí po zavření nechat hlavní okno bez klávesnicového fokusu (stejný
+// problém jako u window.alert(), viz oprava "Uložit heslo"). Používáme proto
+// vlastní okno v rámci aplikace, ne prohlížečový dialog.
+let confirmResolver=null;
+function showConfirm(message){
+ return new Promise(resolve=>{
+  confirmResolver=resolve;
+  $('confirmModalMessage').textContent=message;
+  $('confirmModal').classList.add('open');
+  setTimeout(()=>$('confirmModalOk').focus(),30);
+ });
+}
+function resolveConfirm(value){
+ $('confirmModal').classList.remove('open');
+ if(confirmResolver){confirmResolver(value);confirmResolver=null}
+}
+if($('confirmModalCancel'))$('confirmModalCancel').onclick=()=>resolveConfirm(false);
+if($('confirmModalOk'))$('confirmModalOk').onclick=()=>resolveConfirm(true);
+if($('confirmModal'))$('confirmModal').onclick=e=>{if(e.target===$('confirmModal'))resolveConfirm(false)};
+
+let promptResolver=null;
+function showPromptText(message,title='Potvrzení'){
+ return new Promise(resolve=>{
+  promptResolver=resolve;
+  $('promptModalTitle').textContent=title;
+  $('promptModalMessage').textContent=message;
+  $('promptModalInput').value='';
+  $('promptModal').classList.add('open');
+  setTimeout(()=>$('promptModalInput').focus(),30);
+ });
+}
+function resolvePrompt(value){
+ $('promptModal').classList.remove('open');
+ if(promptResolver){promptResolver(value);promptResolver=null}
+}
+if($('promptModalCancel'))$('promptModalCancel').onclick=()=>resolvePrompt(null);
+if($('promptModalOk'))$('promptModalOk').onclick=()=>resolvePrompt($('promptModalInput').value);
+if($('promptModalInput'))$('promptModalInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('promptModalOk').click()}});
+if($('promptModal'))$('promptModal').onclick=e=>{if(e.target===$('promptModal'))resolvePrompt(null)};
+$('portfolioToggle')?.addEventListener('click',()=>{
+ const body=$('portfolioBody'),collapsed=body.classList.toggle('collapsed');$('portfolioArrow').textContent=collapsed?'▶':'▼';localStorage.setItem('FuturesJournal_portfolioCollapsed',collapsed?'1':'0');
+});
+if(localStorage.getItem('FuturesJournal_portfolioCollapsed')==='1'){$('portfolioBody').classList.add('collapsed');$('portfolioArrow').textContent='▶'}
+async function refreshPortfolio(){
+ try{
+  const all=await collectReportRows();const wins=all.filter(t=>t.result==='target'),losses=all.filter(t=>t.result==='stoploss');
+  const pnl=all.reduce((a,t)=>a+reportSigned(t),0),gw=wins.reduce((a,t)=>a+Number(t.pnl||0),0),gl=losses.reduce((a,t)=>a+Number(t.pnl||0),0);
+  $('portfolioPnl').innerHTML=dualMoney(pnl,true);$('portfolioPnl').className=pnl>=0?'pos':'neg';
+  $('portfolioTrades').textContent=all.length;$('portfolioWinrate').textContent=(wins.length+losses.length)?(wins.length/(wins.length+losses.length)*100).toFixed(1)+' %':'0 %';$('portfolioPf').textContent=gl?(gw/gl).toFixed(2):(gw?'∞':'0');
+ }catch(err){console.error('Portfolio:',err)}
+}
+async function collectAllJournalsBackup(){
+ const journals=[];
+ for(const profile of journalProfiles){
+  const result=await window.desktopAPI.readJournal(profile.id);
+  if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
+  journals.push({profile,trades:result.data?.trades||[],settings:result.data?.settings||[]});
+ }
+ return {app:'Futures Journal',version:2,exportedAt:new Date().toISOString(),activeJournalId,profiles:journalProfiles,journals};
+}
+async function restoreAllJournalsBackup(data){
+ if(!data||!Array.isArray(data.profiles)||!Array.isArray(data.journals))throw new Error('Neplatná záloha.');
+ for(const j of data.journals){
+  const result=await window.desktopAPI.writeJournal(j.profile.id,{trades:j.trades||[],settings:j.settings||[]});
+  if(!result?.ok)throw new Error(result?.error||`Deník ${j.profile.name} nelze obnovit.`);
+ }
+ journalProfiles=data.profiles;
+ activeJournalId=data.activeJournalId||data.profiles[0].id;
+ saveJournalProfiles();
+ safeReload();
+}
+
+async function refreshBackupPathInfo(){
+ if(!window.desktopAPI)return;
+ const p=await window.desktopAPI.getBackupPath();
+ $('backupPathInfo').textContent=p?`Aktuální záloha: ${p}`:'Umístění zálohy zatím není zvoleno.';
+}
+if(window.desktopAPI){
+ $('updateBackup').onclick=async()=>{
+  try{
+   const data=await collectAllJournalsBackup();
+   const result=await window.desktopAPI.saveBackup(JSON.stringify(data));
+   if(result?.ok){
+    $('backupPathInfo').textContent=`Aktuální záloha: ${result.path}`;
+    showToast('Kompletní záloha byla aktualizována.');
+   }
+  }catch(err){showToast('Zálohu se nepodařilo vytvořit: '+err.message)}
+ };
+ $('restoreBackup').onclick=async()=>{
+  try{
+   const result=await window.desktopAPI.loadBackup();
+   if(!result?.ok)return;
+   if(!(await showConfirm('Obnova přepíše současná data všech deníků. Pokračovat?')))return;
+   await restoreAllJournalsBackup(JSON.parse(result.content));
+  }catch(err){showToast('Zálohu se nepodařilo obnovit: '+err.message)}
+ };
+ refreshBackupPathInfo();
+}else{
+ $('updateBackup').onclick=()=>showToast('Tato funkce je dostupná v desktopové aplikaci.');
+ $('restoreBackup').onclick=()=>showToast('Tato funkce je dostupná v desktopové aplikaci.');
+}
+
+
+async function readJournalTrades(profile){
+ const result=await window.desktopAPI.readJournal(profile.id);
+ if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
+ return (result.data?.trades||[]).map(t=>({...t,journalId:profile.id,journalName:profile.name}));
+}
+
+async function collectReportRows(){
+ const all=[];
+ for(const p of journalProfiles)all.push(...await readJournalTrades(p));
+ return all;
+}
+function reportSigned(t){return signed(t,'pnl')}
+function groupSummary(rows,key,nameMap={}){
+ const map={};
+ rows.forEach(t=>{
+  const k=t[key]||'Nezadáno';
+  if(!map[k])map[k]={name:nameMap[k]||k,count:0,wins:0,losses:0,pnl:0};
+  map[k].count++;if(t.result==='target')map[k].wins++;else if(t.result==='stoploss')map[k].losses++;
+  map[k].pnl+=reportSigned(t);
+ });
+ return Object.values(map).sort((a,b)=>b.pnl-a.pnl);
+}
+function drawReportChart(rows){
+ const {x,w,h}=setupCanvas($('reportChart')),pad={l:65,r:20,t:25,b:45};
+ const daily={};rows.forEach(t=>daily[t.date||'Bez data']=(daily[t.date||'Bez data']||0)+reportSigned(t));
+ const labels=Object.keys(daily).sort(), vals=[];let running=0;labels.forEach(d=>{running+=daily[d];vals.push(running)});
+ x.clearRect(0,0,w,h);x.strokeStyle='#273452';x.fillStyle='#98a6c7';x.font='11px sans-serif';
+ if(!vals.length){x.fillText('Pro vybraný filtr nejsou data.',30,h/2);return}
+ let min=Math.min(0,...vals),max=Math.max(0,...vals);if(min===max){min-=1;max+=1}
+ for(let i=0;i<5;i++){const y=pad.t+(h-pad.t-pad.b)*i/4;x.beginPath();x.moveTo(pad.l,y);x.lineTo(w-pad.r,y);x.stroke();x.fillText(Math.round(max-(max-min)*i/4),6,y+4)}
+ const px=i=>pad.l+(w-pad.l-pad.r)*(vals.length===1?.5:i/(vals.length-1));
+ const py=v=>pad.t+(max-v)/(max-min)*(h-pad.t-pad.b);
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle='#5ba7ff';x.lineWidth=3;x.stroke();
+ x.fillStyle='#5ba7ff';vals.forEach((v,i)=>{x.beginPath();x.arc(px(i),py(v),3,0,Math.PI*2);x.fill()});
+}
+async function initReports(){
+ const all=await collectReportRows();
+ const instruments=[...new Set(all.map(t=>t.instrument).filter(Boolean))].sort();
+ $('reportJournal').innerHTML='<option value="">Všechny deníky</option>'+journalProfiles.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ $('reportInstrument').innerHTML='<option value="">Všechny instrumenty</option>'+instruments.map(i=>`<option>${esc(i)}</option>`).join('');
+ generateReportView(all);
+}
+function generateReportView(allRows=null){
+ const run=async()=>{
+  const all=allRows||await collectReportRows();
+  const f=$('reportFrom').value,to=$('reportTo').value,j=$('reportJournal').value,i=$('reportInstrument').value;
+  reportRows=all.filter(t=>(!f||t.date>=f)&&(!to||t.date<=to)&&(!j||t.journalId===j)&&(!i||t.instrument===i));
+  const wins=reportRows.filter(t=>t.result==='target'),losses=reportRows.filter(t=>t.result==='stoploss');
+  const pnl=reportRows.reduce((a,t)=>a+reportSigned(t),0),gw=wins.reduce((a,t)=>a+Number(t.pnl||0),0),gl=losses.reduce((a,t)=>a+Number(t.pnl||0),0);
+  $('reportCount').textContent=reportRows.length;
+  $('reportPnl').innerHTML=dualMoney(pnl,true);$('reportPnl').className='value '+(pnl>=0?'pos':'neg');
+  $('reportWinrate').textContent=(wins.length+losses.length)?(wins.length/(wins.length+losses.length)*100).toFixed(1)+' %':'0 %';
+  $('reportPf').textContent=gl?(gw/gl).toFixed(2):(gw?'∞':'0');
+  $('reportAvg').innerHTML=dualMoney(reportRows.length?pnl/reportRows.length:0);
+  const inst=groupSummary(reportRows,'instrument'),jr=groupSummary(reportRows,'journalId',Object.fromEntries(journalProfiles.map(x=>[x.id,x.name])));
+  $('reportInstrumentRows').innerHTML=inst.map(s=>`<tr><td>${esc(s.name)}</td><td>${s.count}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.count?(s.wins/s.count*100).toFixed(1):0} %</td><td class="${s.pnl>=0?'pos':'neg'}">${dualMoney(s.pnl,true)}</td></tr>`).join('');
+  $('reportJournalRows').innerHTML=jr.map(s=>`<tr><td>${esc(s.name)}</td><td>${s.count}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.count?(s.wins/s.count*100).toFixed(1):0} %</td><td class="${s.pnl>=0?'pos':'neg'}">${dualMoney(s.pnl,true)}</td></tr>`).join('');
+  $('reportTradeList').innerHTML=reportRows.length?reportRows.sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime)).map(t=>`<div class="card"><div class="title">${esc(t.instrument||'Bez instrumentu')} · ${esc(t.journalName)}</div>${tradeHTML(t)}</div>`).join(''):'<div class="card sub">Pro vybraný filtr nejsou žádné obchody.</div>';
+  drawReportChart(reportRows);
+ };
+ run();
+}
+$('generateReport').onclick=()=>generateReportView();
+$('reportPrint').onclick=()=>window.print();
+$('reportCsv').onclick=()=>{
+ const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L','Komentář'];
+ const rows=reportRows.map(t=>[t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,reportSigned({...t,pnl:t.points}),reportSigned(t),t.comment]);
+ const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
+ download(new Blob(['\ufeff'+csv],{type:'text/csv'}),'futures-report.csv');
+};
+setTimeout(()=>{initReports();refreshPortfolio()},300);
+
+window.addEventListener('error',e=>console.error('Chyba aplikace:',e.error||e.message));
+window.addEventListener('unhandledrejection',e=>console.error('Nezachycená chyba:',e.reason));
+
+let captureSnapshot=null;
+
+async function refreshCaptureStatus(){
+ if(!window.desktopAPI?.captureStatus)return;
+ const r=await window.desktopAPI.captureStatus();
+ if(!r?.ok)return;
+ captureSnapshot=r;
+ $('captureStatusText').value=r.running?`Běží na portu ${r.port}`:'Neběží';
+ $('capturePendingCount').value=r.pending;
+ $('captureEndpoint').value=r.endpoint;
+ $('captureApiKey').value=r.apiKey;
+ $('captureScreenshotMode').value=r.screenshotMode||'primary';
+ $('captureAutoImportSelect').value=r.autoImport?'ano':'ne';
+ $('relayUrl').value=r.relayUrl||'';
+ $('relayToken').value=r.relayToken||'';
+ $('relayEnabled').value=r.relayEnabled?'ano':'ne';
+ renderCaptureMappings(r.accounts||[],r.accountMappings||{},r.hiddenAccounts||[]);
+ renderOpenPositions(r.openPositions||[]);
+}
+function renderOpenPositions(rows){
+ const target=$('captureOpenPositions');
+ if(!target)return;
+ const fmtPrice=v=>Number.isFinite(Number(v))?Number(v).toLocaleString('cs-CZ',{maximumFractionDigits:8}):'—';
+ const fmtTime=v=>{if(!v)return '—';const d=new Date(v);return Number.isNaN(d.getTime())?esc(v):d.toLocaleString('cs-CZ');};
+ target.innerHTML=rows.length?rows.map(p=>{
+  const entry=Number(p.avgPrice||0);
+  const current=Number(p.currentPrice??p.lastPrice??entry);
+  const direction=p.side==='short'?-1:1;
+  const qty=Math.abs(Number(p.qty||0));
+  const pointValue=Number(p.pointValue||1);
+  const rate=Number(p.rate||1);
+  const pnl=(current-entry)*direction*qty*pointValue*rate;
+  return `<tr>
+   <td><b>${esc(p.instrumentFull||p.instrument||'—')}</b><div class="sub">${esc(p.account||'')}</div></td>
+   <td class="${p.side==='long'?'pos':p.side==='short'?'neg':''}"><b>${p.side==='long'?'LONG':p.side==='short'?'SHORT':'—'}</b></td>
+   <td>${fmtTime(p.openedAt)}</td>
+   <td>${fmtPrice(entry)}</td>
+   <td>${fmtPrice(current)}</td>
+   <td class="${pnl>0?'pos':pnl<0?'neg':''}">${pnl>=0?'+':''}${pnl.toLocaleString('cs-CZ',{maximumFractionDigits:2})}</td>
+  </tr>`;
+ }).join(''):'<tr><td colspan="6" class="sub">Žádné otevřené pozice.</td></tr>';
+}
+function renderCaptureMappings(accounts,mappings,hiddenAccounts=[]){
+ const hidden=new Set(hiddenAccounts);
+ const visible=accounts.filter(account=>!hidden.has(account));
+ $('captureMappingRows').innerHTML=visible.length?visible.map(account=>`<div class="mapping-row">
+  <div><b>${esc(account)}</b></div>
+  <select class="capture-mapping" data-account="${esc(account)}">
+   <option value="">Aktivní karta při importu</option>
+   ${journalProfiles.map(j=>`<option value="${esc(j.id)}" ${mappings[account]===j.id?'selected':''}>${esc(j.name)}</option>`).join('')}
+  </select>
+  <button class="btn capture-hide-account" data-account="${esc(account)}" title="Skrýt účet ze seznamu" style="padding:5px 9px;font-size:12px;min-width:auto">Skrýt</button>
+ </div>`).join(''):'<p class="sub">V seznamu nejsou žádné zobrazené účty.</p>';
+ const box=$('captureHiddenAccountsBox');
+ box.innerHTML=hiddenAccounts.length?`<details><summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">SKRYTÉ ÚČTY (${hiddenAccounts.length})</summary><div style="margin-top:10px">${hiddenAccounts.map(account=>`<div class="mapping-row"><div><b>${esc(account)}</b></div><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn capture-restore-account" data-account="${esc(account)}" style="padding:5px 9px;font-size:12px">Přidat zpět</button><button class="btn danger capture-delete-account" data-account="${esc(account)}" style="padding:5px 9px;font-size:12px">Odstranit</button></div></div>`).join('')}</div></details>`:'';
+ document.querySelectorAll('.capture-hide-account').forEach(btn=>btn.onclick=async()=>{
+  const next=[...new Set([...(captureSnapshot?.hiddenAccounts||[]),btn.dataset.account])];
+  await window.desktopAPI.captureSetHiddenAccounts(next);await refreshCaptureStatus();
+ });
+ document.querySelectorAll('.capture-restore-account').forEach(btn=>btn.onclick=async()=>{
+  const next=(captureSnapshot?.hiddenAccounts||[]).filter(a=>a!==btn.dataset.account);
+  await window.desktopAPI.captureSetHiddenAccounts(next);await refreshCaptureStatus();
+ });
+ document.querySelectorAll('.capture-delete-account').forEach(btn=>btn.onclick=async()=>{
+  const account=btn.dataset.account;
+  if(!(await showConfirm(`Účet ${account} bude trvale odstraněn ze seznamu účtů. Pokračovat?`)))return;
+  await window.desktopAPI.captureDeleteAccount(account);await refreshCaptureStatus();
+ });
+}
+async function capturedImages(e){
+ const paths=Array.isArray(e.screenshotPaths)?e.screenshotPaths:[];
+ const images=[];
+ for(const p of paths.slice(0,3)){
+  const r=await window.desktopAPI.captureReadScreenshot(p);
+  if(r?.ok&&r.dataUrl)images.push(r.dataUrl);
+ }
+ return images;
+}
+function mapCapturedTrade(e,images=[]){
+ const entry=new Date(e.entryTime||e.receivedAt||Date.now());
+ const exit=new Date(e.exitTime||e.receivedAt||Date.now());
+ const contracts=Number(e.quantity||e.contracts||1);
+ let commission=Number(e.commission||0);
+ let pnlRaw=Number(e.pnl||0);
+ const grossPnl=Number(e.grossPnl||0);
+ // Konektor (NinjaTrader/cTrader) posílá jen svou vlastní "Commission" a
+ // nezahrnuje další poplatky (Clearing/Exchange/IP/NFA fee), takže reálná
+ // komise může být vyšší. Pokud je to v Nastavení vypnuté a instrument má
+ // v šabloně vyplněnou vlastní komisi, použije se ta místo té z konektoru –
+ // a zisk/ztráta se přepočítá z hrubé hodnoty (ta z konektoru zůstává přesná).
+ if(settings.useConnectorCommission===false && grossPnl){
+  const defCommission=getDefaultCommissionForInstrument(e.instrument||e.instrumentFull||'');
+  if(defCommission!=null){
+   commission=Math.round(defCommission*contracts*100)/100;
+   pnlRaw=Math.round((grossPnl-commission)*100)/100;
+  }
+ }
+ const result=classifyResult(pnlRaw);
+ const tpl=findTemplate(e.instrument||e.instrumentFull||'');
+ return {
+  id:crypto.randomUUID(),
+  instrument:e.instrument||e.instrumentFull||'',
+  date:exit.toISOString().slice(0,10),
+  entryTime:entry.toTimeString().slice(0,5),
+  entryPrice:Number(e.entryPrice||0),
+  exitTime:exit.toTimeString().slice(0,5),
+  exitPrice:Number(e.exitPrice||0),
+  result,
+  points:Math.abs(Number(e.points||0)),
+  pnl:Math.abs(pnlRaw),
+  pnlRaw,
+  contracts,
+  strategy:e.strategy||tpl?.strategy||'NinjaTrader automatický import',
+  planFollowed:tpl?.planFollowed||'ano',
+  comment:e.comment||tpl?.comment||`Automaticky importováno ze zdroje ${e.source||'integrace'}.`,
+  images,
+  createdAt:Date.now(),
+  sourceEventId:e.id,
+  externalAccount:e.account||'',
+  commission,
+  grossPnl,
+  side:e.side||'',
+  positionId:e.positionId||''
+ };
+}
+function tradeHasSourceEventId(t,sourceEventId){
+ if(!sourceEventId)return false;
+ if(t.sourceEventId===sourceEventId)return true;
+ if(Array.isArray(t.sourceEventIds)&&t.sourceEventIds.includes(sourceEventId))return true;
+ if(Array.isArray(t.legs)&&t.legs.some(l=>l.sourceEventId===sourceEventId))return true;
+ return false;
+}
+async function appendOrMergeCapturedTrade(journalId,trade){
+ const r=await window.desktopAPI.readJournal(journalId);
+ if(!r?.ok)throw new Error(r?.error||'Deník nelze načíst.');
+ const data=r.data||{trades:[],settings:[]};
+ data.trades=Array.isArray(data.trades)?data.trades:[];
+ // Kontroluje se napříč VŠEMI legy už sloučených obchodů, ne jen top-level polem –
+ // jinak by se dal stejný (např. znovu nahlášený) fill importovat podruhé jako
+ // nový cíl u obchodu, který už jednou vznikl sloučením dvou a více legů.
+ if(data.trades.some(t=>tradeHasSourceEventId(t,trade.sourceEventId)))return false;
+ const jSettingsEntry=(Array.isArray(data.settings)?data.settings:[]).find(s=>s.key==='main');
+ const autoMerge=jSettingsEntry?.value?.autoMergeLegs!==false;
+ if(autoMerge&&trade.positionId){
+  const idx=data.trades.findIndex(t=>t.positionId&&t.positionId===trade.positionId);
+  if(idx>=0){
+   const combined=combineTradeObjects([data.trades[idx],trade]);
+   combined.id=data.trades[idx].id;
+   data.trades[idx]=combined;
+   const w=await window.desktopAPI.writeJournal(journalId,data);
+   if(!w?.ok)throw new Error(w?.error||'Deník nelze uložit.');
+   return true;
+  }
+ }
+ data.trades.push(trade);
+ const w=await window.desktopAPI.writeJournal(journalId,data);
+ if(!w?.ok)throw new Error(w?.error||'Deník nelze uložit.');
+ return true;
+}
+async function importCapturedTrades(silent=false){
+ const r=await window.desktopAPI.captureEvents(false);
+ const pending=(r?.events||[]).filter(e=>e.type==='trade_closed');
+ if(!pending.length){if(!silent)showToast('Nejsou připravené žádné uzavřené obchody.');return 0}
+ const mappings=captureSnapshot?.accountMappings||{};
+ const importedIds=[];
+ let count=0;
+ for(const e of pending){
+  const journalId=mappings[e.account]||activeJournalId;
+  const images=await capturedImages(e);
+  const added=await appendOrMergeCapturedTrade(journalId,mapCapturedTrade(e,images));
+  if(added)count++;
+  importedIds.push(e.id);
+ }
+ await window.desktopAPI.captureMarkImported(importedIds);
+ calendarAllTrades=null;
+ if(mappings&&Object.values(mappings).includes(activeJournalId)||!Object.keys(mappings).length){
+  const current=await window.desktopAPI.readJournal(activeJournalId);
+  if(current?.ok){db.data=current.data;trades=db.data.trades||[];renderAll()}
+ }
+ await refreshCaptureStatus();
+ if(!silent)showToast(`Importováno obchodů: ${count}`);
+ return count;
+}
+$('clearInvalidPositions').onclick=async()=>{
+ if(!(await showConfirm('Vymazat celý seznam otevřených pozic v deníku? Uzavřené obchody se nesmažou.')))return;
+ await window.desktopAPI.captureClearPositions();
+ await refreshCaptureStatus();
+};
+$('captureRefresh').onclick=refreshCaptureStatus;
+$('captureTestSequence').onclick=async()=>{await window.desktopAPI.captureTestExecutionSequence();await refreshCaptureStatus()};
+$('captureTestMultiTarget').onclick=async()=>{
+ await window.desktopAPI.captureTestMultiTargetSequence();
+ await refreshCaptureStatus();
+ showToast('Vytvořena testovací pozice se 3 kontrakty uzavřenými přes TP1, Break Even a TP2. Spusť import (nebo počkej na automatický) a zkontroluj Deník – měl by se objevit jeden sloučený obchod se třemi legy.');
+};
+$('captureImport').onclick=()=>importCapturedTrades(false);
+$('captureInstallNinja').onclick=async()=>{
+ const r=await window.desktopAPI.captureInstallNinjaConnector();
+ if(r?.ok)showToast('Hotovo. Konektor byl automaticky vložen do NinjaTraderu. Teď spusť NinjaTrader, otevři NinjaScript Editor a stiskni F5 pro kompilaci.');
+ else showToast('Automatická instalace se nepodařila: '+(r?.error||'neznámá chyba'));
+};
+$('capturePrepareTradingView').onclick=async()=>{
+ const r=await window.desktopAPI.capturePrepareTradingViewPine();
+ if(r?.ok)showToast('Pine Script je zkopírovaný ve schránce a TradingView se otevřel. V Pine Editoru stiskni Ctrl+V a Přidat do grafu.');
+ else showToast('Příprava Pine Scriptu se nepodařila: '+(r?.error||'neznámá chyba'));
+};
+$('capturePrepareWorker').onclick=async()=>{
+ const r=await window.desktopAPI.capturePrepareTradingViewWorker();
+ if(r?.ok)showToast('Kód webhooku je zkopírovaný ve schránce a Cloudflare se otevřel. Vytvoř Worker, smaž ukázkový kód, stiskni Ctrl+V a Deploy.');
+ else showToast('Příprava webhooku se nepodařila: '+(r?.error||'neznámá chyba'));
+};
+$('captureExportConnector').onclick=async()=>{
+ const r=await window.desktopAPI.captureExportNinjaConnector();
+ if(r?.ok)showToast('Konektor byl uložen. V NinjaTraderu ho importuj přes Tools → Import → NinjaScript Add-On.');
+ else if(!r?.canceled)showToast('Konektor se nepodařilo uložit: '+(r?.error||'neznámá chyba'));
+};
+$('captureTestCTrader').onclick=async()=>{
+ const r=await window.desktopAPI.captureTestCTraderSequence();
+ await refreshCaptureStatus();
+ if(r?.ok)showToast('Vytvořena testovací cTrader pozice uzavřená přes dva cíle (TP1 a TP2) se stejným Position.Id. Spusť import a zkontroluj Deník – měl by se objevit jeden sloučený obchod se dvěma legy.');
+ else showToast('Test se nepodařil: '+(r?.error||'neznámá chyba'));
+};
+$('captureInstallCTrader').onclick=async()=>{
+ const r=await window.desktopAPI.captureInstallCTraderConnector();
+ if(r?.ok)showToast('Hotovo – kód cBota byl aktualizován přímo v projektu, který už máš v cTraderu vytvořený. V cTraderu klikni na FuturesJournalCTraderConnector v Algo → cBots a znovu Build (Ctrl+B).');
+ else if(r?.notFound)showToast(r.error);
+ else showToast('Aktualizace se nepodařila: '+(r?.error||'neznámá chyba'));
+};
+$('captureExportCTrader').onclick=async()=>{
+ const r=await window.desktopAPI.captureExportCTraderConnector();
+ if(r?.ok)showToast('cBot byl stažen. V cTraderu: Algo → cBots → New → C# → From scratch → pojmenuj přesně "FuturesJournalCTraderConnector" a Create. V editoru smaž ukázkový kód a vlož obsah staženého souboru. Klikni Build, pak na grafu přidej instanci k účtu a klikni Start.');
+ else if(!r?.canceled)showToast('cBot se nepodařilo uložit: '+(r?.error||'neznámá chyba'));
+};
+$('captureExportTradingView').onclick=async()=>{
+ const r=await window.desktopAPI.captureExportTradingViewConnector();
+ if(r?.ok)showToast('TradingView Pine Script byl uložen. Otevři ho, zkopíruj celý kód do Pine Editoru a klikni na Přidat do grafu.');
+ else if(!r?.canceled)showToast('TradingView Pine Script se nepodařilo uložit: '+(r?.error||'neznámá chyba'));
+};
+$('captureExportTradingViewWorker').onclick=async()=>{
+ const r=await window.desktopAPI.captureExportTradingViewWorker();
+ if(r?.ok)showToast('Soubor webhook relay byl uložen. Použije se při nastavení veřejného webhooku pro TradingView.');
+ else if(!r?.canceled)showToast('Webhook relay se nepodařilo uložit: '+(r?.error||'neznámá chyba'));
+};
+$('captureOpenConnectors').onclick=async()=>{const r=await window.desktopAPI.captureOpenConnectorFolder();if(!r?.ok)showToast('Složku nelze otevřít: '+(r?.error||''))};
+$('captureNewKey').onclick=async()=>{
+ if(!(await showConfirm('Starý NinjaTrader konektor přestane fungovat, dokud v něm nezměníš klíč. Pokračovat?')))return;
+ await window.desktopAPI.captureRegenerateKey();await refreshCaptureStatus();
+};
+$('captureClear').onclick=async()=>{if(await showConfirm('Vymazat frontu zachycených událostí?')){await window.desktopAPI.captureClear();await refreshCaptureStatus()}};
+$('captureScreenshotMode').onchange=async e=>{await window.desktopAPI.captureSetScreenshotMode(e.target.value);await refreshCaptureStatus()};
+$('captureAutoImportSelect').onchange=async e=>{await window.desktopAPI.captureSetAutoImport(e.target.value==='ano');await refreshCaptureStatus()};
+$('captureSaveMappings').onclick=async()=>{
+ const mappings={...(captureSnapshot?.accountMappings||{})};
+ document.querySelectorAll('.capture-mapping').forEach(s=>{if(s.value)mappings[s.dataset.account]=s.value;else delete mappings[s.dataset.account]});
+ await window.desktopAPI.captureSetMappings(mappings);
+ await refreshCaptureStatus();
+ showToast('Přiřazení účtů bylo uloženo.');
+};
+$('saveRelay').onclick=async()=>{
+ await window.desktopAPI.captureSetRelay({enabled:$('relayEnabled').value==='ano',url:$('relayUrl').value,token:$('relayToken').value});
+ await refreshCaptureStatus();showToast('Nastavení TradingView relay bylo uloženo.');
+};
+$('pollRelay').onclick=async()=>{
+ try{const r=await window.desktopAPI.capturePollRelay();await refreshCaptureStatus();showToast(`Staženo alertů: ${r?.count||0}`)}
+ catch(e){showToast('Relay nelze načíst: '+e.message)}
+};
+window.desktopAPI?.onCaptureEvent?.(async()=>{
+ await refreshCaptureStatus();
+ const s=await window.desktopAPI.captureStatus();
+ if(s?.autoImport&&s.pending)await importCapturedTrades(true);
+});
+setInterval(async()=>{
+ const s=await window.desktopAPI?.captureStatus?.();
+ if(s?.autoImport&&s.pending)await importCapturedTrades(true);
+},5000);
+setTimeout(refreshCaptureStatus,800);
+
+
+let overviewAllTrades=[];
+async function readTradesForOverview(profile){
+ const result=await window.desktopAPI.readJournal(profile.id);
+ if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
+ const rows=Array.isArray(result.data?.trades)?result.data.trades:[];
+ return rows.map(t=>({...t,journalId:profile.id,journalName:profile.name}));
+}
+function refreshAccountInstrumentOptions(preferredValue=''){
+ const selectedJournal=$('accountJournal').value;
+ const source=selectedJournal?overviewAllTrades.filter(t=>t.journalId===selectedJournal):overviewAllTrades;
+ const instruments=[...new Set(source.map(t=>String(t.instrument||'').trim()).filter(Boolean))]
+  .sort((a,b)=>a.localeCompare(b,'cs',{sensitivity:'base'}));
+ $('accountInstrument').innerHTML='<option value="">Všechny instrumenty</option>'+instruments.map(i=>`<option value="${esc(i)}">${esc(i)}</option>`).join('');
+ $('accountInstrument').value=instruments.includes(preferredValue)?preferredValue:'';
+}
+async function initAccountOverview(){
+ overviewAllTrades=[];
+ for(const p of journalProfiles)overviewAllTrades.push(...await readTradesForOverview(p));
+ const oldJ=$('accountJournal').value,oldI=$('accountInstrument').value;
+ $('accountJournal').innerHTML='<option value="">Všechny deníky</option>'+journalProfiles.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+ $('accountJournal').value=journalProfiles.some(p=>p.id===oldJ)?oldJ:'';
+ refreshAccountInstrumentOptions(oldI);
+ syncAccountDateFields();
+ applyAccountOverview();
+}
+function syncAccountDateFields(){
+ const mode=$('accountRangeMode').value;
+ document.querySelectorAll('.account-day-field').forEach(el=>el.style.display=mode==='day'?'block':'none');
+ document.querySelectorAll('.account-interval-field').forEach(el=>el.style.display=mode==='interval'?'block':'none');
+}
+function filteredOverviewTrades(){
+ const mode=$('accountRangeMode').value,day=$('accountDay').value,from=$('accountFrom').value,to=$('accountTo').value;
+ const journal=$('accountJournal').value,instrument=$('accountInstrument').value;
+ return overviewAllTrades.filter(t=>{
+  if(journal&&t.journalId!==journal)return false;
+  if(instrument&&t.instrument!==instrument)return false;
+  if(mode==='day'&&day&&t.date!==day)return false;
+  if(mode==='interval'&&from&&t.date<from)return false;
+  if(mode==='interval'&&to&&t.date>to)return false;
+  return true;
+ });
+}
+function applyAccountOverview(){
+ const rows=filteredOverviewTrades();
+ renderDashboard(rows);
+ $('accountOverviewTrades').innerHTML=rows.length?rows.slice().sort((a,b)=>(b.date+(b.entryTime||'')).localeCompare(a.date+(a.entryTime||''))).map(tradeHTML).join(''):'<div class="sub">Pro vybraný filtr nejsou žádné obchody.</div>';
+}
+$('accountRangeMode').onchange=syncAccountDateFields;
+$('accountJournal').onchange=()=>{refreshAccountInstrumentOptions();applyAccountOverview()};
+$('accountInstrument').onchange=applyAccountOverview;
+$('applyAccountFilters').onclick=applyAccountOverview;
+$('clearAccountFilters').onclick=()=>{
+ $('accountRangeMode').value='all';$('accountDay').value='';$('accountFrom').value='';$('accountTo').value='';$('accountJournal').value='';$('accountInstrument').value='';
+ syncAccountDateFields();applyAccountOverview();
+};
+syncAccountDateFields();
+
+document.querySelector('.topbar').style.display='none';
+let journalAppStarted=false;
+async function startJournalApplication(){
+ if(journalAppStarted)return;
+ journalAppStarted=true;
+ try{
+  await removeLegacyDefaultJournal();
+  renderJournalSelector();
+  if(!journalProfiles.length){
+   openJournalNameModal('new');
+   showToast('Vytvořte svůj první deník.');
+   return;
+  }
+  await openDB();
+  await load();
+ }
+ catch(e){journalAppStarted=false;showToast('Databázi se nepodařilo otevřít: '+e.message)}
+}
+window.addEventListener('journal:authenticated',()=>{void startJournalApplication()},{once:true});
+</script>
+<script src="login.js"></script>
+</body>
+</html>

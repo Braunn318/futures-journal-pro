@@ -1,0 +1,19 @@
+FUTURES JOURNAL PRO 4.3.0 – ČISTÁ INSTALACE
+
+Toto je samostatný čistý projekt. Není potřeba instalovat žádnou starší verzi ani spouštět žádnou opravu.
+
+POSTUP:
+1. Rozbalte celý ZIP přes „Extrahovat vše“.
+2. Ve vzniklé složce spusťte VYTVORIT_INSTALATOR.bat.
+3. Po dokončení otevřete složku dist.
+4. Spusťte Futures-Journal-PRO-Setup-4.3.0.exe.
+
+Po instalaci:
+- aplikace se spouští automaticky po přihlášení do Windows,
+- zavření křížkem ji ponechá běžet na pozadí,
+- ikona je v oznamovací oblasti vedle hodin nebo pod šipkou ^,
+- pravým tlačítkem na ikoně lze aplikaci úplně ukončit,
+- uživatelská data nejsou při běžné aktualizaci/odinstalaci automaticky mazána.
+
+DŮLEŽITÉ:
+Windows rozhoduje, zda novou ikonu zobrazí přímo vedle hodin, nebo nejprve pod šipkou ^. Po prvním spuštění ji lze přetáhnout ze skrytých ikon přímo na lištu.
