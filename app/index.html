@@ -103,6 +103,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .field input,.field select,.field textarea{width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px}
 textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.full{grid-column:1/-1}
 .modal{position:fixed;inset:0;background:rgba(var(--shadow-rgb),.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;pointer-events:none}
+#imageViewerModal{z-index:30}
 .modal.open{pointer-events:auto}
 .modal.open{display:flex}.modalbox{width:min(900px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
 .modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
@@ -640,10 +641,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
             <label>Komise u nových importovaných obchodů (NinjaTrader / cTrader)</label>
             <select id="useConnectorCommission">
-              <option value="ano">Použít komisi nahlášenou konektorem (výchozí)</option>
-              <option value="ne">Ignorovat konektor – vždy použít komisi ze šablony instrumentu</option>
+              <option value="ne">Použít komisi ze šablony instrumentu, jinak $0 (výchozí)</option>
+              <option value="ano">Použít komisi nahlášenou konektorem</option>
             </select>
-            <div class="sub" style="margin-top:6px">NinjaTrader posílá jen "Commission" a nezahrnuje další poplatky (Clearing, Exchange, IP, NFA fee), takže reálná komise může být vyšší, než co pošle konektor. Když přepneš na "Ignorovat konektor", nově importované obchody použijí komisi ze šablony instrumentu (za kontrakt) místo toho.</div>
+            <div class="sub" style="margin-top:6px">NinjaTrader posílá jen "Commission" a nezahrnuje další poplatky (Clearing, Exchange, IP, NFA fee), takže reálná komise může být vyšší, než co pošle konektor. Proto je výchozí chování bezpečnější: použije se komise ze šablony instrumentu (za kontrakt), a pokud šablona pro daný instrument komisi nemá vyplněnou, počítá se s $0 (hrubá hodnota bez komise) – konektoru se nevěří automaticky. Přepnutím na "Použít komisi nahlášenou konektorem" se vrátíš k původnímu chování.</div>
             <button class="btn" id="saveConnectorCommissionSetting" style="margin-top:10px">Uložit</button>
           </div>
           <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
@@ -653,11 +654,27 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           </div>
         </div>
         <div class="card">
+          <h3>Export pro AI analýzu / Claude Cowork</h3>
+          <p class="sub">Vedle běžných dat udržuje appka automaticky ještě jednu "odlehčenou" kopii každého deníku – úplně stejná obchodní data (výsledek, body, komentář, denní plán, setup/scénář, psychologický checklist…), ale BEZ screenshotů. Ty totiž dělají soubor objemný; bez nich je i deník s velkým počtem obchodů v řádu stovek kB. Tahle kopie se aktualizuje sama při každém uložení obchodu.</p>
+          <div id="aiExportInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji umístění…</div>
+          <button class="btn primary" id="regenerateAiExports" style="margin-top:10px">🔄 Aktualizovat teď (pro všechny deníky)</button>
+          <div class="sub" style="margin-top:8px">Nasměruj Claude Cowork (nebo jiný nástroj) přímo na tuhle složku, ať vidí aktuální obchody napříč deníky bez nutnosti cokoliv ručně exportovat. Soubor "index.json" v této složce říká, který soubor patří kterému deníku podle názvu.</div>
+        </div>
+        <div class="card">
+          <h3>Umístění dat (deníky, obchody, screenshoty)</h3>
+          <p class="sub">Ve výchozím stavu se data ukládají na systémovém disku (C:), stejně jako u většiny Windows aplikací. Pokud chceš mít data na jiném disku (např. kvůli místu na SSD vyhrazenému jen pro OS), lze umístění změnit – appka existující deníky i screenshoty přesune celé, nic se neztratí.</p>
+          <div id="dataLocationInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji aktuální umístění…</div>
+          <button class="btn primary" id="changeDataLocation" style="margin-top:10px">📁 Změnit umístění dat…</button>
+          <button class="btn" id="resetDataLocation" style="margin-top:10px;margin-left:8px">Vrátit na výchozí umístění</button>
+          <div class="sub" style="margin-top:8px">Po změně se appka restartuje, ať se nové umístění projeví všude bezpečně.</div>
+        </div>
+        <div class="card">
           <h3>Záloha a obnova</h3>
           <p class="sub">Data se ukládají lokálně v tomto prohlížeči.</p>
           <button class="btn primary" id="updateBackup">💾 Aktualizovat zálohu na SSD</button>
           <button class="btn" id="restoreBackup" style="display:block;margin-top:10px">♻️ Obnovit ze zálohy</button>
           <div id="backupPathInfo" class="sub" style="margin-top:10px">Umístění zálohy zatím není zvoleno.</div>
+          <button class="btn" id="changeBackupPath" style="margin-top:10px">Změnit umístění zálohy…</button>
           <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
           <button class="btn" id="exportJson">Stáhnout zálohu JSON</button>
           <label class="btn" style="display:inline-block;margin-top:10px">Nahrát zálohu<input id="importJson" type="file" accept=".json" hidden></label>
@@ -802,8 +819,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           </div>
         </div>
 
-        <div class="field full"><label>Komentář <span class="optional-badge">nepovinné</span></label><textarea id="comment" placeholder="Volitelné"></textarea></div>
-        <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="image-preview" id="imagePreview"></div></div>
+        <div class="field full"><label>Komentář <span class="optional-badge" title="Tohle je pole, které uvidíš u obchodu v přehledu Deníku.">Viditelné</span></label><textarea id="comment" placeholder="Volitelné"></textarea></div>
+        <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tohle okno otevřené.</div><div class="image-preview" id="imagePreview"></div></div>
       </div>
       <div id="formAlert" class="alert red"></div>
       <button class="btn primary" type="submit" style="margin-top:16px">Uložit obchod</button>
@@ -1008,7 +1025,7 @@ function fillSettings(){
  $('riskMaxTradesPerDay').value=r.maxTradesPerDay||'';
  $('riskMaxProfitTradesPerDay').value=r.maxProfitTradesPerDay||'';
  $('riskProfitTargetPerDay').value=r.profitTargetPerDay||'';
- if($('useConnectorCommission'))$('useConnectorCommission').value=settings.useConnectorCommission===false?'ne':'ano';
+ if($('useConnectorCommission'))$('useConnectorCommission').value=settings.useConnectorCommission===true?'ano':'ne';
  renderTemplateList();
  fillThemeSettingsUI();
 }
@@ -1334,7 +1351,8 @@ function resultMeta(result){
 function legPillHTML(l,i){
  const m=resultMeta(l.result);
  const label=l.label||(l.result==='breakeven'?'BE':`Cíl ${i+1}`);
- return `<span class="leg-pill ${m.moneyCls}">${esc(label)}: ${m.sign}${Math.abs(Number(l.points||0))}b</span>`;
+ const detail=`${label}: ${l.exitTime||'?'} @ ${l.exitPrice??'?'} · ${l.contracts||0} ks · ${m.sign}${Math.abs(Number(l.pnl||0)).toFixed(2)}`;
+ return `<span class="leg-pill ${m.moneyCls}" title="${esc(detail)}" style="cursor:pointer" onclick="showToast('${esc(detail).replaceAll("'","\\'")}')">${esc(label)}: ${m.sign}${Math.abs(Number(l.points||0))}b</span>`;
 }
 function tradeHTML(t){
  const m=resultMeta(t.result);
@@ -1452,6 +1470,18 @@ window.openImage=src=>{
  const note=$('imageViewerNote');
  if(note)note.textContent=window.desktopAPI?.copyImageToClipboard?'':'Náhled v prohlížeči: tlačítka níže fungují přes schopnosti tvého prohlížeče (v nainstalované aplikaci fungují vždy).';
  $('imageViewerModal').classList.add('open');
+};
+// Náhledy uvnitř formuláře Nový/Upravit obchod jsou samy uvnitř jiného
+// otevřeného okna (#tradeModal) – okno prohlížeče obrázků by se tak mohlo
+// otevřít "pod" ním. Nejjednodušší a nejspolehlivější řešení: obrázek se
+// z formuláře otevře rovnou v OS výchozím prohlížeči obrázků (skutečné,
+// samostatné okno Windows), bez mezikroku přes okno v aplikaci.
+window.openImageFromForm=src=>{
+ if(window.desktopAPI?.openImageExternally){
+  window.desktopAPI.openImageExternally(src).then(r=>{ if(!r?.ok) showToast('Otevření se nezdařilo: '+(r?.error||'neznámá chyba')) });
+ }else{
+  openImage(src);
+ }
 };
 function closeImageViewer(){$('imageViewerModal').classList.remove('open');currentViewedImage=''}
 $('closeImageViewer').onclick=closeImageViewer;
@@ -1635,7 +1665,7 @@ function readLegRows(){
  }));
 }
 if($('addLegBtn'))$('addLegBtn').onclick=()=>addLegRow();
-function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div><img src="${src}"><button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
+function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div><img src="${src}" style="cursor:pointer" title="Otevřít obrázek ve výchozím prohlížeči obrázků" onclick="openImageFromForm('${src}')"><button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
 window.removeImg=i=>{editImages.splice(i,1);showPreviews()}
 window.editTrade=id=>openModal(trades.find(t=>t.id===id));
 window.deleteTrade=async id=>{if(await showConfirm('Opravdu smazat tento obchod?')){await del('trades',id);await load()}};
@@ -1700,6 +1730,23 @@ $('screenshots').addEventListener('change',async e=>{
  for(const f of files){if(f.size>3_000_000){showToast('Jeden obrázek je větší než 3 MB. Zvol menší soubor.');continue}
   const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});editImages.push(data)}
  showPreviews();e.target.value='';
+});
+document.addEventListener('paste',async e=>{
+ if(!$('tradeModal')?.classList.contains('open'))return;
+ const items=(e.clipboardData||window.clipboardData)?.items;
+ if(!items)return;
+ const imageItems=[...items].filter(it=>it.type&&it.type.startsWith('image/'));
+ if(!imageItems.length)return;
+ e.preventDefault();
+ for(const item of imageItems){
+  if(editImages.length>=3){showToast('Obchod může mít nejvýše 3 obrázky.');break}
+  const file=item.getAsFile();
+  if(!file)continue;
+  if(file.size>3_000_000){showToast('Vložený obrázek je větší než 3 MB.');continue}
+  const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
+  editImages.push(data);
+ }
+ showPreviews();
 });
 $('tradeForm').addEventListener('submit',async e=>{
  e.preventDefault();
@@ -1857,8 +1904,34 @@ function legFromTrade(t,label){
   contracts:Number(t.contracts||0),
   commission:Number(t.commission||0),
   result:t.result,
-  sourceEventId:t.sourceEventId
+  sourceEventId:t.sourceEventId,
+  sourceEventIds:Array.isArray(t.sourceEventIds)&&t.sourceEventIds.length?t.sourceEventIds:(t.sourceEventId?[t.sourceEventId]:[])
  };
+}
+// NinjaTrader/cTrader občas nahlásí jednu skutečnou uzávěrku pozice jako víc
+// samostatných exekucí se stejnou cenou výstupu (např. TP2 přesunutý na
+// cenu TP1, nebo více fillů na stejné ceně). Takové cíle se mají chovat
+// jako JEDEN cíl se sečteným počtem kontraktů, ne jako dva/tři samostatné
+// – jinak vzniká matoucí zobrazení (víc "TPX" pilulek se stejnou cenou) a
+// zdánlivě "chybějící" kontrakt v přehledu.
+function mergeSamePriceLegs(legs){
+ const merged=[];
+ for(const leg of legs){
+  const existing=merged.find(m=>m.result===leg.result&&Math.abs(Number(m.exitPrice)-Number(leg.exitPrice))<1e-6);
+  if(existing){
+   existing.contracts=(Number(existing.contracts)||0)+(Number(leg.contracts)||0);
+   existing.pnl=(Number(existing.pnl)||0)+(Number(leg.pnl)||0);
+   existing.pnlRaw=(Number(existing.pnlRaw)||0)+(Number(leg.pnlRaw)||0);
+   existing.commission=Math.round(((Number(existing.commission)||0)+(Number(leg.commission)||0))*100)/100;
+   existing.sourceEventIds=[...new Set([...(existing.sourceEventIds||[]),...(leg.sourceEventIds||[])])];
+   if(!existing.sourceEventId)existing.sourceEventId=leg.sourceEventId;
+   // Pozdější čas výstupu je spolehlivější (odpovídá tomu, kdy byl cíl doopravdy zasažen).
+   if(String(leg.exitTime||'')>String(existing.exitTime||''))existing.exitTime=leg.exitTime;
+  }else{
+   merged.push({...leg,sourceEventIds:[...(leg.sourceEventIds||[])]});
+  }
+ }
+ return merged;
 }
 function labelLegs(legs){
  legs.forEach((l,i)=>{
@@ -1869,7 +1942,7 @@ function labelLegs(legs){
 }
 function combineTradeObjects(list){
  // list = pole běžných obchodů (mohou už samy mít legs, pokud byly dřív sloučené)
- const legs=labelLegs(list.flatMap(t=>Array.isArray(t.legs)&&t.legs.length?t.legs:[legFromTrade(t)]));
+ const legs=mergeSamePriceLegs(labelLegs(list.flatMap(t=>Array.isArray(t.legs)&&t.legs.length?t.legs:[legFromTrade(t)])));
  const sorted=[...list].sort((a,b)=>(String(a.date||'')+String(a.entryTime||'')).localeCompare(String(b.date||'')+String(b.entryTime||'')));
  const first=sorted[0], lastByExit=[...list].sort((a,b)=>(String(a.date||'')+String(a.exitTime||'')).localeCompare(String(b.date||'')+String(b.exitTime||''))).at(-1);
  const totalPnlRaw=legs.reduce((a,l)=>a+(Number(l.pnlRaw)||0),0);
@@ -1901,7 +1974,7 @@ function combineTradeObjects(list){
   legs,
   positionId:list.find(t=>t.positionId)?.positionId||'',
   sourceEventId:list.find(t=>t.sourceEventId)?.sourceEventId,
-  sourceEventIds:[...new Set(legs.map(l=>l.sourceEventId).filter(Boolean))],
+  sourceEventIds:[...new Set(legs.flatMap(l=>Array.isArray(l.sourceEventIds)&&l.sourceEventIds.length?l.sourceEventIds:(l.sourceEventId?[l.sourceEventId]:[])))],
   externalAccount:list.find(t=>t.externalAccount)?.externalAccount||'',
   journalId:first.journalId
  };
@@ -1962,7 +2035,9 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
 });
 $('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
 $('addTradeBtn').onclick=()=>openModal();$('closeModal').onclick=()=>$('tradeModal').classList.remove('open');
-$('tradeModal').onclick=e=>{if(e.target===$('tradeModal'))$('tradeModal').classList.remove('open')};
+// Záměrně BEZ zavírání kliknutím mimo okno – u rozdělaného formuláře (Nový/
+// Upravit obchod) by omylem kliknutí mimo mohlo smazat rozepsanou práci.
+// Zavírá se jen křížkem (#closeModal) nahoře.
 ['search','filterResult','filterDate'].forEach(id=>$(id).addEventListener('input',renderTrades));
 $('prevMonth').onclick=()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);renderCalendar()};
 $('nextMonth').onclick=()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);renderCalendar()};
@@ -2052,13 +2127,33 @@ $('saveTheme').onclick=()=>{
 function refreshChartsForTheme(){
  try{ renderAll(); }catch(e){}
 }
-$('exportCsv').onclick=()=>{
- const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář'];
- const rows=trades.map(t=>[t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,t.result==='breakeven'?Math.abs(Number(t.points||0)):(t.result==='target'?t.points:-t.points),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment]);
- const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');download(new Blob(['\ufeff'+csv],{type:'text/csv'}),'futures-denik.csv')
+$('exportCsv').onclick=async()=>{
+ const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka'];
+ const rows=trades.map(t=>{
+  const p=t.dailyPlan||{};
+  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,t.result==='breakeven'?Math.abs(Number(t.points||0)):(t.result==='target'?t.points:-t.points),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note];
+ });
+ const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
+ const content='\ufeff'+csv;
+ if(window.desktopAPI?.exportBackupOnce){
+  const r=await window.desktopAPI.exportBackupOnce(content,'futures-denik.csv');
+  if(r?.ok)showToast('CSV uloženo: '+r.path);
+  else if(!r?.canceled)showToast('Uložení se nezdařilo: '+(r?.error||'neznámá chyba'));
+ }else{
+  download(new Blob([content],{type:'text/csv'}),'futures-denik.csv');
+ }
 };
 $('printPdf').onclick=()=>window.print();
-$('exportJson').onclick=()=>download(new Blob([JSON.stringify({settings,trades},null,2)],{type:'application/json'}),'futures-journal-zaloha.json');
+$('exportJson').onclick=async()=>{
+ const content=JSON.stringify({settings,trades},null,2);
+ if(window.desktopAPI?.exportBackupOnce){
+  const r=await window.desktopAPI.exportBackupOnce(content,'futures-journal-zaloha.json');
+  if(r?.ok)showToast('Záloha uložena: '+r.path);
+  else if(!r?.canceled)showToast('Uložení se nezdařilo: '+(r?.error||'neznámá chyba'));
+ }else{
+  download(new Blob([content],{type:'application/json'}),'futures-journal-zaloha.json');
+ }
+};
 $('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const t of data.trades)await put('trades',t);if(data.settings)await put('settings',{key:'main',value:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
 $('clearAll').onclick=async()=>{if(await showConfirm('Tato akce smaže všechny obchody a nastavení pouze v aktuálním deníku. Pokračovat?')){await clearStore('trades');await clearStore('settings');safeReload()}};
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
@@ -2090,6 +2185,10 @@ window.addEventListener('resize',()=>{if($('dashboard').classList.contains('acti
 function saveJournalProfiles(){
  localStorage.setItem(JOURNAL_LIST_KEY,JSON.stringify(journalProfiles));
  localStorage.setItem(ACTIVE_JOURNAL_KEY,activeJournalId);
+ // Udržuje aktuální seznam názvů deníků pro "odlehčený" AI export (viz Nastavení
+ // → Export pro AI/Cowork) – ať jde podle názvu poznat, který soubor patří kterému
+ // deníku, i když je název souboru jen náhodné ID.
+ window.desktopAPI?.writeAiExportManifest?.(journalProfiles)?.catch?.(()=>{});
 }
 function safeReload(){
  // Reload stránky, zatímco má nějaké pole fokus, může v Electronu/Chromiu
@@ -2271,11 +2370,52 @@ if(window.desktopAPI){
    await restoreAllJournalsBackup(JSON.parse(result.content));
   }catch(err){showToast('Zálohu se nepodařilo obnovit: '+err.message)}
  };
+ if($('changeBackupPath'))$('changeBackupPath').onclick=async()=>{
+  const result=await window.desktopAPI.changeBackupPath();
+  if(result?.ok){$('backupPathInfo').textContent=`Aktuální záloha: ${result.path}`;showToast('Umístění zálohy bylo změněno.')}
+  else if(!result?.canceled)showToast('Změna se nezdařila: '+(result?.error||'neznámá chyba'));
+ };
  refreshBackupPathInfo();
 }else{
  $('updateBackup').onclick=()=>showToast('Tato funkce je dostupná v desktopové aplikaci.');
  $('restoreBackup').onclick=()=>showToast('Tato funkce je dostupná v desktopové aplikaci.');
+ if($('changeBackupPath'))$('changeBackupPath').onclick=()=>showToast('Tato funkce je dostupná v desktopové aplikaci.');
 }
+
+async function refreshDataLocationInfo(){
+ if(!window.desktopAPI?.getDataLocation){if($('dataLocationInfo'))$('dataLocationInfo').textContent='Dostupné jen v desktopové aplikaci.';return}
+ const r=await window.desktopAPI.getDataLocation();
+ if($('dataLocationInfo'))$('dataLocationInfo').textContent=r?.ok?`Aktuální umístění: ${r.path}${r.isDefault?' (výchozí, systémový disk)':''}`:'Umístění se nepodařilo zjistit.';
+}
+if($('changeDataLocation'))$('changeDataLocation').onclick=async()=>{
+ if(!window.desktopAPI?.chooseDataLocation){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
+ if(!(await showConfirm('Přesune všechny deníky, obchody a screenshoty do zvolené složky a appka se restartuje. Pokračovat?')))return;
+ const r=await window.desktopAPI.chooseDataLocation();
+ if(r?.ok){showToast('Umístění změněno, appka se za chvíli restartuje…');setTimeout(()=>window.desktopAPI.restartApp(),1200)}
+ else if(!r?.canceled)showToast('Změna se nezdařila: '+(r?.error||'neznámá chyba'));
+};
+if($('resetDataLocation'))$('resetDataLocation').onclick=async()=>{
+ if(!window.desktopAPI?.resetDataLocationToDefault){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
+ if(!(await showConfirm('Přesune data zpět do výchozí složky (systémový disk) a appka se restartuje. Pokračovat?')))return;
+ const r=await window.desktopAPI.resetDataLocationToDefault();
+ if(r?.ok){showToast('Umístění vráceno na výchozí, appka se za chvíli restartuje…');setTimeout(()=>window.desktopAPI.restartApp(),1200)}
+ else showToast('Nepodařilo se: '+(r?.error||'neznámá chyba'));
+};
+refreshDataLocationInfo();
+
+async function refreshAiExportInfo(){
+ if(!window.desktopAPI?.getAiExportInfo){if($('aiExportInfo'))$('aiExportInfo').textContent='Dostupné jen v desktopové aplikaci.';return}
+ const r=await window.desktopAPI.getAiExportInfo();
+ if($('aiExportInfo'))$('aiExportInfo').textContent=r?.ok?`Složka pro AI export: ${r.path}`:'Umístění se nepodařilo zjistit.';
+}
+if($('regenerateAiExports'))$('regenerateAiExports').onclick=async()=>{
+ if(!window.desktopAPI?.regenerateAiExports){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
+ const r=await window.desktopAPI.regenerateAiExports(journalProfiles);
+ if(r?.ok)showToast(`Odlehčený export aktualizován pro ${r.count} deník(y/ů).`);
+ else showToast('Nepodařilo se: '+(r?.error||'neznámá chyba'));
+};
+refreshAiExportInfo();
+
 
 
 async function readJournalTrades(profile){
@@ -2342,11 +2482,21 @@ function generateReportView(allRows=null){
 }
 $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
-$('reportCsv').onclick=()=>{
- const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L','Komentář'];
- const rows=reportRows.map(t=>[t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,reportSigned({...t,pnl:t.points}),reportSigned(t),t.comment]);
+$('reportCsv').onclick=async()=>{
+ const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka'];
+ const rows=reportRows.map(t=>{
+  const p=t.dailyPlan||{};
+  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,reportSigned({...t,pnl:t.points}),reportSigned(t),t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note];
+ });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
- download(new Blob(['\ufeff'+csv],{type:'text/csv'}),'futures-report.csv');
+ const content='\ufeff'+csv;
+ if(window.desktopAPI?.exportBackupOnce){
+  const r=await window.desktopAPI.exportBackupOnce(content,'futures-report.csv');
+  if(r?.ok)showToast('CSV uloženo: '+r.path);
+  else if(!r?.canceled)showToast('Uložení se nezdařilo: '+(r?.error||'neznámá chyba'));
+ }else{
+  download(new Blob([content],{type:'text/csv'}),'futures-report.csv');
+ }
 };
 setTimeout(()=>{initReports();refreshPortfolio()},300);
 
@@ -2440,15 +2590,16 @@ function mapCapturedTrade(e,images=[]){
  const grossPnl=Number(e.grossPnl||0);
  // Konektor (NinjaTrader/cTrader) posílá jen svou vlastní "Commission" a
  // nezahrnuje další poplatky (Clearing/Exchange/IP/NFA fee), takže reálná
- // komise může být vyšší. Pokud je to v Nastavení vypnuté a instrument má
- // v šabloně vyplněnou vlastní komisi, použije se ta místo té z konektoru –
- // a zisk/ztráta se přepočítá z hrubé hodnoty (ta z konektoru zůstává přesná).
- if(settings.useConnectorCommission===false && grossPnl){
-  const defCommission=getDefaultCommissionForInstrument(e.instrument||e.instrumentFull||'');
-  if(defCommission!=null){
-   commission=Math.round(defCommission*contracts*100)/100;
-   pnlRaw=Math.round((grossPnl-commission)*100)/100;
-  }
+ // komise může být vyšší. VÝCHOZÍ chování je proto bezpečnější a konektoru
+ // nevěří automaticky: použije se komise ze šablony instrumentu, a když
+ // šablona komisi nemá vyplněnou, počítá se s $0 (hrubá hodnota beze
+ // změny) – ne s tím, co poslal konektor. Teprve výslovným zapnutím
+ // "Použít komisi nahlášenou konektorem" v Nastavení se použije ta z
+ // konektoru tak, jak přišla.
+ if(settings.useConnectorCommission!==true && grossPnl){
+  const defCommission=getDefaultCommissionForInstrument(e.instrument||e.instrumentFull||'')??0;
+  commission=Math.round(defCommission*contracts*100)/100;
+  pnlRaw=Math.round((grossPnl-commission)*100)/100;
  }
  const result=classifyResult(pnlRaw);
  const tpl=findTemplate(e.instrument||e.instrumentFull||'');
@@ -2482,7 +2633,7 @@ function tradeHasSourceEventId(t,sourceEventId){
  if(!sourceEventId)return false;
  if(t.sourceEventId===sourceEventId)return true;
  if(Array.isArray(t.sourceEventIds)&&t.sourceEventIds.includes(sourceEventId))return true;
- if(Array.isArray(t.legs)&&t.legs.some(l=>l.sourceEventId===sourceEventId))return true;
+ if(Array.isArray(t.legs)&&t.legs.some(l=>l.sourceEventId===sourceEventId||(Array.isArray(l.sourceEventIds)&&l.sourceEventIds.includes(sourceEventId))))return true;
  return false;
 }
 async function appendOrMergeCapturedTrade(journalId,trade){

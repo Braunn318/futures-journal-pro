@@ -1,0 +1,22 @@
+Futures Journal PRO 4.4.1 – změny oproti 4.4.0
+
+1) OPRAVA: NÁHLEDY SCREENSHOTŮ VE FORMULÁŘI "UPRAVIT OBCHOD" NEŠLY OTEVŘÍT
+   V okně Deníku šlo na screenshot kliknout a otevřít ho (kopírovat do
+   schránky, otevřít ve výchozím prohlížeči obrázků, uložit jako). Malé
+   náhledy přímo ve formuláři "Nový/Upravit obchod" ale měly navěšenou akci
+   jen na tlačítko ✕ (smazat) – na samotný obrázek kliknutím nešlo nic
+   udělat. Teď funguje stejně na obou místech – kliknutím na náhled ve
+   formuláři se otevře stejné okno prohlížeče obrázků jako z Deníku.
+
+2) OPRAVA: OKNO SE SCREENSHOTEM ZŮSTÁVALO SCHOVANÉ ZA OTEVŘENÝM OBCHODEM
+   Kliknutí na náhled ve formuláři "Nový/Upravit obchod" (oprava výše)
+   otevíralo okno prohlížeče obrázků se stejnou "vrstvou" jako samotný
+   formulář – jelikož formulář byl otevřený dřív, okno s obrázkem se
+   schovalo za něj a bylo vidět, až se formulář zavřel.
+   Řešení: klik na náhled přímo ve formuláři teď rovnou otevře obrázek ve
+   VÝCHOZÍM PROHLÍŽEČI OBRÁZKŮ VE WINDOWS (skutečné samostatné okno OS,
+   ne okno uvnitř aplikace) – stejná volba, kterou nabízí tlačítko
+   "Otevřít ve výchozím prohlížeči obrázků" u Deníku. Odpadá tím celý
+   problém se schovaným oknem. Okno prohlížeče obrázků uvnitř aplikace
+   (s možností kopírovat/uložit) navíc pro jistotu dostalo vyšší vrstvu
+   než ostatní okna, kdyby k podobné kolizi došlo i jinde.

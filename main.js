@@ -9,17 +9,29 @@ let tray = null;
 let isQuitting = false;
 const startHidden = process.argv.includes('--background');
 
+// Šablony konektorů (CONNECTORS) se v zabaleném instalátoru drží MIMO asar
+// archiv (viz "extraResources" v package.json) – jde o soubory, které mají
+// zůstat čitelné/otevíratelné jako normální soubory na disku (Průzkumník
+// Windows neumí "otevřít" cestu uvnitř .asar archivu). V nezabalené appce
+// (spuštěno přes "npm start") žádný resources adresář neexistuje, tam se
+// použije prostá cesta ve zdrojové složce projektu.
+function connectorsDir() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'CONNECTORS')
+    : path.join(__dirname, 'CONNECTORS');
+}
+
 // Zabrání spuštění více kopií aplikace. Druhé spuštění pouze otevře existující okno.
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 }
-const settingsPath = () => path.join(app.getPath('userData'), 'backup-settings.json');
-const logPath = () => path.join(app.getPath('userData'), 'futures-journal-error.log');
+const settingsPath = () => path.join(resolveDataDir(), 'backup-settings.json');
+const logPath = () => path.join(resolveDataDir(), 'futures-journal-error.log');
 
 function logError(context, error) {
   try {
-    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.mkdirSync(path.dirname(logPath()), { recursive: true });
     fs.appendFileSync(logPath(), `[${new Date().toISOString()}] ${context}: ${error?.stack || error}\n`, 'utf8');
   } catch {}
 }
@@ -31,6 +43,110 @@ function writeSettings(data) {
   fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
   fs.writeFileSync(settingsPath(), JSON.stringify(data, null, 2), 'utf8');
 }
+
+// ---------- Umístění dat (volitelně mimo systémový disk C:) ----------
+// V "userData" (vždy na C:, dané Windows/Electronem) se drží jen tenhle
+// malý ukazatel na skutečné umístění dat – samotné deníky, screenshoty a
+// nastavení se pak čtou/zapisují ZE ZVOLENÉ SLOŽKY, ne z C:.
+const dataLocationConfigPath = () => path.join(app.getPath('userData'), 'data-location.json');
+function resolveDataDir() {
+  try {
+    const raw = fs.readFileSync(dataLocationConfigPath(), 'utf8');
+    const cfg = JSON.parse(raw);
+    if (cfg.customDataDir && fs.existsSync(cfg.customDataDir)) return cfg.customDataDir;
+  } catch {}
+  return app.getPath('userData');
+}
+function writeDataLocationConfig(customDataDir) {
+  fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  fs.writeFileSync(dataLocationConfigPath(), JSON.stringify({ customDataDir }, null, 2), 'utf8');
+}
+// Přesune existující deníky/nastavení/screenshoty ze staré do nové složky
+// (kopie + smazání originálu, aby se místo na starém disku opravdu uvolnilo).
+// Doplňková pojistka navíc: těsně před JAKÝMKOLIV přesunem se obchody
+// (bez screenshotů, kvůli rychlosti) zkopírují i do pevného, nikdy se
+// nepřesouvajícího umístění – pro případ, že by se přesun i přes výše
+// popsané bezpečné pořadí něčím nečekaným přerušil (např. vynucené
+// ukončení procesu uprostřed kopírování).
+function writeSafetyBackupBeforeMove(oldDir) {
+  try {
+    const journalDataSrc = path.join(oldDir, 'journal-data');
+    if (!fs.existsSync(journalDataSrc)) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupDir = path.join(app.getPath('userData'), 'safety-backups', `pred-presunem-${stamp}`, 'journal-data');
+    fs.cpSync(journalDataSrc, backupDir, { recursive: true });
+  } catch (error) {
+    logError('writeSafetyBackupBeforeMove', error);
+  }
+}
+// Přesune existující deníky/nastavení/screenshoty ze staré do nové složky.
+// Pořadí je záměrně: 1) zkopírovat VŠECHNO, 2) teprve pak přepnout appku na
+// nové umístění, 3) až úplně nakonec (a jen jako "úklid") smazat staré
+// soubory. Kdyby cokoliv selhalo v kroku 1, nic se nesmaže a appka dál vidí
+// svá data na původním místě beze změny – nikdy nemůže nastat stav, kdy je
+// originál pryč, ale appka o novém umístění ještě neví (přesně tohle byl
+// dřívější, nebezpečnější postup: kopírovat a rovnou mazat po jedné položce).
+function moveDataContents(oldDir, newDir) {
+  const entries = ['journal-data', 'trade-capture', 'backup-settings.json', 'futures-journal-error.log'];
+  fs.mkdirSync(newDir, { recursive: true });
+  const copied = [];
+  for (const name of entries) {
+    const src = path.join(oldDir, name);
+    if (!fs.existsSync(src)) continue;
+    const dest = path.join(newDir, name);
+    fs.cpSync(src, dest, { recursive: true, force: true });
+    if (!fs.existsSync(dest)) throw new Error(`Kopírování "${name}" do nového umístění se nezdařilo.`);
+    copied.push(src);
+  }
+  // Od tohoto místa dál appka už najde svá data v newDir bez ohledu na to,
+  // jestli se podaří smazat staré soubory – volající hned poté zapíše
+  // ukazatel na nové umístění (writeDataLocationConfig).
+  for (const src of copied) {
+    try { fs.rmSync(src, { recursive: true, force: true }); } catch (error) { logError('moveDataContents cleanup', error); }
+  }
+}
+ipcMain.handle('data:getLocation', async () => {
+  try { const p = resolveDataDir(); return { ok: true, path: p, isDefault: p === app.getPath('userData') }; }
+  catch (error) { return { ok: false, error: error.message }; }
+});
+ipcMain.handle('data:chooseLocation', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Vyber složku pro ukládání dat Futures Journal PRO',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (result.canceled || !result.filePaths?.[0]) return { ok: false, canceled: true };
+    const oldDir = resolveDataDir();
+    const newDir = path.join(result.filePaths[0], 'FuturesJournalPRO-Data');
+    if (path.resolve(newDir) === path.resolve(oldDir)) return { ok: false, error: 'Vybraná složka už je aktuálním umístěním dat.' };
+    writeSafetyBackupBeforeMove(oldDir);
+    moveDataContents(oldDir, newDir);
+    writeDataLocationConfig(newDir);
+    return { ok: true, path: newDir };
+  } catch (error) {
+    logError('data:chooseLocation', error);
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('data:resetLocationToDefault', async () => {
+  try {
+    const oldDir = resolveDataDir();
+    const defaultDir = app.getPath('userData');
+    if (path.resolve(oldDir) !== path.resolve(defaultDir)) {
+      writeSafetyBackupBeforeMove(oldDir);
+      moveDataContents(oldDir, defaultDir);
+    }
+    fs.rmSync(dataLocationConfigPath(), { force: true });
+    return { ok: true, path: defaultDir };
+  } catch (error) {
+    logError('data:resetLocationToDefault', error);
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('app:restart', () => {
+  app.relaunch();
+  app.exit(0);
+});
 
 function focusMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -160,7 +276,7 @@ function createWindow() {
 }
 
 
-const dataRoot = () => path.join(app.getPath('userData'), 'journal-data');
+const dataRoot = () => path.join(resolveDataDir(), 'journal-data');
 function safeJournalId(id) {
   const value = String(id || 'default');
   if (!/^[a-zA-Z0-9_-]+$/.test(value)) throw new Error('Neplatný identifikátor deníku.');
@@ -184,7 +300,70 @@ function writeJournal(id, data) {
   const temp = `${target}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(data, null, 2), 'utf8');
   fs.renameSync(temp, target);
+  writeAiExportMirror(id, data);
 }
+
+// ---------- "Odlehčený" export bez screenshotů – pro čtení jinými nástroji ----------
+// Screenshoty (base64 obrázky) jsou to, co dělá surová data deníku objemná.
+// Tahle kopie se udržuje automaticky při KAŽDÉM uložení obchodu a obsahuje
+// úplně všechna textová pole (komentář, denní plán, setup/scénář, psycho-
+// logický checklist…), jen bez obrázků – bezpečně malá i pro nástroje s
+// omezenou velikostí dat (např. jiný Claude projekt hodnotící obchody).
+const aiExportRoot = () => path.join(resolveDataDir(), 'ai-export');
+function aiExportPath(id) { return path.join(aiExportRoot(), `${safeJournalId(id)}.json`); }
+function stripImages(trade) {
+  const { images, legs, ...rest } = trade || {};
+  return {
+    ...rest,
+    imageCount: Array.isArray(images) ? images.length : 0,
+    legs: Array.isArray(legs) ? legs.map(({ images: legImages, ...legRest }) => legRest) : undefined
+  };
+}
+function writeAiExportMirror(id, data) {
+  try {
+    fs.mkdirSync(aiExportRoot(), { recursive: true });
+    const trades = Array.isArray(data?.trades) ? data.trades.map(stripImages) : [];
+    const temp = `${aiExportPath(id)}.tmp`;
+    fs.writeFileSync(temp, JSON.stringify({ journalId: id, updatedAt: new Date().toISOString(), trades }, null, 2), 'utf8');
+    fs.renameSync(temp, aiExportPath(id));
+  } catch (error) {
+    logError('writeAiExportMirror', error);
+  }
+}
+ipcMain.handle('data:getAiExportInfo', async () => {
+  try { return { ok: true, path: aiExportRoot() }; }
+  catch (error) { return { ok: false, error: error.message }; }
+});
+// Ruční přegenerování pro všechny deníky – užitečné hlavně hned po zapnutí
+// téhle funkce, ať se odlehčená kopie vytvoří i pro obchody uložené dřív.
+ipcMain.handle('data:regenerateAiExports', async (_event, journals) => {
+  try {
+    fs.mkdirSync(aiExportRoot(), { recursive: true });
+    const list = Array.isArray(journals) ? journals : [];
+    for (const j of list) {
+      if (!j?.id) continue;
+      writeAiExportMirror(j.id, readJournal(j.id));
+    }
+    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(j => ({ id: j.id, name: j.name })) };
+    fs.writeFileSync(path.join(aiExportRoot(), 'index.json'), JSON.stringify(manifest, null, 2), 'utf8');
+    return { ok: true, count: list.length, path: aiExportRoot() };
+  } catch (error) {
+    logError('data:regenerateAiExports', error);
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('data:writeAiExportManifest', async (_event, journals) => {
+  try {
+    fs.mkdirSync(aiExportRoot(), { recursive: true });
+    const list = Array.isArray(journals) ? journals : [];
+    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(j => ({ id: j.id, name: j.name })) };
+    fs.writeFileSync(path.join(aiExportRoot(), 'index.json'), JSON.stringify(manifest, null, 2), 'utf8');
+    return { ok: true };
+  } catch (error) {
+    logError('data:writeAiExportManifest', error);
+    return { ok: false, error: error.message };
+  }
+});
 
 ipcMain.handle('storage:read', async (_event, journalId) => {
   try { return { ok: true, data: readJournal(journalId) }; }
@@ -242,16 +421,61 @@ ipcMain.handle('backup:load', async () => {
     return { ok: false, error: error.message };
   }
 });
+// Umožní znovu zvolit umístění "Aktualizovat zálohu na SSD" – jinak si appka
+// napořád pamatuje jen tu VŮBEC první zvolenou cestu bez možnosti změny.
+ipcMain.handle('backup:changePath', async () => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Vyber nové umístění aktuální zálohy',
+      defaultPath: 'FuturesJournal_AKTUALNI_ZALOHA.json',
+      filters: [{ name: 'Záloha Futures Journal', extensions: ['json'] }]
+    });
+    if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+    writeSettings({ ...readSettings(), backupPath: result.filePath });
+    return { ok: true, path: result.filePath };
+  } catch (error) {
+    logError('backup:changePath', error);
+    return { ok: false, error: error.message };
+  }
+});
+// "Stáhnout zálohu JSON" – na rozdíl od "Aktualizovat na SSD" si nic
+// nepamatuje, pokaždé se ukáže skutečný dialog Uložit jako.
+ipcMain.handle('backup:exportOnce', async (_event, content, suggestedName) => {
+  try {
+    const name = suggestedName || 'futures-journal-export.json';
+    const ext = path.extname(name).replace('.', '') || 'json';
+    const extLabels = { json: 'JSON soubor', csv: 'CSV soubor', txt: 'Textový soubor' };
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Uložit soubor',
+      defaultPath: path.join(app.getPath('documents'), name),
+      filters: [{ name: extLabels[ext] || `Soubor .${ext}`, extensions: [ext] }]
+    });
+    if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(result.filePath, content, 'utf8');
+    return { ok: true, path: result.filePath };
+  } catch (error) {
+    logError('backup:exportOnce', error);
+    return { ok: false, error: error.message };
+  }
+});
 
 ipcMain.handle('app:factoryReset', async () => {
   try {
     const userDataPath = app.getPath('userData');
-    const ownedEntries = [
+    const dataDir = resolveDataDir();
+    // Vlastní obchody/nastavení/log mažeme z AKTUÁLNÍHO umístění dat (mohlo
+    // být přesunuté mimo C:), zatímco vnitřní cache Chromia/Electronu
+    // (IndexedDB, Local Storage…) zůstává vždy v defaultní userData složce.
+    const dataEntries = ['journal-data', 'trade-capture', 'backup-settings.json', 'futures-journal-error.log'];
+    for (const name of dataEntries) {
+      try { fs.rmSync(path.join(dataDir, name), { recursive: true, force: true }); } catch {}
+    }
+    const cacheEntries = [
       'IndexedDB', 'Local Storage', 'Session Storage', 'databases', 'Cache',
       'Code Cache', 'GPUCache', 'DawnCache', 'Network', 'Preferences',
-      'Shared Dictionary', 'WebStorage', 'backup-settings.json', 'journal-data'
+      'Shared Dictionary', 'WebStorage', 'data-location.json'
     ];
-    for (const name of ownedEntries) {
+    for (const name of cacheEntries) {
       try { fs.rmSync(path.join(userDataPath, name), { recursive: true, force: true }); } catch {}
     }
     return { ok: true };
@@ -266,7 +490,7 @@ ipcMain.handle('app:factoryReset', async () => {
 let captureServer = null;
 let relayTimer = null;
 const CAPTURE_PORT = 17654;
-const captureRoot = () => path.join(app.getPath('userData'), 'trade-capture');
+const captureRoot = () => path.join(resolveDataDir(), 'trade-capture');
 const captureEventsPath = () => path.join(captureRoot(), 'events.json');
 const captureSettingsPath = () => path.join(captureRoot(), 'settings.json');
 const captureStatePath = () => path.join(captureRoot(), 'positions.json');
@@ -866,7 +1090,7 @@ ipcMain.handle('capture:readScreenshot', async (_event, filePath) => {
 ipcMain.handle('capture:installNinjaConnector', async () => {
   try {
     const settings = readCaptureSettings();
-    const templatePath = path.join(__dirname, 'CONNECTORS', 'NinjaTrader8', 'FuturesJournalCapture.cs');
+    const templatePath = path.join(connectorsDir(), 'NinjaTrader8', 'FuturesJournalCapture.cs');
     let source = fs.readFileSync(templatePath, 'utf8');
     source = source.replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', settings.apiKey);
     const targetDir = path.join(app.getPath('documents'), 'NinjaTrader 8', 'bin', 'Custom', 'AddOns');
@@ -883,7 +1107,7 @@ ipcMain.handle('capture:installNinjaConnector', async () => {
 
 ipcMain.handle('capture:prepareTradingViewPine', async () => {
   try {
-    const source = fs.readFileSync(path.join(__dirname, 'CONNECTORS', 'TradingView', 'FuturesJournalAlertConnector.pine'), 'utf8');
+    const source = fs.readFileSync(path.join(connectorsDir(), 'TradingView', 'FuturesJournalAlertConnector.pine'), 'utf8');
     clipboard.writeText(source);
     await shell.openExternal('https://www.tradingview.com/chart/');
     return { ok: true };
@@ -892,7 +1116,7 @@ ipcMain.handle('capture:prepareTradingViewPine', async () => {
 
 ipcMain.handle('capture:prepareTradingViewWorker', async () => {
   try {
-    const source = fs.readFileSync(path.join(__dirname, 'CONNECTORS', 'TradingViewRelayWorker', 'worker.js'), 'utf8');
+    const source = fs.readFileSync(path.join(connectorsDir(), 'TradingViewRelayWorker', 'worker.js'), 'utf8');
     clipboard.writeText(source);
     await shell.openExternal('https://dash.cloudflare.com/');
     return { ok: true };
@@ -902,7 +1126,7 @@ ipcMain.handle('capture:prepareTradingViewWorker', async () => {
 ipcMain.handle('capture:exportNinjaConnector', async () => {
   try {
     const settings = readCaptureSettings();
-    const templatePath = path.join(__dirname, 'CONNECTORS', 'NinjaTrader8', 'FuturesJournalCapture.cs');
+    const templatePath = path.join(connectorsDir(), 'NinjaTrader8', 'FuturesJournalCapture.cs');
     let source = fs.readFileSync(templatePath, 'utf8');
     source = source.replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', settings.apiKey);
     const result = await dialog.showSaveDialog(mainWindow, {
@@ -921,7 +1145,7 @@ ipcMain.handle('capture:exportNinjaConnector', async () => {
 ipcMain.handle('capture:installCTraderConnector', async () => {
   try {
     const settings = readCaptureSettings();
-    const templatePath = path.join(__dirname, 'CONNECTORS', 'cTrader', 'FuturesJournalCTraderConnector.cs');
+    const templatePath = path.join(connectorsDir(), 'cTrader', 'FuturesJournalCTraderConnector.cs');
     let source = fs.readFileSync(templatePath, 'utf8');
     source = source.replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', settings.apiKey);
     const robotName = 'FuturesJournalCTraderConnector';
@@ -951,7 +1175,7 @@ ipcMain.handle('capture:installCTraderConnector', async () => {
 ipcMain.handle('capture:exportCTraderConnector', async () => {
   try {
     const settings = readCaptureSettings();
-    const templatePath = path.join(__dirname, 'CONNECTORS', 'cTrader', 'FuturesJournalCTraderConnector.cs');
+    const templatePath = path.join(connectorsDir(), 'cTrader', 'FuturesJournalCTraderConnector.cs');
     let source = fs.readFileSync(templatePath, 'utf8');
     source = source.replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', settings.apiKey);
     const result = await dialog.showSaveDialog(mainWindow, {
@@ -970,7 +1194,7 @@ ipcMain.handle('capture:exportCTraderConnector', async () => {
 
 ipcMain.handle('capture:exportTradingViewConnector', async () => {
   try {
-    const templatePath = path.join(__dirname, 'CONNECTORS', 'TradingView', 'FuturesJournalAlertConnector.pine');
+    const templatePath = path.join(connectorsDir(), 'TradingView', 'FuturesJournalAlertConnector.pine');
     const source = fs.readFileSync(templatePath, 'utf8');
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Uložit TradingView Pine Script',
@@ -987,7 +1211,7 @@ ipcMain.handle('capture:exportTradingViewConnector', async () => {
 });
 ipcMain.handle('capture:exportTradingViewWorker', async () => {
   try {
-    const templatePath = path.join(__dirname, 'CONNECTORS', 'TradingViewRelayWorker', 'worker.js');
+    const templatePath = path.join(connectorsDir(), 'TradingViewRelayWorker', 'worker.js');
     const source = fs.readFileSync(templatePath, 'utf8');
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Uložit TradingView webhook relay',
@@ -1006,7 +1230,7 @@ ipcMain.handle('capture:exportTradingViewWorker', async () => {
 ipcMain.handle('capture:openConnectorFolder', async () => {
   try {
     const { shell } = require('electron');
-    const folder = path.join(__dirname, 'CONNECTORS');
+    const folder = connectorsDir();
     const error = await shell.openPath(folder);
     return error ? { ok: false, error } : { ok: true };
   } catch (error) { return { ok: false, error: error.message }; }

@@ -1,0 +1,41 @@
+Futures Journal PRO 4.3.11 – změny oproti 4.3.10
+
+Vyřízené položky ze seznamu "Next steps after electron update released"
+v project-status.md.
+
+1) FORMULÁŘ OBCHODU SE NEZAVÍRÁ KLIKNUTÍM MIMO OKNO
+   Okno "Nový/Upravit obchod" se dřív zavíralo i kliknutím kdekoliv mimo něj
+   – u rozdělaného formuláře to mohlo znamenat ztrátu rozepsané práce jedním
+   nechtěným kliknutím. Teď se zavírá jen tlačítkem ✕ v pravém horním rohu.
+   (Ostatní menší dialogy – potvrzení, sloučení, změna hesla – se kliknutím
+   mimo dál zavírají, tam k žádné ztrátě dat nedochází.)
+
+2) POLE "KOMENTÁŘ" MÁ ŠTÍTEK "VIDITELNÉ" MÍSTO "NEPOVINNÉ"
+   Pole zůstává nepovinné (placeholder "Volitelné" beze změny), ale štítek
+   teď jasně říká, že jde o pole, které uvidíš přímo u obchodu v přehledu
+   Deníku – ne jen o "další nepovinné pole" jako ostatní.
+
+3) BEZPEČNĚJŠÍ VÝCHOZÍ CHOVÁNÍ KOMISE
+   Dosavadní výchozí chování důvěřovalo komisi nahlášené konektorem
+   (NinjaTrader/cTrader), což jak víme z bug reportu dřív vedlo k
+   nepřesnostem (NinjaTrader nezahrnuje Clearing/Exchange/IP/NFA fee).
+   Nové výchozí chování: použije se komise ze šablony instrumentu, a pokud
+   šablona komisi nemá vyplněnou, počítá se s $0 (hrubá hodnota beze
+   změny) – konektoru se už nevěří automaticky. V Nastavení → Šablony
+   podle instrumentu lze přepnout zpět na "Použít komisi nahlášenou
+   konektorem", pokud je uživatel s přesností konektoru spokojený.
+
+4) VKLÁDÁNÍ SCREENSHOTŮ PŘES CTRL+V
+   Ve formuláři obchodu jde screenshot vložit i přímo ze schránky (např. po
+   pořízení snímku přes Win+Shift+S) klávesovou zkratkou Ctrl+V, ne jen
+   nahráním souboru. Platí stejný limit tří obrázků a 3 MB na obrázek jako
+   u nahrávání souboru.
+
+5) AKTUALIZOVANÝ KOMPLETNÍ NÁVOD (Kompletni_navod_Futures_Journal_PRO_4.3.11.docx)
+   Původní návod byl z verze 4.2.8 a neobsahoval nic z toho, co přibylo od
+   té doby – slučování obchodů (TP1/TP2/Break Even), Break Even jako vlastní
+   výsledek, šablony s hodnotou bodu a komisí, řízení rizika, integraci
+   cTraderu, vzhled aplikace (témata), zabezpečení heslem. Návod byl
+   přepsaný od základu se zachováním stejné struktury (Část A – používání,
+   Část B – instalace) a je teď součástí každého zabaleného zdrojového
+   balíčku, ne jen samostatně přiloženým souborem po ruce.

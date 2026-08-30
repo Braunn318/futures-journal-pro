@@ -1,0 +1,35 @@
+Futures Journal PRO 4.4.0 – změny oproti 4.3.11
+
+TOTO JE JIŽ SLOUČENÁ STABILNÍ VERZE – žádná samostatná DEV varianta se dál
+neudržuje. Testovací náhled v prohlížeči (bez instalace) byl na žádost
+zrušen a nebude se dál generovat; testuje se přímo touto verzí.
+
+1) AKTUALIZACE ELECTRONU A ELECTRON-BUILDERU
+   Electron 39 -> 43 (nejnovější podporovaná řada), electron-builder na
+   nejnovější 26.x. Šlo o největší skok verzí za dobu vývoje aplikace (4
+   hlavní verze Electronu najednou), proto se napřed dva týdny ověřoval
+   v samostatné testovací DEV verzi (jiný appId, jiný port, jiná uživatelská
+   data, samostatně přejmenovaný NinjaTrader konektor) souběžně vedle
+   stabilní appky, aby v případě problému nehrozilo nic reálným datům. Po
+   potvrzení, že běží, se sloučilo zpátky do jediné stabilní verze.
+
+2) OPRAVA NPM VAROVÁNÍ (deprecated: inflight, rimraf, glob, boolean)
+   Tahle varování při "npm install" nepocházela z electron-builderu
+   samotného, ale z jeho vnitřní řetězové závislosti na starších balíčcích
+   (glob@7 -> inflight, rimraf@2). V package.json přibylo pole "overrides",
+   které vynucuje vždy aktuální verzi glob/rimraf/boolean napříč celým
+   stromem závislostí, včetně vnitřního použití uvnitř electron-builderu –
+   řeší se tím i to, že glob mezitím sám vydal další hlavní verzi a stará
+   varování se objevovala znovu s jiným číslem verze.
+
+3) BEZE ZMĚNY OPROTI 4.3.11
+   Žádná funkčnost appky (Deník, Kalendář, šablony, řízení rizika, merge/
+   slučování obchodů, Break Even, komise, propojený výpočet zisku/ztráty,
+   NinjaTrader/cTrader/TradingView konektory) se v tomhle kroku neměnila –
+   jde čistě o novější Electron pod stejným kódem. Pokud narazíš na chybu,
+   která souvisí s chováním nebo vzhledem OKNA aplikace (ne s obchodní
+   logikou), je slušná šance, že souvisí právě s novým Electronem – popiš
+   ji prosím co nejpodrobněji (screenshot, přesný postup).
+
+Historie verzí 4.3.x zůstává zachovaná v samostatných ZMENY_VERZE_*.txt
+souborech pro referenci.
