@@ -6,25 +6,25 @@
 <title>Futures Trading Journal</title>
 <style>
 :root{
-  --bg-start:#080c18;--bg-end:#111a30;
-  --sidebar-bg:#0b1222;
-  --panel:#121a2d;--panel2:#18223a;--input-bg:#0d1527;
-  --card-bg-rgb:18,26,45;--card-bg-alpha:.94;
-  --text:#eef3ff;--text2:#cfd8ee;--muted:#98a6c7;
+  --bg-start:#07070a;--bg-end:#0c0d11;
+  --sidebar-bg:#08090c;
+  --panel:#0e1013;--panel2:#15171b;--input-bg:#0a0b0e;
+  --card-bg-rgb:14,16,19;--card-bg-alpha:.96;
+  --text:#eef1f6;--text2:#b9c0cc;--muted:#767d8a;
   --green:#2ecc71;--green-rgb:46,204,113;
   --red:#ff5c67;--red-rgb:255,92,103;
   --blue:#5ba7ff;--blue-rgb:91,167,255;
   --yellow:#f6c453;--yellow-rgb:246,196,83;
   --orange:#f6a623;--orange-rgb:246,166,35;
-  --line:#273452;
+  --line:#212327;
   --tint-rgb:255,255,255;
-  --overlay-rgb:4,8,18;
+  --overlay-rgb:4,4,5;
   --shadow-rgb:0,0,0;
   --hover-border:#34507d;
   --btn-text:#ffffff;
   --btn-primary-text:#06101f;
   --btn-danger-text:#220408;
-  --login-bg-start:#17233d;--login-bg-end:#070b14;--login-card-bg-rgb:15,22,38;
+  --login-bg-start:#141517;--login-bg-end:#050506;--login-card-bg-rgb:14,16,19;
 }
 html[data-theme="light"]{
   --bg-start:#eef2fb;--bg-end:#dfe7f7;
@@ -60,6 +60,10 @@ button{cursor:pointer}
 .journal-switcher .journal-actions button{flex:1;padding:7px 8px;font-size:12px}
 .nav button{width:100%;text-align:left;border:0;background:transparent;color:var(--muted);padding:12px 14px;border-radius:10px;margin:4px 0}
 .nav button.active,.nav button:hover{background:var(--panel2);color:var(--text)}
+.subtab-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.subtab-bar button{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:9px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer}
+.subtab-bar button.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
+.subsection{display:none}.subsection.active{display:block}
 .main{padding:26px;min-width:0}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px}
 h1{font-size:28px;margin:0}.sub{color:var(--muted);margin-top:5px}
@@ -70,7 +74,38 @@ h1{font-size:28px;margin:0}.sub{color:var(--muted);margin-top:5px}
 .metric .label{color:var(--muted);font-size:13px}.metric .value{font-size:27px;font-weight:800;margin-top:6px}
 .pos{color:var(--green)}.neg{color:var(--red)}.neutral{color:var(--yellow)}
 .charts{grid-template-columns:1fr 1.7fr;margin-top:16px}.chart-wrap{height:320px;position:relative}
+.chart-wrap.sm{height:150px}
 canvas{width:100%;height:100%}
+.kpi-strip{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:9px;margin-bottom:14px}
+.kpi-item{background:rgba(var(--card-bg-rgb),var(--card-bg-alpha));border:1px solid var(--line);border-radius:10px;padding:9px 10px;text-align:center}
+.kpi-label{color:var(--muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px}
+.kpi-value{font-size:15px;font-weight:800;margin-top:3px}
+.section-divider{display:flex;align-items:center;text-align:center;color:var(--muted);font-weight:800;font-size:10px;letter-spacing:1.6px;margin:16px 0 8px}
+.section-divider::before,.section-divider::after{content:'';flex:1;height:1px;background:var(--line)}
+.section-divider span{padding:0 10px}
+.overview-row{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr);gap:10px}
+.performance-row{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr);gap:10px}
+.overview-row>.card,.performance-row>.card{padding:12px 14px;min-width:0}
+.overview-row h3,.performance-row h3{font-size:12.5px;margin:0 0 8px}
+.panel-subtitle{color:var(--muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px}
+.stat-list{display:grid;gap:5px}
+.stat-list .row{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--text2)}
+.stat-list .row b{color:var(--text);font-weight:800}
+.bar-list{display:grid;gap:6px}
+.bar-row{display:grid;grid-template-columns:56px 1fr 64px;gap:7px;align-items:center;font-size:10.5px}
+.bar-row .bar-name{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-row .bar-track{height:7px;border-radius:4px;background:var(--panel2);overflow:hidden}
+.bar-row .bar-fill{height:100%;border-radius:4px}
+.bar-row .bar-val{text-align:right;font-weight:700}
+.gauge-row{display:flex;justify-content:space-around;gap:6px;margin-bottom:7px}
+.gauge-wrap{width:84px;height:84px;position:relative}
+.gauge-wrap canvas{width:100%;height:100%;display:block}
+.gauge-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.gauge-pct{font-size:15px;font-weight:800}
+.gauge-name{font-size:9px;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:.3px}
+.legend{display:flex;gap:12px;font-size:10.5px;color:var(--muted);margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:13px;height:2px;border-radius:2px;display:inline-block}
 .section{display:none}.section.active{display:block}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px}.toolbar input,.toolbar select{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px;border-radius:10px}
 .trade-list{display:grid;gap:14px}.trade{display:grid;grid-template-columns:1.2fr .8fr 1fr auto;gap:16px;align-items:center}
@@ -94,10 +129,13 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .comment{color:var(--text2);font-size:14px;line-height:1.45}
 .actions{display:flex;gap:7px}.icon{padding:8px 10px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px}
 .calendar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.dow{text-align:center;color:var(--muted);font-size:12px;padding:6px}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr) 0.9fr;gap:8px}.dow{text-align:center;color:var(--muted);font-size:12px;padding:6px}
+.dow.week{color:var(--blue);font-weight:700}
 .day{min-height:105px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px;position:relative}
 .day.empty{opacity:.25}.day .num{font-weight:800}.day .pnl{font-size:12px;margin-top:7px}.day .count{font-size:11px;color:var(--muted);margin-top:4px}
 .day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
+.day.week-summary{background:var(--panel2);border-color:rgba(var(--blue-rgb),.4)}
+.day.week-summary .num{color:var(--blue);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
 .day-flag{position:absolute;top:6px;right:8px;font-size:14px}
 .limitbox{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
 .field input,.field select,.field textarea{width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px}
@@ -112,13 +150,10 @@ textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-c
 .table-scroll{overflow:auto}table{width:100%;border-collapse:collapse;min-width:900px}th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 
-.portfolio-panel{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
-.portfolio-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:transparent;color:var(--text);font-weight:800;padding:8px 4px}
-.portfolio-body{display:grid;gap:8px;padding:8px 4px 0}.portfolio-body.collapsed{display:none}
-.portfolio-row{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:12px}.portfolio-row strong{color:var(--text)}
 .status-toast{position:fixed;right:22px;bottom:22px;z-index:50;padding:12px 16px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);box-shadow:0 10px 30px rgba(var(--shadow-rgb),.35);display:none;max-width:420px;white-space:pre-line;line-height:1.4;cursor:pointer}.status-toast.show{display:block}
-@media(max-width:1000px){#integrations>.grid{grid-template-columns:1fr!important}.journal-switcher{min-width:220px;margin:0 12px}.stats{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}.trade{grid-template-columns:1fr}.app{grid-template-columns:1fr}.sidebar{height:auto;position:static;display:flex;align-items:center;justify-content:space-between;padding:14px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.brand{margin:0}.main{padding:16px}}
-@media(max-width:600px){.formgrid,.settings-grid,.limitbox{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.calendar{gap:4px}.day{min-height:78px;padding:6px}.day .pnl{font-size:10px}}
+@media(max-width:1000px){#integrations>.grid{grid-template-columns:1fr!important}.journal-switcher{min-width:220px;margin:0 12px}.stats{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}.trade{grid-template-columns:1fr}.app{grid-template-columns:1fr}.sidebar{height:auto;position:static;display:flex;align-items:center;justify-content:space-between;padding:14px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.brand{margin:0}.main{padding:16px}.kpi-strip{grid-template-columns:repeat(2,1fr)}.overview-row,.performance-row{grid-template-columns:1fr}}
+@media(max-width:900px){.calendar{grid-template-columns:repeat(7,1fr)}.dow.week,.day.week-summary{display:none}}
+@media(max-width:600px){.formgrid,.settings-grid,.limitbox{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.calendar{gap:4px}.day{min-height:78px;padding:6px}.day .pnl{font-size:10px}.kpi-strip{grid-template-columns:1fr}}
 @media print{.sidebar,.topbar .btn,.toolbar,.actions{display:none!important}.app{display:block}.main{padding:0}.section{display:block!important;page-break-after:always}.modal{display:none!important}}
 
 .hero-banner{height:240px;border-radius:18px;overflow:hidden;position:relative;margin-bottom:16px;border:1px solid var(--line);box-shadow:0 16px 40px rgba(var(--shadow-rgb),.35)}
@@ -271,10 +306,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       </div>
     </div>
     <div class="nav">
-      <button class="active" data-section="home">🏠 Úvod</button>
       <button data-section="openPositions">📈 Otevřené pozice</button>
-      <button data-section="accountOverview">📊 Přehled účtu</button>
-      <button data-section="instrumentPortfolio">🥧 Podíl instrumentů</button>
+      <button class="active" data-section="accountOverview">📊 Přehled účtu</button>
       <button data-section="journal">📒 Deník</button>
       <button data-section="calendar">📅 Kalendář</button>
       <button data-section="reports">📑 Reporty</button>
@@ -285,17 +318,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
   <main class="main">
 <div class="topbar">
-      <div><h1 id="pageTitle">Dashboard</h1><div class="sub">Obchodní deník pro futures</div></div>
-      <button class="btn primary" id="addTradeBtn">＋ Přidat obchod</button>
+      <div><h1 id="pageTitle">Přehled účtu</h1><div class="sub">Obchodní deník pro futures</div></div>
+      <button class="btn primary" id="addTradeBtn" style="display:none">＋ Přidat obchod</button>
     </div>
-
-    
-    
-    <section id="home" class="section active">
-      <div class="home-image-only">
-        <img src="assets/bull_bear_home_4k.jpg" alt="Býk a medvěd – Futures Journal PRO">
-      </div>
-    </section>
 
 
     <section id="openPositions" class="section">
@@ -316,7 +341,14 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       </div>
     </section>
 
-    <section id="accountOverview" class="section">
+    <section id="accountOverview" class="section active">
+
+      <div class="subtab-bar">
+        <button class="active" data-subtab="dashOverview">Přehled</button>
+        <button data-subtab="dashInstrumentPortfolio" data-oninit="initInstrumentPortfolioSection">Podíl instrumentů</button>
+      </div>
+
+      <div class="subsection active" id="dashOverview">
 
       <div class="card account-filter-card">
         <div class="account-filter-title">
@@ -339,27 +371,56 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       </div>
 
       <div id="limitAlert" class="alert red"></div>
-      <div class="grid stats">
-        <div class="card metric"><div class="label">Stav účtu</div><div class="value" id="accountValue">0 Kč</div></div>
-        <div class="card metric"><div class="label">Celkové P/L</div><div class="value" id="totalPnl">0</div></div>
-        <div class="card metric"><div class="label">Úspěšné obchody</div><div class="value pos" id="wins">0</div></div>
-        <div class="card metric"><div class="label">Ztrátové obchody</div><div class="value neg" id="losses">0</div></div>
-        <div class="card metric"><div class="label">Break Even obchody</div><div class="value neutral" id="breakevens">0</div></div>
-        <div class="card metric"><div class="label">Win rate</div><div class="value" id="winrate">0 %</div></div>
-</div>
-      <div class="grid charts">
-        <div class="card"><h3>Poměr Target / Stop Loss</h3><div class="chart-wrap"><canvas id="pieChart"></canvas></div></div>
-        <div class="card"><h3>Equity křivka</h3><div class="chart-wrap"><canvas id="equityChart"></canvas></div></div>
+
+      <div class="kpi-strip">
+        <div class="kpi-item"><div class="kpi-label">Počáteční stav</div><div class="kpi-value" id="kpiStart">0</div></div>
+        <div class="kpi-item"><div class="kpi-label">Čistý zisk</div><div class="kpi-value" id="kpiNet">0</div></div>
+        <div class="kpi-item"><div class="kpi-label">Aktuální stav účtu</div><div class="kpi-value" id="accountValue">0</div></div>
+        <div class="kpi-item"><div class="kpi-label">Win rate</div><div class="kpi-value" id="kpiWinrate">0 %</div></div>
+        <div class="kpi-item"><div class="kpi-label">Profit factor</div><div class="kpi-value" id="kpiPf">0</div></div>
       </div>
+
+      <div class="section-divider"><span>CELKOVÝ PŘEHLED</span></div>
+      <div class="grid overview-row">
+        <div class="card">
+          <h3>Celková výkonnost</h3>
+          <div id="overallStatsList" class="stat-list"></div>
+          <div class="panel-subtitle">Top instrumenty dle P/L</div>
+          <div id="topInstruments" class="bar-list"></div>
+        </div>
+        <div class="card">
+          <h3>Rozložení zisků a ztrát</h3>
+          <div class="panel-subtitle" style="margin-top:0">Počet obchodů podle výše zisku/ztráty ($)</div>
+          <div class="chart-wrap sm"><canvas id="histChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Statistika obchodů</h3>
+          <div class="gauge-row">
+            <div class="gauge-wrap"><canvas id="gaugeWinrate"></canvas><div class="gauge-label"><span class="gauge-pct" id="gaugeWinrateLabel">0%</span><span class="gauge-name">Win Rate</span></div></div>
+            <div class="gauge-wrap"><canvas id="gaugeProfitRate"></canvas><div class="gauge-label"><span class="gauge-pct" id="gaugeProfitRateLabel">0%</span><span class="gauge-name">Profit Rate</span></div></div>
+          </div>
+          <div class="stat-list" id="tradeStatsTable"></div>
+        </div>
+      </div>
+
+      <div class="section-divider"><span>VÝKONNOST</span></div>
+      <div class="grid performance-row">
+        <div class="card">
+          <h3>Výkonnost dle období</h3>
+          <div id="periodStats" class="stat-list"></div>
+        </div>
+        <div class="card"><h3>Equity křivka</h3><div class="chart-wrap"><canvas id="equityChart"></canvas></div><div class="legend"><span><i style="background:var(--blue)"></i>Equity účtu</span><span><i style="background:var(--red)"></i>Výchozí stav (0 %)</span></div></div>
+        <div class="card"><h3>Týdenní výkonnost</h3><div class="chart-wrap sm"><canvas id="weeklyChart"></canvas></div></div>
+      </div>
+
       <div class="card" style="margin-top:16px">
         <h3>Vybrané obchody</h3>
         <div id="accountOverviewTrades" class="trade-list"></div>
       </div>
 
-    </section>
+      </div>
 
-    
-    <section id="instrumentPortfolio" class="section">
+      <div class="subsection" id="dashInstrumentPortfolio">
       <div class="card">
         <div class="instrument-section-head">
           <div>
@@ -396,6 +457,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         </div>
         <div class="card instrument-portfolio-list" id="instrumentPortfolioList"></div>
       </div>
+      </div>
+
     </section>
 
     <section id="journal" class="section">
@@ -472,58 +535,82 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     
     
     <section id="integrations" class="section">
-      <div class="grid integration-top">
-        <div class="card">
-          <h2>NinjaTrader, cTrader a TradingView – automatické obchody</h2>
-          <p class="sub">Exekuce se automaticky párují do otevřených a uzavřených obchodů, včetně částečných fillů a otočení pozice. Stejný lokální endpoint a API klíč používá NinjaTrader konektor, cTrader cBot i TradingView relay.</p>
-          <div class="settings-grid" style="margin-top:16px">
-            <div class="field"><label>Stav služby</label><input id="captureStatusText" readonly></div>
-            <div class="field"><label>Uzavřené obchody čekající na import</label><input id="capturePendingCount" readonly></div>
-            <div class="field full"><label>Lokální endpoint</label><input id="captureEndpoint" readonly></div>
-            <div class="field full"><label>API klíč pro NinjaTrader</label><input id="captureApiKey" readonly></div>
-            <div class="field"><label>Automatické screenshoty</label>
-              <select id="captureScreenshotMode">
-                <option value="none">Vypnuto</option>
-                <option value="primary">Hlavní monitor</option>
-                <option value="all">Všechny monitory</option>
-              </select>
-            </div>
-            <div class="field"><label>Automatický import</label>
-              <select id="captureAutoImportSelect"><option value="ano">Zapnuto</option><option value="ne">Vypnuto</option></select>
-            </div>
-          </div>
-          <div class="integration-actions">
-            <button class="btn primary" id="captureRefresh">Obnovit stav</button>
-            <button class="btn" id="captureTestSequence">Otestovat vstup a výstup</button>
-            <button class="btn" id="captureTestMultiTarget" title="Nasimuluje pozici uzavřenou přes TP1, Break Even a TP2 (pro test slučování)">Otestovat TP1/BE/TP2</button>
-            <button class="btn" id="captureImport">Importovat nyní</button>
-            <button class="btn primary" id="captureInstallNinja">Nainstalovat NinjaTrader konektor automaticky</button>
-            <button class="btn" id="captureExportConnector">Pouze stáhnout NinjaTrader konektor</button>
-            <button class="btn" id="captureTestCTrader" title="Nasimuluje cTrader pozici uzavřenou přes dva cíle (TP1/TP2) se stejným Position.Id">Otestovat cTrader (TP1/TP2)</button>
-            <button class="btn primary" id="captureExportCTrader">Pouze stáhnout cTrader cBot (.cs)</button>
-            <button class="btn" id="captureInstallCTrader" title="Funguje až po prvním ručním vytvoření cBota v cTraderu (viz návod výše) – pak tímto tlačítkem aktualizuješ kód na novou verzi bez kopírování">Aktualizovat cBot (po prvním vytvoření)</button>
-            <button class="btn primary" id="capturePrepareTradingView">Připravit Pine Script a otevřít TradingView</button>
-            <button class="btn primary" id="capturePrepareWorker">Připravit webhook a otevřít Cloudflare</button>
-            <button class="btn" id="captureExportTradingView">Pouze stáhnout TradingView Pine Script</button>
-            <button class="btn" id="captureExportTradingViewWorker">Pouze stáhnout TradingView webhook relay</button>
-            <button class="btn" id="captureOpenConnectors">Otevřít složku konektorů</button>
-            <button class="btn" id="captureNewKey">Nový API klíč</button>
-            <button class="btn danger" id="captureClear">Vymazat frontu</button>
-          </div>
-          <div class="sub" style="margin-top:12px">
-            <b>cTrader – jak zapojit (ověřeno podle aktuální dokumentace cTrader):</b> v cTrader Desktopu vlevo dole klikni na <b>Algo</b>, v kartě <b>cBots</b> klikni <b>New</b>, zvol jazyk C# a „From scratch" / Blank, pojmenuj přesně <b>„FuturesJournalCTraderConnector"</b> a potvrď Create. Otevře se editor s ukázkovým kódem – ten celý smaž (Ctrl+A, Delete) a vlož místo něj obsah staženého souboru (tlačítko „Pouze stáhnout cTrader cBot (.cs)" níže, pak ho otevři v Poznámkovém bloku a zkopíruj). Klikni <b>Build</b> (Ctrl+B) – dole by se měla objevit zelená hláška o úspěchu. Pak se vrať do grafu účtu, který chceš sledovat, klikni na ikonu cBotů, najdi FuturesJournalCTraderConnector a přidej instanci – klikni <b>Start</b>. Konektor používá vestavěné síťové rozhraní cAlgo, takže nepotřebuje neomezený přístup (Full Access) – cTrader se na nic ptát nebude. API klíč je v souboru už doplněný automaticky, stejný jako u NinjaTraderu.
-            <br><br>Tlačítko „Aktualizovat cBot" níže funguje až <b>po tomto prvním ručním vytvoření</b> – najde už existující projekt v Dokumenty\cAlgo\Sources\Robots a přepíše jen jeho kód, takže při příští aktualizaci Futures Journal PRO už nebudeš muset nic ručně kopírovat. Samotný projekt (soubory .csproj/.sln) si spravuje cTrader sám, ty se automaticky nevytváří.
-          </div>
-        </div>
-        <div class="card">
-          <h3>Přiřazení účtů ke kartám</h3>
-          <p class="sub">Například SIM101 → Simulace, APEX-123 → Apex účet.</p>
-          <div id="captureMappingRows"></div>
-          <button class="btn" id="captureSaveMappings" style="margin-top:12px">Uložit přiřazení</button>
-          <div id="captureHiddenAccountsBox" style="margin-top:16px"></div>
-        </div>
+      <div class="subtab-bar">
+        <button class="active" data-subtab="capStatus">Stav a obecné</button>
+        <button data-subtab="capNinja">NinjaTrader</button>
+        <button data-subtab="capCtrader">cTrader</button>
+        <button data-subtab="capTradingview">TradingView</button>
+        <button data-subtab="capMapping">Přiřazení účtů</button>
       </div>
 
+      <div class="subsection active" id="capStatus">
+      <div class="card">
+        <h2>Stav služby a obecné akce</h2>
+        <p class="sub">Exekuce se automaticky párují do otevřených a uzavřených obchodů, včetně částečných fillů a otočení pozice. Stejný lokální endpoint a API klíč používá NinjaTrader konektor, cTrader cBot i TradingView relay.</p>
+        <div class="settings-grid" style="margin-top:16px">
+          <div class="field"><label>Stav služby</label><input id="captureStatusText" readonly></div>
+          <div class="field"><label>Uzavřené obchody čekající na import</label><input id="capturePendingCount" readonly></div>
+          <div class="field full"><label>Lokální endpoint</label><input id="captureEndpoint" readonly></div>
+          <div class="field full"><label>API klíč pro NinjaTrader</label><input id="captureApiKey" readonly></div>
+          <div class="field"><label>Automatické screenshoty</label>
+            <select id="captureScreenshotMode">
+              <option value="none">Vypnuto</option>
+              <option value="primary">Hlavní monitor</option>
+              <option value="all">Všechny monitory</option>
+            </select>
+          </div>
+          <div class="field"><label>Automatický import</label>
+            <select id="captureAutoImportSelect"><option value="ano">Zapnuto</option><option value="ne">Vypnuto</option></select>
+          </div>
+        </div>
+        <div class="integration-actions">
+          <button class="btn primary" id="captureRefresh">Obnovit stav</button>
+          <button class="btn" id="captureTestSequence">Otestovat vstup a výstup</button>
+          <button class="btn" id="captureTestMultiTarget" title="Nasimuluje pozici uzavřenou přes TP1, Break Even a TP2 (pro test slučování)">Otestovat TP1/BE/TP2</button>
+          <button class="btn" id="captureImport">Importovat nyní</button>
+          <button class="btn" id="captureOpenConnectors">Otevřít složku konektorů</button>
+          <button class="btn" id="captureNewKey">Nový API klíč</button>
+          <button class="btn danger" id="captureClear">Vymazat frontu</button>
+        </div>
+      </div>
+      </div>
+
+      <div class="subsection" id="capNinja">
+      <div class="card">
+        <h2>NinjaTrader</h2>
+        <p class="sub">Konektor používá stejný lokální endpoint a API klíč jako sekce "Stav a obecné".</p>
+        <div class="integration-actions">
+          <button class="btn primary" id="captureInstallNinja">Nainstalovat NinjaTrader konektor automaticky</button>
+          <button class="btn" id="captureExportConnector">Pouze stáhnout NinjaTrader konektor</button>
+        </div>
+      </div>
+      </div>
+
+      <div class="subsection" id="capCtrader">
+      <div class="card">
+        <h2>cTrader</h2>
+        <div class="integration-actions">
+          <button class="btn" id="captureTestCTrader" title="Nasimuluje cTrader pozici uzavřenou přes dva cíle (TP1/TP2) se stejným Position.Id">Otestovat cTrader (TP1/TP2)</button>
+          <button class="btn primary" id="captureExportCTrader">Pouze stáhnout cTrader cBot (.cs)</button>
+          <button class="btn" id="captureInstallCTrader" title="Funguje až po prvním ručním vytvoření cBota v cTraderu (viz návod níže) – pak tímto tlačítkem aktualizuješ kód na novou verzi bez kopírování">Aktualizovat cBot (po prvním vytvoření)</button>
+        </div>
+        <div class="sub" style="margin-top:12px">
+          <b>cTrader – jak zapojit (ověřeno podle aktuální dokumentace cTrader):</b> v cTrader Desktopu vlevo dole klikni na <b>Algo</b>, v kartě <b>cBots</b> klikni <b>New</b>, zvol jazyk C# a „From scratch" / Blank, pojmenuj přesně <b>„FuturesJournalCTraderConnector"</b> a potvrď Create. Otevře se editor s ukázkovým kódem – ten celý smaž (Ctrl+A, Delete) a vlož místo něj obsah staženého souboru (tlačítko „Pouze stáhnout cTrader cBot (.cs)" výše, pak ho otevři v Poznámkovém bloku a zkopíruj). Klikni <b>Build</b> (Ctrl+B) – dole by se měla objevit zelená hláška o úspěchu. Pak se vrať do grafu účtu, který chceš sledovat, klikni na ikonu cBotů, najdi FuturesJournalCTraderConnector a přidej instanci – klikni <b>Start</b>. Konektor používá vestavěné síťové rozhraní cAlgo, takže nepotřebuje neomezený přístup (Full Access) – cTrader se na nic ptát nebude. API klíč je v souboru už doplněný automaticky, stejný jako u NinjaTraderu.
+          <br><br>Tlačítko „Aktualizovat cBot" výše funguje až <b>po tomto prvním ručním vytvoření</b> – najde už existující projekt v Dokumenty\cAlgo\Sources\Robots a přepíše jen jeho kód, takže při příští aktualizaci Futures Journal PRO už nebudeš muset nic ručně kopírovat. Samotný projekt (soubory .csproj/.sln) si spravuje cTrader sám, ty se automaticky nevytváří.
+        </div>
+      </div>
+      </div>
+
+      <div class="subsection" id="capTradingview">
+      <div class="card">
+        <h2>TradingView</h2>
+        <div class="integration-actions">
+          <button class="btn primary" id="capturePrepareTradingView">Připravit Pine Script a otevřít TradingView</button>
+          <button class="btn primary" id="capturePrepareWorker">Připravit webhook a otevřít Cloudflare</button>
+          <button class="btn" id="captureExportTradingView">Pouze stáhnout TradingView Pine Script</button>
+          <button class="btn" id="captureExportTradingViewWorker">Pouze stáhnout TradingView webhook relay</button>
+        </div>
+      </div>
       <div class="card" style="margin-top:16px">
         <h2>TradingView – webhook relay</h2>
         <p class="sub">TradingView nemůže posílat na localhost. Připravený Cloudflare Worker přijme veřejný webhook a aplikace si alerty bezpečně stáhne.</p>
@@ -538,10 +625,29 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         </div>
         <p class="sub" style="margin-top:10px">Zdroj Workeru a Pine Script jsou ve složce <b>CONNECTORS</b>.</p>
       </div>
+      </div>
+
+      <div class="subsection" id="capMapping">
+      <div class="card">
+        <h3>Přiřazení účtů ke kartám</h3>
+        <p class="sub">Například SIM101 → Simulace, APEX-123 → Apex účet.</p>
+        <div id="captureMappingRows"></div>
+        <button class="btn" id="captureSaveMappings" style="margin-top:12px">Uložit přiřazení</button>
+        <div id="captureHiddenAccountsBox" style="margin-top:16px"></div>
+      </div>
+      </div>
 
     </section>
 
     <section id="settings" class="section">
+      <div class="subtab-bar">
+        <button class="active" data-subtab="settingsGeneral">Obecné</button>
+        <button data-subtab="settingsRisk">Riziko</button>
+        <button data-subtab="settingsTemplates">Šablony</button>
+        <button data-subtab="settingsBackup">Data a zálohy</button>
+      </div>
+
+      <div class="subsection active" id="settingsGeneral">
       <div class="settings-grid">
         <div class="card">
           <h3>Vzhled (téma)</h3>
@@ -602,6 +708,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
           <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
         </div>
+      </div>
+      </div>
+
+      <div class="subsection" id="settingsRisk">
+      <div class="settings-grid">
         <div class="card">
           <h3>Řízení rizika (per deník)</h3>
           <p class="sub">Volitelné denní/celkové limity pro tento konkrétní deník. Prázdné pole = pravidlo je vypnuté. Porušení nebo splnění cíle se poznačí u příslušného dne v Kalendáři.</p>
@@ -621,6 +732,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" style="margin-top:12px"><label>Automaticky slučovat cíle stejné pozice (TP1/TP2/BE) při importu</label><select id="autoMergeLegs"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <button class="btn primary" id="saveBreakEvenSettings" style="margin-top:14px">Uložit nastavení</button>
         </div>
+      </div>
+      </div>
+
+      <div class="subsection" id="settingsTemplates">
+      <div class="settings-grid">
         <div class="card">
           <h3>Šablony podle instrumentu</h3>
           <p class="sub">Pro daný instrument lze předvyplnit strategii, dodržení plánu, komentář, hodnotu bodu a výchozí komisi — při ručním přidání i při automatickém importu.</p>
@@ -653,6 +769,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <button class="btn danger" id="recalcCommissionBtn" style="margin-top:10px">Přepočítat komisi v aktivním deníku</button>
           </div>
         </div>
+      </div>
+      </div>
+
+      <div class="subsection" id="settingsBackup">
+      <div class="settings-grid">
         <div class="card">
           <h3>Export pro AI analýzu / Claude Cowork</h3>
           <p class="sub">Vedle běžných dat udržuje appka automaticky ještě jednu "odlehčenou" kopii každého deníku – úplně stejná obchodní data (výsledek, body, komentář, denní plán, setup/scénář, psychologický checklist…), ale BEZ screenshotů. Ty totiž dělají soubor objemný; bez nich je i deník s velkým počtem obchodů v řádu stovek kB. Tahle kopie se aktualizuje sama při každém uložení obchodu.</p>
@@ -682,6 +803,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn danger" id="factoryReset" style="display:block;margin-top:10px">⚠️ Kompletní reset aplikace</button>
           <div class="sub" style="margin-top:8px">Smaže všechny deníky, obchody, nastavení i uloženou cestu k záloze.</div>
         </div>
+      </div>
       </div>
     </section>
   </main>
@@ -1012,6 +1134,7 @@ async function load(){
  // Jednorázová migrace ze starého jednoduchého denního limitu, pokud nový ještě nebyl nastaven.
  if(!settings.risk.maxDailyDrawdown && settings.dailyLossLimit) settings.risk.maxDailyDrawdown=settings.dailyLossLimit;
  fillSettings(); renderAll();
+ setTimeout(initAccountOverview,60);
 }
 function fillSettings(){
  $('startingBalance').value=settings.startingBalance;$('currency').value='USD';$('usdCzkRate').value=settings.usdCzkRate||23;
@@ -1266,19 +1389,93 @@ function evaluateDayRisk(date, drawdownByDate, rows=trades){
  if(r.profitTargetPerDay && dailyPnl>=r.profitTargetPerDay) achievements.push(`Splněn profit target ${dualMoneyText(r.profitTargetPerDay)}`);
  return {violations,achievements};
 }
+function computeOverallStats(rows){
+ const wins=rows.filter(t=>t.result==='target'), losses=rows.filter(t=>t.result==='stoploss'), breakevens=rows.filter(t=>t.result==='breakeven');
+ const gainSum=wins.reduce((a,t)=>a+signed(t),0), lossSum=losses.reduce((a,t)=>a+signed(t),0);
+ const winrateDenom=wins.length+losses.length;
+ const winRate=winrateDenom?wins.length/winrateDenom:0;
+ const profitFactor=lossSum?Math.abs(gainSum/lossSum):(gainSum?Infinity:0);
+ return {
+  wins,losses,breakevens,gainSum,lossSum,winRate,profitFactor,
+  totalTrades:rows.length,
+  avgWin:wins.length?gainSum/wins.length:0,
+  avgLoss:losses.length?lossSum/losses.length:0,
+  expectancy:rows.length?(gainSum+lossSum)/rows.length:0
+ };
+}
+function renderKpiStrip(total,balance,stats){
+ if($('kpiStart'))$('kpiStart').innerHTML=money(Number(settings.startingBalance)||0);
+ if($('kpiNet')){$('kpiNet').innerHTML=(total>=0?'+':'')+money(total);$('kpiNet').className='kpi-value '+(total>=0?'pos':'neg')}
+ if($('accountValue'))$('accountValue').innerHTML=money(balance);
+ if($('kpiWinrate'))$('kpiWinrate').textContent=(stats.winRate*100).toFixed(1)+' %';
+ if($('kpiPf'))$('kpiPf').textContent=stats.profitFactor===Infinity?'∞':stats.profitFactor.toFixed(2);
+}
+function renderOverallStatsList(stats){
+ const el=$('overallStatsList'); if(!el)return;
+ const ratioTxt=stats.profitFactor===Infinity?'∞':stats.profitFactor.toFixed(2);
+ const rows=[
+  ['Celkový zisk',stats.gainSum,'pos'],
+  ['Celková ztráta',stats.lossSum,'neg'],
+  ['Poměr zisk/ztráta',ratioTxt,stats.gainSum+stats.lossSum>=0?'pos':'neg']
+ ];
+ el.innerHTML=rows.map(([label,val,cls])=>`<div class="row"><span>${label}</span><b class="${cls}">${typeof val==='number'?(val>=0?'+':'')+money(val):val}</b></div>`).join('');
+}
+function renderTopInstruments(rows){
+ const el=$('topInstruments'); if(!el)return;
+ const groups=groupSummary(rows,'instrument').filter(g=>g.pnl!==0).slice(0,5);
+ if(!groups.length){el.innerHTML='<div class="sub">Zatím žádná data.</div>';return}
+ const maxAbs=Math.max(...groups.map(g=>Math.abs(g.pnl)),1);
+ el.innerHTML=groups.map(g=>{
+  const pct=Math.max(4,Math.abs(g.pnl)/maxAbs*100);
+  const cls=g.pnl>=0?'pos':'neg', color=g.pnl>=0?'var(--green)':'var(--red)';
+  return `<div class="bar-row"><div class="bar-name">${esc(g.name)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="bar-val ${cls}">${(g.pnl>=0?'+':'')+money(g.pnl)}</div></div>`;
+ }).join('');
+}
+function renderTradeStatsTable(stats){
+ const el=$('tradeStatsTable'); if(!el)return;
+ const row=(label,val,cls='')=>`<div class="row"><span>${label}</span><b class="${cls}">${val}</b></div>`;
+ el.innerHTML=
+  row('Ziskové obchody',stats.wins.length,'pos')+
+  row('Ztrátové obchody',stats.losses.length,'neg')+
+  row('Průměrný zisk',money(stats.avgWin),'pos')+
+  row('Průměrná ztráta',money(stats.avgLoss),'neg')+
+  row('Profit factor',stats.profitFactor===Infinity?'∞':stats.profitFactor.toFixed(2))+
+  row('Expectancy',money(stats.expectancy),stats.expectancy>=0?'pos':'neg');
+}
+function computePeriodStats(rows){
+ const now=new Date();
+ const startOfMonth=new Date(now.getFullYear(),now.getMonth(),1);
+ const startOfQuarter=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);
+ const startOfYear=new Date(now.getFullYear(),0,1);
+ const sum=from=>rows.filter(t=>t.date&&new Date(t.date+'T00:00:00')>=from).reduce((a,t)=>a+signed(t),0);
+ return {month:sum(startOfMonth),quarter:sum(startOfQuarter),ytd:sum(startOfYear),all:rows.reduce((a,t)=>a+signed(t),0)};
+}
+function renderPeriodStats(rows){
+ const el=$('periodStats'); if(!el)return;
+ const p=computePeriodStats(rows);
+ const row=(label,val)=>`<div class="row"><span>${label}</span><b class="${val>=0?'pos':'neg'}">${(val>=0?'+':'')+money(val)}</b></div>`;
+ el.innerHTML=row('Tento měsíc',p.month)+row('Toto čtvrtletí',p.quarter)+row('Od začátku roku',p.ytd)+row('Celkem',p.all);
+}
+function renderGauges(stats){
+ drawGauge('gaugeWinrate',stats.winRate,'--green');
+ if($('gaugeWinrateLabel'))$('gaugeWinrateLabel').textContent=(stats.winRate*100).toFixed(1)+'%';
+ const profitRate=stats.totalTrades?stats.wins.length/stats.totalTrades:0;
+ drawGauge('gaugeProfitRate',profitRate,'--blue');
+ if($('gaugeProfitRateLabel'))$('gaugeProfitRateLabel').textContent=(profitRate*100).toFixed(1)+'%';
+}
 function renderDashboard(rows=trades){
  const safeRows=Array.isArray(rows)?rows:[];
- const wins=safeRows.filter(t=>t.result==='target'), losses=safeRows.filter(t=>t.result==='stoploss'), breakevens=safeRows.filter(t=>t.result==='breakeven');
- const total=safeRows.reduce((a,t)=>a+signed(t),0), balance=Number(settings.startingBalance)+total;
- if($('accountValue'))$('accountValue').innerHTML=dualMoney(balance);
- if($('totalPnl')){$('totalPnl').innerHTML=dualMoney(total,true);$('totalPnl').className='value '+(total>=0?'pos':'neg')}
- if($('wins'))$('wins').textContent=wins.length;
- if($('losses'))$('losses').textContent=losses.length;
- if($('breakevens'))$('breakevens').textContent=breakevens.length;
- const winrateDenom=wins.length+losses.length;
- if($('winrate'))$('winrate').textContent=winrateDenom?((wins.length/winrateDenom)*100).toFixed(1)+' %':'0 %';
- if($('pieChart'))drawPie(wins.length,losses.length);
+ const stats=computeOverallStats(safeRows);
+ const total=stats.gainSum+stats.lossSum, balance=Number(settings.startingBalance)+total;
+ renderKpiStrip(total,balance,stats);
+ renderOverallStatsList(stats);
+ renderTopInstruments(safeRows);
+ renderTradeStatsTable(stats);
+ renderPeriodStats(safeRows);
+ if($('gaugeWinrate'))renderGauges(stats);
+ if($('histChart'))drawHistogram(safeRows);
  if($('equityChart'))drawEquityRows(safeRows);
+ if($('weeklyChart'))drawWeeklyCurve(safeRows);
  const today=new Date().toISOString().slice(0,10);
  const {violations,achievements}=evaluateDayRisk(today, computeDrawdownByDate());
  const alertBox=$('limitAlert');
@@ -1296,36 +1493,113 @@ function themeColor(varName){
  const v=getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
  return v||'#98a6c7';
 }
-function drawPie(wins,losses){
- const {x,w,h}=setupCanvas($('pieChart')),cx=w/2,cy=h/2,r=Math.min(w,h)*.32,total=wins+losses;
- const muted=themeColor('--muted'),panel=themeColor('--panel'),text=themeColor('--text'),green=themeColor('--green'),red=themeColor('--red');
- x.clearRect(0,0,w,h);
- if(!total){x.fillStyle=muted;x.textAlign='center';x.font='16px sans-serif';x.fillText('Zatím žádné obchody',cx,cy);return}
- let start=-Math.PI/2;
- [[wins,green,'Target'],[losses,red,'Stop Loss']].forEach(([v,c])=>{
-  const end=start+(v/total)*Math.PI*2;x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,r,start,end);x.closePath();x.fillStyle=c;x.fill();start=end;
- });
- x.beginPath();x.arc(cx,cy,r*.56,0,Math.PI*2);x.fillStyle=panel;x.fill();
- x.fillStyle=text;x.textAlign='center';x.font='700 26px sans-serif';x.fillText(total,cx,cy+7);
- x.font='13px sans-serif';x.fillStyle=muted;x.fillText('obchodů',cx,cy+28);
- x.textAlign='left';x.fillStyle=green;x.fillRect(18,h-44,12,12);x.fillStyle=text;x.fillText(`Target ${wins}`,38,h-33);
- x.fillStyle=red;x.fillRect(w-120,h-44,12,12);x.fillStyle=text;x.fillText(`SL ${losses}`,w-100,h-33);
-}
 function drawEquityRows(rows){
- const {x,w,h}=setupCanvas($('equityChart')),pad={l:65,r:20,t:25,b:45};
- const line=themeColor('--line'),muted=themeColor('--muted'),blue=themeColor('--blue');
+ const {x,w,h}=setupCanvas($('equityChart')),pad={l:65,r:20,t:30,b:45};
+ const line=themeColor('--line'),muted=themeColor('--muted'),blue=themeColor('--blue'),red=themeColor('--red'),text=themeColor('--text');
+ const start=Number(settings.startingBalance)||0;
  const daily={};rows.forEach(t=>{if(t.date)daily[t.date]=(daily[t.date]||0)+signed(t)});
- const dates=Object.keys(daily).sort(),vals=[Number(settings.startingBalance)];
+ const dates=Object.keys(daily).sort(),vals=[start];
  dates.forEach(d=>vals.push(vals.at(-1)+daily[d]));
- const labels=['Start',...dates];let min=Math.min(...vals),max=Math.max(...vals);if(min===max){min-=1;max+=1}
+ const labels=['Start',...dates];let min=Math.min(...vals,start),max=Math.max(...vals,start);if(min===max){min-=1;max+=1}
  x.clearRect(0,0,w,h);x.strokeStyle=line;x.fillStyle=muted;x.font='11px sans-serif';
  for(let i=0;i<5;i++){const y=pad.t+(h-pad.t-pad.b)*i/4;x.beginPath();x.moveTo(pad.l,y);x.lineTo(w-pad.r,y);x.stroke();x.fillText(Math.round(max-(max-min)*i/4),6,y+4)}
- if(vals.length<2){x.fillText('Equity se zobrazí po prvním obchodu',pad.l+20,h/2);return}
+ const returnPct=start?((vals.at(-1)-start)/start*100):0;
+ x.textAlign='right';x.font='700 13px sans-serif';x.fillStyle=returnPct>=0?blue:red;
+ x.fillText((returnPct>=0?'+':'')+returnPct.toFixed(1)+'%',w-pad.r,16);
+ x.font='9.5px sans-serif';x.fillStyle=muted;x.fillText('Celkový výnos',w-pad.r,28);
+ if(vals.length<2){x.textAlign='left';x.fillText('Equity se zobrazí po prvním obchodu',pad.l+20,h/2);return}
  const px=i=>pad.l+(w-pad.l-pad.r)*i/(vals.length-1),py=v=>pad.t+(max-v)/(max-min)*(h-pad.t-pad.b);
- x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle=blue;x.lineWidth=3;x.stroke();
- x.fillStyle=blue;vals.forEach((v,i)=>{x.beginPath();x.arc(px(i),py(v),3,0,Math.PI*2);x.fill()});
+ x.strokeStyle=red;x.setLineDash([5,4]);x.lineWidth=1.25;x.beginPath();x.moveTo(px(0),py(start));x.lineTo(px(vals.length-1),py(start));x.stroke();x.setLineDash([]);
+ const grad=x.createLinearGradient(0,pad.t,0,h-pad.b);grad.addColorStop(0,'rgba(91,167,255,.22)');grad.addColorStop(1,'rgba(91,167,255,0)');
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.lineTo(px(vals.length-1),h-pad.b);x.lineTo(px(0),h-pad.b);x.closePath();x.fillStyle=grad;x.fill();
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle=blue;x.lineWidth=2.75;x.stroke();
+ x.fillStyle=blue;x.beginPath();x.arc(px(vals.length-1),py(vals.at(-1)),3.5,0,Math.PI*2);x.fill();
  const step=Math.max(1,Math.ceil(labels.length/6));x.fillStyle=muted;x.textAlign='center';
  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)x.fillText(l==='Start'?l:l.slice(5),px(i),h-18)});
+}
+function drawGauge(id,pct,colorVar){
+ const c=$(id); if(!c)return;
+ const {x,w,h}=setupCanvas(c),cx=w/2,cy=h/2,r=Math.max(0,Math.min(w,h)/2-9);
+ if(r<=0)return;
+ const track=themeColor('--panel2'),color=themeColor(colorVar);
+ const lw=Math.max(4,Math.min(w,h)*.14);
+ x.clearRect(0,0,w,h);x.lineCap='round';
+ x.lineWidth=lw;x.strokeStyle=track;x.beginPath();x.arc(cx,cy,r,0,Math.PI*2);x.stroke();
+ const p=Math.min(1,Math.max(0,pct||0)),end=-Math.PI/2+Math.PI*2*p;
+ if(p>0){
+  x.save();x.shadowColor=color;x.shadowBlur=Math.max(4,lw*.6);
+  x.lineWidth=lw;x.strokeStyle=color;x.beginPath();x.arc(cx,cy,r,-Math.PI/2,end);x.stroke();
+  x.restore();
+ }
+}
+function mixHex(hexA,hexB,t){
+ t=Math.max(0,Math.min(1,t));
+ const a=hexA.replace('#','').match(/.{2}/g).map(v=>parseInt(v,16));
+ const b=hexB.replace('#','').match(/.{2}/g).map(v=>parseInt(v,16));
+ return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join('');
+}
+function drawHistogram(rows){
+ const c=$('histChart'); if(!c)return;
+ const {x,w,h}=setupCanvas(c),pad={l:26,r:8,t:16,b:24};
+ const line=themeColor('--line'),muted=themeColor('--muted'),green=themeColor('--green'),red=themeColor('--red'),text=themeColor('--text');
+ x.clearRect(0,0,w,h);
+ const vals=rows.filter(t=>t.result!=='breakeven').map(t=>signed(t));
+ x.strokeStyle=line;x.beginPath();x.moveTo(pad.l,h-pad.b);x.lineTo(w-pad.r,h-pad.b);x.stroke();
+ if(!vals.length){x.fillStyle=muted;x.font='13px sans-serif';x.textAlign='center';x.fillText('Zatím žádné obchody',w/2,h/2);return}
+ const min=Math.min(...vals,0),max=Math.max(...vals,0),binCount=10,span=(max-min)||1,binSize=span/binCount;
+ const bins=new Array(binCount).fill(0);
+ vals.forEach(v=>{let idx=Math.floor((v-min)/binSize);if(idx>=binCount)idx=binCount-1;if(idx<0)idx=0;bins[idx]++});
+ const maxCount=Math.max(...bins,1),bw=(w-pad.l-pad.r)/binCount;
+ const zeroT=Math.min(1,Math.max(0,(0-min)/span));
+ if(zeroT>0&&zeroT<1){
+  const zx=pad.l+zeroT*(w-pad.l-pad.r);
+  x.strokeStyle=muted;x.setLineDash([3,3]);x.lineWidth=1;
+  x.beginPath();x.moveTo(zx,pad.t);x.lineTo(zx,h-pad.b);x.stroke();x.setLineDash([]);
+ }
+ bins.forEach((count,i)=>{
+  const t=(i+0.5)/binCount;
+  const barColor = t<zeroT
+   ? mixHex(mixHex(red,'#3a1416',.55),red,Math.min(1,t/Math.max(zeroT,0.001)))
+   : mixHex(green,mixHex(green,'#0a3a1f',.6),Math.min(1,(t-zeroT)/Math.max(1-zeroT,0.001)));
+  const barH=count?Math.max(3,(h-pad.t-pad.b)*(count/maxCount)):0;
+  const bx=pad.l+i*bw+1,bwid=Math.max(1,bw-2);
+  x.fillStyle=barColor;
+  x.beginPath();
+  const rr=Math.min(3,bwid/2);
+  x.moveTo(bx,h-pad.b);x.lineTo(bx,h-pad.b-barH+rr);x.arcTo(bx,h-pad.b-barH,bx+rr,h-pad.b-barH,rr);
+  x.lineTo(bx+bwid-rr,h-pad.b-barH);x.arcTo(bx+bwid,h-pad.b-barH,bx+bwid,h-pad.b-barH+rr,rr);
+  x.lineTo(bx+bwid,h-pad.b);x.closePath();x.fill();
+  if(count){x.fillStyle=text;x.font='9.5px sans-serif';x.textAlign='center';x.fillText(count,pad.l+i*bw+bw/2,h-pad.b-barH-4)}
+ });
+ x.fillStyle=muted;x.font='9.5px sans-serif';x.textAlign='center';
+ [0,Math.floor(binCount/2),binCount-1].forEach(i=>{
+  const v=Math.round(min+i*binSize);
+  x.fillText((v>=0?'+$':'-$')+Math.abs(v),pad.l+i*bw+bw/2,h-8);
+ });
+}
+function drawWeeklyCurve(rows){
+ const c=$('weeklyChart'); if(!c)return;
+ const {x,w,h}=setupCanvas(c),pad={l:44,r:12,t:14,b:22};
+ const line=themeColor('--line'),muted=themeColor('--muted'),blue=themeColor('--blue');
+ x.clearRect(0,0,w,h);
+ const now=new Date(),weeks=[];
+ for(let i=7;i>=0;i--){
+  const end=new Date(now);end.setDate(end.getDate()-i*7);
+  const start=new Date(end);start.setDate(start.getDate()-6);
+  weeks.push({start,end,pnl:0});
+ }
+ rows.forEach(t=>{
+  if(!t.date)return;
+  const d=new Date(t.date+'T00:00:00');
+  const wk=weeks.find(w2=>d>=w2.start&&d<=w2.end);
+  if(wk)wk.pnl+=signed(t);
+ });
+ const vals=weeks.map(w2=>w2.pnl);
+ let min=Math.min(0,...vals),max=Math.max(0,...vals);if(min===max){min-=1;max+=1}
+ for(let i=0;i<4;i++){const y=pad.t+(h-pad.t-pad.b)*i/3;x.strokeStyle=line;x.beginPath();x.moveTo(pad.l,y);x.lineTo(w-pad.r,y);x.stroke();x.fillStyle=muted;x.font='10px sans-serif';x.textAlign='right';x.fillText(Math.round(max-(max-min)*i/3),pad.l-6,y+3)}
+ const px=i=>pad.l+(w-pad.l-pad.r)*i/(vals.length-1),py=v=>pad.t+(max-v)/(max-min)*(h-pad.t-pad.b);
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle=blue;x.lineWidth=2.5;x.stroke();
+ x.fillStyle=blue;vals.forEach((v,i)=>{x.beginPath();x.arc(px(i),py(v),2.5,0,Math.PI*2);x.fill()});
 }
 function drawEquity(){
  const {x,w,h}=setupCanvas($('equityChart')),pad={l:65,r:20,t:25,b:45};
@@ -1415,7 +1689,7 @@ if($('calendarJournal'))$('calendarJournal').onchange=async()=>{
 function renderCalendar(){
  const y=calendarDate.getFullYear(),m=calendarDate.getMonth();
  $('monthLabel').textContent=new Intl.DateTimeFormat('cs-CZ',{month:'long',year:'numeric'}).format(calendarDate);
- const names=['Po','Út','St','Čt','Pá','So','Ne'];let html=names.map(n=>`<div class="dow">${n}</div>`).join('');
+ const names=['Po','Út','St','Čt','Pá','So','Ne'];let html=names.map(n=>`<div class="dow">${n}</div>`).join('')+'<div class="dow week">Týden</div>';
  const first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate();
  const scope=$('calendarJournal')?.value||'';
  const rows=getCalendarRows();
@@ -1423,13 +1697,25 @@ function renderCalendar(){
  const riskNote=$('calendarRiskNote');
  if(riskNote)riskNote.textContent=showRisk?'':'Řízení rizika (⚠️/🎯) se zobrazuje jen pro aktivní deník – při zobrazení více deníků najednou by hodnoty z různých nastavení nebyly srovnatelné.';
  const drawdownByDate=showRisk?computeDrawdownByDate(rows):null;
- for(let i=0;i<first;i++)html+='<div class="day empty"></div>';
+ let cellsInRow=0,weekPnl=0,weekCount=0;
+ const flushWeek=()=>{
+  html+=`<div class="day week-summary"><div class="num">Týden</div><div class="pnl ${weekPnl>=0?'pos':'neg'}">${dualMoney(weekPnl,true)}</div><div class="count">${weekCount} obchodů</div></div>`;
+  weekPnl=0;weekCount=0;
+ };
+ for(let i=0;i<first;i++){html+='<div class="day empty"></div>';cellsInRow++;if(cellsInRow===7){flushWeek();cellsInRow=0}}
  for(let day=1;day<=days;day++){
   const date=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,ts=rows.filter(t=>t.date===date),p=ts.reduce((a,t)=>a+signed(t),0);
   const {violations,achievements}=showRisk?evaluateDayRisk(date, drawdownByDate, rows):{violations:[],achievements:[]};
   const flagCls=violations.length?'risk':(achievements.length?'goal':'');
   const title=[...violations,...achievements].join(' | ');
   html+=`<div class="day ${ts.length?'has':''} ${flagCls}" ${ts.length?`onclick="showDay('${date}')"`:''} ${title?`title="${esc(title)}"`:''}><div class="num">${day}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}</div>`;
+  weekPnl+=p;weekCount+=ts.length;
+  cellsInRow++;
+  if(cellsInRow===7){flushWeek();cellsInRow=0}
+ }
+ if(cellsInRow>0){
+  for(;cellsInRow<7;cellsInRow++)html+='<div class="day empty"></div>';
+  flushWeek();
  }
  $('calendarGrid').innerHTML=html;
 }
@@ -2026,12 +2312,18 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
  const target=$(b.dataset.section);if(target)target.classList.add('active');
  $('pageTitle').textContent=b.textContent.replace(/^[^\s]+\s/,'');
- const isHome=b.dataset.section==='home';
- document.querySelector('.topbar').style.display=isHome?'none':'flex';
  $('addTradeBtn').style.display=(b.dataset.section==='journal'||b.dataset.section==='calendar')?'inline-block':'none';
- if(b.dataset.section==='accountOverview')setTimeout(initAccountOverview,60); if(b.dataset.section==='instrumentPortfolio')setTimeout(initInstrumentPortfolioSection,60);
+ if(b.dataset.section==='accountOverview')setTimeout(initAccountOverview,60);
  if(b.dataset.section==='reports')setTimeout(initReports,60);
  if(b.dataset.section==='calendar')setTimeout(initCalendarSection,60);
+});
+document.querySelectorAll('.subtab-bar').forEach(bar=>{
+ bar.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{
+  bar.querySelectorAll('button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
+  bar.parentElement.querySelectorAll(':scope > .subsection').forEach(s=>s.classList.remove('active'));
+  const target=$(btn.dataset.subtab);if(target)target.classList.add('active');
+  if(btn.dataset.oninit && typeof window[btn.dataset.oninit]==='function')setTimeout(window[btn.dataset.oninit],60);
+ });
 });
 $('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
 $('addTradeBtn').onclick=()=>openModal();$('closeModal').onclick=()=>$('tradeModal').classList.remove('open');
@@ -2180,7 +2472,7 @@ $('factoryReset').onclick=async()=>{
  }
 };
 
-window.addEventListener('resize',()=>{if($('dashboard').classList.contains('active'))renderDashboard()});
+window.addEventListener('resize',()=>{if($('accountOverview').classList.contains('active'))renderDashboard()});
 
 function saveJournalProfiles(){
  localStorage.setItem(JOURNAL_LIST_KEY,JSON.stringify(journalProfiles));
@@ -2313,18 +2605,6 @@ if($('promptModalCancel'))$('promptModalCancel').onclick=()=>resolvePrompt(null)
 if($('promptModalOk'))$('promptModalOk').onclick=()=>resolvePrompt($('promptModalInput').value);
 if($('promptModalInput'))$('promptModalInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('promptModalOk').click()}});
 if($('promptModal'))$('promptModal').onclick=e=>{if(e.target===$('promptModal'))resolvePrompt(null)};
-$('portfolioToggle')?.addEventListener('click',()=>{
- const body=$('portfolioBody'),collapsed=body.classList.toggle('collapsed');$('portfolioArrow').textContent=collapsed?'▶':'▼';localStorage.setItem('FuturesJournal_portfolioCollapsed',collapsed?'1':'0');
-});
-if(localStorage.getItem('FuturesJournal_portfolioCollapsed')==='1'){$('portfolioBody').classList.add('collapsed');$('portfolioArrow').textContent='▶'}
-async function refreshPortfolio(){
- try{
-  const all=await collectReportRows();const wins=all.filter(t=>t.result==='target'),losses=all.filter(t=>t.result==='stoploss');
-  const pnl=all.reduce((a,t)=>a+reportSigned(t),0),gw=wins.reduce((a,t)=>a+Number(t.pnl||0),0),gl=losses.reduce((a,t)=>a+Number(t.pnl||0),0);
-  $('portfolioPnl').innerHTML=dualMoney(pnl,true);$('portfolioPnl').className=pnl>=0?'pos':'neg';
-  $('portfolioTrades').textContent=all.length;$('portfolioWinrate').textContent=(wins.length+losses.length)?(wins.length/(wins.length+losses.length)*100).toFixed(1)+' %':'0 %';$('portfolioPf').textContent=gl?(gw/gl).toFixed(2):(gw?'∞':'0');
- }catch(err){console.error('Portfolio:',err)}
-}
 async function collectAllJournalsBackup(){
  const journals=[];
  for(const profile of journalProfiles){
@@ -2442,16 +2722,17 @@ function groupSummary(rows,key,nameMap={}){
 }
 function drawReportChart(rows){
  const {x,w,h}=setupCanvas($('reportChart')),pad={l:65,r:20,t:25,b:45};
+ const line=themeColor('--line'),muted=themeColor('--muted'),blue=themeColor('--blue');
  const daily={};rows.forEach(t=>daily[t.date||'Bez data']=(daily[t.date||'Bez data']||0)+reportSigned(t));
  const labels=Object.keys(daily).sort(), vals=[];let running=0;labels.forEach(d=>{running+=daily[d];vals.push(running)});
- x.clearRect(0,0,w,h);x.strokeStyle='#273452';x.fillStyle='#98a6c7';x.font='11px sans-serif';
+ x.clearRect(0,0,w,h);x.strokeStyle=line;x.fillStyle=muted;x.font='11px sans-serif';
  if(!vals.length){x.fillText('Pro vybraný filtr nejsou data.',30,h/2);return}
  let min=Math.min(0,...vals),max=Math.max(0,...vals);if(min===max){min-=1;max+=1}
  for(let i=0;i<5;i++){const y=pad.t+(h-pad.t-pad.b)*i/4;x.beginPath();x.moveTo(pad.l,y);x.lineTo(w-pad.r,y);x.stroke();x.fillText(Math.round(max-(max-min)*i/4),6,y+4)}
  const px=i=>pad.l+(w-pad.l-pad.r)*(vals.length===1?.5:i/(vals.length-1));
  const py=v=>pad.t+(max-v)/(max-min)*(h-pad.t-pad.b);
- x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle='#5ba7ff';x.lineWidth=3;x.stroke();
- x.fillStyle='#5ba7ff';vals.forEach((v,i)=>{x.beginPath();x.arc(px(i),py(v),3,0,Math.PI*2);x.fill()});
+ x.beginPath();vals.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.strokeStyle=blue;x.lineWidth=3;x.stroke();
+ x.fillStyle=blue;vals.forEach((v,i)=>{x.beginPath();x.arc(px(i),py(v),3,0,Math.PI*2);x.fill()});
 }
 async function initReports(){
  const all=await collectReportRows();
@@ -2498,7 +2779,7 @@ $('reportCsv').onclick=async()=>{
   download(new Blob([content],{type:'text/csv'}),'futures-report.csv');
  }
 };
-setTimeout(()=>{initReports();refreshPortfolio()},300);
+setTimeout(()=>{initReports()},300);
 
 window.addEventListener('error',e=>console.error('Chyba aplikace:',e.error||e.message));
 window.addEventListener('unhandledrejection',e=>console.error('Nezachycená chyba:',e.reason));
@@ -2839,7 +3120,6 @@ $('clearAccountFilters').onclick=()=>{
 };
 syncAccountDateFields();
 
-document.querySelector('.topbar').style.display='none';
 let journalAppStarted=false;
 async function startJournalApplication(){
  if(journalAppStarted)return;

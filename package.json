@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.4.7",
-  "description": "Futures Journal PRO 4.4.7 – cíle sdílející stejnou cenu výstupu (např. TP2 přesunutý na TP1) se teď spojí do jednoho cíle se sečteným počtem kontraktů, místo matoucího zobrazení jako dva samostatné. Detail cíle teď jde vidět i po kliknutí, ne jen po najetí myší.",
+  "version": "4.4.8",
+  "description": "Futures Journal PRO 4.4.8 – přepracovaný dashboard Přehled účtu (KPI strip, gauge grafy, rozložení zisků/ztrát, týdenní výkonnost), podíl instrumentů přesunut do podzáložky, odstraněna mrtvá sidebar portfolio-widget sekce a nové tmavší barevné téma.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",
