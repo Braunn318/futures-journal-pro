@@ -1352,7 +1352,7 @@ function legPillHTML(l,i){
  const m=resultMeta(l.result);
  const label=l.label||(l.result==='breakeven'?'BE':`Cíl ${i+1}`);
  const detail=`${label}: ${l.exitTime||'?'} @ ${l.exitPrice??'?'} · ${l.contracts||0} ks · ${m.sign}${Math.abs(Number(l.pnl||0)).toFixed(2)}`;
- return `<span class="leg-pill ${m.moneyCls}" title="${esc(detail)}" style="cursor:pointer" onclick="showToast('${esc(detail).replaceAll("'","\\'")}')">${esc(label)}: ${m.sign}${Math.abs(Number(l.points||0))}b</span>`;
+ return `<span class="leg-pill ${m.moneyCls}" title="${esc(detail)}" style="cursor:pointer" onclick="showToast(${esc(JSON.stringify(detail))})">${esc(label)}: ${m.sign}${Math.abs(Number(l.points||0))}b</span>`;
 }
 function tradeHTML(t){
  const m=resultMeta(t.result);
