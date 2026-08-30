@@ -1,0 +1,895 @@
+# Changelog
+
+All notable changes are logged here (one file, newest first).
+
+## 4.4.8 - 2026-08-30
+- Redesigned "Přehled účtu" (account overview) dashboard: new KPI strip (initial balance, net profit, current balance, win rate, profit factor), win-rate/profit-rate gauges, P/L distribution histogram, weekly performance chart, and per-period stats panel.
+- Merged the "Podíl instrumentů" (instrument portfolio) view into a subtab of the account overview instead of its own sidebar entry.
+- Removed the standalone "🏠 Úvod" home section/nav button and the dead sidebar portfolio-widget CSS/markup that was no longer used.
+- Reworked the app's color theme to a darker, more neutral palette.
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.7 – změny oproti 4.4.6
+
+Vychází z troubleshoot.md a přiložených screenshotů (MNQ obchod se 3 kontrakty,
+kde se TP2 přesunul na stejnou cenu jako TP1).
+
+1) CÍLE SE STEJNOU CENOU VÝSTUPU SE TEĎ SPOJUJÍ DO JEDNOHO
+   Popsaný scénář: pozice se 3 kontrakty, TP1 (2 ks) a TP2 (1 ks) NinjaTrader
+   přesunul na stejnou cenu. Po zásahu se v deníku objevily DVĚ samostatné
+   pilulky "TP1: +18b" a "TP2: +18b" místo jednoho spojeného cíle – celkový
+   součet bodů (+36) byl matoucí (ve skutečnosti šlo o jediný cenový pohyb
+   18 bodů, jen rozdělený do dvou fillů), i když částka v USD a komise byly
+   spočítané správně (protože počet kontraktů se už předtím sčítal správně).
+
+   Opraveno: cíle se stejnou cenou výstupu (a stejným výsledkem Target/Stop
+   Loss/Break Even) se teď automaticky spojí do JEDNOHO cíle se sečteným
+   počtem kontraktů, zisku i komise – body zůstávají správně jen jednou
+   (18b, ne 36b). Ověřeno simulací přesně na popsaném scénáři: výsledek
+   1 pilulka, 18 bodů, 3 kontrakty, $72 hrubého (odpovídá výpočtu z
+   troubleshoot.md). Platí jak pro automatické slučování při importu, tak
+   pro ruční "Sloučit vybrané". Sledování zdrojových ID zůstává zachované
+   pro oba spojené cíle zvlášť, takže ochrana proti opravdovým duplicitám
+   (viz předchozí verze) tímhle nijak neoslabla.
+
+2) DETAIL CÍLE JDE TEĎ ZOBRAZIT I KLIKNUTÍM, NE JEN NAJETÍM MYŠI
+   Štítky jednotlivých cílů (TP1, TP2, Break Even…) u sloučeného obchodu
+   dřív neměly žádný detail navíc. Teď po najetí myší (nebo klikem, což
+   funguje spolehlivě i v případech, kdy se nativní tooltip v Electronu
+   neobjeví) zobrazí přesný čas, cenu, počet kontraktů a zisk/ztrátu daného
+   konkrétního cíle.
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.6 – změny oproti 4.4.5
+
+Reakce na reálný incident: nešlo zavřít appku při reinstalaci (pomohl až
+restart PC), po reinstalaci zmizela všechna data (obnoveno jen díky JSON
+záloze) a následně se neuložil obchod z NinjaTraderu. Všechny tři věci mají
+společnou, propojenou příčinu – popsáno níže.
+
+1) KRITICKÁ OPRAVA: BEZPEČNÉ POŘADÍ PŘI PŘESUNU UMÍSTĚNÍ DAT
+   Funkce pro přesun dat (zavedená ve 4.4.4, "Změnit umístění dat…") u
+   každé položky (deníky, screenshoty, nastavení) NEJDŘÍV zkopírovala a
+   HNED nato smazala originál – jedna položka po druhé. Kdyby cokoliv
+   selhalo uprostřed (uzamčený soubor, vynucené ukončení procesu, výpadek),
+   část dat už byla nenávratně smazaná ze starého místa, ale appka o novém
+   umístění ještě nevěděla (ukazatel na něj se zapisoval až na úplný konec)
+   – při dalším spuštění appka hledala data na starém místě, kde už
+   chyběla. Přesně tohle vypadá jako "všechna data zmizela".
+
+   Opraveno na bezpečné pořadí: 1) zkopírovat úplně všechno a ověřit, že
+   kopie skutečně existuje, 2) teprve pak appku přepnout na nové umístění,
+   3) až úplně nakonec (jako pouhý úklid) smazat staré soubory. Pokud
+   cokoliv selže v kroku 1, nesmaže se vůbec nic a appka dál normálně vidí
+   svá data na původním místě. Ověřeno simulací přerušeného přesunu.
+
+   Navíc: před každým přesunem se teď automaticky vytvoří i rychlá záložní
+   kopie obchodů (bez screenshotů) na pevném místě, které se nikdy
+   nepřesouvá – další pojistka navíc pro tenhle konkrétní krok.
+
+2) OPRAVA: INSTALÁTOR NEUMĚL SPOLEHLIVĚ ZAVŘÍT BĚŽÍCÍ APLIKACI
+   Aplikace je záměrně navržená tak, že běžné zavření (křížkem) ji jen
+   schová na pozadí – doopravdy se ukončí jen přes "Ukončit aplikaci a
+   záznam" v menu ikony u hodin. Instalátor (NSIS) při aktualizaci/
+   reinstalaci ale zkoušel zavřít běžící appku běžným, kooperativním
+   způsobem – přesně tím, který appka schválně ignoruje. Proto hlásil
+   "nelze zavřít automaticky, zavřete ji ručně", a jen zavření okna
+   nepomáhalo (pomohl až restart PC, který proces ukončil silou).
+
+   Opraveno přidáním vlastního instalačního skriptu, který PŘED instalací
+   i před odinstalací vynutí ukončení běžící aplikace napřímo (taskkill),
+   bez ohledu na to, jestli běží viditelně nebo jen na pozadí. Appka nemá
+   šanci to odmítnout, takže by se tenhle problém už neměl opakovat.
+
+3) SOUVISLOST S "OBCHOD Z NINJATRADERU SE NEULOŽIL"
+   Pravděpodobná příčina: API klíč pro NinjaTrader/cTrader konektor se
+   ukládá v tom samém "trade-capture" adresáři jako obchody. Pokud tenhle
+   soubor byl zasažen stejným incidentem jako body 1–2 výše, appka si při
+   příštím spuštění vygenerovala NOVÝ, jiný API klíč – ale už nainstalovaný
+   NinjaScript konektor má napevno zapečený ten STARÝ. NinjaTrader pak
+   posílal obchody s neplatným klíčem a appka je tiše odmítala.
+   Řešení nevyžaduje žádnou změnu konektoru samotného – stačí v kartě
+   Integrace znovu kliknout na "Nainstalovat NinjaTrader konektor
+   automaticky" (zapečeře se do něj AKTUÁLNÍ klíč) a v NinjaTraderu udělat
+   znovu Compile.
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.5 – změny oproti 4.4.4
+
+Řeší problém: jiný Claude projekt (Trading Coach) hodnotící obchody neviděl
+denní plán, setup/scénář ani psychologický checklist – jen viditelný
+komentář – a kvůli velikosti dat nešlo číst deník přímo (screenshoty dělají
+soubor objemný).
+
+1) AUTOMATICKÝ ODLEHČENÝ EXPORT PRO AI ANALÝZU (nová karta v Nastavení)
+   Appka teď při KAŽDÉM uložení obchodu automaticky udržuje ještě jednu
+   kopii deníku – úplně stejná obchodní data, ale BEZ screenshotů (ty jsou
+   to, co dělá soubor objemný). Obsahuje kompletně:
+   - výsledek, body, P/L, komisi, kontrakty, strategii,
+   - viditelný komentář,
+   - CELÝ denní plán: instrument, limity, čas, setup/scénář, psychologický
+     checklist, poznámku k plánu – dřív nikde v exportech.
+   Umístění: Nastavení → Export pro AI analýzu / Claude Cowork. Obsahuje
+   i "index.json" s názvy deníků, aby šlo poznat, který soubor patří
+   kterému deníku (jinak jsou soubory pojmenované jen náhodným ID).
+   Tlačítko "Aktualizovat teď" přegeneruje kopie pro všechny deníky ihned
+   (pro obchody uložené ještě před touto verzí).
+
+   → Doporučený postup: nasměruj Claude Cowork přímo na tuhle složku
+   (Nastavení → Export pro AI analýzu ukáže přesnou cestu). Uvidí aktuální
+   obchody se vším kromě screenshotů a hesla, bez nutnosti cokoliv ručně
+   exportovat.
+
+2) CSV EXPORTY (Deník i Reporty) TEĎ OBSAHUJÍ CELÝ DENNÍ PLÁN
+   Export CSV dřív obsahoval jen viditelný komentář. Teď přibyly sloupce:
+   Plán: Instrument, Max. obchodů, Limit ztráty, Denní cíl, Od, Do,
+   Setup/scénář, Psychologický checklist, Poznámka.
+
+3) OPRAVA: EXPORT CSV TIŠE PADAL DO DOWNLOADS BEZ DIALOGU
+   Stejná chyba jako dřív u "Stáhnout zálohu JSON" (viz 4.4.4) se týkala
+   i obou CSV exportů (Deník, Reporty) – teď při každém kliknutí zobrazí
+   skutečný dialog "Uložit jako".
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.4 – změny oproti 4.4.3
+
+1) VOLITELNÉ UMÍSTĚNÍ DAT MIMO SYSTÉMOVÝ DISK C:
+   Ve výchozím stavu se všechna data (deníky, obchody, screenshoty,
+   nastavení) ukládala do standardní uživatelské složky Windows
+   (%APPDATA%), která je vždy na systémovém disku – i kdyby byla appka
+   samotná nainstalovaná jinam.
+
+   V Nastavení přibyla nová karta "Umístění dat":
+   - "Změnit umístění dat…" otevře výběr složky a KOMPLETNĚ do ní přesune
+     všechny existující deníky, screenshoty i nastavení (nezůstává kopie
+     na starém místě – místo na starém disku se opravdu uvolní).
+   - "Vrátit na výchozí umístění" přesune data zpátky do standardní
+     Windows složky.
+   - Po každé změně se appka automaticky restartuje, aby se nové umístění
+     projevilo bezpečně všude (včetně automatického příjmu obchodů z
+     NinjaTraderu/cTraderu).
+   - Na systémovém disku zůstává i po změně jen nepatrný ukazatel na
+     zvolenou složku (řádově stovky bajtů) – jinak by appka při příštím
+     spuštění nevěděla, kam se má podívat.
+
+2) MOŽNOST ZMĚNIT ZAPAMATOVANOU CESTU ZÁLOHY "AKTUALIZOVAT NA SSD"
+   Tlačítko "Aktualizovat zálohu na SSD" si při prvním použití zapamatuje
+   zvolenou cestu a od té chvíle ji dál potichu používalo bez možnosti
+   změny. Přidáno tlačítko "Změnit umístění zálohy…", které umožní kdykoliv
+   zvolit nové místo.
+
+3) OPRAVA: "STÁHNOUT ZÁLOHU JSON" TIŠE PADALO DO DOWNLOADS BEZ DIALOGU
+   main.js nikde nezachytával stahování souborů (chybějící "will-download"
+   handling), takže tlačítko "Stáhnout zálohu JSON" spoléhalo na výchozí
+   chování Electronu/Chromia, které soubor bez zeptání uloží do složky
+   Stažené soubory – žádná možnost zvolit jiné umístění.
+   Opraveno: tlačítko teď při každém kliknutí zobrazí skutečný nativní
+   dialog "Uložit jako", stejně jako ostatní exportní tlačítka v appce
+   (konektory, screenshoty). Lze tak pro každou zálohu zvolit jiné místo.
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.3 – změny oproti 4.4.2
+
+1) ZAPNUTO ASAR (electron-builder to hlásil jako "strongly not recommended")
+   ASAR je způsob, jakým Electron balí zdrojové soubory appky do jednoho
+   archivu místo tisíců drobných souborů – zrychluje čtení souborů při
+   startu a je to standardní, doporučené nastavení pro produkční build.
+   Bylo vypnuté ("asar": false), což electron-builder při každém sestavení
+   hlásil jako nedoporučené.
+
+   Skutečný důvod, proč bylo vypnuté: v main.js existovalo jedno místo
+   (funkce pro otevření složky CONNECTORS v Průzkumníku Windows), které by
+   pod ASAR nefungovalo – cesta uvnitř .asar archivu není skutečná složka
+   na disku, takže by ji Průzkumník nemohl otevřít. Tahle konkrétní funkce
+   ale není v rozhraní aplikace nikde napojená na žádné tlačítko (mrtvý
+   kód), takže reálně nic aktuálně nerozbíjela – přesto byla opravena
+   pořádně, ne jen obejita:
+
+   - Složka CONNECTORS (šablony konektorů pro NinjaTrader/cTrader/
+     TradingView) se teď v zabaleném instalátoru drží MIMO .asar archiv,
+     jako běžné soubory na disku vedle aplikace (electron-builder
+     "extraResources") – přesně tak, jak to Electron pro podobné případy
+     doporučuje.
+   - main.js nově cestu k téhle složce zjišťuje přes novou pomocnou funkci
+     (funguje správně jak v zabalené appce, tak při vývoji přes "npm
+     start").
+   - Všech 10 míst v main.js, která čtou soubory konektorů (automatická
+     instalace/stažení NinjaTrader, cTrader i TradingView konektoru),
+     upraveno na použití týž funkce – ověřeno, že žádné z nich nic nepíše
+     zpátky do vlastní instalační složky appky (do ASAR archivu se totiž
+     nedá zapisovat, jen číst).
+   - "asar" nastaveno na true.
+
+   Funkčnost pro tebe: naprosto beze změny – jen appka teď startuje o
+   trochu rychleji a instalátor už electron-builder hlášku o ASAR nebude
+   psát.
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.2 – změny oproti 4.4.1
+
+1) POKUS O ODSTRANĚNÍ NPM VAROVÁNÍ boolean@3.2.0 – ZALOŽENO NA SKUTEČNÉM ZDROJI
+   Díky odkazu, který jsi našel (github.com/electron/get/issues/304,
+   navazuje na github.com/electron/electron/issues/44416), se podařilo
+   dohledat PŘESNÝ řetězec závislosti přímo z hlášení Electron týmu:
+
+     electron -> @electron/get@2.0.3 -> global-agent@3.0.0 -> boolean@3.2.0
+                                          (i přes roarr@2.15.4 -> boolean, stejná verze)
+
+   Zjištění: balíček "boolean" byl svým autorem označen jako CELÝ
+   nepodporovaný (potvrzeno přímo na jeho stránce na npmjs.com – "This
+   package has been deprecated", i jeho aktuální/poslední verze 3.2.0 nese
+   tohle označení). To znamená, že předchozí pokus v 4.0.0/4.1.0-4.1.4
+   (override "boolean": "latest") nemohl fungovat – "latest" u tohoto
+   balíčku JE ta samá deprecated verze 3.2.0, žádná novější "opravená"
+   verze neexistuje.
+
+   Skutečná páka: "global-agent" (balíček, který "boolean" vyžaduje) má
+   mezitím vlastní novou hlavní verzi 4.1.3 (aktuálně nejnovější), zatímco
+   @electron/get má napevno danou starou 3.0.0. Balíček "boolean" je
+   triviální pomocník (převod textu na true/false) – přesně to, co se při
+   přechodu na novou hlavní verzi typicky jako první zbaví. V package.json
+   je proto nově override "global-agent": "^4.1.3" (nahrazuje předchozí,
+   neúčinný override "boolean").
+
+   POCTIVĚ K JISTOTĚ TOHOTO ŘEŠENÍ: nepodařilo se mi přímo ověřit soubor
+   package.json balíčku global-agent@4.1.3 (nedostupné z mého prostředí),
+   takže nemám 100% jistotu, že novější global-agent na "boolean" už
+   opravdu nezávisí – je to podložený odhad (velký skok hlavní verze +
+   triviální povaha "boolean"), ne potvrzený fakt. Navíc jde o citlivější
+   zásah než u glob/rimraf: global-agent se v @electron/get používá při
+   STAHOVÁNÍ SAMOTNÉHO ELECTRON BINÁRNÍHO SOUBORU během "npm install" (řeší
+   nastavení proxy), takže existuje malé riziko, že by vynucená novější
+   verze mohla tenhle konkrétní krok rozbít.
+
+   CO SLEDOVAT: pokud po "npm install" varování o "boolean" zmizí a
+   instalace proběhne v pořádku až do konce (včetně "npm run dist") –
+   skvělé. Pokud by "npm install" selhalo konkrétně na stažení Electronu
+   (ne jen na varování), dej vědět – override "global-agent" se dá vrátit
+   zpět bez dopadu na cokoliv jiného.
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.1 – změny oproti 4.4.0
+
+1) OPRAVA: NÁHLEDY SCREENSHOTŮ VE FORMULÁŘI "UPRAVIT OBCHOD" NEŠLY OTEVŘÍT
+   V okně Deníku šlo na screenshot kliknout a otevřít ho (kopírovat do
+   schránky, otevřít ve výchozím prohlížeči obrázků, uložit jako). Malé
+   náhledy přímo ve formuláři "Nový/Upravit obchod" ale měly navěšenou akci
+   jen na tlačítko ✕ (smazat) – na samotný obrázek kliknutím nešlo nic
+   udělat. Teď funguje stejně na obou místech – kliknutím na náhled ve
+   formuláři se otevře stejné okno prohlížeče obrázků jako z Deníku.
+
+2) OPRAVA: OKNO SE SCREENSHOTEM ZŮSTÁVALO SCHOVANÉ ZA OTEVŘENÝM OBCHODEM
+   Kliknutí na náhled ve formuláři "Nový/Upravit obchod" (oprava výše)
+   otevíralo okno prohlížeče obrázků se stejnou "vrstvou" jako samotný
+   formulář – jelikož formulář byl otevřený dřív, okno s obrázkem se
+   schovalo za něj a bylo vidět, až se formulář zavřel.
+   Řešení: klik na náhled přímo ve formuláři teď rovnou otevře obrázek ve
+   VÝCHOZÍM PROHLÍŽEČI OBRÁZKŮ VE WINDOWS (skutečné samostatné okno OS,
+   ne okno uvnitř aplikace) – stejná volba, kterou nabízí tlačítko
+   "Otevřít ve výchozím prohlížeči obrázků" u Deníku. Odpadá tím celý
+   problém se schovaným oknem. Okno prohlížeče obrázků uvnitř aplikace
+   (s možností kopírovat/uložit) navíc pro jistotu dostalo vyšší vrstvu
+   než ostatní okna, kdyby k podobné kolizi došlo i jinde.
+
+---------------------------------------------
+
+Futures Journal PRO 4.4.0 – změny oproti 4.3.11
+
+TOTO JE JIŽ SLOUČENÁ STABILNÍ VERZE – žádná samostatná DEV varianta se dál
+neudržuje. Testovací náhled v prohlížeči (bez instalace) byl na žádost
+zrušen a nebude se dál generovat; testuje se přímo touto verzí.
+
+1) AKTUALIZACE ELECTRONU A ELECTRON-BUILDERU
+   Electron 39 -> 43 (nejnovější podporovaná řada), electron-builder na
+   nejnovější 26.x. Šlo o největší skok verzí za dobu vývoje aplikace (4
+   hlavní verze Electronu najednou), proto se napřed dva týdny ověřoval
+   v samostatné testovací DEV verzi (jiný appId, jiný port, jiná uživatelská
+   data, samostatně přejmenovaný NinjaTrader konektor) souběžně vedle
+   stabilní appky, aby v případě problému nehrozilo nic reálným datům. Po
+   potvrzení, že běží, se sloučilo zpátky do jediné stabilní verze.
+
+2) OPRAVA NPM VAROVÁNÍ (deprecated: inflight, rimraf, glob, boolean)
+   Tahle varování při "npm install" nepocházela z electron-builderu
+   samotného, ale z jeho vnitřní řetězové závislosti na starších balíčcích
+   (glob@7 -> inflight, rimraf@2). V package.json přibylo pole "overrides",
+   které vynucuje vždy aktuální verzi glob/rimraf/boolean napříč celým
+   stromem závislostí, včetně vnitřního použití uvnitř electron-builderu –
+   řeší se tím i to, že glob mezitím sám vydal další hlavní verzi a stará
+   varování se objevovala znovu s jiným číslem verze.
+
+3) BEZE ZMĚNY OPROTI 4.3.11
+   Žádná funkčnost appky (Deník, Kalendář, šablony, řízení rizika, merge/
+   slučování obchodů, Break Even, komise, propojený výpočet zisku/ztráty,
+   NinjaTrader/cTrader/TradingView konektory) se v tomhle kroku neměnila –
+   jde čistě o novější Electron pod stejným kódem. Pokud narazíš na chybu,
+   která souvisí s chováním nebo vzhledem OKNA aplikace (ne s obchodní
+   logikou), je slušná šance, že souvisí právě s novým Electronem – popiš
+   ji prosím co nejpodrobněji (screenshot, přesný postup).
+
+Historie verzí 4.3.x zůstává zachovaná v samostatných ZMENY_VERZE_*.txt
+souborech pro referenci.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.11 – změny oproti 4.3.10
+
+Vyřízené položky ze seznamu "Next steps after electron update released"
+v project-status.md.
+
+1) FORMULÁŘ OBCHODU SE NEZAVÍRÁ KLIKNUTÍM MIMO OKNO
+   Okno "Nový/Upravit obchod" se dřív zavíralo i kliknutím kdekoliv mimo něj
+   – u rozdělaného formuláře to mohlo znamenat ztrátu rozepsané práce jedním
+   nechtěným kliknutím. Teď se zavírá jen tlačítkem ✕ v pravém horním rohu.
+   (Ostatní menší dialogy – potvrzení, sloučení, změna hesla – se kliknutím
+   mimo dál zavírají, tam k žádné ztrátě dat nedochází.)
+
+2) POLE "KOMENTÁŘ" MÁ ŠTÍTEK "VIDITELNÉ" MÍSTO "NEPOVINNÉ"
+   Pole zůstává nepovinné (placeholder "Volitelné" beze změny), ale štítek
+   teď jasně říká, že jde o pole, které uvidíš přímo u obchodu v přehledu
+   Deníku – ne jen o "další nepovinné pole" jako ostatní.
+
+3) BEZPEČNĚJŠÍ VÝCHOZÍ CHOVÁNÍ KOMISE
+   Dosavadní výchozí chování důvěřovalo komisi nahlášené konektorem
+   (NinjaTrader/cTrader), což jak víme z bug reportu dřív vedlo k
+   nepřesnostem (NinjaTrader nezahrnuje Clearing/Exchange/IP/NFA fee).
+   Nové výchozí chování: použije se komise ze šablony instrumentu, a pokud
+   šablona komisi nemá vyplněnou, počítá se s $0 (hrubá hodnota beze
+   změny) – konektoru se už nevěří automaticky. V Nastavení → Šablony
+   podle instrumentu lze přepnout zpět na "Použít komisi nahlášenou
+   konektorem", pokud je uživatel s přesností konektoru spokojený.
+
+4) VKLÁDÁNÍ SCREENSHOTŮ PŘES CTRL+V
+   Ve formuláři obchodu jde screenshot vložit i přímo ze schránky (např. po
+   pořízení snímku přes Win+Shift+S) klávesovou zkratkou Ctrl+V, ne jen
+   nahráním souboru. Platí stejný limit tří obrázků a 3 MB na obrázek jako
+   u nahrávání souboru.
+
+5) AKTUALIZOVANÝ KOMPLETNÍ NÁVOD (Kompletni_navod_Futures_Journal_PRO_4.3.11.docx)
+   Původní návod byl z verze 4.2.8 a neobsahoval nic z toho, co přibylo od
+   té doby – slučování obchodů (TP1/TP2/Break Even), Break Even jako vlastní
+   výsledek, šablony s hodnotou bodu a komisí, řízení rizika, integraci
+   cTraderu, vzhled aplikace (témata), zabezpečení heslem. Návod byl
+   přepsaný od základu se zachováním stejné struktury (Část A – používání,
+   Část B – instalace) a je teď součástí každého zabaleného zdrojového
+   balíčku, ne jen samostatně přiloženým souborem po ruce.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.10 – změny oproti 4.3.9
+
+Vychází z podrobného bug reportu (FutureJournal P/L Import Bug Report,
+08/10–08/24/2026, účet Phidias 1, MES+FDXS). Děkujeme za tak důkladnou
+diagnostiku – přesně ukázala, kde přepočet komise selhal.
+
+1) KRITICKÁ OPRAVA: PŘEPOČET KOMISE MOHL VYNULOVAT SKUTEČNÝ ZISK/ZTRÁTU
+   Tlačítko "Přepočítat komisi" (zavedené ve 4.3.9) u obchodů BEZ známé
+   hodnoty bodu instrumentu (typicky nový/neznámý kontrakt, žádná šablona,
+   žádná vestavěná hodnota) počítalo hrubý zisk jako "body × kontrakty ×
+   hodnota bodu" – když byla hodnota bodu neznámá, dosadila se 0, a hrubý
+   zisk/ztráta se tiše přepsal na pouhé "-komise". Potvrzeno přesně na
+   reportovaném příkladu (FDXS, žádná nastavená hodnota bodu): -$59,00 se
+   změnilo na -$1,56.
+   Opraveno tak, že hrubá hodnota se teď VŽDY odvozuje z už uloženého
+   zisku/ztráty a staré komise (hrubý = starý zisk/ztráta + stará komise) –
+   to je matematicky přesné a vůbec nepotřebuje znát hodnotu bodu. Stejná
+   oprava platí jak pro jednoduché obchody, tak pro jednotlivé cíle uvnitř
+   sloučeného obchodu (TP1/TP2/BE).
+   Pokud jsi tlačítko "Přepočítat komisi" v 4.3.9 už použil/a u instrumentu
+   bez nastavené hodnoty bodu (report zmiňuje FDXS), doporučujeme obnovit
+   zálohu z doby PŘED přepočtem a spustit ho znovu v této verzi – bez toho
+   se skutečná hodnota už nedá dopočítat zpětně.
+
+2) KOMISE SE TEĎ AUTOMATICKY PŘEPOČÍTÁVÁ I PŘI ZMĚNĚ POČTU KONTRAKTŮ
+   Pokud má instrument v šabloně vyplněnou výchozí komisi ($/kontrakt),
+   změna pole "Počet kontraktů" ve formuláři (u prvního cíle i u každého
+   dalšího ručně přidaného cíle) teď automaticky přepočítá i celkovou
+   komisi – stejně jako se už automaticky přepočítává hrubý zisk/ztráta.
+   Platí i při změně instrumentu (komise se dopočítá pro aktuální počet
+   kontraktů). Komisi lze i tak kdykoliv přepsat ručně pro konkrétní obchod;
+   auto-přepočet se znovu spustí až při další změně počtu kontraktů nebo
+   instrumentu.
+
+POZNÁMKA K OSTATNÍM BODŮM Z REPORTU (§4.2, §4.3, §3 – dva konkrétní řádky):
+- §4.2 (obchod ukázal zisk/ztrátu neodpovídající ani jednomu fillu) měl
+  pravděpodobně STEJNOU příčinu jako bod 1 výše (chybějící hodnota bodu při
+  přepočtu) – měl by se opravou vyřešit sám. Prosím zkontroluj po opětovném
+  spuštění přepočtu.
+- §4.3 (druhý cíl u škálovaného výstupu je o $0,60 mimo) – tohle je jiná,
+  drobnější odchylka, kterou jsem bez syrových dat z NinjaTraderu (přesné
+  ceny/časy/komise obou fillů) nechtěl opravovat naslepo – další neověřená
+  záplata by mohla nadělat víc škody než užitku. Pošli prosím syrová data
+  k tomuto konkrétnímu obchodu a podíváme se na to cíleně.
+- §3 (dva konkrétní řádky 7673.00→7673.00 a 7672.50→7674.75, kde chybí
+  druhý fill) – tohle už bohužel nejde opravit automaticky: chybějící
+  exekuce byla nenávratně zahozena ještě před opravou v 4.3.3 a v aplikaci
+  o ní není žádný záznam. Řešení: otevři obchod k úpravě a přidej chybějící
+  cíl ručně přes "＋ Přidat další cíl" – s cenou/časem druhého fillu podle
+  actual.csv.
+- Strukturální rozdíl NinjaTrader vs. Tradovate (NT nezahrnuje Clearing/
+  Exchange/IP/NFA fee) řeší funkce ze 4.3.9 (výchozí komise podle šablony +
+  přepínač "Ignorovat konektor") – ne dokonale 1:1 podle Tradovate, ale dá
+  se tím komisi nastavit přesně podle skutečných nákladů na kontrakt.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.9 – změny oproti 4.3.8
+
+1) VÝCHOZÍ KOMISE PODLE ŠABLONY INSTRUMENTU
+   Šablona instrumentu (Nastavení → Šablony podle instrumentu) má nové pole
+   "Komise ($/ks)" – zadá se jako celková komise za round-trip na 1 kontrakt
+   (např. u MES reálně $1,90 se všemi poplatky – Clearing, Exchange, IP, NFA
+   – ne jen holé "Commission" z NinjaTraderu). Ve výchozím stavu je prázdné,
+   nic se tím automaticky nemění.
+
+2) MOŽNOST IGNOROVAT KOMISI Z KONEKTORU
+   V téže kartě je nový přepínač "Komise u nových importovaných obchodů":
+   - Použít komisi nahlášenou konektorem (výchozí, dosavadní chování).
+   - Ignorovat konektor – vždy použít komisi ze šablony instrumentu.
+   Když je zapnuté "Ignorovat konektor" a instrument má v šabloně vyplněnou
+   komisi, nově importované obchody z NinjaTraderu/cTraderu použijí místo
+   konektorem nahlášené komise tu ze šablony (× počet kontraktů) a zisk/
+   ztráta se dopočítá ze skutečné hrubé hodnoty pohybu ceny – ta z konektoru
+   zůstává přesná, mění se jen odečítaná komise.
+
+3) ZPĚTNÝ PŘEPOČET U UŽ ULOŽENÝCH OBCHODŮ
+   Tlačítko "Přepočítat komisi v aktivním deníku" projde všechny obchody
+   v aktivním deníku (včetně jednotlivých cílů u sloučených obchodů TP1/
+   TP2/BE) a u instrumentů, které mají v šabloně vyplněnou komisi, přepočítá
+   komisi podle počtu kontraktů a z toho i výslednou čistou zisk/ztrátu.
+   Obchody u instrumentů bez vyplněné komise v šabloně zůstanou beze změny.
+   Před spuštěním se zobrazí potvrzení s doporučením mít zálohu.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.8 – změny oproti 4.3.7
+
+1) OPRAVA: KOMISE U STOP LOSS OBCHODU ŠTRÁTU CHYBNĚ SNIŽOVALA
+   Automatický výpočet (zavedený v 4.3.3/4.3.4) vždy počítal "hrubý zisk
+   mínus komise" bez ohledu na to, jestli šlo o Target, nebo Stop Loss.
+   U zisku je to správně (komise zisk snižuje), ale u ztráty je to obráceně
+   – komise je náklad navíc, takže ztrátu MÁ zvětšovat, ne zmenšovat.
+   Potvrzeno na reálném příkladu: obchod -1,75 bodu, 1 kontrakt MES (hrubá
+   ztráta $8,75), komise $3 – aplikace dřív spočítala čistou ztrátu jako
+   $5,75 (chybně nižší), teď správně $11,75 (hrubá ztráta + komise).
+
+   Zisk (Target): čistý = hrubý − komise (beze změny, bylo správně).
+   Ztráta (Stop Loss): čistý = hrubý + komise (opraveno).
+   Break Even: čistý = −komise (obchod bez pohybu ceny pořád stojí komisi).
+
+   Platí pro první cíl (TP1) i pro každý další ručně přidaný cíl (TP2, Break
+   Even...) v témže formuláři.
+
+2) Přepnutí pole "Výsledek" (Target/Stop Loss/Break Even) teď rovnou přepočítá
+   zisk/ztrátu podle výše uvedené opravené logiky – dřív bylo potřeba po
+   přepnutí ještě sáhnout na jiné pole, aby se přepočet spustil.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.7 – změny oproti 4.3.6
+
+1) KALENDÁŘ → DENÍK FILTROVANÝ NA JEDEN DEN
+   Kliknutím na den v Kalendáři se pod ním jako dřív zobrazí obchody toho
+   dne, a nově je nad nimi tlačítko "📒 Otevřít tento den v Deníku" – přepne
+   na kartu Deník s filtrem data nastaveným přesně na kliknutý den (a
+   vymaže ostatní filtry – hledání, výsledek), takže v Deníku uvidíš jen
+   obchody z toho jednoho dne.
+   Funguje jen při zobrazení "Aktivní deník" v Kalendáři (Deník totiž vždy
+   zobrazuje jen aktivně otevřený deník) – při zobrazení "Všechny deníky"
+   nebo jiného konkrétního deníku v Kalendáři aplikace na to upozorní.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.6 – změny oproti 4.3.5
+
+1) OPRAVA INSTALAČNÍHO SKRIPTU (VYTVORIT_INSTALATOR.bat)
+   Řádek "title" obsahoval české znaky s diakritikou ("vytvoření instalátoru"),
+   zatímco zbytek skriptu záměrně používal jen ASCII text bez diakritiky
+   ("zdrojovych", "soucasti" apod.). Na některých Windows (potvrzeno na
+   německé lokalizaci) tohle cmd.exe rozbilo natolik, že se objevila chyba
+   "Der Befehl 'le' ist entweder falsch geschrieben..." (příkaz "le" nenalezen)
+   hned na začátku – ten text vznikl chybnou interpretací kódování řádku
+   s diakritikou, ne skutečným příkazem "le". Opraveno – celý skript je teď
+   od začátku do konce jen v ASCII, beze změny funkčnosti.
+
+2) VERZE V TEXTU SE UŽ NEZASEKNE NA STARÉM ČÍSLE
+   Skript dřív měl číslo verze (např. "4.3.0") napevno napsané ve dvou
+   místech a při každé nové verzi aplikace jsem ho zapomínal ručně
+   přepisovat. Teď se číslo verze čte přímo ze souboru package.json při
+   každém spuštění skriptu, takže v textu i v názvu výsledného instalátoru
+   bude vždy odpovídat skutečné verzi aplikace bez ručních zásahů.
+
+3) NPM VAROVÁNÍ (deprecated: inflight, rimraf, glob) – VYSVĚTLENÍ
+   Tahle hlášení při "npm install" NEJSOU chybou instalace – jsou to jen
+   varování npm o starších vnitřních závislostech nástroje electron-builder
+   (ne přímo Futures Journal PRO). electron-builder je nainstalovaný
+   v aktuálně nejnovější verzi (26.15.3, dovoluje to i současné nastavení
+   v package.json), a tahle konkrétní varování pocházejí z JEHO vlastního
+   seznamu závislostí, který zatím sami autoři electron-builderu
+   neaktualizovali. Instalaci ani chod aplikace to nijak neovlivňuje –
+   dají se bezpečně ignorovat.
+   Electron samotný je momentálně na verzi 39.x (nejnovější v této řadě:
+   39.8.10, taky se stáhne automaticky). Nejnovější řada je už 43.x, ale
+   přeskočit rovnou 4 hlavní verze je riziko, které bez možnosti to sám
+   reálně sestavit a otestovat na Windows nechci nasadit naslepo – zůstává
+   proto zatím na ověřené 39.x řadě.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.5 – změny oproti 4.3.4
+
+1) OPRAVA: PŘIDÁNÍ/SMAZÁNÍ ŠABLONY INSTRUMENTU SE NEPROJEVILO V SEZNAMU
+   Tlačítka „＋" (přidat šablonu) a 🗑️ (smazat šablonu) v Nastavení → Šablony
+   podle instrumentu ve skutečnosti fungovala – data se opravdu uložila
+   (proto se objevila hláška „Šablona byla přidána") – ale seznam šablon na
+   obrazovce se po uložení nikdy neobnovil, takže to vypadalo, že tlačítko
+   nic nedělá. Chyba byla v tom, že funkce, která po uložení nastavení
+   obnovuje obrazovku (renderAll), obnovuje jen Přehled/Deník/Kalendář/Podíl
+   instrumentů – kartu Nastavení vůbec ne. Přidání/smazání šablony se teď
+   v seznamu projeví okamžitě, beze změny se to netýkalo žádných jiných dat
+   ani funkcí.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.4 – změny oproti 4.3.3
+
+1) AUTOMATICKÝ VÝPOČET I U DALŠÍCH CÍLŮ (TP2, Break Even...), NE JEN U PRVNÍHO
+   V 4.3.3 fungoval propojený výpočet (cena vstupu/výstupu → body → zisk podle
+   hodnoty bodu a komise) jen u prvního cíle nahoře ve formuláři. Řádky
+   přidané tlačítkem "＋ Přidat další cíl" auto-výpočet neměly vůbec – musely
+   se vyplňovat úplně ručně, včetně bodů a zisku.
+
+   Teď se chová úplně stejně jako první cíl:
+   - Stačí vyplnit jen cenu výstupu daného cíle – body se dopočítají ze
+     společné ceny vstupu obchodu.
+   - Ze společné hodnoty bodu instrumentu (šablona nebo vestavěná tabulka),
+     bodů a počtu kontraktů daného cíle se dopočítá zisk/ztráta.
+   - Přidáno pole "Komise" i pro každý další cíl zvlášť (dřív ho tam vůbec
+     nebylo) – odečítá se od hrubého zisku stejně jako u prvního cíle.
+   - Všechna pole lze i tak kdykoliv přepsat ručně, stejně jako dřív.
+   - Funguje úplně stejně u ručně zadaných obchodů i u obchodů z NinjaTraderu/
+     cTraderu – žádný rozdíl mezi automatickým a ručním zadáním.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.3 – změny oproti 4.3.2
+
+1) OPRAVA: DEDUP MAZAL SKUTEČNÉ OBCHODY (regrese ze 4.3.1)
+   Minulá "doplňková pojistka" proti duplicitám (podle shody účtu, instrumentu,
+   ceny, počtu kontraktů a času) byla nebezpečná: dva OPRAVDU ROZDÍLNÉ obchody
+   se stejnou cenou/počtem kontraktů/blízkým časem (běžné např. u dvou
+   samostatných 1-kontraktových uzávěrek za sebou) se mylně vyhodnotily jako
+   "duplicita" a jeden z nich se v tichosti vůbec neuložil. Potvrzeno na
+   reálných datech – trade z NinjaTraderu (Trade Performance #22) v deníku
+   úplně chyběl.
+   Tahle heuristika byla ODSTRANĚNA úplně. Ochrana proti opravdovým duplicitám
+   (NinjaTrader umí tutéž exekuci nahlásit znovu po výpadku spojení) zůstává
+   jen na přesných ID: HashSet v NinjaScript konektoru, seznam executionId
+   v main.js a sourceEventId/sourceEventIds na úrovni obchodů a jejich legů.
+   Žádné "hádání podle podobnosti" už se nepoužívá.
+
+2) PROPOJENÝ VÝPOČET ZISKU/ZTRÁTY (jako vzorec v Excelu)
+   - Formulář "Nový/Upravit obchod": když vyplníš cenu vstupu a výstupu,
+     počet bodů se dopočítá sám. Když jsou k dispozici body, počet kontraktů
+     a hodnota bodu daného instrumentu, "Zisk/ztráta" se dopočítá automaticky
+     (a pod polem se zobrazí přesný rozpis výpočtu). Pole lze i tak kdykoliv
+     přepsat ručně – auto-výpočet se jen nabídne jako výchozí hodnota.
+   - Nové pole "Komise" – odečítá se od hrubého zisku při výpočtu čistého
+     zisku/ztráty, stejně jako to dělá NinjaTrader. Zobrazuje se i u obchodu
+     v Deníku a je součástí exportu CSV.
+   - Hodnota bodu (USD za bod na 1 kontrakt) se hledá nejdřív v šabloně podle
+     instrumentu (Nastavení → Šablony podle instrumentu, nové pole "Bod"),
+     a pokud tam není, použije se vestavěná tabulka pro nejběžnější kontrakty:
+     ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5.
+     Pro cokoliv jiného (jiné futures, forex/CFD) je potřeba přidat šablonu
+     s vlastní hodnotou bodu – bez ní se "Zisk/ztráta" nepočítá automaticky
+     a vyplňuje se ručně jako dřív.
+
+DŮLEŽITÁ POZNÁMKA K PŘESNOSTI OPROTI VÝPISU Z NINJATRADERU:
+NinjaTrader Trade Performance počítá čistý zisk i s dalšími poplatky, které
+report zobrazuje zvlášť (Clearing Fee, Exchange Fee, IP Fee, NFA Fee) – NinjaTrader
+konektor z reálného API dostane jen "Commission", tyhle další poplatkové
+kategorie nejsou přes NinjaScript Execution událost dostupné. U účtů/kontraktů,
+kde tyhle poplatky reálně vznikají, proto čistý zisk v Deníku nemusí do centu
+sedět s NinjaTraderovým sloupcem "Profit" – rozdíl by měl odpovídat právě
+součtu těchto dalších poplatků. Pokud to bude vadit, dá se řešit ručním
+zadáním vyšší hodnoty komise u dotčených obchodů.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.2 – změny oproti 4.3.1
+
+1) SKUTEČNÁ PŘÍČINA "ZASEKNUTÝCH" POLÍ (nešlo kliknout/psát, jen minimalizace pomohla)
+   Šlo o dvě různé věci, obě teď opravené:
+
+   a) Nativní dialogy (alert/confirm/prompt) v Electronu na Windows umí po
+      zavření nechat hlavní okno bez klávesnicového fokusu – okno vypadá
+      aktivní a myš funguje (proto šlo měnit číslo šipkami u pole), ale
+      klávesnice "nedojde" k oknu, dokud uživatel neklikne jinam (typicky
+      minimalizovat a znovu otevřít). Přesně tohle dělalo tlačítko "Uložit
+      řízení rizika" i "Uložit nastavení" a desítky dalších míst v aplikaci.
+      Všech 51 window.alert(), 10 window.confirm() a 1 window.prompt() bylo
+      nahrazeno okny přímo v aplikaci (stejný princip jako u sloučení
+      obchodů nebo změny hesla) – už nejde o nativní dialog Windows, takže
+      k tomuhle zaseknutí nemůže dojít.
+   b) Okno se po prvním zobrazení (hned po instalaci, nebo po kliknutí na
+      ikonu u hodin po skrytém spuštění na pozadí) nezaostřilo klávesnicově
+      – to byla samostatná díra opravená už dřív v rámci 4.3.1, zůstává
+      v platnosti i teď.
+
+2) VERZOVÁNÍ
+   Od této verze se číslo verze v package.json i v tomto souboru bude
+   zvyšovat při každé sadě změn (4.3.2 → 4.3.3 → …), aby šlo snadno poznat,
+   jestli je nainstalovaná nejnovější verze.
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.1 – změny oproti 4.3.0
+
+1) SLUČOVÁNÍ OBCHODŮ (TP1 / TP2 / Break Even)
+   - NinjaTrader konektor nyní ke každé pozici přiřadí interní positionId, které
+     zůstává stejné pro všechny částečné výstupy (TP1, TP2, BE) dokud se pozice
+     nevrátí na nulu.
+   - V kartě Deník lze u obchodů zaškrtnout checkbox a tlačítkem "Sloučit vybrané"
+     je spojit do jednoho obchodu. Jednotlivé cíle se zobrazí jako malé štítky
+     (TP1, TP2, BE) uvnitř sloučeného obchodu.
+   - V Nastavení lze zapnout "Automaticky slučovat cíle stejné pozice" – pak se
+     obchody se stejným positionId slučují samy už při importu z NinjaTraderu.
+   - V kartě Integrace přibylo testovací tlačítko "Otestovat TP1/BE/TP2", které
+     nasimuluje pozici o 3 kontraktech uzavřenou přes tři různé cíle – pro ověření
+     funkce bez nutnosti mít připojený NinjaTrader.
+   - Formulář "Nový obchod" má nově sekci "Více cílů u téhož obchodu" – lze rovnou
+     při ručním zadávání přidat TP2, Break Even apod. jako další cíle (tlačítko
+     "＋ Přidat další cíl"), bez nutnosti zadávat je jako samostatné obchody a
+     dodatečně je slučovat. Funguje jen při zakládání nového obchodu; u úpravy
+     už sloučeného obchodu zůstávají jeho cíle beze změny (needituje se formulářem).
+
+2) BREAK EVEN JAKO SAMOSTATNÝ VÝSLEDEK
+   - V Nastavení lze zapnout rozpoznávání Break Even a nastavit práh (v měně účtu).
+     Obchod, jehož čistý zisk/ztráta spadá do tohoto rozmezí kolem nuly, se nově
+     zobrazí jako žlutý štítek "BREAK EVEN" místo červeného "STOP LOSS".
+   - Break Even obchody se nepočítají ani jako výhra, ani jako prohra do win rate.
+   - Na Přehledu přibyla dlaždice "Break Even obchody".
+   - Funguje jak pro ručně zadané obchody (nová volba ve výsledku), tak pro
+     automaticky importované z NinjaTraderu i TradingView.
+
+3) ŠABLONY PODLE INSTRUMENTU
+   - V Nastavení lze vytvořit šablony (instrument → strategie, dodržení plánu,
+     komentář). Při ručním přidávání obchodu se šablona automaticky nabídne
+     po vyplnění instrumentu. Při automatickém importu z NinjaTraderu/TradingView
+     se šablona použije, pokud konektor sám strategii/komentář neposlal.
+
+4) SCREENSHOTY OBCHODŮ – KOPÍROVÁNÍ A OTEVŘENÍ VE VÝCHOZÍM PROHLÍŽEČI
+   - Kliknutím na náhled screenshotu se otevře nové okno s tlačítky "Kopírovat
+     do schránky", "Otevřít ve výchozím prohlížeči obrázků" a "Uložit jako…".
+   - V nainstalované aplikaci navíc funguje i klasické kliknutí pravým tlačítkem
+     přímo na obrázek – nabídne úplně stejné tři možnosti jako nativní menu
+     Windows. Dřív se obrázek otevíral do prázdného okna, kde nešlo nic zkopírovat.
+   - "Otevřít ve výchozím prohlížeči obrázků" uloží obrázek do dočasného souboru
+     a otevře ho v programu, který má uživatel ve Windows nastavený jako výchozí
+     pro obrázky (Fotky, IrfanView, apod.).
+
+5) ŘÍZENÍ RIZIKA (Nastavení → nová karta, samostatně pro každý deník)
+   - Nová karta v Nastavení nahrazuje starý jednoduchý "Denní limit ztráty":
+     Max. denní drawdown, Max. celkový drawdown účtu (peak-to-current), Limit
+     S/L za den, Celkový limit obchodů za den, Limit profitabilních obchodů
+     za den a Profit target za den.
+   - Všechna pole jsou nepovinná – prázdné pole pravidlo úplně vypne.
+   - Nastavuje se zvlášť pro každý deník (je součástí nastavení konkrétního
+     deníku, stejně jako Break Even práh nebo šablony).
+   - Porušení pravidla se v Kalendáři zobrazí jako červený rámeček dne + ikona
+     ⚠️, splnění denního profit targetu jako zelený rámeček + ikona 🎯. Po
+     kliknutí na den se nahoře zobrazí přesný výpis, které pravidlo bylo
+     porušené/splněné a o kolik.
+   - Staré nastavení "Denní limit ztráty v měně účtu" se při prvním spuštění
+     této verze automaticky převede do nového "Max. denní drawdown".
+
+6) OPRAVA: DUPLICITNÍ CÍLE PO SLOUČENÍ (např. TP2 a TP3 se stejnou cenou/časem)
+   - Nalezena a opravena race condition v lokálním HTTP serveru pro NinjaTrader:
+     když dorazily dva požadavky těsně po sobě (např. rychlý částečný fill),
+     mohly být zpracovány souběžně a oba přečíst stejný "zbývající počet
+     kontraktů" dřív, než ho ten první stihl zapsat – výsledkem byly dva
+     identické uzavřené obchody pro jeden skutečný fill (viditelné po sloučení
+     jako dva stejné cíle, např. TP2 a TP3 se stejnou cenou i časem), a tím i
+     nesprávný celkový počet kontraktů u obchodu.
+   - Zpracování exekucí je nyní serializované (fronta), takže ke stejné pozici
+     nemůžou přistupovat dva požadavky současně.
+   - Přidána i doplňková pojistka: než se založí nové otevření nebo uzavření
+     pozice, zkontrolují se nedávné události na stejném účtu/instrumentu se
+     stejnou cenou, počtem kontraktů a časem (do 5 s) – shoda se tiše zahodí
+     jako duplicitní hlášení stejného fillu.
+
+7) OPRAVA: NEŠLO UPRAVIT CÍLE (TP1/TP2/BE) U JIŽ SLOUČENÉHO OBCHODU
+   - Otevření sloučeného obchodu k úpravě dřív skrylo a zamklo pole jednotlivých
+     cílů, takže žádná úprava (ani smazání) se neuložila.
+   - Nyní se při úpravě do formuláře načte první cíl (TP1) do horních polí a
+     každý další cíl jako samostatný editovatelný řádek – lze tak i smazat
+     chybný/duplicitní cíl (např. právě ten popsaný v bodě 6) a opravit tak
+     celkový počet kontraktů i výsledek obchodu.
+
+8) cTRADER – AUTOMATICKÉ OBCHODY A SCREENSHOTY (stejný princip jako NinjaTrader)
+   - Nový konektor CONNECTORS/cTrader/FuturesJournalCTraderConnector.cs – cBot pro
+     cTrader Desktop (cAlgo Automate), který poslouchá na otevření/uzavření pozic
+     a posílá je na stejný lokální endpoint jako NinjaTrader konektor.
+   - Funguje i pro multi-target pozice: cTrader u částečných uzávěrů (TP1/TP2/BE)
+     zachovává stejné Position.Id napříč všemi částmi, konektor ho posílá jako
+     "positionId" – funkce slučování obchodů proto funguje identicky jako
+     u NinjaTraderu, včetně automatického slučování při importu.
+   - V kartě Integrace přibylo: "Nainstalovat cTrader cBot automaticky" (uloží
+     soubor do Dokumenty\cAlgo\Sources\Robots, odkud ho cTrader sám nabídne
+     k sestavení v Automate), "Pouze stáhnout cTrader cBot (.cs)" a testovací
+     tlačítko "Otestovat cTrader (TP1/TP2)" pro ověření bez nutnosti mít
+     připojený cTrader.
+   - Instalace v cTraderu: Automate → najít FuturesJournalCTraderConnector →
+     Build → přetáhnout na graf sledovaného účtu → Start. cTrader se zeptá na
+     neomezený přístup (Full Access) – je potřeba pro odeslání dat na tento počítač.
+   - Screenshoty fungují stejně jako u NinjaTraderu – dělá je přímo aplikace
+     Futures Journal PRO při přijetí události, ne platforma samotná.
+   - Poznámka: ověřeno podle oficiální dokumentace cAlgo API (Positions.Opened/
+     Closed, HistoricalTrade), ale nebylo možné otestovat proti živému cTrader
+     terminálu – doporučuji nejdřív vyzkoušet na demo/trial účtu (FTMO Trial je
+     pro to ideální) a dát vědět, pokud by se cokoliv nechovalo podle očekávání.
+
+9) VZHLED APLIKACE – TÉMATA (Tmavý / Světlý / Vlastní)
+   - Nová karta "Vzhled (téma)" v Nastavení, úplně nahoře. Platí pro celou
+     aplikaci na tomto počítači (nezávisle na deníku), včetně přihlašovací
+     obrazovky, kalendáře i grafů (equity křivka, koláčový graf).
+   - Tmavý – původní vzhled aplikace (výchozí).
+   - Světlý – nová světlá paleta.
+   - Vlastní – ruční výběr 10 klíčových barev (pozadí nahoře/dole, postranní
+     panel, karty, text, ohraničení, zvýraznění/accent, zisk, ztráta, Break
+     Even) s živým náhledem při výběru; ostatní odstíny (najetí myší, pole
+     formulářů apod.) se dopočítají automaticky, aby vzhled zůstal konzistentní.
+   - Uloží se jen v tomto zařízení/prohlížeči (localStorage), nejde o součást
+     zálohy deníku.
+
+Datový formát obchodu (JSON) zůstává zpětně kompatibilní – staré zálohy i staré
+obchody bez nových polí (pnlRaw, legs, positionId, risk) fungují beze změny.
+
+POZNÁMKA K JIŽ EXISTUJÍCÍMU CHYBNÉMU OBCHODU (MES 2026-08-13 16:09):
+Oprava race condition zabrání vzniku NOVÝCH duplicitních cílů. Obchod, který už
+byl takto poškozený předtím, oprava sama o sobě nesmaže – otevři ho teď v Deníku
+k úpravě, smaž duplicitní řádek cíle (TP3) a ulož. Počet kontraktů i výsledek se
+přepočítají automaticky ze zbylých cílů.
+
+OPRAVA NÁZVOSLOVÍ cTRADER: Aktuální cTrader nazývá sekci pro cBoty "Algo", ne
+"Automate" (starší název). Doporučený a ověřený postup podle aktuální
+dokumentace cTraderu: Algo → cBots → New → C# → From scratch → pojmenovat
+"FuturesJournalCTraderConnector" → Create → v editoru smazat ukázkový kód a
+vložit obsah staženého souboru → Build → na grafu přidat instanci k účtu →
+Start. Automatické umístění souboru do Dokumenty\cAlgo\Sources\Robots
+zůstává k dispozici jako rychlejší pokus, ale v některých verzích cTraderu
+cBota v seznamu nenabídne – v tom případě použij postup výše.
+
+OPRAVA cTRADER cBOTA (build error CS0104 / CS0108):
+Konektor používal System.Net.Http, což koliduje s vestavěným síťovým rozhraním
+cAlgo (vlastní Http.Send / HttpMethod na Robot třídě) – proto build hlásil
+nejednoznačnou referenci na HttpMethod. Přepsáno na nativní cAlgo Http API
+(Http.Send s HttpRequest) – žádná kolize, a navíc už nepotřebuje AccessRights.
+FullAccess (stačí AccessRights.None), takže se cTrader při startu na nic neptá.
+
+Tlačítko pro automatickou instalaci bylo přejmenováno na "Aktualizovat cBot" a
+nově funguje takto: cTrader při "New" vytváří vnořenou strukturu projektu
+(Robots\<Název>\<Název>\<Název>.cs + .csproj/.sln/GlobalUsings.cs, které si
+spravuje sám). Tlačítko tenhle už vytvořený projekt najde a přepíše jen jeho
+.cs soubor nejnovější verzí konektoru – funguje až PO prvním ručním vytvoření
+cBota v cTraderu (Algo → cBots → New → vložit kód, popsáno v aplikaci), ale od
+té chvíle už při každé další aktualizaci Futures Journal PRO stačí kliknout na
+tlačítko a v cTraderu dát znovu Build, bez ručního kopírování.
+
+10) FILTROVÁNÍ PODLE DENÍKU V KALENDÁŘI + VIDITELNOST DENÍKU U OBCHODU
+    - Karta Kalendář má nový filtr "Deník / karta": Aktivní deník (výchozí,
+      stejné chování jako dřív), Všechny deníky, nebo konkrétní jiný deník.
+      Při zobrazení více deníků najednou se u obchodu, který nepatří do
+      aktivně otevřeného deníku, skryjí akce Upravit/Smazat/Sloučit (aby
+      nedošlo k omylu) – zůstává jen možnost obchod přesunout.
+    - Řízení rizika (⚠️/🎯) se v Kalendáři zobrazuje jen pro Aktivní deník,
+      protože limity jsou nastavené zvlášť pro každý deník a při zobrazení
+      více deníků najednou by nebyly srovnatelné – při zapnutí "Všechny
+      deníky" se to jasně napíše pod kalendářem.
+    - Karta "Přehled účtu" už filtr podle deníku měla (byl součástí aplikace
+      od začátku), teď navíc – stejně jako Kalendář – u každého obchodu
+      zobrazuje malý modrý štítek 📁 s názvem deníku, takže je na první
+      pohled jasné, odkud obchod pochází, i když se díváš na víc deníků
+      najednou.
+
+11) OPRAVA: TLAČÍTKO "ZMĚNIT HESLO" NEREAGOVALO + HESLO PŘI KAŽDÉM PŘEPNUTÍ DENÍKU
+    - "Změnit heslo" a "Zamknout aplikaci" v Nastavení → Zabezpečení aplikace
+      byly v HTML, ale neměly vůbec žádnou funkci navěšenou (nereagovaly na
+      kliknutí). Obě teď fungují: Změnit heslo ověří současné heslo a nastaví
+      nové (alespoň 4 znaky), Zamknout aplikaci okamžitě znovu zobrazí
+      přihlašovací obrazovku bez zavírání aplikace.
+    - Oprava příčiny, proč aplikace chtěla heslo znovu při každém vytvoření/
+      přejmenování/přepnutí deníku: tyto akce interně dělají obnovení stránky
+      (aby se načetla čerstvá data), a přihlašovací obrazovka si dřív nijak
+      nepamatovala, že už jsi přihlášený. Teď se úspěšné přihlášení uloží jen
+      pro aktuální spuštění aplikace – po zavření a novém spuštění Futures
+      Journal PRO se heslo vyžádá znovu jako dřív, ale uvnitř jednoho běhu už
+      ne při každé práci s deníky.
+
+12) DALŠÍ OPRAVA "ZMĚNIT HESLO" – NÁHRADA ZA MODÁLNÍ OKNO
+    Předchozí verze používala prohlížečové dialogy window.prompt(). V náhledu
+    spouštěném v sandboxovaném prostředí (a možná i jinde) se ukázalo, že
+    window.prompt() může tiše vrátit prázdnou hodnotu bez zobrazení dialogu,
+    takže tlačítko vypadalo jako nereagující. "Změnit heslo" teď používá
+    normální okno v rámci aplikace (stejné jako u ostatních akcí, např.
+    sloučení obchodů) – funguje spolehlivě v nainstalované aplikaci i v
+    náhledu v prohlížeči.
+
+13) SKUTEČNÁ PŘÍČINA OPAKOVANÉHO "TP3 NAVÍC" U NINJATRADERU (MES) – 3 nezávislé opravy
+    Minulá oprava (verze výše) přidala ochranu proti souběžnému zpracování a
+    kontrolu duplicit podle ceny/času, ale problém se objevil znovu. Po bližším
+    zkoumání se ukázaly TŘI samostatné mezery, opraveny jsou všechny tři:
+
+    a) NinjaScript konektor (FuturesJournalCapture.cs): NinjaTrader umí znovu
+       vyvolat událost ExecutionUpdate pro fill, který už jednou proběhl –
+       typicky po výpadku a obnovení spojení s brokerem/simulátorem. Konektor
+       teď v paměti (po dobu běhu NinjaTraderu) pamatuje, které ExecutionId už
+       jednou odeslal, a opakované odeslání stejné exekuce přeskočí úplně u
+       zdroje – TOHLE je pravděpodobně skutečná příčina.
+    b) main.js: okno pro rozpoznání duplicitního hlášení (podle účtu,
+       instrumentu, ceny, počtu kontraktů a času) bylo jen 5 sekund – pokud
+       NinjaTrader exekuci nahlásí znovu s větším odstupem (např. při
+       pomalejším obnovení spojení), okno to nestihlo zachytit. Prodlouženo
+       na 20 minut.
+    c) Skutečná díra (nejzávažnější): když se dva cíle (např. TP1 a TP2)
+       sloučily do jednoho obchodu, sloučený obchod si u sebe pamatoval ID
+       zdrojové události jen z PRVNÍHO cíle – ID druhého (a dalšího) cíle se
+       při slučování ztratilo. Pokud pak NinjaTrader nahlásil TEN DRUHÝ fill
+       znovu, aplikace neměla podle čeho poznat, že ho už jednou zpracovala,
+       a přidala ho jako nový (třetí) cíl. Opraveno – každý cíl uvnitř
+       sloučeného obchodu si teď své zdrojové ID pamatuje samostatně a kontrola
+       duplicit je prochází všechny, ne jen ten první.
+
+    Pro NOVOU verzi konektoru je potřeba v NinjaTraderu udělat znovu Compile
+    (Tools → Import → NinjaScript Add-On, nebo přes automatickou instalaci v
+    kartě Integrace) – bez toho se oprava (a) neprojeví.
+
+14) OPRAVA: OBČAS "ZASEKNUTÉ" POLE PO PŘEPNUTÍ DENÍKU (nereaguje na klik ani psaní)
+    Pravděpodobná příčina: known Electron/Chromium chování, kdy obnovení
+    stránky (location.reload()) v okamžiku, kdy má nějaké pole fokus, může
+    po znovunačtení nechat některé pole (nemusí to být zrovna to původní)
+    "zaseknuté" – reaguje, až když uživatel klikne jinam a zpátky.
+    Všech 6 míst v aplikaci, která dělají reload (přepnutí deníku, nový/
+    přejmenovaný/smazaný deník, obnova zálohy, smazání dat, kompletní reset),
+    teď před reloadem nejdřív úmyslně zruší fokus z aktuálního pole.
+    Pro jistotu přidána i druhá pojistka: zavřené modální okno (např. staré
+    okno pro sloučení obchodů) teď má nastaveno pointer-events:none, takže
+    ani v případě chyby ve viditelnosti nemůže neviditelně blokovat kliky na
+    prvky pod sebou.
+
+15) SKUTEČNÁ PŘÍČINA "ZASEKNUTÝCH" POLÍ – NALEZENO (jen v nainstalované aplikaci)
+    Bod 14) výše (zrušení fokusu před reloadem) byl užitečná pojistka, ale
+    nebyl to skutečný zdroj problému – proto přetrvával i po něm, zatímco
+    v náhledu v prohlížeči (kde tahle věc vůbec nehrozí) fungovalo vše v
+    pořádku. Skutečná příčina: aplikace se na Windows spouští automaticky na
+    pozadí (skrytě) po přihlášení, a když se pak okno poprvé zobrazí – buď
+    hned po instalaci/spuštění, nebo kliknutím na ikonu u hodin – volalo se
+    jen okno.show(), bez okno.focus(). Okno se vizuálně zobrazilo a myš
+    fungovala normálně (proto šlo měnit číslo šipkami u pole), ale klávesnice
+    zůstávala "mimo" okno, dokud uživatel neklikl jinam a zpět – to je known
+    chování Electronu na Windows.
+    Opraveno: úplně všechna místa, která okno zobrazují (první spuštění,
+    kliknutí na ikonu u hodin, druhé spuštění aplikace, obnovení z
+    minimalizace), teď volají i .focus(), a na Windows navíc krátké
+    přepnutí "vždy nahoře", což OS donutí klávesnicový fokus oknu opravdu
+    předat – tohle druhé opatření řeší i případy, kdy samotné .focus()
+    nestačí (to je bohužel taky known chování Electronu na Windows).
+
+---------------------------------------------
+
+Futures Journal PRO 4.3.0
+- čistý instalační projekt bez opravných skriptů předchozích verzí
+- opravené zabalení celé složky app včetně app/index.html
+- více kontrolovaných cest při načítání hlavní aplikace
+- tray ikona a nabídka pro otevření nebo úplné ukončení
+- automatické spuštění po přihlášení do Windows
+- ochrana proti spuštění více kopií
+- zachovaná minutová kontrola otevřených pozic v NinjaTrader konektoru
+
