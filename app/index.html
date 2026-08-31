@@ -1002,7 +1002,10 @@ function currentDBName(){return 'FuturesJournalDB_'+activeJournalId}
 let db={data:{trades:[],settings:[]},close(){}}, trades=[], settings={startingBalance:100000,currency:'USD',usdCzkRate:23,dailyLossLimit:5000,dailyPointLimit:100,breakEvenEnabled:false,breakEvenThreshold:0,autoMergeLegs:true,templates:[],risk:{}};
 let editImages=[], calendarDate=new Date();
 let tradeFormBaseline='';
-function tradeFormSnapshot(){return JSON.stringify([...new FormData($('tradeForm')).entries()])+'|'+JSON.stringify(editImages)}
+function tradeFormSnapshot(){
+ const vals=[...$('tradeForm').querySelectorAll('input,select,textarea')].map(el=>el.type==='file'?'':el.value);
+ return JSON.stringify(vals)+'|'+JSON.stringify(editImages);
+}
 
 async function openDB(){
  if(!window.desktopAPI?.readJournal)throw new Error('Datové úložiště desktopové aplikace není dostupné.');
