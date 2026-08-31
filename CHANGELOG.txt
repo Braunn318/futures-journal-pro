@@ -2,6 +2,14 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.4.9 - 2026-09-01
+- Added a per-day block in Deník: trades for each day are now grouped inside a bordered container with a visible date/weekday/trade-count header and net P/L.
+- Added a "Komentář" field per day, shown directly on the day header (same visibility model as a trade's own comment), plus up to 3 screenshots shown directly with an "add" button.
+- Added an expandable day detail panel with P/L, win rate, and wins/losses tiles, plus free-text "Náhled" and "Poznámky" fields.
+- CSV export (both the per-journal Deník export and the cross-journal Reporty export) now includes the day's comment/náhled/poznámky as extra columns on each day's first trade row.
+- Fixed: reading a journal from disk was silently dropping its day notes (main-process bug), which could also cause a later save to erase them; day notes now round-trip correctly through export and app restarts.
+- Fixed the CZ typo "slouč" → "sluč" in the merge-trades hint text.
+
 ## 4.4.8 - 2026-08-30
 - Redesigned "Přehled účtu" (account overview) dashboard: new KPI strip (initial balance, net profit, current balance, win rate, profit factor), win-rate/profit-rate gauges, P/L distribution histogram, weekly performance chart, and per-period stats panel.
 - Merged the "Podíl instrumentů" (instrument portfolio) view into a subtab of the account overview instead of its own sidebar entry.

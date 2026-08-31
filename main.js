@@ -291,7 +291,8 @@ function readJournal(id) {
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
   return {
     trades: Array.isArray(parsed.trades) ? parsed.trades : [],
-    settings: Array.isArray(parsed.settings) ? parsed.settings : []
+    settings: Array.isArray(parsed.settings) ? parsed.settings : [],
+    dayNotes: (parsed.dayNotes && typeof parsed.dayNotes === 'object') ? parsed.dayNotes : {}
   };
 }
 function writeJournal(id, data) {
@@ -319,12 +320,18 @@ function stripImages(trade) {
     legs: Array.isArray(legs) ? legs.map(({ images: legImages, ...legRest }) => legRest) : undefined
   };
 }
+function stripDayNote(note) {
+  const { images, ...rest } = note || {};
+  return { ...rest, imageCount: Array.isArray(images) ? images.length : 0 };
+}
 function writeAiExportMirror(id, data) {
   try {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
     const trades = Array.isArray(data?.trades) ? data.trades.map(stripImages) : [];
+    const dayNotes = {};
+    for (const date in (data?.dayNotes || {})) dayNotes[date] = stripDayNote(data.dayNotes[date]);
     const temp = `${aiExportPath(id)}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify({ journalId: id, updatedAt: new Date().toISOString(), trades }, null, 2), 'utf8');
+    fs.writeFileSync(temp, JSON.stringify({ journalId: id, updatedAt: new Date().toISOString(), trades, dayNotes }, null, 2), 'utf8');
     fs.renameSync(temp, aiExportPath(id));
   } catch (error) {
     logError('writeAiExportMirror', error);

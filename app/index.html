@@ -128,6 +128,36 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .thumbs{display:flex;gap:7px}.thumbs img{width:64px;height:48px;object-fit:cover;border-radius:7px;border:1px solid var(--line)}
 .comment{color:var(--text2);font-size:14px;line-height:1.45}
 .actions{display:flex;gap:7px}.icon{padding:8px 10px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px}
+.day-wrap{border:1.5px solid rgba(var(--blue-rgb),.55);border-radius:16px;padding:14px 14px 16px;background:rgba(var(--blue-rgb),.045)}
+.day-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;user-select:none}
+.day-header .chev{width:16px;height:16px;flex:none;color:var(--blue);transition:transform .18s ease}
+.day-wrap.open .day-header .chev{transform:rotate(90deg)}
+.day-header .date{font-weight:800;font-size:14.5px;color:var(--text)}
+.day-header .count{color:var(--muted);font-weight:600;font-size:12px}
+.day-header .spacer{flex:1}
+.day-header .stat{font-weight:800;font-size:13.5px;font-variant-numeric:tabular-nums}
+.day-header .stat.pos{color:var(--green)}.day-header .stat.neg{color:var(--red)}
+.day-comment-row{color:var(--text2);font-size:13.5px;line-height:1.45;margin:8px 0 0 26px}
+.day-comment-row .lbl{color:var(--blue);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-right:6px}
+.day-comment-row input{width:calc(100% - 26px);background:transparent;border:1px solid transparent;color:var(--text2);font-family:inherit;font-size:13.5px;padding:2px 4px;border-radius:6px}
+.day-comment-row input:hover,.day-comment-row input:focus{background:var(--input-bg);border-color:var(--line);outline:none}
+.day-thumbs{display:flex;gap:7px;margin:10px 0 2px 26px;flex-wrap:wrap;align-items:center}
+.day-thumbs img{width:64px;height:48px;object-fit:cover;border-radius:7px;border:1px solid var(--line);cursor:pointer}
+.day-thumbs .day-thumb-wrap{position:relative}
+.day-thumbs .day-thumb-wrap button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;line-height:16px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:11px;cursor:pointer}
+.day-add-shot{border:1px dashed var(--line);background:transparent;color:var(--muted);font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit;height:48px}
+.day-detail{display:none;margin:14px 0 4px 26px;padding-top:14px;border-top:1px dashed rgba(var(--blue-rgb),.35);grid-template-columns:1fr 1fr;gap:18px}
+.day-wrap.open .day-detail{display:grid}
+@media(max-width:560px){.day-detail{grid-template-columns:1fr}}
+.day-detail .col-label{text-transform:uppercase;letter-spacing:.06em;font-size:10px;font-weight:800;color:var(--muted);margin-bottom:8px}
+.day-kpis{grid-column:1/-1;display:flex;gap:8px;margin-bottom:14px}
+.day-kpis .kpi-item{flex:1;background:rgba(var(--card-bg-rgb),var(--card-bg-alpha));border:1px solid var(--line);border-radius:10px;padding:9px 10px;text-align:center}
+.day-kpis .kpi-label{color:var(--muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px}
+.day-kpis .kpi-value{font-size:15px;font-weight:800;margin-top:3px}
+.day-kpis .kpi-value.pos{color:var(--green)}.day-kpis .kpi-value.neg{color:var(--red)}
+.day-notes{width:100%;min-height:80px;resize:vertical;background:var(--input-bg);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:inherit;font-size:13.5px;line-height:1.5;padding:10px 12px}
+.day-notes::placeholder{color:var(--muted)}
+.day-trades{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .calendar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .calendar{display:grid;grid-template-columns:repeat(7,1fr) 0.9fr;gap:8px}.dow{text-align:center;color:var(--muted);font-size:12px;padding:6px}
 .dow.week{color:var(--blue);font-weight:700}
@@ -470,8 +500,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <button class="btn" id="printPdf">Tisk / PDF</button>
         <button class="btn" id="mergeSelected" title="Sloučí vybrané obchody (např. TP1/TP2/BE ze stejné pozice) do jednoho">🔗 Sloučit vybrané</button>
       </div>
-      <div class="sub" style="margin:-6px 0 10px">Zaškrtni obchody, které NinjaTrader rozdělil na více cílů (TP1/TP2/BE), a slouč je tlačítkem výše do jednoho obchodu.</div>
+      <div class="sub" style="margin:-6px 0 10px">Zaškrtni obchody, které NinjaTrader rozdělil na více cílů (TP1/TP2/BE), a sluč je tlačítkem výše do jednoho obchodu.</div>
       <div id="tradeList" class="trade-list"></div>
+      <input id="dayShotInput" type="file" accept="image/*" multiple style="display:none">
     </section>
 
     <section id="calendar" class="section">
@@ -974,12 +1005,13 @@ async function openDB(){
  if(!window.desktopAPI?.readJournal)throw new Error('Datové úložiště desktopové aplikace není dostupné.');
  const result=await window.desktopAPI.readJournal(activeJournalId);
  if(!result?.ok)throw new Error(result?.error||'Data deníku nelze načíst.');
- db={data:result.data||{trades:[],settings:[]},close(){}};if(!Array.isArray(db.data.trades))db.data.trades=[];if(!Array.isArray(db.data.settings))db.data.settings=[];
+ db={data:result.data||{trades:[],settings:[]},close(){}};if(!Array.isArray(db.data.trades))db.data.trades=[];if(!Array.isArray(db.data.settings))db.data.settings=[];if(!db.data.dayNotes||typeof db.data.dayNotes!=='object')db.data.dayNotes={};
 }
 async function ensureActiveJournalData(){
  if(db?.data){
   if(!Array.isArray(db.data.trades))db.data.trades=[];
   if(!Array.isArray(db.data.settings))db.data.settings=[];
+  if(!db.data.dayNotes||typeof db.data.dayNotes!=='object')db.data.dayNotes={};
   return db.data;
  }
  if(!window.desktopAPI?.readJournal)throw new Error('Datové úložiště desktopové aplikace není dostupné.');
@@ -988,6 +1020,7 @@ async function ensureActiveJournalData(){
  const data=result.data||{trades:[],settings:[]};
  if(!Array.isArray(data.trades))data.trades=[];
  if(!Array.isArray(data.settings))data.settings=[];
+ if(!data.dayNotes||typeof data.dayNotes!=='object')data.dayNotes={};
  db={data,close(){}};
  return db.data;
 }
@@ -1011,6 +1044,19 @@ async function put(name,val){
 async function del(name,keyValue){
  const data=await ensureActiveJournalData();
  data[name]=(data[name]||[]).filter(x=>x?.id!==keyValue&&x?.key!==keyValue);
+ await persistDB();
+}
+function emptyDayNote(){return {comment:'',preview:'',notes:'',images:[]}}
+function getDayNote(date){
+ const n=(db?.data?.dayNotes||{})[date];
+ return n?{...emptyDayNote(),...n}:emptyDayNote();
+}
+async function saveDayNote(date,patch){
+ const data=await ensureActiveJournalData();
+ const current=data.dayNotes[date]||emptyDayNote();
+ const next={...current,...patch};
+ const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length);
+ if(isEmpty)delete data.dayNotes[date];else data.dayNotes[date]=next;
  await persistDB();
 }
 async function clearStore(name){
@@ -1655,10 +1701,87 @@ function tradeHTML(t){
  <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
 }
 
+const openDayNotes=new Set();
+const DOW_LABELS=['Ne','Po','Út','St','Čt','Pá','So'];
+function dayKpis(dayTrades){
+ const pnl=dayTrades.reduce((a,t)=>a+signed(t),0);
+ const wins=dayTrades.filter(t=>t.result==='target').length, losses=dayTrades.filter(t=>t.result==='stoploss').length;
+ const denom=wins+losses;
+ return {pnl,wins,losses,winRate:denom?(wins/denom)*100:0};
+}
+function dayThumbsHTML(date){
+ const note=getDayNote(date);
+ const shotsHTML=(note.images||[]).map((src,i)=>`<div class="day-thumb-wrap"><img src="${src}" onclick="openImage('${src}')"><button type="button" title="Odebrat" onclick="event.stopPropagation();removeDayImage('${date}',${i})">✕</button></div>`).join('');
+ const addShotBtn=(note.images||[]).length<3?`<button type="button" class="day-add-shot" onclick="event.stopPropagation();triggerDayShotPicker('${date}')">+ Přidat obrázek</button>`:'';
+ return shotsHTML+addShotBtn;
+}
+function dayGroupHTML(date,dayTrades){
+ const note=getDayNote(date);
+ const kpi=dayKpis(dayTrades);
+ const open=openDayNotes.has(date);
+ const d=new Date(date+'T00:00:00');
+ const weekday=isNaN(d)?'':DOW_LABELS[d.getDay()];
+ return `<div class="day-wrap${open?' open':''}" data-day="${date}">
+ <div class="day-header" onclick="toggleDayNote('${date}')">
+ <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+ <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${dayTrades.length===1?'obchod':'obchody'}</span>
+ <div class="spacer"></div>
+ <span class="stat ${kpi.pnl>=0?'pos':'neg'}">${kpi.pnl>=0?'+':''}${money(kpi.pnl)}</span>
+ </div>
+ <div class="day-comment-row"><span class="lbl">Komentář</span><input type="text" placeholder="Volitelné" value="${esc(note.comment)}" onclick="event.stopPropagation()" onblur="saveDayField('${date}','comment',this.value)"></div>
+ <div class="day-thumbs">${dayThumbsHTML(date)}</div>
+ <div class="day-detail">
+ <div class="day-kpis">
+ <div class="kpi-item"><div class="kpi-label">P/L za den</div><div class="kpi-value ${kpi.pnl>=0?'pos':'neg'}">${kpi.pnl>=0?'+':''}${money(kpi.pnl)}</div></div>
+ <div class="kpi-item"><div class="kpi-label">Win rate</div><div class="kpi-value">${kpi.winRate.toFixed(0)} %</div></div>
+ <div class="kpi-item"><div class="kpi-label">Zisky / Ztráty</div><div class="kpi-value">${kpi.wins} / ${kpi.losses}</div></div>
+ </div>
+ <div><div class="col-label">Náhled</div><textarea class="day-notes" placeholder="Denní náhled k obchodnímu dni" onblur="saveDayField('${date}','preview',this.value)">${esc(note.preview)}</textarea></div>
+ <div><div class="col-label">Poznámky</div><textarea class="day-notes" placeholder="Libovolné poznámky k tomuto dni. Psycho/setupy atd." onblur="saveDayField('${date}','notes',this.value)">${esc(note.notes)}</textarea></div>
+ </div>
+ <div class="day-trades">${dayTrades.map(tradeHTML).join('')}</div>
+ </div>`;
+}
+function findDayWrap(date){return document.querySelector(`.day-wrap[data-day="${CSS.escape(date)}"]`)}
+window.toggleDayNote=date=>{
+ if(openDayNotes.has(date))openDayNotes.delete(date);else openDayNotes.add(date);
+ const el=findDayWrap(date);
+ if(el)el.classList.toggle('open',openDayNotes.has(date));else renderTrades();
+};
+window.saveDayField=async(date,field,value)=>{await saveDayNote(date,{[field]:value})};
+window.removeDayImage=async(date,i)=>{
+ const note=getDayNote(date);note.images.splice(i,1);
+ await saveDayNote(date,{images:note.images});
+ const el=findDayWrap(date)?.querySelector('.day-thumbs');
+ if(el)el.innerHTML=dayThumbsHTML(date);else renderTrades();
+};
+window.triggerDayShotPicker=date=>{pendingDayShotDate=date;$('dayShotInput').click()};
+let pendingDayShotDate=null;
+async function handleDayShotInputChange(e){
+ const date=pendingDayShotDate;pendingDayShotDate=null;
+ if(!date)return;
+ const note=getDayNote(date);
+ const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).slice(0,3-note.images.length);
+ for(const f of files){
+  if(f.size>3_000_000){showToast('Jeden obrázek je větší než 3 MB. Zvol menší soubor.');continue}
+  const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});
+  note.images.push(data);
+ }
+ e.target.value='';
+ await saveDayNote(date,{images:note.images});
+ const el=findDayWrap(date)?.querySelector('.day-thumbs');
+ if(el)el.innerHTML=dayThumbsHTML(date);else renderTrades();
+}
 function renderTrades(){
  const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value;
  const list=trades.filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
- $('tradeList').innerHTML=list.length?list.map(tradeHTML).join(''):'<div class="card sub">Zatím zde nejsou žádné obchody.</div>';
+ if(!list.length){$('tradeList').innerHTML='<div class="card sub">Zatím zde nejsou žádné obchody.</div>';return}
+ const groups=[];
+ for(const t of list){
+  const last=groups[groups.length-1];
+  if(last&&last.date===t.date)last.trades.push(t);else groups.push({date:t.date,trades:[t]});
+ }
+ $('tradeList').innerHTML=groups.map(g=>dayGroupHTML(g.date,g.trades)).join('');
 }
 let calendarAllTrades=null;
 async function loadCalendarAllTrades(){
@@ -2017,6 +2140,7 @@ $('screenshots').addEventListener('change',async e=>{
   const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});editImages.push(data)}
  showPreviews();e.target.value='';
 });
+$('dayShotInput').addEventListener('change',handleDayShotInputChange);
 document.addEventListener('paste',async e=>{
  if(!$('tradeModal')?.classList.contains('open'))return;
  const items=(e.clipboardData||window.clipboardData)?.items;
@@ -2419,11 +2543,25 @@ $('saveTheme').onclick=()=>{
 function refreshChartsForTheme(){
  try{ renderAll(); }catch(e){}
 }
+function firstTradeIdPerDate(rows){
+ const map={};
+ for(const t of rows){
+  if(!t.date)continue;
+  const cur=map[t.date];
+  if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)map[t.date]=t;
+ }
+ const out={};
+ for(const date in map)out[date]=map[date].id;
+ return out;
+}
 $('exportCsv').onclick=async()=>{
- const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka'];
+ const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const firstIdByDate=firstTradeIdPerDate(trades);
  const rows=trades.map(t=>{
   const p=t.dailyPlan||{};
-  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,t.result==='breakeven'?Math.abs(Number(t.points||0)):(t.result==='target'?t.points:-t.points),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note];
+  const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
+  const dn=isFirstOfDay?getDayNote(t.date):null;
+  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,t.result==='breakeven'?Math.abs(Number(t.points||0)):(t.result==='target'?t.points:-t.points),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -2703,6 +2841,19 @@ async function readJournalTrades(profile){
  if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
  return (result.data?.trades||[]).map(t=>({...t,journalId:profile.id,journalName:profile.name}));
 }
+async function readJournalDayNotes(profile){
+ const result=await window.desktopAPI.readJournal(profile.id);
+ if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
+ return result.data?.dayNotes||{};
+}
+async function collectReportDayNotes(){
+ const map={};
+ for(const p of journalProfiles){
+  const notes=await readJournalDayNotes(p);
+  for(const date in notes)map[p.id+'|'+date]=notes[date];
+ }
+ return map;
+}
 
 async function collectReportRows(){
  const all=[];
@@ -2764,10 +2915,15 @@ function generateReportView(allRows=null){
 $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
 $('reportCsv').onclick=async()=>{
- const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka'];
+ const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const dayNotesByJournal={};
+ reportRows.forEach(t=>{if(t.date){const cur=dayNotesByJournal[t.journalId+'|'+t.date];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)dayNotesByJournal[t.journalId+'|'+t.date]=t}});
+ const allDayNotes=await collectReportDayNotes();
  const rows=reportRows.map(t=>{
   const p=t.dailyPlan||{};
-  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,reportSigned({...t,pnl:t.points}),reportSigned(t),t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note];
+  const isFirstOfDay=t.date&&dayNotesByJournal[t.journalId+'|'+t.date]===t;
+  const dn=isFirstOfDay?(allDayNotes[t.journalId+'|'+t.date]||{}):null;
+  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,reportSigned({...t,pnl:t.points}),reportSigned(t),t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;

@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.4.8",
-  "description": "Futures Journal PRO 4.4.8 – přepracovaný dashboard Přehled účtu (KPI strip, gauge grafy, rozložení zisků/ztrát, týdenní výkonnost), podíl instrumentů přesunut do podzáložky, odstraněna mrtvá sidebar portfolio-widget sekce a nové tmavší barevné téma.",
+  "version": "4.4.9",
+  "description": "Futures Journal PRO 4.4.9 – nový denní blok v Deníku (komentář, náhled, poznámky a screenshoty za celý obchodní den, ohraničený a napojený na jeho obchody), denní P/L a win rate v detailu dne, export CSV/report doplněný o denní pole a oprava CZ překlepu.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",
