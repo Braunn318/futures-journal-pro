@@ -157,6 +157,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .day-kpis .kpi-value.pos{color:var(--green)}.day-kpis .kpi-value.neg{color:var(--red)}
 .day-notes{width:100%;min-height:80px;resize:vertical;background:var(--input-bg);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:inherit;font-size:13.5px;line-height:1.5;padding:10px 12px}
 .day-notes::placeholder{color:var(--muted)}
+.day-detail-actions{grid-column:1/-1;display:flex;justify-content:flex-end;margin-top:2px}
 .day-trades{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .calendar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .calendar{display:grid;grid-template-columns:repeat(7,1fr) 0.9fr;gap:8px}.dow{text-align:center;color:var(--muted);font-size:12px;padding:6px}
@@ -1000,6 +1001,8 @@ async function removeLegacyDefaultJournal(){
 function currentDBName(){return 'FuturesJournalDB_'+activeJournalId}
 let db={data:{trades:[],settings:[]},close(){}}, trades=[], settings={startingBalance:100000,currency:'USD',usdCzkRate:23,dailyLossLimit:5000,dailyPointLimit:100,breakEvenEnabled:false,breakEvenThreshold:0,autoMergeLegs:true,templates:[],risk:{}};
 let editImages=[], calendarDate=new Date();
+let tradeFormBaseline='';
+function tradeFormSnapshot(){return JSON.stringify([...new FormData($('tradeForm')).entries()])+'|'+JSON.stringify(editImages)}
 
 async function openDB(){
  if(!window.desktopAPI?.readJournal)throw new Error('Datové úložiště desktopové aplikace není dostupné.');
@@ -1738,6 +1741,7 @@ function dayGroupHTML(date,dayTrades){
  </div>
  <div><div class="col-label">Náhled</div><textarea class="day-notes" placeholder="Denní náhled k obchodnímu dni" onblur="saveDayField('${date}','preview',this.value)">${esc(note.preview)}</textarea></div>
  <div><div class="col-label">Poznámky</div><textarea class="day-notes" placeholder="Libovolné poznámky k tomuto dni. Psycho/setupy atd." onblur="saveDayField('${date}','notes',this.value)">${esc(note.notes)}</textarea></div>
+ <div class="day-detail-actions"><button type="button" class="btn primary" onclick="saveDayDetail('${date}')">💾 Uložit</button></div>
  </div>
  <div class="day-trades">${dayTrades.map(tradeHTML).join('')}</div>
  </div>`;
@@ -1749,6 +1753,17 @@ window.toggleDayNote=date=>{
  if(el)el.classList.toggle('open',openDayNotes.has(date));else renderTrades();
 };
 window.saveDayField=async(date,field,value)=>{await saveDayNote(date,{[field]:value})};
+window.saveDayDetail=async(date)=>{
+ const wrap=findDayWrap(date);
+ if(wrap){
+  const commentInput=wrap.querySelector('.day-comment-row input');
+  const [previewTa,notesTa]=wrap.querySelectorAll('.day-notes');
+  await saveDayNote(date,{comment:commentInput?.value??'',preview:previewTa?.value??'',notes:notesTa?.value??''});
+  openDayNotes.delete(date);
+  wrap.classList.remove('open');
+ }
+ showToast('Poznámky ke dni uloženy.');
+};
 window.removeDayImage=async(date,i)=>{
  const note=getDayNote(date);note.images.splice(i,1);
  await saveDayNote(date,{images:note.images});
@@ -1979,6 +1994,7 @@ function openModal(t=null){
  else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;
  ['tradePlanInstrument','tradePlanMaxTrades','tradePlanLossLimit','tradePlanProfitTarget','tradePlanFromTime','tradePlanToTime','tradePlanSetup','tradePlanPsychology','tradePlanNote'].forEach(id=>$(id).value='')}
  if($('formAlert')){$('formAlert').classList.remove('show');$('formAlert').textContent=''};$('tradeModal').classList.add('open')
+ tradeFormBaseline=tradeFormSnapshot();
 }
 let legRowSeq=0;
 function legRowHTML(id){
@@ -2450,7 +2466,11 @@ document.querySelectorAll('.subtab-bar').forEach(bar=>{
  });
 });
 $('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
-$('addTradeBtn').onclick=()=>openModal();$('closeModal').onclick=()=>$('tradeModal').classList.remove('open');
+$('addTradeBtn').onclick=()=>openModal();
+$('closeModal').onclick=async()=>{
+ if(tradeFormSnapshot()!==tradeFormBaseline && !(await showConfirm('Neuložené změny v obchodu budou ztraceny. Zavřít bez uložení?')))return;
+ $('tradeModal').classList.remove('open');
+};
 // Záměrně BEZ zavírání kliknutím mimo okno – u rozdělaného formuláře (Nový/
 // Upravit obchod) by omylem kliknutí mimo mohlo smazat rozepsanou práci.
 // Zavírá se jen křížkem (#closeModal) nahoře.

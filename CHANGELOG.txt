@@ -9,6 +9,8 @@ All notable changes are logged here (one file, newest first).
 - CSV export (both the per-journal Deník export and the cross-journal Reporty export) now includes the day's comment/náhled/poznámky as extra columns on each day's first trade row.
 - Fixed: reading a journal from disk was silently dropping its day notes (main-process bug), which could also cause a later save to erase them; day notes now round-trip correctly through export and app restarts.
 - Fixed the CZ typo "slouč" → "sluč" in the merge-trades hint text.
+- Added an explicit "💾 Uložit" button to the day detail panel, confirming with a toast and collapsing the panel once saved.
+- Closing the Add/Edit Trade window with ✕ now warns if there are unsaved changes instead of silently discarding them.
 
 ## 4.4.8 - 2026-08-30
 - Redesigned "Přehled účtu" (account overview) dashboard: new KPI strip (initial balance, net profit, current balance, win rate, profit factor), win-rate/profit-rate gauges, P/L distribution histogram, weekly performance chart, and per-period stats panel.
