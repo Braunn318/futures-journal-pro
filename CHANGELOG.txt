@@ -2,6 +2,11 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.4.10 - 2026-09-01
+- Added a "+ Přidat den" button in Deník to create a day block (Komentář/Náhled/Poznámky/screenshoty) for a day with no trades at all, so a "dummy" trade is no longer needed just to access it (GitHub issue #6).
+- Days that only have a saved day note (no trades) now persist and reappear across restarts, same as trade days.
+- Minor: correct Czech pluralization ("0/5+ obchodů", "1 obchod", "2-4 obchody") in the day header.
+
 ## 4.4.9 - 2026-09-01
 - Added a per-day block in Deník: trades for each day are now grouped inside a bordered container with a visible date/weekday/trade-count header and net P/L.
 - Added a "Komentář" field per day, shown directly on the day header (same visibility model as a trade's own comment), plus up to 3 screenshots shown directly with an "add" button.

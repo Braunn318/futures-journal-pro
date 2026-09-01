@@ -498,6 +498,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <input id="search" placeholder="Hledat instrument nebo komentář">
         <select id="filterResult"><option value="">Všechny výsledky</option><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
         <input type="date" id="filterDate">
+        <input type="date" id="newDayDate" title="Datum dne k přidání">
+        <button class="btn" id="addEmptyDay" title="Přidá denní blok (komentář/náhled/poznámky/screenshoty) i bez obchodu">+ Přidat den</button>
         <button class="btn" id="exportCsv">Export CSV</button>
         <button class="btn" id="printPdf">Tisk / PDF</button>
         <button class="btn" id="mergeSelected" title="Sloučí vybrané obchody (např. TP1/TP2/BE ze stejné pozice) do jednoho">🔗 Sloučit vybrané</button>
@@ -1709,7 +1711,9 @@ function tradeHTML(t){
 }
 
 const openDayNotes=new Set();
+const extraEmptyDays=new Set();
 const DOW_LABELS=['Ne','Po','Út','St','Čt','Pá','So'];
+function czPluralObchod(n){if(n===1)return 'obchod';if(n>=2&&n<=4)return 'obchody';return 'obchodů'}
 function dayKpis(dayTrades){
  const pnl=dayTrades.reduce((a,t)=>a+signed(t),0);
  const wins=dayTrades.filter(t=>t.result==='target').length, losses=dayTrades.filter(t=>t.result==='stoploss').length;
@@ -1731,7 +1735,7 @@ function dayGroupHTML(date,dayTrades){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${dayTrades.length===1?'obchod':'obchody'}</span>
+ <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}</span>
  <div class="spacer"></div>
  <span class="stat ${kpi.pnl>=0?'pos':'neg'}">${kpi.pnl>=0?'+':''}${money(kpi.pnl)}</span>
  </div>
@@ -1747,7 +1751,7 @@ function dayGroupHTML(date,dayTrades){
  <div><div class="col-label">Poznámky</div><textarea class="day-notes" placeholder="Libovolné poznámky k tomuto dni. Psycho/setupy atd." onblur="saveDayField('${date}','notes',this.value)">${esc(note.notes)}</textarea></div>
  <div class="day-detail-actions"><button type="button" class="btn primary" onclick="saveDayDetail('${date}')">💾 Uložit</button></div>
  </div>
- <div class="day-trades">${dayTrades.map(tradeHTML).join('')}</div>
+ ${dayTrades.length?`<div class="day-trades">${dayTrades.map(tradeHTML).join('')}</div>`:''}
  </div>`;
 }
 function findDayWrap(date){return document.querySelector(`.day-wrap[data-day="${CSS.escape(date)}"]`)}
@@ -1794,12 +1798,22 @@ async function handleDayShotInputChange(e){
 function renderTrades(){
  const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value;
  const list=trades.filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
- if(!list.length){$('tradeList').innerHTML='<div class="card sub">Zatím zde nejsou žádné obchody.</div>';return}
  const groups=[];
  for(const t of list){
   const last=groups[groups.length-1];
   if(last&&last.date===t.date)last.trades.push(t);else groups.push({date:t.date,trades:[t]});
  }
+ if(!q&&!r){
+  const tradeDates=new Set(groups.map(g=>g.date));
+  const extraDates=new Set([...Object.keys(db?.data?.dayNotes||{}),...extraEmptyDays]);
+  extraDates.forEach(date=>{
+   if(tradeDates.has(date))return;
+   if(d&&d!==date)return;
+   groups.push({date,trades:[]});
+  });
+  groups.sort((a,b)=>b.date.localeCompare(a.date));
+ }
+ if(!groups.length){$('tradeList').innerHTML='<div class="card sub">Zatím zde nejsou žádné obchody.</div>';return}
  $('tradeList').innerHTML=groups.map(g=>dayGroupHTML(g.date,g.trades)).join('');
 }
 let calendarAllTrades=null;
@@ -2479,6 +2493,13 @@ $('closeModal').onclick=async()=>{
 // Upravit obchod) by omylem kliknutí mimo mohlo smazat rozepsanou práci.
 // Zavírá se jen křížkem (#closeModal) nahoře.
 ['search','filterResult','filterDate'].forEach(id=>$(id).addEventListener('input',renderTrades));
+$('addEmptyDay').onclick=()=>{
+ const date=$('newDayDate').value||new Date().toISOString().slice(0,10);
+ extraEmptyDays.add(date);
+ openDayNotes.add(date);
+ renderTrades();
+ findDayWrap(date)?.scrollIntoView({behavior:'smooth',block:'center'});
+};
 $('prevMonth').onclick=()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);renderCalendar()};
 $('nextMonth').onclick=()=>{calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);renderCalendar()};
 $('saveSettings').onclick=async()=>{await persistSettings({startingBalance:Number($('startingBalance').value)||0,currency:'USD',usdCzkRate:Number($('usdCzkRate').value)||23});showToast('Nastavení uloženo.')};
