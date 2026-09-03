@@ -2,6 +2,16 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.5.0 - 2026-09-03
+- Added a "Směr obchodu" (Long/Short) field to the trade form. Profit/loss is now derived from the direction plus the entry/exit prices — a long that exits below entry is a loss, a short that exits below entry is a win — instead of being declared by hand.
+- The "Výsledek" dropdown is now a read-only badge that updates live from the net P/L. It was already misleading: the saved result has always been recomputed from the P/L, so the dropdown never actually set what was stored — it only skewed the calculation.
+- **Fixed a serious regression introduced in 4.4.11 and released in 4.4.12**: with a known point value, choosing "Stop Loss" auto-filled a *positive* P/L and the trade was saved as a win (Break Even was saved as a stop loss). The 4.4.11 change removed the sign-forcing that the P/L calculator depended on. Direction-based math removes the need for that sign-forcing entirely.
+- Added an opt-in "Doplnit směr" tool in Nastavení that fills in the direction on older trades, inferred from the entry/exit prices and the stored gross result. Profit, loss, points and result are never changed. Trades whose direction cannot be determined (missing prices, identical entry/exit, zero gross result, or contradicting targets) are left alone and listed so they can be fixed by hand. The report also flags trades that look like a Stop Loss wrongly saved as a win by 4.4.11/4.4.12.
+- Direction now shows as a LONG/SHORT pill on the trade card, as a "Směr" column in both CSV exports, as a long/short win-rate and P/L split in "Statistika obchodů", and as a filter in the journal toolbar. Trades without a recorded direction look exactly as before.
+- Fixed editing a trade destroying fields the form doesn't show: the direction, the position/source-event link used to deduplicate connector imports, and the external account were all wiped on every manual save of an imported trade. Merging trades dropped the same fields.
+- Fixed the "Body" column in the Reporty CSV export containing the P/L in money instead of the points.
+- Backwards compatible: no data is migrated or rewritten on load, and opening an older trade and saving it leaves its profit, loss, points and result byte-identical.
+
 ## 4.4.12 - 2026-09-03
 - Fixed the actual reported case of GitHub issue #7: a trade closed manually via the "Close" button in NinjaTrader 8 (imported through the connector), with a gross profit but a net loss once real commissions were applied, was still counted as a win in the overview. The connector-import mapping (`mapCapturedTrade`) was silently assuming $0 commission whenever the instrument had no commission template configured, discarding the correctly net-computed P/L that `main.js` already derived from the actual NT8 execution commissions. It now falls back to that connector-computed net P/L when no template commission is set, instead of assuming zero. (The 4.4.11 fix for manually *entered* trades in the app's own form is unrelated but still valid and stays in place.)
 

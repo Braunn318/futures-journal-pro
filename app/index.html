@@ -112,6 +112,15 @@ canvas{width:100%;height:100%}
 .trade .title{font-size:18px;font-weight:800}.trade .meta{color:var(--muted);font-size:13px;margin-top:5px}.pill{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:800;font-size:12px}
 .pill.win{background:rgba(var(--green-rgb),.15);color:var(--green)}.pill.loss{background:rgba(var(--red-rgb),.15);color:var(--red)}.pill.be{background:rgba(var(--yellow-rgb),.18);color:var(--yellow)}
 .pill.journal-pill{background:rgba(var(--blue-rgb),.15);color:var(--blue);font-weight:700}
+/* Směr obchodu je záměrně modrá/žlutá, ne zelená/červená – ta je v celé aplikaci
+   vyhrazená pro zisk/ztrátu a směr je na výsledku nezávislý. */
+.pill.side-pill.long{background:rgba(var(--blue-rgb),.15);color:var(--blue)}
+.pill.side-pill.short{background:rgba(var(--yellow-rgb),.18);color:var(--yellow)}
+.result-badge{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:5px 12px;background:rgba(var(--tint-rgb),.06);color:var(--muted);border:1px solid var(--line)}
+.leg-result-badge{display:inline-flex;align-items:center;justify-content:center;padding:4px 6px;font-size:11px;background:rgba(var(--tint-rgb),.06);color:var(--muted);border:1px solid var(--line);text-align:center}
+.result-badge.win,.leg-result-badge.win{background:rgba(var(--green-rgb),.15);color:var(--green);border-color:transparent}
+.result-badge.loss,.leg-result-badge.loss{background:rgba(var(--red-rgb),.15);color:var(--red);border-color:transparent}
+.result-badge.be,.leg-result-badge.be{background:rgba(var(--yellow-rgb),.18);color:var(--yellow);border-color:transparent}
 .trade-legs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .leg-pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;background:rgba(var(--tint-rgb),.06);border:1px solid var(--line)}
 .leg-pill.pos{color:var(--green);border-color:rgba(var(--green-rgb),.35)}.leg-pill.neg{color:var(--red);border-color:rgba(var(--red-rgb),.35)}.leg-pill.neutral{color:var(--yellow);border-color:rgba(var(--yellow-rgb),.35)}
@@ -497,6 +506,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="toolbar">
         <input id="search" placeholder="Hledat instrument nebo komentář">
         <select id="filterResult"><option value="">Všechny výsledky</option><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
+        <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <input type="date" id="filterDate">
         <input type="date" id="newDayDate" title="Datum dne k přidání">
         <button class="btn" id="addEmptyDay" title="Přidá denní blok (komentář/náhled/poznámky/screenshoty) i bez obchodu">+ Přidat den</button>
@@ -803,6 +813,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="sub" style="margin-top:2px">Projde všechny obchody v aktivním deníku a u instrumentů, které mají v šabloně vyplněnou komisi, přepočítá komisi (podle počtu kontraktů) i výsledný zisk/ztrátu. Obchody u instrumentů bez vyplněné komise v šabloně zůstanou beze změny. Nejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova).</div>
             <button class="btn danger" id="recalcCommissionBtn" style="margin-top:10px">Přepočítat komisi v aktivním deníku</button>
           </div>
+          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+            <label>Doplnit směr (Long / Short) u starších obchodů</label>
+            <div class="sub" style="margin-top:2px">Obchody uložené ve starších verzích nemají zaznamenaný směr. Tenhle nástroj ho u nich jednorázově doplní podle vstupní a výstupní ceny a uloženého hrubého výsledku. <b>Zisk, ztráta, body ani výsledek se nijak nemění</b> – doplní se pouze směr. Obchody, u kterých směr určit nejde (chybějící ceny, stejná vstupní i výstupní cena, nulový hrubý výsledek), zůstanou bez směru a můžeš je doplnit ručně. Nejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova).</div>
+            <button class="btn danger" id="backfillSideBtn" style="margin-top:10px">Doplnit směr v aktivním deníku</button>
+            <div class="sub" id="backfillSideReport" style="margin-top:10px"></div>
+          </div>
         </div>
       </div>
       </div>
@@ -942,11 +958,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="formgrid">
         <div class="field"><label>Instrument</label><input id="instrument" placeholder="např. NQ, ES, CL" list="templateInstrumentList"><datalist id="templateInstrumentList"></datalist><div class="sub" id="templateHint" style="margin-top:4px"></div></div>
         <div class="field"><label>Datum</label><input id="date" type="date"></div>
+        <div class="field"><label>Směr obchodu</label><select id="side"><option value="">— nezadáno —</option><option value="long">Long (nákup)</option><option value="short">Short (prodej)</option></select></div>
         <div class="field"><label>Čas vstupu</label><input id="entryTime" type="time"></div>
         <div class="field"><label>Cena vstupu</label><input id="entryPrice" type="number" step="any"></div>
         <div class="field"><label>Čas výstupu</label><input id="exitTime" type="time"></div>
         <div class="field"><label>Cena výstupu</label><input id="exitPrice" type="number" step="any"></div>
-        <div class="field"><label>Výsledek</label><select id="result"><option value="target">Target (+)</option><option value="breakeven">Break Even (≈0)</option><option value="stoploss">Stop Loss (−)</option></select></div>
+        <div class="field"><label>Výsledek <span class="sub">— dopočítá se ze zisku/ztráty</span></label><div id="resultBadge" class="pill result-badge">—</div><input type="hidden" id="result" value=""></div>
         <div class="field"><label>Počet bodů</label><input id="points" type="number" step="any"></div>
         <div class="field"><label>Zisk / ztráta v měně účtu (čistý, po komisi)</label><input id="pnl" type="number" step="any"></div>
         <div class="field"><label>Komise (v měně účtu)</label><input id="commission" type="number" step="any" min="0" value="0"></div>
@@ -1304,6 +1321,77 @@ if($('recalcCommissionBtn'))$('recalcCommissionBtn').onclick=async()=>{
  await load();
  showToast(`Přepočítáno obchodů: ${changed}.`);
 };
+// ---- Jednorázové doplnění směru u starších obchodů ----
+// Směr se určuje z HRUBÉHO výsledku, ne z uloženého "result": ten je odvozený
+// z ČISTÉ částky, takže drobný zisk sežraný komisemi je uložený jako "stoploss",
+// i když cena šla ve prospěch obchodu – podle "result" by směr vyšel obráceně.
+// Hrubý = pnlRaw + komise (stejný invariant, na kterém stojí recalcUnitCommission).
+function inferSideForUnit(entryPrice,unit){
+ const e=Number(entryPrice), x=Number(unit.exitPrice);
+ if(entryPrice===''||entryPrice==null||unit.exitPrice===''||unit.exitPrice==null
+   ||!Number.isFinite(e)||!Number.isFinite(x))return {side:'',reason:'noPrices'};
+ if(Math.abs(x-e)<1e-9)return {side:'',reason:'equalPrices'};
+ const raw=(unit.pnlRaw!==undefined&&unit.pnlRaw!==null&&unit.pnlRaw!=='')?Number(unit.pnlRaw):signed(unit);
+ const gross=raw+Math.abs(Number(unit.commission)||0);
+ if(Math.abs(gross)<1e-9)return {side:'',reason:'zeroGross'};
+ return {side:((gross>0)===(x>e))?'long':'short',reason:'ok'};
+}
+function inferSideForTrade(t){
+ if(t.side==='long'||t.side==='short')return {side:t.side,reason:'already'};
+ const units=(Array.isArray(t.legs)&&t.legs.length)?t.legs:[t];
+ let found='';
+ for(const u of units){
+  const r=inferSideForUnit(t.entryPrice,u);
+  if(!r.side)continue;
+  if(!found)found=r.side;
+  else if(found!==r.side)return {side:'',reason:'conflict'};  // cíle si odporují – nikdy nehádat
+ }
+ return found?{side:found,reason:'ok'}:{side:'',reason:'undecidable'};
+}
+// Obchody zadané ve verzích 4.4.11/4.4.12 s ručně vybraným "Stop Loss" se mohly
+// uložit jako výhra s KLADNÝM ziskem (komise se u nich přičítala místo odečítání).
+// Poznají se podle toho, že pnlRaw odpovídá hrubému + komisi místo hrubý − komise.
+function looksLikeStopLossSavedAsWin(t){
+ if(t.result!=='target')return false;
+ const commission=Math.abs(Number(t.commission)||0);
+ if(commission<=0)return false;
+ const pointValue=getPointValueForInstrument(t.instrument);
+ if(!pointValue)return false;
+ const points=Math.abs(Number(t.points)||0), contracts=Math.abs(Number(t.contracts)||0);
+ if(!points||!contracts)return false;
+ const gross=points*contracts*pointValue;
+ const raw=Number(t.pnlRaw)||0;
+ return Math.abs(raw-(gross+commission))<0.01 && Math.abs(raw-(gross-commission))>=0.01;
+}
+if($('backfillSideBtn'))$('backfillSideBtn').onclick=async()=>{
+ const jName=journalProfiles.find(j=>j.id===activeJournalId)?.name||'aktivní deník';
+ const ok=await showConfirm(`Projde obchody v deníku „${jName}", u kterých ještě není vyplněný směr, a doplní ho podle vstupní/výstupní ceny a uloženého hrubého výsledku.\n\nZisk, ztráta, body ani výsledek se NIJAK nemění – doplní se pouze směr.\n\nObchody, u kterých směr určit nejde (chybějící ceny, stejná vstupní i výstupní cena, nulový hrubý výsledek), zůstanou bez směru a doplníš je ručně.\n\nNejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova). Pokračovat?`);
+ if(!ok)return;
+ // POZOR: modulové pole `trades` je klon (getAll dělá structuredClone), takže
+ // úpravy v něm by se neuložily. Pracuje se přímo nad živými daty deníku a
+ // zapisuje se jednou, ne jako u přepočtu komisí obchod po obchodu.
+ const data=await ensureActiveJournalData();
+ const rows=Array.isArray(data.trades)?data.trades:[];
+ let filled=0,longs=0,shorts=0,already=0;
+ const skipped=[],suspects=[];
+ for(const t of rows){
+  if(looksLikeStopLossSavedAsWin(t))suspects.push(t);
+  const r=inferSideForTrade(t);
+  if(r.reason==='already'){already++;continue}
+  if(!r.side){skipped.push(t);continue}
+  t.side=r.side; t.updatedAt=Date.now(); filled++;
+  if(r.side==='long')longs++;else shorts++;
+ }
+ if(filled)await persistDB();
+ await load();
+ const nameOf=t=>`${t.date||'?'} ${t.instrument||'?'}`;
+ const listOf=arr=>esc(arr.slice(0,10).map(nameOf).join(', '))+(arr.length>10?` a další ${arr.length-10}`:'');
+ const box=$('backfillSideReport');
+ if(box)box.innerHTML=`Doplněno: <b>${filled}</b> (Long ${longs}, Short ${shorts}). Už mělo směr: ${already}. Nešlo určit: <b>${skipped.length}</b>`
+  +(skipped.length?` – např. ${listOf(skipped)}. Otevři je a vyber směr ručně.`:'.')
+  +(suspects.length?`<div style="margin-top:8px;color:var(--yellow)">⚠️ Podezřelé obchody (${suspects.length}): vypadají jako Stop Loss uložený omylem jako zisk ve verzi 4.4.11/4.4.12 – ${listOf(suspects)}. Zkontroluj je a případně oprav ručně; automaticky se needitují, protože jejich správný směr nejde spolehlivě určit.</div>`:'');
+ showToast(filled?`Směr doplněn u ${filled} obchodů.`:'Nebyl doplněn žádný směr.');
+};
 function recalcUnitCommission(unit,instrument,defCommissionPerContract){
  const contracts=Math.abs(Number(unit.contracts))||0;
  const newCommission=Math.round(defCommissionPerContract*contracts*100)/100;
@@ -1332,6 +1420,35 @@ function classifyResult(netPnl){
  const v=Number(netPnl)||0;
  if(settings.breakEvenEnabled && Math.abs(v)<=(Number(settings.breakEvenThreshold)||0)) return 'breakeven';
  return v>=0?'target':'stoploss';
+}
+// ---- Směr obchodu (Long/Short) ----
+// Znaménko pohybu ceny z pohledu obchodníka: long vydělává, když cena roste,
+// short když klesá. Vrací null, když směr nebo některá z cen chybí – v tom
+// případě znaménko NEJDE určit a zisk/ztráta se nedopočítává (uživatel ji
+// vyplní ručně). Nula znamená vstup = výstup, tedy nulový hrubý výsledek.
+function priceDirectionSign(side, entryPrice, exitPrice){
+ if(side!=='long'&&side!=='short')return null;
+ if(entryPrice===''||entryPrice==null||exitPrice===''||exitPrice==null)return null;
+ const e=Number(entryPrice), x=Number(exitPrice);
+ if(!Number.isFinite(e)||!Number.isFinite(x))return null;
+ if(Math.abs(x-e)<1e-9)return 0;
+ return ((x>e)===(side==='long'))?1:-1;
+}
+// Komise je vždy náklad: u zisku ho snižuje, u ztráty ji prohlubuje.
+function netFromGross(grossSigned, commission){
+ return Math.round((Number(grossSigned)-Math.abs(Number(commission)||0))*100)/100;
+}
+function sideMeta(side){
+ if(side==='long')return {label:'LONG',cls:'long',text:'Long'};
+ if(side==='short')return {label:'SHORT',cls:'short',text:'Short'};
+ return null;
+}
+// Body pro zobrazení a export: uložené body jsou VŽDY bez znaménka (magnituda),
+// znaménko nese výsledek obchodu.
+function displayPoints(t){
+ const p=Math.abs(Number(t.points||0));
+ if(t.result==='breakeven')return p;
+ return t.result==='stoploss'?-p:p;
 }
 function renderAll(){renderDashboard();renderTrades();renderCalendar();refreshInstrumentPortfolioCard()}
 
@@ -1450,12 +1567,21 @@ function computeOverallStats(rows){
  const winrateDenom=wins.length+losses.length;
  const winRate=winrateDenom?wins.length/winrateDenom:0;
  const profitFactor=lossSum?Math.abs(gainSum/lossSum):(gainSum?Infinity:0);
+ // Rozpad podle směru: ukazuje, jestli se ti daří líp na long, nebo na short.
+ // Obchody bez uloženého směru se počítají zvlášť, aby čísla nelhala.
+ const bySide=s=>{
+  const sub=rows.filter(t=>t.side===s);
+  const w=sub.filter(t=>t.result==='target').length, l=sub.filter(t=>t.result==='stoploss').length;
+  return {count:sub.length,wins:w,losses:l,winRate:(w+l)?w/(w+l):0,pnl:sub.reduce((a,t)=>a+signed(t),0)};
+ };
  return {
   wins,losses,breakevens,gainSum,lossSum,winRate,profitFactor,
   totalTrades:rows.length,
   avgWin:wins.length?gainSum/wins.length:0,
   avgLoss:losses.length?lossSum/losses.length:0,
-  expectancy:rows.length?(gainSum+lossSum)/rows.length:0
+  expectancy:rows.length?(gainSum+lossSum)/rows.length:0,
+  longs:bySide('long'), shorts:bySide('short'),
+  unknownSide:rows.filter(t=>t.side!=='long'&&t.side!=='short').length
  };
 }
 function renderKpiStrip(total,balance,stats){
@@ -1489,13 +1615,20 @@ function renderTopInstruments(rows){
 function renderTradeStatsTable(stats){
  const el=$('tradeStatsTable'); if(!el)return;
  const row=(label,val,cls='')=>`<div class="row"><span>${label}</span><b class="${cls}">${val}</b></div>`;
+ const dirRow=(label,s)=>row(label,`${s.count} obch. · ${(s.winRate*100).toFixed(0)} % · ${money(s.pnl)}`,s.pnl>=0?'pos':'neg');
+ const dirRows=(stats.longs.count||stats.shorts.count)
+  ? dirRow('Long — obchody / win rate / P/L',stats.longs)
+   +dirRow('Short — obchody / win rate / P/L',stats.shorts)
+   +(stats.unknownSide?row('Bez určeného směru',stats.unknownSide):'')
+  : row('Směr obchodů','Zatím nevyplněn');
  el.innerHTML=
   row('Ziskové obchody',stats.wins.length,'pos')+
   row('Ztrátové obchody',stats.losses.length,'neg')+
   row('Průměrný zisk',money(stats.avgWin),'pos')+
   row('Průměrná ztráta',money(stats.avgLoss),'neg')+
   row('Profit factor',stats.profitFactor===Infinity?'∞':stats.profitFactor.toFixed(2))+
-  row('Expectancy',money(stats.expectancy),stats.expectancy>=0?'pos':'neg');
+  row('Expectancy',money(stats.expectancy),stats.expectancy>=0?'pos':'neg')+
+  dirRows;
 }
 function computePeriodStats(rows){
  const now=new Date();
@@ -1687,8 +1820,11 @@ function tradeHTML(t){
  const m=resultMeta(t.result);
  const pnlVal=signed(t,'pnl');
  const pointsDisplay=t.result==='breakeven'?`±${Math.abs(Number(t.points||0))}`:`${m.sign}${Math.abs(Number(t.points||0))}`;
+ // U obchodů bez uloženého směru se pilulka nezobrazuje vůbec (ne "—"), aby
+ // deník bez doplněných směrů vypadal přesně jako dřív.
+ const sm=sideMeta(t.side);
  return `<div class="card trade">
- <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
+ <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
  <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů · ${dualMoney(pnlVal,true)}</div>
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
@@ -1796,14 +1932,17 @@ async function handleDayShotInputChange(e){
  if(el)el.innerHTML=dayThumbsHTML(date);else renderTrades();
 }
 function renderTrades(){
- const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value;
- const list=trades.filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
+ const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'';
+ const sideOk=t=>!s||(s==='none'?(t.side!=='long'&&t.side!=='short'):t.side===s);
+ const list=trades.filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
  const groups=[];
  for(const t of list){
   const last=groups[groups.length-1];
   if(last&&last.date===t.date)last.trades.push(t);else groups.push({date:t.date,trades:[t]});
  }
- if(!q&&!r){
+ // Prázdné dny (jen s poznámkou) se přidávají jen když se nefiltruje – jinak by
+ // se objevovaly i u filtru, kterému žádný jejich obchod neodpovídá.
+ if(!q&&!r&&!s){
   const tradeDates=new Set(groups.map(g=>g.date));
   const extraDates=new Set([...Object.keys(db?.data?.dayNotes||{}),...extraEmptyDays]);
   extraDates.forEach(date=>{
@@ -1885,6 +2024,7 @@ function goToJournalForDate(date){
  if(navBtn)navBtn.click();
  if($('filterDate'))$('filterDate').value=date;
  if($('filterResult'))$('filterResult').value='';
+ if($('filterSide'))$('filterSide').value='';
  if($('search'))$('search').value='';
  renderTrades();
 }
@@ -1972,6 +2112,9 @@ function openModal(t=null){
   const legs=Array.isArray(t.legs)&&t.legs.length>1?t.legs:null;
   const leg0=legs?legs[0]:null;
   ['instrument','date','entryTime','entryPrice'].forEach(k=>$(k).value=t[k]??'');
+  // Starší obchody směr uložený nemají – zůstane prázdný ("nezadáno"), nikdy se
+  // nehádá. Doplnit ho jde hromadně v Nastavení, nebo tady ručně.
+  $('side').value=(t.side==='long'||t.side==='short')?t.side:'';
   if(leg0){
    $('exitTime').value=leg0.exitTime??t.exitTime??'';
    $('exitPrice').value=leg0.exitPrice??t.exitPrice??'';
@@ -2015,6 +2158,14 @@ function openModal(t=null){
  else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;
  ['tradePlanInstrument','tradePlanMaxTrades','tradePlanLossLimit','tradePlanProfitTarget','tradePlanFromTime','tradePlanToTime','tradePlanSetup','tradePlanPsychology','tradePlanNote'].forEach(id=>$(id).value='')}
  if($('formAlert')){$('formAlert').classList.remove('show');$('formAlert').textContent=''};$('tradeModal').classList.add('open')
+ // ZÁMĚRNĚ se tu NEVOLÁ žádný přepočet. Programové nastavení .value nespouští
+ // událost "input", takže otevření staršího obchodu nemůže tiše přepsat jeho
+ // uložený zisk/ztrátu. Odznaky jen ČTOU pole se zisk/ztrátou, nic nedopočítávají.
+ updateResultBadge();
+ document.querySelectorAll('#extraLegsList .leg-row').forEach(updateLegBadge);
+ // Až po dopočtu odznaků – ty zapisují do skrytého #result, které snímek
+ // kontroly neuložených změn čte. Opačné pořadí by každý otevřený obchod
+ // označilo jako rozpracovaný.
  tradeFormBaseline=tradeFormSnapshot();
 }
 let legRowSeq=0;
@@ -2024,7 +2175,7 @@ function legRowHTML(id){
   <input class="leg-label" placeholder="TP${legRowSeq+1}" value="TP${legRowSeq+1}">
   <input class="leg-exitTime" type="time" title="Čas výstupu">
   <input class="leg-exitPrice" type="number" step="any" placeholder="Cena výstupu">
-  <select class="leg-result"><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
+  <span class="pill leg-result-badge" title="Výsledek cíle se dopočítá ze zisku/ztráty">—</span><input type="hidden" class="leg-result" value="">
   <input class="leg-points" type="number" step="any" placeholder="Body">
   <input class="leg-pnl" type="number" step="any" placeholder="Zisk/ztráta">
   <input class="leg-commission" type="number" step="any" min="0" value="0" placeholder="Komise" title="Komise pro tento cíl">
@@ -2032,16 +2183,9 @@ function legRowHTML(id){
   <button type="button" class="icon remove-leg" title="Odebrat cíl">🗑️</button>
  </div>`;
 }
-// Komise je náklad bez ohledu na výsledek obchodu – u zisku ho snižuje,
-// u ztráty ji naopak zvětšuje (nikdy ji nezmenšuje). Vrací hodnotu ve stejném
-// tvaru, v jakém ji formulář dál očekává: kladnou velikost pro Target/Stop
-// Loss (znaménko se doplní podle výsledku při uložení), a přímo znaménkovou
-// hodnotu pro Break Even (ta se ukládá beze změny).
-function netAmountForResult(gross, commission, result){
- if(result==='stoploss') return gross+commission;
- if(result==='breakeven') return -commission;
- return gross-commission; // target
-}
+// Cíl (leg) sdílí s obchodem vstupní cenu a směr, vlastní má cenu výstupu,
+// počet kontraktů a komisi. Znaménko hrubého výsledku plyne ze směru a cen,
+// ne z ručně vybraného výsledku – ten je naopak odvozený z čisté částky.
 function recomputeLegRow(row){
  const entryVal=$('entryPrice').value;
  const exitVal=row.querySelector('.leg-exitPrice').value;
@@ -2056,15 +2200,15 @@ function recomputeLegRow(row){
  const points=pointsField===''?null:Math.abs(Number(pointsField))||0;
  const contracts=Math.abs(Number(row.querySelector('.leg-contracts').value))||0;
  const pointValue=getPointValueForInstrument($('instrument').value);
- const result=row.querySelector('.leg-result').value;
- if(points!=null&&contracts&&pointValue){
-  const gross=points*contracts*pointValue;
+ const dirSign=priceDirectionSign($('side').value,entryVal,exitVal);
+ if(points!=null&&contracts&&pointValue&&dirSign!==null){
+  const gross=points*contracts*pointValue*dirSign;
   const commission=Math.abs(Number(row.querySelector('.leg-commission').value))||0;
-  const net=Math.round(netAmountForResult(gross,commission,result)*100)/100;
+  const net=netFromGross(gross,commission);
   row.querySelector('.leg-pnl').value=net;
-  const op=result==='stoploss'?'plus':'mínus';
-  row.querySelector('.leg-pnl').title=`Automaticky: ${points} bodů × ${contracts} kontrakty × $${pointValue.toFixed(2)}/bod = $${gross.toFixed(2)} hrubého, ${op} komise $${commission.toFixed(2)}.`;
+  row.querySelector('.leg-pnl').title=`Automaticky: ${points} bodů × ${contracts} kontrakty × $${pointValue.toFixed(2)}/bod = $${gross.toFixed(2)} hrubého, mínus komise $${commission.toFixed(2)} = $${net.toFixed(2)} čistého.`;
  }
+ updateLegBadge(row);
 }
 function recomputeAllLegRows(){
  document.querySelectorAll('#extraLegsList .leg-row').forEach(recomputeLegRow);
@@ -2075,7 +2219,8 @@ function wireLegRow(row){
  row.querySelector('.leg-points').addEventListener('input',()=>recomputeLegRow(row));
  row.querySelector('.leg-contracts').addEventListener('input',()=>{applyTemplateCommissionToLegRow(row);recomputeLegRow(row)});
  row.querySelector('.leg-commission').addEventListener('input',()=>recomputeLegRow(row));
- row.querySelector('.leg-result').addEventListener('change',()=>recomputeLegRow(row));
+ // Ruční přepis zisku/ztráty cíle musí hned překreslit i jeho odznak výsledku.
+ row.querySelector('.leg-pnl').addEventListener('input',()=>updateLegBadge(row));
 }
 function applyTemplateCommissionToLegRow(row){
  // Komise se odvíjí od počtu kontraktů stejně jako hrubý zisk – když má
@@ -2116,31 +2261,66 @@ window.removeImg=i=>{editImages.splice(i,1);showPreviews()}
 window.editTrade=id=>openModal(trades.find(t=>t.id===id));
 window.deleteTrade=async id=>{if(await showConfirm('Opravdu smazat tento obchod?')){await del('trades',id);await load()}};
 
+// Velikost (magnituda) pohybu se bere z pole „Počet bodů", ZNAMÉNKO ze směru
+// obchodu a vztahu vstupní/výstupní ceny. Dřív znaménko určoval ručně vybraný
+// „Výsledek", což znamenalo, že si uživatel sám určoval, jestli byl obchod
+// ziskový – a Stop Loss se kvůli tomu dal uložit jako výhra.
 function recomputePnlFromInputs(){
  const contracts=Math.abs(Number($('contracts').value))||0;
  const points=$('points').value===''?null:Math.abs(Number($('points').value))||0;
  const pointValue=getPointValueForInstrument($('instrument').value);
- const result=$('result').value;
+ const side=$('side').value;
  const hint=$('pnlCalcHint');
- if(points!=null && contracts && pointValue){
-  const gross=points*contracts*pointValue;
+ const dirSign=priceDirectionSign(side,$('entryPrice').value,$('exitPrice').value);
+ if(points!=null && contracts && pointValue && dirSign!==null){
+  const gross=points*contracts*pointValue*dirSign;
   const commission=Math.abs(Number($('commission').value))||0;
-  const net=Math.round(netAmountForResult(gross,commission,result)*100)/100;
+  const net=netFromGross(gross,commission);
   $('pnl').value=net;
-  const op=result==='stoploss'?'plus':'mínus';
-  if(hint)hint.innerHTML=`<span class="sub">Automaticky dopočteno: ${points} bodů × ${contracts} kontrakty × $${pointValue.toFixed(2)}/bod = $${gross.toFixed(2)} hrubého, ${op} komise $${commission.toFixed(2)} = <b>$${net.toFixed(2)}</b> čistého. Pole „Zisk/ztráta" lze i tak přepsat ručně.</span>`;
+  if(hint)hint.innerHTML=`<span class="sub">Automaticky dopočteno (${sideMeta(side).text}): ${points} bodů × ${contracts} kontrakty × $${pointValue.toFixed(2)}/bod = $${gross.toFixed(2)} hrubého, mínus komise $${commission.toFixed(2)} = <b>$${net.toFixed(2)}</b> čistého. Pole „Zisk/ztráta" lze i tak přepsat ručně.</span>`;
  }else if(hint){
-  hint.innerHTML=(points!=null&&contracts&&!pointValue)?`<span class="sub">Hodnota bodu pro „${esc($('instrument').value||'—')}" není známá – přidej ji do šablony instrumentu v Nastavení (karta Nastavení → Šablony podle instrumentu), nebo vyplň Zisk/ztrátu ručně.</span>`:'';
+  if(dirSign===null && points!=null && contracts && pointValue)
+   hint.innerHTML=`<span class="sub">Vyber <b>Směr obchodu</b> (Long/Short) a vyplň vstupní i výstupní cenu – teprve pak jde určit, jestli šla cena pro tebe, nebo proti, a dopočítat zisk/ztrátu. Můžeš ji vyplnit i ručně (u ztráty záporně).</span>`;
+  else if(points!=null && contracts && !pointValue)
+   hint.innerHTML=`<span class="sub">Hodnota bodu pro „${esc($('instrument').value||'—')}" není známá – přidej ji do šablony instrumentu v Nastavení (karta Nastavení → Šablony podle instrumentu), nebo vyplň Zisk/ztrátu ručně.</span>`;
+  else hint.innerHTML='';
  }
+ updateResultBadge();
 }
 function recomputePointsFromPrices(){
  const entry=$('entryPrice').value, exit=$('exitPrice').value;
- if(entry===''||exit==='')return;
+ if(entry===''||exit===''){recomputePnlFromInputs();return}
  const e=Number(entry), x=Number(exit);
- if(!Number.isFinite(e)||!Number.isFinite(x))return;
+ if(!Number.isFinite(e)||!Number.isFinite(x)){recomputePnlFromInputs();return}
  const pts=Math.round(Math.abs(x-e)*10000)/10000;
  $('points').value=pts;
  recomputePnlFromInputs();
+}
+// Odznak „Výsledek" je jen ODVOZENÝ z čisté částky – čte pole #pnl a používá
+// úplně stejnou funkci, jaká výsledek ukládá (classifyResult), takže odznak
+// nemůže ukazovat něco jiného, než co se do obchodu doopravdy uloží.
+function updateResultBadge(){
+ const badge=$('resultBadge'); if(!badge)return;
+ const raw=$('pnl').value;
+ if(raw===''){
+  badge.textContent='—'; badge.className='pill result-badge';
+  badge.title='Vyplň zisk/ztrátu, nebo směr a ceny – výsledek se dopočítá sám.';
+  $('result').value=''; return;
+ }
+ const r=classifyResult(Number(raw)||0), m=resultMeta(r);
+ badge.textContent=m.label; badge.className='pill result-badge '+m.cls;
+ badge.title=settings.breakEvenEnabled
+  ?`Práh Break Even: ±${money(Number(settings.breakEvenThreshold)||0)} (Nastavení → Break Even a slučování).`
+  :'Rozpoznávání Break Even je vypnuté (Nastavení → Break Even a slučování).';
+ $('result').value=r;
+}
+function updateLegBadge(row){
+ const badge=row.querySelector('.leg-result-badge'), hidden=row.querySelector('.leg-result');
+ if(!badge||!hidden)return;
+ const raw=row.querySelector('.leg-pnl').value;
+ if(raw===''){badge.textContent='—'; badge.className='pill leg-result-badge'; hidden.value=''; return}
+ const r=classifyResult(Number(raw)||0), m=resultMeta(r);
+ badge.textContent=m.label; badge.className='pill leg-result-badge '+m.cls; hidden.value=r;
 }
 function applyTemplateCommission(){
  // Komise se odvíjí od počtu kontraktů stejně jako hrubý zisk – když má
@@ -2150,12 +2330,13 @@ function applyTemplateCommission(){
  const contracts=Math.abs(Number($('contracts').value))||0;
  if(defCommission!=null && contracts) $('commission').value=Math.round(defCommission*contracts*100)/100;
 }
-['entryPrice','exitPrice'].forEach(id=>$(id)?.addEventListener('input',recomputePointsFromPrices));
+['entryPrice','exitPrice'].forEach(id=>$(id)?.addEventListener('input',()=>{recomputePointsFromPrices();recomputeAllLegRows()}));
+$('side')?.addEventListener('change',()=>{recomputePnlFromInputs();recomputeAllLegRows()});
 $('points')?.addEventListener('input',recomputePnlFromInputs);
 $('commission')?.addEventListener('input',recomputePnlFromInputs);
 $('contracts')?.addEventListener('input',()=>{applyTemplateCommission();recomputePnlFromInputs();recomputeAllLegRows()});
-$('result')?.addEventListener('change',recomputePnlFromInputs);
-$('entryPrice')?.addEventListener('input',recomputeAllLegRows);
+// Ruční přepis zisku/ztráty přepíše i odznak výsledku (ten se z něj odvozuje).
+$('pnl')?.addEventListener('input',updateResultBadge);
 
 $('instrument').addEventListener('change',()=>{
  const tpl=findTemplate($('instrument').value);
@@ -2206,15 +2387,26 @@ $('tradeForm').addEventListener('submit',async e=>{
   const existing=trades.find(t=>t.id===$('tradeId').value);
   const id=$('tradeId').value||crypto.randomUUID();
   const obj={
+   // Původní obchod se rozbalí, aby úprava ve formuláři nesmazala pole, která
+   // formulář vůbec nemá – směr, vazbu na pozici a zdrojovou událost importu,
+   // externí účet. Dřív se objekt stavěl od nuly a přiřazoval přes
+   // trades[idx]=obj, takže každá ruční úprava importovaného obchodu tyhle
+   // údaje nenávratně zahodila.
+   ...(existing||{}),
    id,
    images:[...editImages],
    createdAt:existing?.createdAt||Date.now(),
    updatedAt:Date.now()
   };
+  // Cíle se níž staví znovu z formuláře; kdyby tu zůstaly staré, odstranění
+  // všech cílů v editaci by je neodstranilo (viz komentář u obj.legs níž).
+  delete obj.legs;
 
-  ['instrument','date','entryTime','entryPrice','exitTime','exitPrice','result','points','pnl','contracts','strategy','planFollowed','comment']
+  // "result" se tu ZÁMĚRNĚ nečte – je odvozený z čisté částky (classifyResult níž).
+  ['instrument','date','entryTime','entryPrice','exitTime','exitPrice','points','pnl','contracts','strategy','planFollowed','comment']
    .forEach(k=>obj[k]=$(k)?.value??'');
   obj.commission=Math.abs(Number($('commission')?.value))||0;
+  obj.side=($('side').value==='long'||$('side').value==='short')?$('side').value:'';
 
   // "pnl" pole je čistý (po komisi) výsledek a smí být záporné (např. hrubý zisk
   // smazaný komisemi u obchodu zasahujícího "target") – nesmí se přepisovat na
@@ -2273,6 +2465,11 @@ $('tradeForm').addEventListener('submit',async e=>{
   }
   // Pokud byly všechny další cíle v editaci odstraněny, obj.legs zůstává nenastaveno
   // a obchod se uloží jako jediný cíl – to je záměr (odstranění duplicitního cíle).
+
+  // Hrubý výsledek drží invariant "pnlRaw = hrubý − komise", na kterém stojí
+  // přepočet komisí (recalcUnitCommission). Po ruční editaci se dopočítá znovu,
+  // aby u importovaného obchodu nezůstala stará hodnota od konektoru.
+  obj.grossPnl=Math.round((Number(obj.pnlRaw||0)+Number(obj.commission||0))*100)/100;
 
   const idx=trades.findIndex(t=>t.id===id);
   if(idx>=0)trades[idx]=obj;else trades.push(obj);
@@ -2411,9 +2608,15 @@ function combineTradeObjects(list){
   exitTime:lastByExit.exitTime,
   exitPrice:lastByExit.exitPrice,
   result,
+  // Všechny cíle patří k jedné pozici, takže mají společný směr. Dřív se tu
+  // směr ztrácel – tenhle objekt je bílá listina polí a sloučený obchod nahradí
+  // původní, takže každý vícecílový import o směr přišel.
+  side:(list.find(t=>t.side==='long'||t.side==='short')?.side)||'',
   points:Math.round(totalPoints*100)/100,
   pnl:Math.abs(totalPnlRaw),
   pnlRaw:totalPnlRaw,
+  grossPnl:Math.round((totalPnlRaw+totalCommission)*100)/100,
+  dailyPlan:list.find(t=>t.dailyPlan)?.dailyPlan||null,
   contracts:totalContracts,
   commission:Math.round(totalCommission*100)/100,
   strategy:first.strategy||list.find(t=>t.strategy)?.strategy||'',
@@ -2436,10 +2639,16 @@ function openMergePreview(selected){
  $('mergePreviewList').innerHTML=selected.map(tradeHTML).join('');
  const merged=combineTradeObjects(selected);
  const m=resultMeta(merged.result);
- $('mergeSummary').innerHTML=`<b>Výsledek po sloučení:</b> <span class="pill ${m.cls}">${m.label}</span>
+ // Cíle jedné pozice mají vždy stejný směr – různý směr znamená, že vybrané
+ // obchody k sobě nejspíš nepatří. Jen varování, ne blokace: starší obchody
+ // směr uložený nemají vůbec.
+ const sides=[...new Set(selected.map(t=>t.side).filter(s=>s==='long'||s==='short'))];
+ const sideWarn=sides.length>1?`<div class="sub" style="color:var(--yellow);margin-top:6px">⚠️ Vybrané obchody mají různý směr (Long i Short). Po sloučení se použije směr prvního z nich – zkontroluj, jestli opravdu patří k jedné pozici.</div>`:'';
+ const sm=sideMeta(merged.side);
+ $('mergeSummary').innerHTML=`<b>Výsledek po sloučení:</b> <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}">${sm.label}</span>`:''}
   <div style="margin-top:8px">${esc(merged.instrument||'—')} · ${merged.entryTime} @ ${merged.entryPrice} → ${merged.exitTime} @ ${merged.exitPrice}</div>
   <div style="margin-top:6px;font-weight:800" class="${m.moneyCls}">${Math.abs(merged.points)} bodů · ${dualMoney(merged.pnlRaw,true)}</div>
-  <div class="trade-legs" style="margin-top:8px">${merged.legs.map(legPillHTML).join('')}</div>`;
+  <div class="trade-legs" style="margin-top:8px">${merged.legs.map(legPillHTML).join('')}</div>${sideWarn}`;
  $('mergeError').textContent='';$('mergeError').classList.remove('show');
  $('mergeTradeModal').classList.add('open');
 }
@@ -2499,7 +2708,7 @@ $('closeModal').onclick=async()=>{
 // Záměrně BEZ zavírání kliknutím mimo okno – u rozdělaného formuláře (Nový/
 // Upravit obchod) by omylem kliknutí mimo mohlo smazat rozepsanou práci.
 // Zavírá se jen křížkem (#closeModal) nahoře.
-['search','filterResult','filterDate'].forEach(id=>$(id).addEventListener('input',renderTrades));
+['search','filterResult','filterSide','filterDate'].forEach(id=>$(id)?.addEventListener('input',renderTrades));
 $('addEmptyDay').onclick=()=>{
  const date=$('newDayDate').value||new Date().toISOString().slice(0,10);
  extraEmptyDays.add(date);
@@ -2607,13 +2816,13 @@ function firstTradeIdPerDate(rows){
  return out;
 }
 $('exportCsv').onclick=async()=>{
- const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
  const firstIdByDate=firstTradeIdPerDate(trades);
  const rows=trades.map(t=>{
   const p=t.dailyPlan||{};
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?getDayNote(t.date):null;
-  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,t.result==='breakeven'?Math.abs(Number(t.points||0)):(t.result==='target'?t.points:-t.points),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPoints(t),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -2967,7 +3176,7 @@ function generateReportView(allRows=null){
 $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
 $('reportCsv').onclick=async()=>{
- const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Výsledek','Body','P/L','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body','P/L','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
  const dayNotesByJournal={};
  reportRows.forEach(t=>{if(t.date){const cur=dayNotesByJournal[t.journalId+'|'+t.date];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)dayNotesByJournal[t.journalId+'|'+t.date]=t}});
  const allDayNotes=await collectReportDayNotes();
@@ -2975,7 +3184,10 @@ $('reportCsv').onclick=async()=>{
   const p=t.dailyPlan||{};
   const isFirstOfDay=t.date&&dayNotesByJournal[t.journalId+'|'+t.date]===t;
   const dn=isFirstOfDay?(allDayNotes[t.journalId+'|'+t.date]||{}):null;
-  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,t.result,reportSigned({...t,pnl:t.points}),reportSigned(t),t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
+  // u pole "pnl" přednostně vrací pnlRaw – ve sloupci Body tak končily PENÍZE,
+  // ne body. displayPoints() je stejná funkce, jakou používá i export deníku.
+  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPoints(t),reportSigned(t),t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;

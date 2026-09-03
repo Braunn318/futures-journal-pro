@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.4.12",
-  "description": "Futures Journal PRO 4.4.12 – oprava: obchod ručně uzavřený tlačítkem Close v NT8 s hrubým ziskem, ale čistou ztrátou po reálných komisích, se už bez nastavené šablony komise v přehledu nepočítá jako výhra.",
+  "version": "4.5.0",
+  "description": "Futures Journal PRO 4.5.0 – obchod má nově směr (Long/Short) a zisk/ztráta se počítá z něj a z cen, ne z ručně vybraného výsledku; ten je teď odvozený. Opravuje i chybu z 4.4.11/4.4.12, kdy se ručně zadaný Stop Loss mohl uložit jako výhra.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",
