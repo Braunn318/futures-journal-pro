@@ -2,6 +2,9 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.4.12 - 2026-09-03
+- Fixed the actual reported case of GitHub issue #7: a trade closed manually via the "Close" button in NinjaTrader 8 (imported through the connector), with a gross profit but a net loss once real commissions were applied, was still counted as a win in the overview. The connector-import mapping (`mapCapturedTrade`) was silently assuming $0 commission whenever the instrument had no commission template configured, discarding the correctly net-computed P/L that `main.js` already derived from the actual NT8 execution commissions. It now falls back to that connector-computed net P/L when no template commission is set, instead of assuming zero. (The 4.4.11 fix for manually *entered* trades in the app's own form is unrelated but still valid and stays in place.)
+
 ## 4.4.11 - 2026-09-03
 - Fixed: a manually entered/edited trade with a gross profit but a net loss after commissions (e.g. hit "target" but commissions ate the profit) was still counted as a win everywhere (overview, dashboard, calendar, reports) because the P/L sign was forced from the selected "target/stoploss" dropdown instead of the actual net amount. The trade's win/loss/breakeven classification is now derived from the real net P/L, same as connector-imported and merged trades already did (GitHub issue #7).
 - Fixed a related bug where re-opening such a trade for editing showed the P/L field as a positive magnitude instead of its real signed net value.

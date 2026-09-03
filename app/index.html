@@ -3080,15 +3080,20 @@ function mapCapturedTrade(e,images=[]){
  // Konektor (NinjaTrader/cTrader) posílá jen svou vlastní "Commission" a
  // nezahrnuje další poplatky (Clearing/Exchange/IP/NFA fee), takže reálná
  // komise může být vyšší. VÝCHOZÍ chování je proto bezpečnější a konektoru
- // nevěří automaticky: použije se komise ze šablony instrumentu, a když
- // šablona komisi nemá vyplněnou, počítá se s $0 (hrubá hodnota beze
- // změny) – ne s tím, co poslal konektor. Teprve výslovným zapnutím
- // "Použít komisi nahlášenou konektorem" v Nastavení se použije ta z
- // konektoru tak, jak přišla.
+ // nevěří automaticky: použije se komise ze šablony instrumentu. Pokud ale
+ // šablona komisi nemá vyplněnou, NESMÍ se tiše počítat s $0 – to by hrubý
+ // zisk ukázalo jako čistý a u obchodu se ztrátou po komisích (typicky
+ // ruční "Close" v NT8) by se ztráta v přehledu tvářila jako zisk (viz
+ // GitHub issue #7). Místo toho se v tom případě ponechá čistý pnl/komise
+ // tak, jak je NT8/konektor už sám dopočítal (main.js processExecution).
+ // Teprve výslovným zapnutím "Použít komisi nahlášenou konektorem" v
+ // Nastavení se konektorová hodnota použije vždy, i když šablona existuje.
  if(settings.useConnectorCommission!==true && grossPnl){
-  const defCommission=getDefaultCommissionForInstrument(e.instrument||e.instrumentFull||'')??0;
-  commission=Math.round(defCommission*contracts*100)/100;
-  pnlRaw=Math.round((grossPnl-commission)*100)/100;
+  const defCommission=getDefaultCommissionForInstrument(e.instrument||e.instrumentFull||'');
+  if(defCommission!=null){
+   commission=Math.round(defCommission*contracts*100)/100;
+   pnlRaw=Math.round((grossPnl-commission)*100)/100;
+  }
  }
  const result=classifyResult(pnlRaw);
  const tpl=findTemplate(e.instrument||e.instrumentFull||'');
