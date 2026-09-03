@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.4.10",
-  "description": "Futures Journal PRO 4.4.10 – denní blok v Deníku lze nyní přidat i pro den bez jediného obchodu (tlačítko „+ Přidat den“), bez nutnosti zakládat obchod jen kvůli přístupu k dennímu detailu.",
+  "version": "4.4.11",
+  "description": "Futures Journal PRO 4.4.11 – oprava: ručně zadaný obchod s hrubým ziskem, ale čistou ztrátou po komisích, se už v přehledu nepočítá jako výhra.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

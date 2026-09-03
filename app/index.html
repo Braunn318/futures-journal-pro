@@ -1977,11 +1977,14 @@ function openModal(t=null){
    $('exitPrice').value=leg0.exitPrice??t.exitPrice??'';
    $('result').value=leg0.result||t.result||'target';
    $('points').value=leg0.points??t.points??'';
-   $('pnl').value=(leg0.pnlRaw!==undefined&&leg0.pnlRaw!==null?Math.abs(leg0.pnlRaw):leg0.pnl)??t.pnl??'';
+   $('pnl').value=(leg0.pnlRaw!==undefined&&leg0.pnlRaw!==null?leg0.pnlRaw:leg0.pnl)??t.pnl??'';
    $('contracts').value=leg0.contracts??t.contracts??'';
    $('commission').value=leg0.commission??0;
   }else{
-   ['exitTime','exitPrice','result','points','pnl','contracts'].forEach(k=>$(k).value=t[k]??'');
+   ['exitTime','exitPrice','result','points','contracts'].forEach(k=>$(k).value=t[k]??'');
+   // "pnl" pole je čisté (po komisi) a smí být záporné – t.pnl je jen absolutní
+   // hodnota (magnituda), takže pro editaci je potřeba znaménko z t.pnlRaw.
+   $('pnl').value=(t.pnlRaw!==undefined&&t.pnlRaw!==null?t.pnlRaw:t.pnl)??'';
    $('commission').value=t.commission??0;
   }
   ['strategy','planFollowed','comment'].forEach(k=>$(k).value=t[k]??'');
@@ -2213,8 +2216,12 @@ $('tradeForm').addEventListener('submit',async e=>{
    .forEach(k=>obj[k]=$(k)?.value??'');
   obj.commission=Math.abs(Number($('commission')?.value))||0;
 
+  // "pnl" pole je čistý (po komisi) výsledek a smí být záporné (např. hrubý zisk
+  // smazaný komisemi u obchodu zasahujícího "target") – nesmí se přepisovat na
+  // znaménko podle vybraného "result", jinak by se čistá ztráta ukázala jako zisk.
   const typedPnl=$('pnl')?.value===''?0:Number($('pnl').value)||0;
-  obj.pnlRaw=obj.result==='target'?Math.abs(typedPnl):obj.result==='stoploss'?-Math.abs(typedPnl):typedPnl;
+  obj.pnlRaw=typedPnl;
+  obj.result=classifyResult(obj.pnlRaw);
 
   const plan={
    date:obj.date||new Date().toISOString().slice(0,10),
@@ -2244,8 +2251,8 @@ $('tradeForm').addEventListener('submit',async e=>{
    const otherLegs=legRows.map(r=>({
     label:r.label, exitTime:r.exitTime||obj.exitTime, exitPrice:r.exitPrice||0,
     points:r.points, pnl:Math.abs(r.pnlTyped),
-    pnlRaw:r.result==='target'?Math.abs(r.pnlTyped):r.result==='stoploss'?-Math.abs(r.pnlTyped):r.pnlTyped,
-    contracts:r.contracts, result:r.result, commission:r.commission
+    pnlRaw:r.pnlTyped,
+    contracts:r.contracts, result:classifyResult(r.pnlTyped), commission:r.commission
    }));
    const legs=[leg1,...otherLegs];
    const totalPnlRaw=legs.reduce((a,l)=>a+(Number(l.pnlRaw)||0),0);

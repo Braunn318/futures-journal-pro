@@ -2,6 +2,10 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.4.11 - 2026-09-03
+- Fixed: a manually entered/edited trade with a gross profit but a net loss after commissions (e.g. hit "target" but commissions ate the profit) was still counted as a win everywhere (overview, dashboard, calendar, reports) because the P/L sign was forced from the selected "target/stoploss" dropdown instead of the actual net amount. The trade's win/loss/breakeven classification is now derived from the real net P/L, same as connector-imported and merged trades already did (GitHub issue #7).
+- Fixed a related bug where re-opening such a trade for editing showed the P/L field as a positive magnitude instead of its real signed net value.
+
 ## 4.4.10 - 2026-09-01
 - Added a "+ Přidat den" button in Deník to create a day block (Komentář/Náhled/Poznámky/screenshoty) for a day with no trades at all, so a "dummy" trade is no longer needed just to access it (GitHub issue #6).
 - Days that only have a saved day note (no trades) now persist and reappear across restarts, same as trade days.
