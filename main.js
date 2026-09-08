@@ -538,7 +538,12 @@ function readCaptureEvents() {
   ensureCaptureRoot();
   try {
     const parsed = JSON.parse(fs.readFileSync(captureEventsPath(), 'utf8'));
-    return Array.isArray(parsed) ? parsed : [];
+    // Snímky pozic se do historie záměrně neukládají (viz appendCaptureEvent).
+    // Starší verze je ukládaly, a protože chodí zhruba jednou za sekundu na
+    // každý účet, vytlačily z 10 000místného kruhového bufferu skoro všechny
+    // opravdové události (exekuce a uzavřené obchody). Tenhle filtr je při
+    // prvním dalším zápisu jednorázově vyhodí.
+    return Array.isArray(parsed) ? parsed.filter(e => e?.type !== 'position_snapshot') : [];
   } catch { return []; }
 }
 function writeCaptureEvents(events) {
@@ -559,8 +564,12 @@ function writeCaptureState(state) {
   const safe = { positions: state.positions || {}, executionIds: (state.executionIds || []).slice(-10000) };
   fs.writeFileSync(captureStatePath(), JSON.stringify(safe, null, 2), 'utf8');
 }
-function appendCaptureEvent(payload, source='unknown') {
-  const events = readCaptureEvents();
+// persist=false: událost se jen pošle do okna (živé obnovení přehledu otevřených
+// pozic), ale neuloží se do historie. Používá se pro snímky pozic – ty chodí
+// zhruba jednou za sekundu na každý účet a jejich ukládáním se z historie
+// vytlačovaly exekuce a uzavřené obchody, tedy jediná data, která mají trvalou
+// hodnotu. Aktuální stav pozic stejně žije v positions.json.
+function appendCaptureEvent(payload, source='unknown', persist=true) {
   const event = {
     id: payload.id || crypto.randomUUID(),
     receivedAt: payload.receivedAt || new Date().toISOString(),
@@ -568,8 +577,11 @@ function appendCaptureEvent(payload, source='unknown') {
     source,
     ...payload
   };
-  events.push(event);
-  writeCaptureEvents(events.slice(-10000));
+  if (persist) {
+    const events = readCaptureEvents();
+    events.push(event);
+    writeCaptureEvents(events.slice(-10000));
+  }
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('capture:event', event);
   return event;
 }
@@ -645,6 +657,51 @@ async function takeScreenshots(label) {
     return [];
   }
 }
+// Zapíše do stavu nově otevřenou pozici a vrátí odvozenou událost "trade_opened".
+// Používá se ze dvou míst: při běžném otevření z ploché pozice a při "převzetí"
+// pozice, kterou pár milisekund předtím založil snímek pozic (viz processExecution).
+// `positionId` se předává, aby si převzatá pozice udržela svoje ID – na něm stojí
+// automatické slučování legů (TP1/TP2/BE) ve frontendu.
+async function openPositionFromExecution(state, key, payload, { delta, price, commission, rate, pointValue, time, executionId, positionId }) {
+  const images = await takeScreenshots('entry');
+  const side = delta > 0 ? 'long' : 'short';
+  const instrument = payload.instrument || payload.symbol || '';
+  const instrumentFull = payload.instrumentFull || payload.instrument || payload.symbol || '';
+  const strategy = payload.strategy || payload.orderName || '';
+  state.positions[key] = {
+    qty: delta,
+    avgPrice: price,
+    currentPrice: price,
+    openedAt: time,
+    pointValue,
+    rate,
+    entryCommission: commission,
+    maxQuantity: Math.abs(delta),
+    side,
+    entryImages: images,
+    account: payload.account || '',
+    instrument,
+    instrumentFull,
+    strategy,
+    positionId,
+    fromSnapshot: false,
+    executionsApplied: true
+  };
+  return appendCaptureEvent({
+    type: 'trade_opened',
+    account: payload.account || '',
+    instrument,
+    instrumentFull,
+    side,
+    entryTime: time,
+    entryPrice: price,
+    quantity: Math.abs(delta),
+    strategy,
+    screenshotPaths: images,
+    sourceExecutionId: executionId,
+    positionId
+  }, 'ninjatrader');
+}
 async function processExecution(payload) {
   const executionId = String(payload.executionId || '');
   const state = readCaptureState();
@@ -666,45 +723,34 @@ async function processExecution(payload) {
   const current = state.positions[key] || null;
   const derived = [];
 
+  const opts = { delta, price, commission, rate, pointValue, time, executionId };
+
   if (!current || current.qty === 0) {
-    const images = await takeScreenshots('entry');
-    const positionId = crypto.randomUUID();
-    state.positions[key] = {
-      qty: delta,
-      avgPrice: price,
-      currentPrice: price,
-      openedAt: time,
-      pointValue,
-      rate,
-      entryCommission: commission,
-      maxQuantity: Math.abs(delta),
-      side: delta > 0 ? 'long' : 'short',
-      entryImages: images,
-      account: payload.account || '',
-      instrument: payload.instrument || payload.symbol || '',
-      instrumentFull: payload.instrumentFull || payload.instrument || payload.symbol || '',
-      strategy: payload.strategy || payload.orderName || '',
-      positionId
-    };
-    derived.push(appendCaptureEvent({
-      type: 'trade_opened',
-      account: payload.account || '',
-      instrument: payload.instrument || payload.symbol || '',
-      instrumentFull: payload.instrumentFull || payload.instrument || payload.symbol || '',
-      side: delta > 0 ? 'long' : 'short',
-      entryTime: time,
-      entryPrice: price,
-      quantity: Math.abs(delta),
-      strategy: payload.strategy || payload.orderName || '',
-      screenshotPaths: images,
-      sourceExecutionId: executionId,
-      positionId
-    }, 'ninjatrader'));
+    derived.push(await openPositionFromExecution(state, key, payload, { ...opts, positionId: crypto.randomUUID() }));
     writeCaptureState(state);
     return derived;
   }
 
   const sameDirection = Math.sign(current.qty) === Math.sign(delta);
+  // NinjaTrader posílá snímek pozic při každé změně pozice, takže snímek vzniklý
+  // vstupním fillem občas dorazí o pár milisekund DŘÍV než exekuce, která ho
+  // způsobila (v reálném logu 25 ms). Pozice pak existuje ještě předtím, než ji
+  // exekuce založí, a bez téhle větve by se vstup započítal podruhé jako
+  // přikoupení (2 kontrakty → 4). Když tedy jde o pozici založenou snímkem, která
+  // ještě neviděla ani jednu exekuci, má stejný směr i velikost a snímek dorazil
+  // před chvílí, jde o týž fill – pozice se nepřičítá, ale převezme se (včetně
+  // ceny, času, komise a názvu vstupního příkazu). ID pozice se zachovává.
+  const adoptSnapshot = sameDirection
+    && current.fromSnapshot === true
+    && current.executionsApplied !== true
+    && Math.abs(current.qty) === Math.abs(delta)
+    && (Date.now() - (Number(current.snapshotSeenAt) || 0)) <= 15000;
+  if (adoptSnapshot) {
+    derived.push(await openPositionFromExecution(state, key, payload, { ...opts, positionId: current.positionId || crypto.randomUUID() }));
+    writeCaptureState(state);
+    return derived;
+  }
+
   if (sameDirection) {
     const oldAbs = Math.abs(current.qty);
     const addAbs = Math.abs(delta);
@@ -713,6 +759,7 @@ async function processExecution(payload) {
     current.qty += delta;
     current.entryCommission += commission;
     current.maxQuantity = Math.max(current.maxQuantity || 0, Math.abs(current.qty));
+    current.executionsApplied = true;
     state.positions[key] = current;
     writeCaptureState(state);
     return derived;
@@ -759,42 +806,16 @@ async function processExecution(payload) {
   if (remainingOld > 0) {
     current.qty = direction * remainingOld;
     current.entryCommission = Math.max(0, current.entryCommission - entryCommissionShare);
+    current.executionsApplied = true;
     state.positions[key] = current;
   } else if (excessNew > 0) {
-    const newDelta = Math.sign(delta) * excessNew;
-    const images = await takeScreenshots('entry');
-    const positionId = crypto.randomUUID();
-    state.positions[key] = {
-      qty: newDelta,
-      avgPrice: price,
-      currentPrice: price,
-      openedAt: time,
-      pointValue,
-      rate,
-      entryCommission: Math.max(0, commission - exitCommissionShare),
-      maxQuantity: excessNew,
-      side: newDelta > 0 ? 'long' : 'short',
-      entryImages: images,
-      account: payload.account || '',
-      instrument: payload.instrument || payload.symbol || '',
-      instrumentFull: payload.instrumentFull || payload.instrument || payload.symbol || '',
-      strategy: payload.strategy || payload.orderName || '',
-      positionId
-    };
-    derived.push(appendCaptureEvent({
-      type: 'trade_opened',
-      account: payload.account || '',
-      instrument: payload.instrument || payload.symbol || '',
-      instrumentFull: payload.instrumentFull || payload.instrument || payload.symbol || '',
-      side: newDelta > 0 ? 'long' : 'short',
-      entryTime: time,
-      entryPrice: price,
-      quantity: excessNew,
-      strategy: payload.strategy || payload.orderName || '',
-      screenshotPaths: images,
-      sourceExecutionId: executionId,
-      positionId
-    }, 'ninjatrader'));
+    // Otočka pozice: zbytek exekuce otevírá novou pozici opačným směrem.
+    derived.push(await openPositionFromExecution(state, key, payload, {
+      ...opts,
+      delta: Math.sign(delta) * excessNew,
+      commission: Math.max(0, commission - exitCommissionShare),
+      positionId: crypto.randomUUID()
+    }));
   } else {
     delete state.positions[key];
   }
@@ -828,7 +849,15 @@ function normalizeSnapshotPosition(item, account, snapshotTime) {
       account: account || '',
       instrument,
       instrumentFull,
-      strategy: item.strategy || ''
+      strategy: item.strategy || '',
+      // Pozice založená ze snímku musí mít ID stejně jako pozice založená
+      // exekucí – na shodě positionId stojí automatické slučování legů
+      // (TP1/TP2/BE) do jednoho obchodu. Bez něj se každý výstup uložil jako
+      // samostatný obchod. Snímek chodí i těsně před vstupní exekucí, proto se
+      // ukládá i čas, kdy byl vidět poprvé (viz adoptSnapshot v processExecution).
+      positionId: crypto.randomUUID(),
+      fromSnapshot: true,
+      snapshotSeenAt: Date.now()
     }
   };
 }
@@ -846,13 +875,24 @@ function processPositionSnapshot(payload) {
   for (const [key, position] of Object.entries(state.positions || {})) {
     if (String(position.account || '') === account && !authoritative[key]) delete state.positions[key];
   }
+  // Snímek je autoritativní jen pro to, co opravdu obsahuje: počet kontraktů,
+  // průměrnou a aktuální cenu. Zbytek pozice pochází z exekucí a snímek ho
+  // NESMÍ přepsat – dřív každý snímek (chodí ~1× za sekundu) vynuloval
+  // nasčítanou vstupní komisi a smazal název vstupního příkazu, takže uzavřený
+  // obchod měl jen výstupní komisi a jako strategii název stop/target příkazu.
   for (const [key, position] of Object.entries(authoritative)) {
     const existing = state.positions[key];
     state.positions[key] = existing ? {
       ...existing,
       ...position,
+      positionId: existing.positionId || position.positionId,
       openedAt: existing.openedAt || position.openedAt,
-      entryImages: existing.entryImages || []
+      entryImages: existing.entryImages || [],
+      entryCommission: Number(existing.entryCommission) || 0,
+      strategy: existing.strategy || position.strategy,
+      maxQuantity: Math.max(Number(existing.maxQuantity) || 0, Math.abs(position.qty)),
+      fromSnapshot: existing.fromSnapshot === true,
+      snapshotSeenAt: existing.snapshotSeenAt || position.snapshotSeenAt
     } : position;
   }
   writeCaptureState(state);
@@ -914,7 +954,7 @@ async function processCTraderClose(payload) {
   }, 'ctrader');
 }
 async function processIncomingPayload(payload, source='external') {
-  const raw = appendCaptureEvent(payload, source);
+  const raw = appendCaptureEvent(payload, source, payload.type !== 'position_snapshot');
   if (payload.type === 'execution' && source === 'ninjatrader') await withCaptureLock(() => processExecution(payload));
   if (payload.type === 'position_snapshot' && source === 'ninjatrader') await withCaptureLock(() => processPositionSnapshot(payload));
   if (payload.type === 'ctrader_position_opened' && source === 'ctrader') await withCaptureLock(() => processCTraderOpen(payload));
@@ -1318,6 +1358,29 @@ ipcMain.handle('capture:testCTraderSequence', async () => {
   await processIncomingPayload({ ...common, type:'ctrader_position_opened', side:'long', entryTime:new Date(base).toISOString(), entryPrice:1.1000, quantity:200000, positionId, strategy:'Test cBot' }, 'ctrader');
   await processIncomingPayload({ ...common, type:'ctrader_trade_closed', side:'long', entryTime:new Date(base).toISOString(), entryPrice:1.1000, exitTime:new Date(base+45000).toISOString(), exitPrice:1.1020, quantity:100000, points:20, pnl:200, commission:2, swap:0, positionId, closingDealId:`test-deal-tp1-${base}`, strategy:'Test cBot' }, 'ctrader');
   await processIncomingPayload({ ...common, type:'ctrader_trade_closed', side:'long', entryTime:new Date(base).toISOString(), entryPrice:1.1000, exitTime:new Date(base+90000).toISOString(), exitPrice:1.1035, quantity:100000, points:35, pnl:350, commission:2, swap:0, positionId, closingDealId:`test-deal-tp2-${base}`, strategy:'Test cBot' }, 'ctrader');
+  return { ok: true };
+});
+// Simuluje reálný závod z 8. 9. 2026: snímek pozic dorazí o pár milisekund DŘÍV
+// než vstupní exekuce, která ho způsobila. Ověřuje, že se vstup nezapočítá
+// podruhé (2 kontrakty, ne 4), že pozice má positionId (bez něj se dva výstupy
+// uložily jako dva samostatné obchody) a že si udrží vstupní komisi i název
+// vstupního příkazu ("Entry", ne "Stop1"/"Stop2").
+ipcMain.handle('capture:testSnapshotRaceSequence', async () => {
+  const base = Date.now();
+  const account = 'SIM101';
+  const instrument = { instrument:'MES', instrumentFull:'MES 09-26' };
+  const common = { source:'ninjatrader', type:'execution', account, ...instrument, pointValue:5, rate:1 };
+  const snapshot = (quantity, marketPosition) => ({
+    source:'ninjatrader', type:'position_snapshot', account, time:new Date().toISOString(),
+    positions: quantity ? [{ ...instrument, quantity, avgPrice:7685, marketPosition, pointValue:5 }] : []
+  });
+  await processIncomingPayload(snapshot(2, 'Short'), 'ninjatrader');
+  await processIncomingPayload({ ...common, executionId:`test-sr-entry-${base}`, time:new Date(base).toISOString(), price:7685, quantity:2, orderAction:'Sell', orderName:'Entry', commission:1.02 }, 'ninjatrader');
+  await processIncomingPayload(snapshot(2, 'Short'), 'ninjatrader');
+  await processIncomingPayload({ ...common, executionId:`test-sr-stop1-${base}`, time:new Date(base+95000).toISOString(), price:7688, quantity:1, orderAction:'BuyToCover', orderName:'Stop1', commission:0.51 }, 'ninjatrader');
+  await processIncomingPayload(snapshot(1, 'Short'), 'ninjatrader');
+  await processIncomingPayload({ ...common, executionId:`test-sr-stop2-${base}`, time:new Date(base+95000).toISOString(), price:7688, quantity:1, orderAction:'BuyToCover', orderName:'Stop2', commission:0.51 }, 'ninjatrader');
+  await processIncomingPayload(snapshot(0), 'ninjatrader');
   return { ok: true };
 });
 

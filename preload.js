@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureTestExecutionSequence: () => ipcRenderer.invoke('capture:testExecutionSequence'),
   captureTestMultiTargetSequence: () => ipcRenderer.invoke('capture:testMultiTargetSequence'),
   captureTestCTraderSequence: () => ipcRenderer.invoke('capture:testCTraderSequence'),
+  captureTestSnapshotRaceSequence: () => ipcRenderer.invoke('capture:testSnapshotRaceSequence'),
   captureInstallCTraderConnector: () => ipcRenderer.invoke('capture:installCTraderConnector'),
   captureExportCTraderConnector: () => ipcRenderer.invoke('capture:exportCTraderConnector'),
   copyImageToClipboard: (dataUrl) => ipcRenderer.invoke('image:copyToClipboard', dataUrl),

@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.5.0",
-  "description": "Futures Journal PRO 4.5.0 – obchod má nově směr (Long/Short) a zisk/ztráta se počítá z něj a z cen, ne z ručně vybraného výsledku; ten je teď odvozený. Opravuje i chybu z 4.4.11/4.4.12, kdy se ručně zadaný Stop Loss mohl uložit jako výhra.",
+  "version": "4.5.1",
+  "description": "Futures Journal PRO 4.5.1 – opravuje rozpadání vícecílových obchodů z NinjaTraderu na samostatné obchody a komisi braných z konektoru místo ze šablony instrumentu.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

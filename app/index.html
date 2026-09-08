@@ -802,10 +802,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
             <label>Komise u nových importovaných obchodů (NinjaTrader / cTrader)</label>
             <select id="useConnectorCommission">
-              <option value="ne">Použít komisi ze šablony instrumentu, jinak $0 (výchozí)</option>
+              <option value="ne">Použít komisi ze šablony instrumentu (výchozí)</option>
               <option value="ano">Použít komisi nahlášenou konektorem</option>
             </select>
-            <div class="sub" style="margin-top:6px">NinjaTrader posílá jen "Commission" a nezahrnuje další poplatky (Clearing, Exchange, IP, NFA fee), takže reálná komise může být vyšší, než co pošle konektor. Proto je výchozí chování bezpečnější: použije se komise ze šablony instrumentu (za kontrakt), a pokud šablona pro daný instrument komisi nemá vyplněnou, počítá se s $0 (hrubá hodnota bez komise) – konektoru se nevěří automaticky. Přepnutím na "Použít komisi nahlášenou konektorem" se vrátíš k původnímu chování.</div>
+            <div class="sub" style="margin-top:6px">NinjaTrader posílá jen "Commission" a nezahrnuje další poplatky (Clearing, Exchange, IP, NFA fee), takže reálná komise může být vyšší, než co pošle konektor. Proto je výchozí chování bezpečnější: použije se komise ze šablony instrumentu (za kontrakt). Pokud šablona pro daný instrument komisi vyplněnou nemá, použije se hodnota od konektoru – s nulou se nepočítá, jinak by se obchod se ztrátou až po komisích tvářil v přehledu jako zisk. Přepnutím na "Použít komisi nahlášenou konektorem" se konektorová hodnota použije vždy, i když šablona existuje.</div>
             <button class="btn" id="saveConnectorCommissionSetting" style="margin-top:10px">Uložit</button>
           </div>
           <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
@@ -1251,15 +1251,19 @@ function getPointValueForInstrument(instrument){
  if(code && BUILTIN_POINT_VALUES[code]!==undefined) return BUILTIN_POINT_VALUES[code];
  return null;
 }
-function getDefaultCommissionForInstrument(instrument){
- const tpl=findTemplate(instrument);
+// `src` je zdroj nastavení. Ve výchozím stavu globální `settings` aktivního
+// deníku; automatický import ale zapisuje do deníku podle mapování účtů a běží
+// i před přihlášením (kdy `settings` ještě nejsou načtené), takže si tam předává
+// nastavení cílového deníku načtené přímo ze souboru – viz mapCapturedTrade.
+function getDefaultCommissionForInstrument(instrument,src=settings){
+ const tpl=findTemplate(instrument,src);
  if(tpl && tpl.defaultCommission!==undefined && tpl.defaultCommission!==null && tpl.defaultCommission!=='' && Number(tpl.defaultCommission)>=0) return Number(tpl.defaultCommission);
  return null;
 }
-function findTemplate(instrument){
+function findTemplate(instrument,src=settings){
  const val=String(instrument||'').trim().toLowerCase();
  if(!val)return null;
- const list=settings.templates||[];
+ const list=src?.templates||[];
  return list.find(tpl=>val===String(tpl.instrument||'').trim().toLowerCase())
   ||list.find(tpl=>tpl.instrument&&val.includes(String(tpl.instrument).trim().toLowerCase()));
 }
@@ -1416,9 +1420,9 @@ $('saveBreakEvenSettings').onclick=async()=>{
  });
  showToast('Nastavení Break Even a slučování bylo uloženo.');
 };
-function classifyResult(netPnl){
+function classifyResult(netPnl,src=settings){
  const v=Number(netPnl)||0;
- if(settings.breakEvenEnabled && Math.abs(v)<=(Number(settings.breakEvenThreshold)||0)) return 'breakeven';
+ if(src?.breakEvenEnabled && Math.abs(v)<=(Number(src.breakEvenThreshold)||0)) return 'breakeven';
  return v>=0?'target':'stoploss';
 }
 // ---- Směr obchodu (Long/Short) ----
@@ -3282,7 +3286,13 @@ async function capturedImages(e){
  }
  return images;
 }
-function mapCapturedTrade(e,images=[]){
+// jSettings = nastavení deníku, DO KTERÉHO se obchod ukládá. Nesmí se sáhnout na
+// globální `settings`: ty patří aktivnímu deníku a hlavně se plní až v load(),
+// který běží teprve po přihlášení. Automatický import ale běží od načtení
+// stránky, takže obchody naimportované, dokud aplikace stojí na přihlašovací
+// obrazovce, se dřív ukládaly s prázdnými šablonami – tedy s komisí od
+// konektoru místo komise ze šablony instrumentu.
+function mapCapturedTrade(e,images=[],jSettings=settings){
  const entry=new Date(e.entryTime||e.receivedAt||Date.now());
  const exit=new Date(e.exitTime||e.receivedAt||Date.now());
  const contracts=Number(e.quantity||e.contracts||1);
@@ -3300,15 +3310,19 @@ function mapCapturedTrade(e,images=[]){
  // tak, jak je NT8/konektor už sám dopočítal (main.js processExecution).
  // Teprve výslovným zapnutím "Použít komisi nahlášenou konektorem" v
  // Nastavení se konektorová hodnota použije vždy, i když šablona existuje.
- if(settings.useConnectorCommission!==true && grossPnl){
-  const defCommission=getDefaultCommissionForInstrument(e.instrument||e.instrumentFull||'');
+ // Podmínka je na e.grossPnl!=null, ne na samotné hodnotě: obchod se skutečně
+ // nulovým hrubým výsledkem (výstup na vstupní ceně) má taky dostat komisi ze
+ // šablony. Události z cTraderu hrubý výsledek neposílají vůbec, ty si nechají
+ // svůj čistý pnl/komisi.
+ if(jSettings?.useConnectorCommission!==true && e.grossPnl!=null){
+  const defCommission=getDefaultCommissionForInstrument(e.instrument||e.instrumentFull||'',jSettings);
   if(defCommission!=null){
    commission=Math.round(defCommission*contracts*100)/100;
    pnlRaw=Math.round((grossPnl-commission)*100)/100;
   }
  }
- const result=classifyResult(pnlRaw);
- const tpl=findTemplate(e.instrument||e.instrumentFull||'');
+ const result=classifyResult(pnlRaw,jSettings);
+ const tpl=findTemplate(e.instrument||e.instrumentFull||'',jSettings);
  return {
   id:crypto.randomUUID(),
   instrument:e.instrument||e.instrumentFull||'',
@@ -3342,7 +3356,7 @@ function tradeHasSourceEventId(t,sourceEventId){
  if(Array.isArray(t.legs)&&t.legs.some(l=>l.sourceEventId===sourceEventId||(Array.isArray(l.sourceEventIds)&&l.sourceEventIds.includes(sourceEventId))))return true;
  return false;
 }
-async function appendOrMergeCapturedTrade(journalId,trade){
+async function appendOrMergeCapturedTrade(journalId,event,images=[]){
  const r=await window.desktopAPI.readJournal(journalId);
  if(!r?.ok)throw new Error(r?.error||'Deník nelze načíst.');
  const data=r.data||{trades:[],settings:[]};
@@ -3350,8 +3364,11 @@ async function appendOrMergeCapturedTrade(journalId,trade){
  // Kontroluje se napříč VŠEMI legy už sloučených obchodů, ne jen top-level polem –
  // jinak by se dal stejný (např. znovu nahlášený) fill importovat podruhé jako
  // nový cíl u obchodu, který už jednou vznikl sloučením dvou a více legů.
- if(data.trades.some(t=>tradeHasSourceEventId(t,trade.sourceEventId)))return false;
+ if(data.trades.some(t=>tradeHasSourceEventId(t,event.id)))return false;
  const jSettingsEntry=(Array.isArray(data.settings)?data.settings:[]).find(s=>s.key==='main');
+ // Obchod se sestavuje až tady, protože teprve tady jsou k dispozici nastavení
+ // (šablony instrumentů, komise) toho deníku, do kterého se opravdu zapisuje.
+ const trade=mapCapturedTrade(event,images,jSettingsEntry?.value||settings);
  const autoMerge=jSettingsEntry?.value?.autoMergeLegs!==false;
  if(autoMerge&&trade.positionId){
   const idx=data.trades.findIndex(t=>t.positionId&&t.positionId===trade.positionId);
@@ -3379,7 +3396,7 @@ async function importCapturedTrades(silent=false){
  for(const e of pending){
   const journalId=mappings[e.account]||activeJournalId;
   const images=await capturedImages(e);
-  const added=await appendOrMergeCapturedTrade(journalId,mapCapturedTrade(e,images));
+  const added=await appendOrMergeCapturedTrade(journalId,e,images);
   if(added)count++;
   importedIds.push(e.id);
  }
