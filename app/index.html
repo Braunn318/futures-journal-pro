@@ -3336,7 +3336,10 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   pnl:Math.abs(pnlRaw),
   pnlRaw,
   contracts,
-  strategy:e.strategy||tpl?.strategy||'NinjaTrader automatický import',
+  // Šablona má přednost před názvem příkazu z konektoru. NinjaTrader posílá
+  // název příkazu vždy ("Entry", "Close"), takže dřív šablonu vždy přebil a
+  // pole "Strategie" v šabloně se u importovaných obchodů vůbec neuplatnilo.
+  strategy:tpl?.strategy||e.strategy||'NinjaTrader automatický import',
   planFollowed:tpl?.planFollowed||'ano',
   comment:e.comment||tpl?.comment||`Automaticky importováno ze zdroje ${e.source||'integrace'}.`,
   images,
