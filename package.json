@@ -1,6 +1,6 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.5.1",
+  "version": "4.5.2",
   "description": "Futures Journal PRO 4.5.1 – opravuje rozpadání vícecílových obchodů z NinjaTraderu na samostatné obchody a komisi braných z konektoru místo ze šablony instrumentu.",
   "main": "main.js",
   "author": "Jája S",

@@ -1820,22 +1820,42 @@ function legPillHTML(l,i){
  const detail=`${label}: ${l.exitTime||'?'} @ ${l.exitPrice??'?'} · ${l.contracts||0} ks · ${m.sign}${Math.abs(Number(l.pnl||0)).toFixed(2)}`;
  return `<span class="leg-pill ${m.moneyCls}" title="${esc(detail)}" style="cursor:pointer" onclick="showToast(${esc(JSON.stringify(detail))})">${esc(label)}: ${m.sign}${Math.abs(Number(l.points||0))}b</span>`;
 }
+// Uložené "points" u jednoho cíle jsou vždy jen pohyb ceny (magnituda za
+// JEDEN kontrakt), bez ohledu na to, kolik kontraktů se v tom cíli zavíralo.
+// Pro pozici s víc kontrakty na jednom cíli (např. 2 ks, 5 bodů/ks) to skrývalo
+// celkový bodový zisk pozice (10 bodů) – viz GitHub issue #8. Tahle funkce
+// dopočítá "total" body váhou počtu kontraktů, ať už jde o jeden cíl nebo víc
+// (TP1/TP2/BE), kde se sčítá přes všechny cíle.
+function tradeTotalPoints(t){
+ if(Array.isArray(t.legs)&&t.legs.length)return t.legs.reduce((a,l)=>a+Math.abs(Number(l.points)||0)*(Number(l.contracts)||1),0);
+ return Math.abs(Number(t.points||0))*(Number(t.contracts)||1);
+}
 function tradeHTML(t){
  const m=resultMeta(t.result);
  const pnlVal=signed(t,'pnl');
- const pointsDisplay=t.result==='breakeven'?`±${Math.abs(Number(t.points||0))}`:`${m.sign}${Math.abs(Number(t.points||0))}`;
+ const rawPoints=Math.abs(Number(t.points||0));
+ const sign=t.result==='breakeven'?'±':m.sign;
+ const pointsDisplay=`${sign}${rawPoints}`;
+ const totalPoints=Math.round(tradeTotalPoints(t)*100)/100;
+ const totalPointsDisplay=Math.abs(totalPoints-rawPoints)>0.005?` · celkem ${sign}${totalPoints} b`:'';
  // U obchodů bez uloženého směru se pilulka nezobrazuje vůbec (ne "—"), aby
  // deník bez doplněných směrů vypadal přesně jako dřív.
  const sm=sideMeta(t.side);
+ // Automaticky naimportované obchody (konektor) mívají prázdný nebo generický
+ // komentář – dřív se místo něj vypisovala celá věta "Automaticky sestaveno
+ // z exekucí NinjaTraderu.", což bylo rušivé (viz GitHub issue #8). Místo textu
+ // se teď zobrazí jen malý štítek, pokud obchod pochází z importu.
+ const isImported=!!(t.sourceEventId||(Array.isArray(t.sourceEventIds)&&t.sourceEventIds.length));
+ const importedBadge=isImported?`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Automaticky naimportováno z konektoru">⚡ Auto import</span>`:'';
  return `<div class="card trade">
  <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
- <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů · ${dualMoney(pnlVal,true)}</div>
+ <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů${totalPointsDisplay} · ${dualMoney(pnlVal,true)}</div>
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
  </div>
  <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Strategie: ${esc(t.strategy||'—')}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
- <div><div class="comment">${esc(t.comment)}</div>
+ <div>${t.comment?`<div class="comment">${esc(t.comment)}</div>`:''}${importedBadge?`<div class="sub" style="margin-top:2px">${importedBadge}</div>`:''}
  ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
  ${t.dailyPlan.instrument?`<div><b>Instrument:</b> ${esc(t.dailyPlan.instrument)}</div>`:''}
  ${t.dailyPlan.maxTrades?`<div><b>Max. obchodů:</b> ${esc(t.dailyPlan.maxTrades)}</div>`:''}
@@ -3341,7 +3361,7 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   // pole "Strategie" v šabloně se u importovaných obchodů vůbec neuplatnilo.
   strategy:tpl?.strategy||e.strategy||'NinjaTrader automatický import',
   planFollowed:tpl?.planFollowed||'ano',
-  comment:e.comment||tpl?.comment||`Automaticky importováno ze zdroje ${e.source||'integrace'}.`,
+  comment:e.comment||tpl?.comment||'',
   images,
   createdAt:Date.now(),
   sourceEventId:e.id,

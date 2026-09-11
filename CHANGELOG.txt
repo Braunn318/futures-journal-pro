@@ -2,6 +2,10 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.5.2 - 2026-09-11
+- Fixed a trade with a single target but several contracts not showing its total point gain/loss — only the raw per-contract point move was shown (e.g. 2 contracts at 5 points profit showed "5 bodů" with no indication the position actually made 10). Every trade card now also shows a "celkem" (total) points figure whenever it differs from the raw points, including multi-target (TP1/TP2/BE) trades.
+- Removed the disruptive "Automaticky sestaveno z exekucí NinjaTraderu"/"z cTrader cBota" sentence that filled the comment field of every auto-imported trade, drowning out real notes and silently overriding an instrument template's own comment. Auto-imported trades now show a small "⚡ Auto import" label instead, and a template's comment is used when the connector doesn't provide one. (#8)
+
 ## 4.5.1 - 2026-09-08
 - **Fixed a position closed on several targets being split back into separate trades.** NinjaTrader posts a position snapshot on every position change, and that snapshot sometimes arrives a few milliseconds *before* the entry execution that caused it (25 ms in the reported case). The position was then created from the snapshot, which never assigned it a position ID — and the automatic leg merging matches on exactly that ID. Every exit therefore landed in the journal as its own trade (the reported case: one MES position of 2 contracts showing up twice, identical except for "Stop1" vs "Stop2"). Positions created from a snapshot now get an ID like any other.
 - Fixed the same race double-counting the entry: the execution arriving after its own snapshot was treated as an add-on, briefly doubling the position (2 contracts → 4). It is now recognised as the fill the snapshot was reporting and adopted instead of added. A genuine add-on to an older position is unaffected.

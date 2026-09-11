@@ -796,7 +796,6 @@ async function processExecution(payload) {
     strategy: current.strategy || payload.strategy || payload.orderName || '',
     screenshotPaths: [...(current.entryImages || []), ...exitImages],
     sourceExecutionId: executionId,
-    comment: 'Automaticky sestaveno z exekucí NinjaTraderu.',
     positionId: current.positionId || ''
   }, 'ninjatrader');
   derived.push(closed);
@@ -949,7 +948,6 @@ async function processCTraderClose(payload) {
     strategy: payload.strategy || '',
     screenshotPaths: images,
     sourceExecutionId: dealId || undefined,
-    comment: 'Automaticky sestaveno z cTrader cBota.',
     positionId: payload.positionId || ''
   }, 'ctrader');
 }
