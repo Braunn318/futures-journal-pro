@@ -2,6 +2,10 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.5.3 - 2026-09-11
+- Fixed the risk management calendar flagging a day as violating the daily S/L limit as soon as the count *reached* the limit, instead of only once it was exceeded (e.g. a "3 S/L per day" rule marked a day red at exactly 3 stop-losses, even though the rule was still being held; it now only flags at 4 or more). (#9)
+- Added clipboard paste support for the Day tab's screenshot, matching the trade detail form: copy a screenshot (e.g. Win+Shift+S) and press Ctrl+V while a day is expanded to attach it, instead of only being able to pick a file. (#10)
+
 ## 4.5.2 - 2026-09-11
 - Fixed a trade with a single target but several contracts not showing its total point gain/loss — only the raw per-contract point move was shown (e.g. 2 contracts at 5 points profit showed "5 bodů" with no indication the position actually made 10). Every trade card now also shows a "celkem" (total) points figure whenever it differs from the raw points, including multi-target (TP1/TP2/BE) trades.
 - Removed the disruptive "Automaticky sestaveno z exekucí NinjaTraderu"/"z cTrader cBota" sentence that filled the comment field of every auto-imported trade, drowning out real notes and silently overriding an instrument template's own comment. Auto-imported trades now show a small "⚡ Auto import" label instead, and a template's comment is used when the connector doesn't provide one. (#8)

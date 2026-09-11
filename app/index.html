@@ -1559,7 +1559,7 @@ function evaluateDayRisk(date, drawdownByDate, rows=trades){
  const tradesCount=dayTrades.length;
  if(r.maxDailyDrawdown && dailyPnl<0 && Math.abs(dailyPnl)>=r.maxDailyDrawdown) violations.push(`Max. denní drawdown ${dualMoneyText(r.maxDailyDrawdown)}`);
  if(r.maxTotalDrawdown && drawdownByDate && (drawdownByDate[date]||0)>=r.maxTotalDrawdown) violations.push(`Max. celkový drawdown účtu ${dualMoneyText(r.maxTotalDrawdown)}`);
- if(r.maxSlPerDay && slCount>=r.maxSlPerDay) violations.push(`Limit S/L za den (${r.maxSlPerDay})`);
+ if(r.maxSlPerDay && slCount>r.maxSlPerDay) violations.push(`Limit S/L za den (${r.maxSlPerDay})`);
  if(r.maxTradesPerDay && tradesCount>=r.maxTradesPerDay) violations.push(`Celkový limit obchodů za den (${r.maxTradesPerDay})`);
  if(r.maxProfitTradesPerDay && profitCount>=r.maxProfitTradesPerDay) violations.push(`Limit profitabilních obchodů za den (${r.maxProfitTradesPerDay})`);
  if(r.profitTargetPerDay && dailyPnl>=r.profitTargetPerDay) achievements.push(`Splněn profit target ${dualMoneyText(r.profitTargetPerDay)}`);
@@ -1883,7 +1883,7 @@ function dayKpis(dayTrades){
 function dayThumbsHTML(date){
  const note=getDayNote(date);
  const shotsHTML=(note.images||[]).map((src,i)=>`<div class="day-thumb-wrap"><img src="${src}" onclick="openImage('${src}')"><button type="button" title="Odebrat" onclick="event.stopPropagation();removeDayImage('${date}',${i})">✕</button></div>`).join('');
- const addShotBtn=(note.images||[]).length<3?`<button type="button" class="day-add-shot" onclick="event.stopPropagation();triggerDayShotPicker('${date}')">+ Přidat obrázek</button>`:'';
+ const addShotBtn=(note.images||[]).length<3?`<button type="button" class="day-add-shot" onclick="event.stopPropagation();triggerDayShotPicker('${date}')" title="Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tento den rozbalený.">+ Přidat obrázek</button>`:'';
  return shotsHTML+addShotBtn;
 }
 function dayGroupHTML(date,dayTrades){
@@ -2384,21 +2384,39 @@ $('screenshots').addEventListener('change',async e=>{
 });
 $('dayShotInput').addEventListener('change',handleDayShotInputChange);
 document.addEventListener('paste',async e=>{
- if(!$('tradeModal')?.classList.contains('open'))return;
  const items=(e.clipboardData||window.clipboardData)?.items;
  if(!items)return;
  const imageItems=[...items].filter(it=>it.type&&it.type.startsWith('image/'));
  if(!imageItems.length)return;
+ if($('tradeModal')?.classList.contains('open')){
+  e.preventDefault();
+  for(const item of imageItems){
+   if(editImages.length>=3){showToast('Obchod může mít nejvýše 3 obrázky.');break}
+   const file=item.getAsFile();
+   if(!file)continue;
+   if(file.size>3_000_000){showToast('Vložený obrázek je větší než 3 MB.');continue}
+   const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
+   editImages.push(data);
+  }
+  showPreviews();
+  return;
+ }
+ const dayWrap=e.target.closest?.('.day-wrap.open');
+ if(!dayWrap)return;
+ const date=dayWrap.dataset.day;
+ const note=getDayNote(date);
  e.preventDefault();
  for(const item of imageItems){
-  if(editImages.length>=3){showToast('Obchod může mít nejvýše 3 obrázky.');break}
+  if(note.images.length>=3){showToast('Den může mít nejvýše 3 obrázky.');break}
   const file=item.getAsFile();
   if(!file)continue;
   if(file.size>3_000_000){showToast('Vložený obrázek je větší než 3 MB.');continue}
   const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
-  editImages.push(data);
+  note.images.push(data);
  }
- showPreviews();
+ await saveDayNote(date,{images:note.images});
+ const el=findDayWrap(date)?.querySelector('.day-thumbs');
+ if(el)el.innerHTML=dayThumbsHTML(date);else renderTrades();
 });
 $('tradeForm').addEventListener('submit',async e=>{
  e.preventDefault();

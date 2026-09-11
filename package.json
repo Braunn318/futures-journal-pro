@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.5.2",
-  "description": "Futures Journal PRO 4.5.2 – u obchodů s víc kontrakty doplňuje celkový počet bodů a nahrazuje rušivý automatický komentář u importovaných obchodů malým štítkem.",
+  "version": "4.5.3",
+  "description": "Futures Journal PRO 4.5.3 – opravuje falešné porušení S/L limitu v kalendáři řízení rizika a umožňuje vkládat obrázek ke dni přímo ze schránky.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",
