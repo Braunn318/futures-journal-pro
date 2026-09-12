@@ -1,9 +1,11 @@
 'use strict';
-// Načtení deníku pro testy. Zvládne oba tvary, které aplikace produkuje:
-//  - jeden deník:      journal-data/<id>.json  → { trades, settings, dayNotes }
-//  - záloha všech:     collectAllJournalsBackup() → { profiles, journals:[{profile,trades,settings}] }
+// Načtení deníku pro testy. Zvládne tři tvary, které aplikace produkuje:
+//  - jeden deník:   journal-data/<id>.json          → { trades, settings, dayNotes }
+//  - odlehčená kopie: ai-export/<id>.json           → { journalId, trades, dayNotes }  (bez settings!)
+//  - záloha všech:  collectAllJournalsBackup()      → { profiles, journals:[{profile,trades,settings}] }
 
 const fs = require('fs');
+const path = require('path');
 
 function readJournalFile(file) {
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -15,7 +17,7 @@ function readJournalFile(file) {
     }));
   }
   return [{
-    name: 'deník',
+    name: parsed.journalId || path.basename(file, '.json'),
     trades: Array.isArray(parsed.trades) ? parsed.trades : [],
     settings: mainSettings(parsed.settings)
   }];
@@ -32,4 +34,10 @@ function mainSettings(settingsArray) {
   };
 }
 
-module.exports = { readJournalFile, mainSettings };
+// Šablony instrumentů ze samostatného souboru – odlehčená kopie deníku je nenese.
+function readTemplates(file) {
+  const journals = readJournalFile(file);
+  return journals.flatMap(j => j.settings.templates);
+}
+
+module.exports = { readJournalFile, mainSettings, readTemplates };
