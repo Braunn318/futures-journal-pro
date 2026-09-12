@@ -540,7 +540,11 @@ function defaultCaptureSettings() {
     deletedAccounts: [],
     relayEnabled: false,
     relayUrl: '',
-    relayToken: ''
+    relayToken: '',
+    // Účty přidané ručně v Nastavení. Bez nich by se dal namapovat jen účet,
+    // který už někdy poslal událost – Playback účet tedy až PO prvním
+    // obchodě, který by mezitím spadl do živého deníku.
+    manualAccounts: []
   };
 }
 function readCaptureSettings() {
@@ -1065,12 +1069,31 @@ function startRelayPolling() {
   relayTimer = setInterval(() => pollTradingViewRelay().catch(error => logError('TradingView relay poll', error)), 10000);
 }
 
+// Seznam účtů pro mapování: účty z historie událostí, účty, které už mapování
+// má, a účty přidané ručně. Odstraněné účty se vynechají.
+function captureAccountList(settings, events) {
+  const deleted = new Set(Array.isArray(settings.deletedAccounts) ? settings.deletedAccounts : []);
+  const fromEvents = (Array.isArray(events) ? events : []).map(e => e && e.account).filter(Boolean);
+  const fromMappings = Object.keys(settings.accountMappings || {});
+  const manual = Array.isArray(settings.manualAccounts) ? settings.manualAccounts : [];
+  return [...new Set([...fromEvents, ...fromMappings, ...manual])].filter(a => !deleted.has(a)).sort();
+}
+ipcMain.handle('capture:addAccount', async (_event, account) => {
+  const name = String(account || '').trim();
+  if (!name) return { ok: false, error: 'Název účtu je prázdný.' };
+  const settings = readCaptureSettings();
+  settings.manualAccounts = [...new Set([...(Array.isArray(settings.manualAccounts) ? settings.manualAccounts : []), name])].sort();
+  // Ručně přidaný účet nesmí zůstat na seznamu odstraněných, jinak by se
+  // hned zase odfiltroval.
+  settings.deletedAccounts = (Array.isArray(settings.deletedAccounts) ? settings.deletedAccounts : []).filter(a => a !== name);
+  writeCaptureSettings(settings);
+  return { ok: true, account: name };
+});
 ipcMain.handle('capture:status', async () => {
   const settings = readCaptureSettings();
   const events = readCaptureEvents();
   const state = readCaptureState();
-  const deletedAccounts = new Set(Array.isArray(settings.deletedAccounts) ? settings.deletedAccounts : []);
-  const accounts = [...new Set(events.map(e => e.account).filter(Boolean))].filter(a => !deletedAccounts.has(a)).sort();
+  const accounts = captureAccountList(settings, events);
   return {
     ok: true,
     running: !!captureServer,

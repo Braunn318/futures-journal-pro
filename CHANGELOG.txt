@@ -2,6 +2,14 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.6.1 - 2026-09-12
+- Narrowed the points fix to what it was for: new trades. The identity `pointsTotal × point value − commission == net P/L` is now enforced on every newly created trade (import, manual entry, multi-target merge) and covered by tests. Historical trades are no longer rewritten — they only get a `legacyPointsConvention` flag and drop out of R-based statistics, and their displayed points and P/L stay exactly as they were.
+- Added the five context fields a backtested trade needs to be analysable at all: Setup (from Strategy.md), Hladina vstupu (multi-select, with the confluence count derived automatically), Order flow potvrzení (multi-select), Stav naplnění, and Cena Stop Lossu. Values are stored as stable keys from a shared taxonomy module, never as free text, so they can actually be filtered on.
+- Multi-target merging no longer loses that context: multi-selects are unioned across legs and single-selects take the first value present. The merge function is a field whitelist and had already silently eaten the trade direction once, so there is now a test that fails if any of these fields disappears.
+- Accounts can be added by hand in Nastavení → Přiřazení účtů. Until now an account only appeared once it had sent its first trade, so a NinjaTrader Playback account could not be pointed at its own journal in advance and the first backtest trade landed in whatever journal was open.
+- Verified that the inverted commission sign seen on two August breakeven trades is not present in the current code: a test drives a zero-movement position through processExecution, mapCapturedTrade, the multi-target merge and the commission recalculation, and the commission comes out as a cost in every one of them.
+- Both CSV exports carry the new fields (Setup, Hladina vstupu, Order flow, Konfluence, Stav naplnění) alongside the points, SL and R columns added in 4.6.0.
+
 ## 4.6.0 - 2026-09-12
 - Fixed the points figure shown for a trade standing on two different bases. For a position closed in one fill the stored value was points *per contract*, while for a position closed through several targets it was the *total* across legs — so a 2-contract trade that made 3 points per contract showed "3 bodů" next to a $26.20 profit that only makes sense at 6 points. Trades now carry two explicitly named fields, `pointsTotal` and `pointsPerContract`, and every display and export uses the total. Verified against the whole journal: the identity `pointsTotal × point value − commission == net P/L` now holds for every trade it can be checked on.
 - Displayed points change for 45 of 86 existing trades (all the ones that stored a per-contract value, e.g. −2.50 → −7.50 on a 3-contract trade). No P/L, commission or result changes — only the points figure, which was previously understating those positions.

@@ -11,12 +11,13 @@
 // obchodů jedinou nohu o 2 kontraktech. Rozdělení „merged = total, nemerged =
 // na kontrakt" tedy neplatí, rozhoduje počet kontraktů na nohu.
 //
-// Tři testy, každý na něco jiného:
-//   1. Starý export z doby PŘED opravou – důkaz, že chyba existovala, a
-//      zároveň kontrola, že ji detektor pozná. Tenhle CSV soubor už nikdy
-//      projít nemůže, je to historický doklad.
-//   2. Živý deník po migraci v paměti – akceptační kritéria §9.
-//   3. Konvence uloženého pole a označení nekonzistentních obchodů.
+// ROZSAH (spec §1.1, revize 12. 9. 2026): historická data se NEOPRAVUJÍ.
+// Identita se vymáhá jen u nově vytvořených obchodů – to hlídá
+// tests/new-trade-identity.test.js. Tady se ověřuje:
+//   1. že starý export z doby před opravou chybu opravdu obsahuje (doklad
+//      chyby a zároveň autotest detektoru – ten soubor projít nemůže),
+//   2. že migrace historickým obchodům jen přidá příznak a NIC jim nezmění,
+//   3. odvození ceny SL a výpočet R.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -174,26 +175,27 @@ test('starý export před opravou: detektor pozná záměnu jednotek v Body', (t
     'Ve starém exportu má být záměna jednotek vidět – pokud není, přestal fungovat detektor.');
 });
 
-test('živý deník po migraci: pointsTotal × hodnota bodu − provize == pnlRaw (§9)', (t) => {
+test('živý deník: staré obchody se jen označí a jejich zobrazení se nezmění', (t) => {
   const sources = journalSources();
   if (!sources.length) {
     const msg = 'PŘESKOČENO: nenalezen žádný datový soubor deníku (hledá se ai-export v userData / customDataDir, přepsatelné env FJ_JOURNAL). Reálná data se do repozitáře nekopírují – je veřejný.';
     skips.push(msg);
-    report.heading('ČÁST 2 – živý deník po migraci').line(msg);
+    report.heading('ČÁST 2 – živý deník (historie se neopravuje)').line(msg);
     t.skip(msg);
     return;
   }
 
   const templates = loadTemplates();
-  const identityViolations = [];
-  const perContractIdentityViolations = [];
-  const flaggedInconsistent = [];
-  const excluded = [];
-  const noPointValue = [];
-  const changedDisplay = [];
+  const displayChanged = [];
+  const flaggedLegacy = [];
+  const alreadyUnambiguous = [];
   let checked = 0;
 
-  report.heading('ČÁST 2 – živý deník po migraci');
+  report.heading('ČÁST 2 – živý deník (historie se neopravuje)');
+  report.line('Rozsah podle spec §1.1: historická data se NEOPRAVUJÍ. Migrace jim jen');
+  report.line('přidá příznak `legacyPointsConvention`, aby vypadly ze statistik podle R.');
+  report.line('Zobrazené body ani P/L se u nich nemění.');
+  report.line('');
 
   for (const source of sources) {
     report.line(`soubor: ${source}`);
@@ -203,70 +205,40 @@ test('živý deník po migraci: pointsTotal × hodnota bodu − provize == pnlRa
       report.line(`  deník: ${journal.name} · obchodů: ${journal.trades.length}`);
 
       for (const raw of journal.trades) {
-        const instrument = String(raw.instrument || '').trim();
-        const label = `${journal.name} · ${raw.date || '?'} ${raw.entryTime || '?'} ${instrument || '?'}`;
-        if (UNVERIFIABLE_INSTRUMENTS.has(instrument)) { excluded.push(label); continue; }
-        const pointValue = renderer.getPointValueForInstrument(instrument);
-        if (!pointValue) { noPointValue.push(`${label} · hodnota bodu chybí`); continue; }
-
-        // Migrace se spouští V PAMĚTI produkční funkcí – testuje se tím kód,
-        // který data opravdu změní, ne jeho popis.
-        const displayBefore = renderer.displayPoints(raw);
+        const label = `${journal.name} · ${raw.date || '?'} ${raw.entryTime || '?'} ${String(raw.instrument || '?')}`;
+        const before = renderer.displayPointsTotal(raw);
         const patch = renderer.migrateTradePointsFields(raw);
         const trade = { ...raw, ...(patch || {}) };
         checked++;
 
-        if (trade.pointsInconsistent === true) {
-          flaggedInconsistent.push(`${label} · body neodpovídají žádné konvenci, obchod je označený a patří mimo statistiky · ${raw.sourceEventId ? 'import' : 'ruční záznam'}`);
-          continue;
+        if (trade.legacyPointsConvention === true) flaggedLegacy.push(label);
+        else alreadyUnambiguous.push(label);
+
+        const after = renderer.displayPointsTotal(trade);
+        if (Math.abs(after - before) > 0.0001) {
+          displayChanged.push(`${label} · zobrazené body ${fmt(before)} → ${fmt(after)}`);
         }
 
-        const commission = Math.abs(Number(trade.commission) || 0);
-        const net = renderer.signed(trade, 'pnl');
-        const contracts = FJPoints.contractsOf(trade);
-
-        // §9, kritérium 1: pointsTotal × hodnota bodu − provize == pnlRaw.
-        const signedTotal = renderer.displayPointsTotal(trade);
-        const residual = signedTotal * pointValue - commission * Math.sign(signedTotal || 1) - net;
-        const identityOk = Math.abs(Math.abs(signedTotal) * pointValue - Math.abs(net + commission)) <= TOLERANCE;
-        if (!identityOk) {
-          identityViolations.push(`${label} · pointsTotal=${fmt(trade.pointsTotal)} × ${pointValue} = ${fmt(Math.abs(signedTotal) * pointValue)} · hrubý ${fmt(net + commission)} · rozdíl ${fmt(residual)}`);
-        }
-
-        // §9, kritérium 2: pointsTotal == pointsPerContract × contracts.
-        if (Math.abs(Number(trade.pointsPerContract) * contracts - Number(trade.pointsTotal)) > 0.0001) {
-          perContractIdentityViolations.push(`${label} · pointsPerContract=${fmt(trade.pointsPerContract)} × ${contracts} ≠ pointsTotal=${fmt(trade.pointsTotal)}`);
-        }
-
-        const displayAfter = renderer.displayPointsTotal(trade);
-        if (Math.abs(displayAfter - displayBefore) > 0.005) {
-          changedDisplay.push(`${label} · zobrazené body ${fmt(displayBefore)} → ${fmt(displayAfter)} (${contracts} kontrakty)`);
-        }
+        // Migrace nesmí sahat na nic jiného než na ten jeden příznak.
+        const touched = Object.keys(patch || {});
+        assert.deepEqual(touched.filter(k => k !== 'legacyPointsConvention'), [],
+          `${label}: migrace změnila i jiná pole než legacyPointsConvention (${touched.join(', ')})`);
       }
     }
   }
 
   report.line('');
-  report.line(`obchodů ověřeno: ${checked}`);
-  report.line(`porušení §9 „pointsTotal × hodnota bodu − provize == pnlRaw": ${identityViolations.length}`);
-  identityViolations.forEach(l => report.line(`  ✗ ${l}`));
-  report.line(`porušení §9 „pointsTotal == pointsPerContract × contracts": ${perContractIdentityViolations.length}`);
-  perContractIdentityViolations.forEach(l => report.line(`  ✗ ${l}`));
-  report.line('');
-  report.line(`MIGRACE ZMĚNÍ ZOBRAZENÉ BODY u ${changedDisplay.length} obchodů:`);
-  changedDisplay.forEach(l => report.line(`  → ${l}`));
-  report.line('');
-  report.line(`označeno jako nekonzistentní (mimo statistiky): ${flaggedInconsistent.length}`);
-  flaggedInconsistent.forEach(l => report.line(`  – ${l}`));
-  report.line(`vyloučeno rozhodnutím §2.1 (${[...UNVERIFIABLE_INSTRUMENTS].join(', ')}): ${excluded.length}`);
-  report.line(`bez hodnoty bodu (nelze ověřit): ${noPointValue.length}`);
-  noPointValue.forEach(l => report.line(`  ? ${l}`));
+  report.line(`obchodů prošlo migrací: ${checked}`);
+  report.line(`označeno jako legacy (mimo statistiky podle R, v P/L zůstávají): ${flaggedLegacy.length}`);
+  report.line(`už má jednoznačná bodová pole: ${alreadyUnambiguous.length}`);
+  report.line(`obchodů, kterým se změnilo zobrazené číslo: ${displayChanged.length}`);
+  displayChanged.forEach(l => report.line(`  ✗ ${l}`));
 
-  assert.equal(identityViolations.length, 0, `Identita §9 neplatí u ${identityViolations.length} obchodů. Detail: tests/output/points-identity.txt`);
-  assert.equal(perContractIdentityViolations.length, 0, `pointsTotal ≠ pointsPerContract × contracts u ${perContractIdentityViolations.length} obchodů. Detail: tests/output/points-identity.txt`);
+  assert.equal(displayChanged.length, 0,
+    `Migrace změnila zobrazené body u ${displayChanged.length} historických obchodů – podle §1.1 se historie nemá opravovat. Detail: tests/output/points-identity.txt`);
 });
 
-test('migrace je idempotentní a nepřepíše ruční hodnotu', (t) => {
+test('migrace je idempotentní', (t) => {
   const sources = journalSources();
   if (!sources.length) { t.skip('bez datového souboru deníku'); return; }
   const templates = loadTemplates();
@@ -276,65 +248,69 @@ test('migrace je idempotentní a nepřepíše ruční hodnotu', (t) => {
       const settings = journal.settings.templates.length ? journal.settings : { ...journal.settings, templates: templates || [] };
       const renderer = loadRenderer(RENDERER_NAMES, { settings });
       for (const raw of journal.trades) {
-        if (UNVERIFIABLE_INSTRUMENTS.has(String(raw.instrument || '').trim())) continue;
         const once = { ...raw, ...(renderer.migrateTradePointsFields(raw) || {}) };
         const twice = { ...once, ...(renderer.migrateTradePointsFields(once) || {}) };
-        assert.deepEqual(twice, once, `Druhé spuštění migrace změnilo obchod ${raw.date} ${raw.entryTime}`);
+        assert.deepEqual(Object.keys(twice).sort(), Object.keys(once).sort(),
+          `Druhé spuštění migrace přidalo pole u obchodu ${raw.date} ${raw.entryTime}`);
+        for (const k of Object.keys(once)) {
+          if (typeof once[k] === 'object') continue;
+          assert.equal(twice[k], once[k], `Druhé spuštění migrace změnilo ${k} u ${raw.date} ${raw.entryTime}`);
+        }
       }
     }
   }
 });
 
-test('migrace nepřepíše ručně zadanou cenu SL', () => {
+// --- Odvození ceny SL (§3.3b). Používá se při UKLÁDÁNÍ nového obchodu, ne
+// --- v migraci: historická data se podle §1.1 neopravují.
+
+test('odvození ceny SL: obchod ukončený na SL bez zadané ceny', () => {
   const renderer = loadRenderer(RENDERER_NAMES, {
     settings: { templates: [{ instrument: 'MES', pointValue: 5, defaultCommission: 1.9 }], breakEvenEnabled: false, breakEvenThreshold: 0 }
   });
-  const trade = {
-    instrument: 'MES', date: '2026-09-01', entryTime: '16:00',
-    entryPrice: 7700, exitPrice: 7696, result: 'stoploss', side: 'long',
-    points: 4, contracts: 1, commission: 1.9, pnl: 21.9, pnlRaw: -21.9,
-    slPrice: 7697, slDerived: false
-  };
-  const patch = renderer.migrateTradePointsFields(trade) || {};
-  assert.equal(patch.slPrice, undefined, 'ruční cena SL se nesmí přepsat');
-  assert.equal(patch.slDerived, undefined, 'příznak odvozené ceny se nesmí nastavit na ruční hodnotu');
-  // R se počítá z bodů na kontrakt a z ručního SL: 4 / |7700 − 7697| = 1.33.
-  assert.equal(patch.rMultiple, 1.33);
+  const derived = renderer.deriveStopLossPrice({
+    instrument: 'MES', entryPrice: 7700, exitPrice: 7696, result: 'stoploss', side: 'long',
+    points: 4, contracts: 1, commission: 1.9, pnlRaw: -21.9
+  });
+  assert.equal(derived, 7696, 'cena SL se odvodí z výstupní ceny');
 });
 
-test('u obchodu ukončeného na SL bez zadané ceny se cena odvodí a označí', () => {
+test('odvození ceny SL: ziskový obchod žádnou cenu neodvozuje', () => {
   const renderer = loadRenderer(RENDERER_NAMES, {
     settings: { templates: [{ instrument: 'MES', pointValue: 5, defaultCommission: 1.9 }], breakEvenEnabled: false, breakEvenThreshold: 0 }
   });
-  const trade = {
-    instrument: 'MES', date: '2026-09-01', entryTime: '16:00',
-    entryPrice: 7700, exitPrice: 7696, result: 'stoploss', side: 'long',
-    points: 4, contracts: 1, commission: 1.9, pnl: 21.9, pnlRaw: -21.9
-  };
-  const patch = renderer.migrateTradePointsFields(trade) || {};
-  assert.equal(patch.slPrice, 7696, 'cena SL se odvodí z výstupní ceny');
-  assert.equal(patch.slDerived, true, 'odvozená hodnota musí být označená');
-  assert.equal(patch.rMultiple, 1, '4 body na kontrakt / 4 body rizika = 1R');
+  const derived = renderer.deriveStopLossPrice({
+    instrument: 'MES', entryPrice: 7700, exitPrice: 7703, result: 'target', side: 'long',
+    points: 3, contracts: 1, commission: 1.9, pnlRaw: 13.1
+  });
+  assert.equal(derived, null, 'u ziskového obchodu se cena SL hádat nesmí');
 });
 
-test('u obchodu s víc cíli se cena SL bere z nohy, která šla na SL', () => {
+test('odvození ceny SL: u víc cílů se bere cena nohy, která šla na SL', () => {
   const renderer = loadRenderer(RENDERER_NAMES, {
     settings: { templates: [{ instrument: 'MES', pointValue: 5, defaultCommission: 1.9 }], breakEvenEnabled: false, breakEvenThreshold: 0 }
   });
   // TP1 vybral 3 body, druhá noha skončila na SL 2 body pod vstupem. Vážený
-  // průměr výstupních cen by dal 7701.5, což není úroveň SL.
-  const trade = {
-    instrument: 'MES', date: '2026-09-01', entryTime: '16:00',
-    entryPrice: 7700, exitPrice: 7701.5, result: 'target', side: 'long',
-    points: 5, contracts: 2, commission: 3.8, pnl: 1.2, pnlRaw: 1.2,
+  // průměr výstupních cen by dal 7700.5, což není úroveň SL.
+  const derived = renderer.deriveStopLossPrice({
+    instrument: 'MES', entryPrice: 7700, exitPrice: 7700.5, result: 'target', side: 'long',
+    points: 5, contracts: 2, commission: 3.8, pnlRaw: 1.2,
     legs: [
       { label: 'TP1', exitTime: '16:05', exitPrice: 7703, points: 3, contracts: 1, result: 'target', commission: 1.9, pnlRaw: 13.1 },
       { label: 'SL', exitTime: '16:09', exitPrice: 7698, points: 2, contracts: 1, result: 'stoploss', commission: 1.9, pnlRaw: -11.9 }
     ]
-  };
-  const patch = renderer.migrateTradePointsFields(trade) || {};
-  assert.equal(patch.slPrice, 7698, 'bere se cena nohy na SL, ne vážený průměr 7701.5');
-  assert.equal(patch.slDerived, true);
+  });
+  assert.equal(derived, 7698, 'bere se cena nohy na SL, ne vážený průměr');
+});
+
+test('R se počítá z bodů na kontrakt, nikdy z celkových', () => {
+  // Dvoukontraktová pozice: 4 body na kontrakt, riziko 4 body → 1R.
+  // Kdyby se R počítalo z celkových 8 bodů, vyšlo by 2R.
+  assert.equal(FJPoints.rMultipleOf(4, 4), 1);
+  assert.equal(FJPoints.rMultipleOf(8, 4), 2, 'kontrolní hodnota: z celkových bodů by vyšlo 2R');
+  assert.equal(FJPoints.slPointsOf(7700, 7696), 4);
+  assert.equal(FJPoints.slPointsOf(7700, 7700), null, 'nulové riziko nedává R');
+  assert.equal(FJPoints.rMultipleOf(4, null), null, 'bez ceny SL není R');
 });
 
 test.after(() => {

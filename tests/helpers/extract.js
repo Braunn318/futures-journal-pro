@@ -15,6 +15,7 @@ const path = require('path');
 const vm = require('vm');
 const nodeCrypto = require('crypto');
 const FJPoints = require('../../app/points.js');
+const FJTaxonomy = require('../../app/taxonomy.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -131,6 +132,7 @@ function loadFromSource(source, names, globals = {}) {
     // Produkční kód sahá na globální FJPoints (app/points.js, načtený přes
     // <script src>), takže ho kontext musí mít taky.
     FJPoints,
+    FJTaxonomy,
     ...globals
   });
   vm.runInContext(code, context, { filename: 'extracted-from-source.js' });

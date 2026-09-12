@@ -112,6 +112,13 @@ canvas{width:100%;height:100%}
 .trade .title{font-size:18px;font-weight:800}.trade .meta{color:var(--muted);font-size:13px;margin-top:5px}.pill{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:800;font-size:12px}
 .pill.win{background:rgba(var(--green-rgb),.15);color:var(--green)}.pill.loss{background:rgba(var(--red-rgb),.15);color:var(--red)}.pill.be{background:rgba(var(--yellow-rgb),.18);color:var(--yellow)}
 .pill.journal-pill{background:rgba(var(--blue-rgb),.15);color:var(--blue);font-weight:700}
+/* Dlaždice číselníků: vyplnit jeden obchod má trvat do 15 s, takže se vybírá
+   klikem do mřížky, ne rozbalovacím seznamem. */
+.chip-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{border:1px solid var(--line);background:var(--input-bg);color:var(--text);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer;user-select:none}
+.chip:hover{border-color:var(--hover-border)}
+.chip.on{background:rgba(var(--blue-rgb),.18);border-color:var(--blue)}
+.pill.context-pill{background:rgba(var(--tint-rgb),.10);font-size:10px;padding:1px 6px;opacity:.9}
 /* Směr obchodu je záměrně modrá/žlutá, ne zelená/červená – ta je v celé aplikaci
    vyhrazená pro zisk/ztrátu a směr je na výsledku nezávislý. */
 .pill.side-pill.long{background:rgba(var(--blue-rgb),.15);color:var(--blue)}
@@ -675,7 +682,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="subsection" id="capMapping">
       <div class="card">
         <h3>Přiřazení účtů ke kartám</h3>
-        <p class="sub">Například SIM101 → Simulace, APEX-123 → Apex účet.</p>
+        <p class="sub">Například SIM101 → Simulace, APEX-123 → Apex účet. Backtest v NinjaTraderu běží na odděleném Playback účtu – přiřaď ho vlastní kartě, ať se jeho obchody nikdy nepotkají s živou equity.</p>
+        <div class="mapping-row" style="margin-bottom:12px">
+          <input id="captureNewAccount" type="text" placeholder="Název účtu, např. Playback101">
+          <button class="btn" id="captureAddAccount" type="button">Přidat účet</button>
+        </div>
+        <p class="sub" style="margin-top:-4px">Účet se v seznamu objeví sám, jakmile z něj přijde první obchod. Přidej ho ručně, pokud ho chceš přiřadit dřív – jinak by první backtest obchod spadl do právě otevřené karty.</p>
         <div id="captureMappingRows"></div>
         <button class="btn" id="captureSaveMappings" style="margin-top:12px">Uložit přiřazení</button>
         <div id="captureHiddenAccountsBox" style="margin-top:16px"></div>
@@ -969,6 +981,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Komise (v měně účtu)</label><input id="commission" type="number" step="any" min="0" value="0"></div>
         <div class="field"><label>Počet kontraktů</label><input id="contracts" type="number" step="1" value="1"></div>
         <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="sub" id="slPriceHint"></div></div>
+        <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
+        <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
+        <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
+        <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
         <div class="field full" id="pnlCalcHint" style="margin-top:-6px"></div>
         <div class="field" id="extraLegsField" style="grid-column:1/-1">
           <label>Více cílů u téhož obchodu (TP2, Break Even…) <span class="sub">— nepovinné</span></label>
@@ -1003,6 +1019,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   </div>
 </div>
 
+<script src="taxonomy.js"></script>
 <script src="points.js"></script>
 <script>
 const DB_VERSION=1;
@@ -1203,54 +1220,31 @@ function sentenceCount(s){return (s.match(/[.!?]+(?=\s|$)/g)||[]).length}
 // a je doplněný i do whitelistu v main.js readJournal().
 const SCHEMA_VERSION=1;
 
-// Migrace bodových polí (spec §3.1). Klíčové je, že se NEPŘEPOČÍTÁVÁ plošně:
-// 45 obchodů v reálném deníku má `points` na kontrakt a 27 celkový součet,
-// takže plošné vynásobení počtem kontraktů by těch 27 rozbilo. Konvenci
-// rozhoduje sdílená funkce FJPoints.classifyTrade, na kterou je test.
+// Označení historických obchodů (spec §1.1). Cílem NENÍ uvést do pořádku
+// historická data – cílem je backtestovat se současnou verzí. Migrace proto
+// nic nepřepočítává: obchod, který nemá jednoznačná bodová pole, se jen
+// označí `legacyPointsConvention` a vyloučí se z R statistik. U takového
+// obchodu totiž nejde spolehlivě říct, jestli je `points` na kontrakt, nebo
+// celkové, a dopočítat to by u části obchodů znamenalo změnit čísla, která
+// jsou dnes správná.
 //
-// Obchod, jehož body neodpovídají ani jedné konvenci, se NEDOPOČÍTÁVÁ –
-// dostane příznak `pointsInconsistent` a vyloučí se ze statistik. Vymyslet
-// mu číslo by znamenalo tvářit se, že vadná data jsou v pořádku.
-//
-// Migrace je idempotentní: pole, která už existují, se nepřepisují, takže
-// opakované spuštění ani ruční hodnota se neztratí.
+// Nová identita, která se vymáhá, se týká jen NOVĚ vytvořených obchodů:
+// pointsTotal × hodnota bodu − provize == pnlRaw.
 function migrateTradePointsFields(t){
- const patch={};
- const pointValue=getPointValueForInstrument(t.instrument);
  const hasTotal=t.pointsTotal!=null&&t.pointsTotal!=="";
- if(!hasTotal){
-  const cls=FJPoints.classifyTrade(t,{pointValue,net:signed(t,'pnl')});
-  if(cls.convention===FJPoints.POINTS_CONVENTION.INCONSISTENT){
-   if(t.pointsInconsistent!==true)patch.pointsInconsistent=true;
-  }else if(cls.pointsTotal!=null){
-   patch.pointsTotal=cls.pointsTotal;
-   patch.pointsPerContract=cls.pointsPerContract;
-   if(t.pointsInconsistent===true)patch.pointsInconsistent=false;
-  }
- }
- // Vážená výstupní cena u obchodů s víc nohami (spec §3.2).
- if(t.lastLegExitPrice==null&&Array.isArray(t.legs)&&t.legs.length>1){
-  const x=FJPoints.exitPriceFields(t);
-  patch.lastLegExitPrice=x.lastLegExitPrice;
-  if(x.approx)patch.exitPriceApprox=true;else patch.exitPrice=x.exitPrice;
- }
- // Odvozená cena SL a R (spec §3.3b, §3.3c). Ruční hodnota má přednost:
- // když už `slPrice` existuje, nesahá se na ni.
- if(t.slPrice==null||t.slPrice===""){
-  const derived=deriveStopLossPrice(t);
-  if(derived!=null){patch.slPrice=derived;patch.slDerived=true}
- }
- const slPrice=patch.slPrice!=null?patch.slPrice:t.slPrice;
- const perContract=patch.pointsPerContract!=null?patch.pointsPerContract:t.pointsPerContract;
- const slPoints=FJPoints.slPointsOf(t.entryPrice,slPrice);
- const rMultiple=FJPoints.rMultipleOf(perContract,slPoints);
- if(slPoints!=null&&t.slPoints!==slPoints)patch.slPoints=slPoints;
- if(rMultiple!=null&&t.rMultiple!==rMultiple)patch.rMultiple=rMultiple;
- return Object.keys(patch).length?patch:null;
+ if(hasTotal)return t.legacyPointsConvention===true?{legacyPointsConvention:false}:null;
+ return t.legacyPointsConvention===true?null:{legacyPointsConvention:true};
 }
 
-// Spustí migraci nad živými daty deníku. Pořadí je záměrné: nejdřív se
-// vytvoří záloha souboru, pak se zapisuje. Nikdy ne naopak.
+// Obchody se starou konvencí bodů nepatří do statistik postavených na R ani
+// na bodech – jejich `points` je dvojznačné. Do P/L, equity a řízení rizika
+// se ale počítají normálně: jsou to reálné obchody s reálným výsledkem.
+function hasReliablePoints(t){
+ return !(t&&t.legacyPointsConvention===true);
+}
+
+// Spustí označení nad živými daty deníku. Pořadí je záměrné: nejdřív záloha,
+// pak zápis. Nikdy naopak.
 async function runPointsMigration(){
  const data=await ensureActiveJournalData();
  const rows=Array.isArray(data.trades)?data.trades:[];
@@ -1260,14 +1254,13 @@ async function runPointsMigration(){
  if(!changed){data.schemaVersion=SCHEMA_VERSION;await persistDB();return {changed:0}}
  // Záloha PŘED zápisem. Když se nepovede, migrace se NESPUSTÍ – radši
  // zůstat na starých datech než je změnit bez možnosti vrátit se.
- const backup=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-migraci-bodu');
+ const backup=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-oznacenim-legacy-bodu');
  if(!backup||backup.ok!==true)throw new Error(backup?.error||'Zálohu deníku před migrací nelze vytvořit.');
- rows.forEach((t,i)=>{if(patches[i])Object.assign(t,patches[i],{updatedAt:Date.now()})});
+ rows.forEach((t,i)=>{if(patches[i])Object.assign(t,patches[i])});
  data.schemaVersion=SCHEMA_VERSION;
  await persistDB();
  return {changed};
 }
-
 async function load(){
  trades=await getAll('trades');
  calendarAllTrades=null;
@@ -1529,7 +1522,11 @@ function sideMeta(side){
 // Fallback na vážený výpočet je pro obchody, které ještě neprošly migrací.
 function tradePointsTotal(t){
  if(t&&t.pointsTotal!=null&&t.pointsTotal!=="")return Math.abs(Number(t.pointsTotal))||0;
- return tradeTotalPoints(t);
+ // Obchod bez `pointsTotal` je z doby před zavedením jednoznačných polí.
+ // Zobrazí se PŮVODNÍ hodnota, ne přepočtená: historická data se podle
+ // spec §1.1 neopravují, jen se označí `legacyPointsConvention` a vylučují
+ // se z R statistik. Přepočet by u nich změnil číslo, které Adam zná.
+ return Math.abs(Number(t&&t.points)||0);
 }
 // Znaménko nese výsledek obchodu, stejně jako u displayPoints.
 function displayPointsTotal(t){
@@ -1914,6 +1911,70 @@ function legPillHTML(l,i){
 // celkový bodový zisk pozice (10 bodů) – viz GitHub issue #8. Tahle funkce
 // dopočítá "total" body váhou počtu kontraktů, ať už jde o jeden cíl nebo víc
 // (TP1/TP2/BE), kde se sčítá přes všechny cíle.
+// ---- Kontextová pole obchodu (spec §4.2) ----
+// Do dat se ukládají KLÍČE číselníku, ne popisky. Popisek je jen zobrazení,
+// takže se dá přeložit nebo upravit bez znehodnocení historie.
+function fillContextSelect(id,enumName,emptyLabel){
+ const el=$(id); if(!el)return;
+ const table=FJTaxonomy.ENUMS[enumName]||{};
+ el.innerHTML=`<option value="">${esc(emptyLabel)}</option>`
+  +Object.keys(table).map(k=>`<option value="${esc(k)}">${esc(table[k])}</option>`).join('');
+}
+// Mřížka dlaždic pro multi-select. Stav drží samotný DOM (class "on"), ať
+// není potřeba další zdroj pravdy vedle formuláře.
+function renderChipGrid(id,enumName,selected){
+ const el=$(id); if(!el)return;
+ const table=FJTaxonomy.ENUMS[enumName]||{};
+ const on=new Set(FJTaxonomy.sanitizeMulti(enumName,selected));
+ el.innerHTML=Object.keys(table).map(k=>
+  `<span class="chip${on.has(k)?' on':''}" data-key="${esc(k)}" role="button" tabindex="0">${esc(table[k])}</span>`).join('');
+ el.querySelectorAll('.chip').forEach(chip=>{
+  const toggle=()=>{chip.classList.toggle('on');updateConfluenceHint()};
+  chip.onclick=toggle;
+  chip.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();toggle()}};
+ });
+}
+function readChipGrid(id,enumName){
+ const el=$(id); if(!el)return [];
+ return FJTaxonomy.sanitizeMulti(enumName,[...el.querySelectorAll('.chip.on')].map(c=>c.dataset.key));
+}
+// Počet hladin v konfluenci se NEEDITUJE ručně – dopočítává se z vybraných
+// hladin, aby nemohl uletět od skutečnosti.
+function updateConfluenceHint(){
+ const hint=$('confluenceHint'); if(!hint)return;
+ const n=FJTaxonomy.confluenceCount(readChipGrid('entryLevels','ENTRY_LEVEL'));
+ hint.textContent=n?`Konfluence: ${n}`:'';
+}
+// Sjednocení kontextových polí ze víc nohou jedné pozice. Pravidla podle
+// spec §2.1: multi-select se sjednocuje, single-select bere první neprázdný.
+function mergeContextFields(list){
+ const out={};
+ for(const field of FJTaxonomy.TRADE_CONTEXT_FIELDS){
+  if(field.cardinality==='multi'){
+   const union=list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]);
+   const clean=FJTaxonomy.sanitizeMulti(field.enumName,union);
+   if(clean.length)out[field.key]=clean;
+  }else{
+   const first=list.find(t=>t?.[field.key]!==undefined&&t?.[field.key]!==null&&t?.[field.key]!=='');
+   if(first)out[field.key]=first[field.key];
+  }
+ }
+ const levels=out.entryLevels;
+ if(levels)out.confluenceCount=FJTaxonomy.confluenceCount(levels);
+ return out;
+}
+// Štítky kontextu na kartě obchodu. Bez nich není v seznamu vidět, jestli je
+// obchod okontextovaný, a díry ve vzorku se pozná až v analýze.
+function contextPillsHTML(t){
+ const parts=[];
+ if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
+ const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
+ if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + '))}</span>`);
+ const of=FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm);
+ if(of.length)parts.push(`<span class="pill context-pill" title="Order flow potvrzení">OF: ${esc(of.map(k=>FJTaxonomy.labelOf('OF_CONFIRM',k)).join(', '))}</span>`);
+ if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
+ return parts.join(' ');
+}
 // Odvození ceny Stop Lossu (spec §3.3b). Používá se jen tehdy, když ji
 // uživatel nezadal a obchod skončil na SL. U obchodu s víc cíli se bere cena
 // NOHY, KTERÁ ŠLA NA SL, ne vážený průměr – ten by u částečně ziskové pozice
@@ -1986,6 +2047,7 @@ function tradeHTML(t){
  ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
  </div>
+ ${contextPillsHTML(t)?`<div class="trade-legs" style="margin-top:6px">${contextPillsHTML(t)}</div>`:''}
  <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Strategie: ${esc(t.strategy||'—')}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
  <div>${t.comment?`<div class="comment">${esc(t.comment)}</div>`:''}${importedBadge?`<div class="sub" style="margin-top:2px">${importedBadge}</div>`:''}
  ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
@@ -2265,6 +2327,15 @@ function openModal(t=null){
  if($('pnlCalcHint'))$('pnlCalcHint').innerHTML='';
  if($('slPrice'))$('slPrice').value=(t&&t.slPrice!=null&&t.slPrice!=='')?t.slPrice:'';
  renderSlPriceHint(t||null);
+ // Číselníky se plní z taxonomy.js, ne z HTML – jeden zdroj pravdy pro UI,
+ // statistiky i export.
+ fillContextSelect('setupCode','SETUP','— nevyplněno —');
+ fillContextSelect('fillStatus','FILL_STATUS','— nevyplněno —');
+ if($('setupCode'))$('setupCode').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode);
+ if($('fillStatus'))$('fillStatus').value=FJTaxonomy.sanitizeSingle('FILL_STATUS',t&&t.fillStatus);
+ renderChipGrid('entryLevels','ENTRY_LEVEL',t&&t.entryLevels);
+ renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
+ updateConfluenceHint();
  if($('extraLegsField'))$('extraLegsField').style.display='';
  if(t){
   const legs=Array.isArray(t.legs)&&t.legs.length>1?t.legs:null;
@@ -2650,6 +2721,15 @@ $('tradeForm').addEventListener('submit',async e=>{
    Array.isArray(obj.legs)&&obj.legs.length?{legs:obj.legs}:{points:obj.points,contracts:obj.contracts}));
   if(Array.isArray(obj.legs)&&obj.legs.length)Object.assign(obj,weightedExitFields(obj));
 
+  // Kontextová pole (spec §4.2). Ukládají se klíče číselníku; neznámá
+  // hodnota se zahazuje, ať se do breakdownu nedostane překlep. Všechna jsou
+  // nepovinná a nesmí blokovat uložení obchodu.
+  obj.setupCode=FJTaxonomy.sanitizeSingle('SETUP',$('setupCode')?.value);
+  obj.fillStatus=FJTaxonomy.sanitizeSingle('FILL_STATUS',$('fillStatus')?.value);
+  obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
+  obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
+  obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
+
   // Cena Stop Lossu: ruční zadání má vždy přednost. Když je prázdná a obchod
   // skončil na SL, odvodí se z ceny nohy, která na SL šla (NE z váženého
   // průměru) – spec §3.3b. Příznak `slDerived` se resetuje, jakmile hodnotu
@@ -2816,6 +2896,10 @@ function combineTradeObjects(list){
   // součet bodů nohou, takže u nohy o víc kontraktech je to hodnota NA
   // KONTRAKT – zobrazuje se proto `pointsTotal`, ne `points`.
   ...FJPoints.pointsFieldsForNewTrade({legs}),
+  // Kontextová pole: multi-select se sjednocuje, single-select bere první
+  // neprázdný (spec §2.1). Tenhle objekt je bílá listina – co v něm není,
+  // při sloučení zmizí, a přesně tak se dřív ztrácel `side`.
+  ...mergeContextFields(list),
   // Výstupní cena je objemově vážený průměr přes nohy (spec §3.2). Dřív to
   // byla cena POSLEDNÍ nohy, takže u ziskového obchodu mohla ukazovat ztrátu
   // (FDXS 2026-08-11 15:40). Cena poslední nohy zůstává v `lastLegExitPrice`.
@@ -3023,13 +3107,13 @@ function firstTradeIdPerDate(rows){
  return out;
 }
 $('exportCsv').onclick=async()=>{
- const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Setup','Hladina vstupu','Order flow','Konfluence','Stav naplnění','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
  const firstIdByDate=firstTradeIdPerDate(trades);
  const rows=trades.map(t=>{
   const p=t.dailyPlan||{};
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?getDayNote(t.date):null;
-  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.setupCode||'',(t.entryLevels||[]).join('|'),(t.ofConfirm||[]).join('|'),t.confluenceCount??'',t.fillStatus||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -3383,7 +3467,7 @@ function generateReportView(allRows=null){
 $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
 $('reportCsv').onclick=async()=>{
- const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Setup','Hladina vstupu','Order flow','Konfluence','Stav naplnění','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
  const dayNotesByJournal={};
  reportRows.forEach(t=>{if(t.date){const cur=dayNotesByJournal[t.journalId+'|'+t.date];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)dayNotesByJournal[t.journalId+'|'+t.date]=t}});
  const allDayNotes=await collectReportDayNotes();
@@ -3394,7 +3478,7 @@ $('reportCsv').onclick=async()=>{
   // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
   // u pole "pnl" přednostně vrací pnlRaw – ve sloupci Body tak končily PENÍZE,
   // ne body. displayPoints() je stejná funkce, jakou používá i export deníku.
-  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.setupCode||'',(t.entryLevels||[]).join('|'),(t.ofConfirm||[]).join('|'),t.confluenceCount??'',t.fillStatus||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -3539,6 +3623,9 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   // Konektor posílá body NA KONTRAKT (main.js processExecution), takže
   // celkové body jsou jejich násobek počtem kontraktů – spec §3.1.
   ...FJPoints.pointsFieldsForNewTrade({points:Math.abs(Number(e.points||0)),contracts}),
+  // Obchod z konektoru vznikl z reálné exekuce, takže je naplněný. Ostatní
+  // kontextová pole doplňuje Adam ručně – hádat je z dat není v rozsahu.
+  fillStatus:'FILLED',
   pnl:Math.abs(pnlRaw),
   pnlRaw,
   contracts,
@@ -3687,6 +3774,16 @@ $('captureNewKey').onclick=async()=>{
 $('captureClear').onclick=async()=>{if(await showConfirm('Vymazat frontu zachycených událostí?')){await window.desktopAPI.captureClear();await refreshCaptureStatus()}};
 $('captureScreenshotMode').onchange=async e=>{await window.desktopAPI.captureSetScreenshotMode(e.target.value);await refreshCaptureStatus()};
 $('captureAutoImportSelect').onchange=async e=>{await window.desktopAPI.captureSetAutoImport(e.target.value==='ano');await refreshCaptureStatus()};
+$('captureAddAccount').onclick=async()=>{
+ const input=$('captureNewAccount');
+ const name=String(input.value||'').trim();
+ if(!name){showToast('Napiš název účtu, jak ho hlásí NinjaTrader (např. Playback101).');return}
+ const r=await window.desktopAPI.captureAddAccount(name);
+ if(!r?.ok){showToast('Účet se nepodařilo přidat: '+(r?.error||'neznámá chyba'));return}
+ input.value='';
+ await refreshCaptureStatus();
+ showToast(`Účet ${name} přidán. Vyber mu kartu a ulož přiřazení.`);
+};
 $('captureSaveMappings').onclick=async()=>{
  const mappings={...(captureSnapshot?.accountMappings||{})};
  document.querySelectorAll('.capture-mapping').forEach(s=>{if(s.value)mappings[s.dataset.account]=s.value;else delete mappings[s.dataset.account]});
@@ -3789,7 +3886,7 @@ async function startJournalApplication(){
   // data zůstanou jak jsou a uživatel se to dozví z hlášky.
   try{
    const r=await runPointsMigration();
-   if(r&&r.changed)showToast(`Doplněna jednoznačná bodová pole u ${r.changed} obchodů. Záloha deníku byla uložena do safety-backups.`);
+   if(r&&r.changed)showToast(`Označeno ${r.changed} starších obchodů (dvojznačná bodová hodnota) – zůstávají v P/L, ale nevstupují do statistik podle R. Záloha deníku je v safety-backups.`);
   }catch(e){showToast('Migrace bodových polí se nepodařila: '+e.message)}
   await load();
  }
