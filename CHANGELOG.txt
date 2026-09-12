@@ -2,6 +2,15 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.6.0 - 2026-09-12
+- Fixed the points figure shown for a trade standing on two different bases. For a position closed in one fill the stored value was points *per contract*, while for a position closed through several targets it was the *total* across legs — so a 2-contract trade that made 3 points per contract showed "3 bodů" next to a $26.20 profit that only makes sense at 6 points. Trades now carry two explicitly named fields, `pointsTotal` and `pointsPerContract`, and every display and export uses the total. Verified against the whole journal: the identity `pointsTotal × point value − commission == net P/L` now holds for every trade it can be checked on.
+- Displayed points change for 45 of 86 existing trades (all the ones that stored a per-contract value, e.g. −2.50 → −7.50 on a 3-contract trade). No P/L, commission or result changes — only the points figure, which was previously understating those positions.
+- Fixed the exit price of a multi-target trade showing only the last leg, which could display a loss on a profitable trade (FDXS 2026-08-11 15:40). It is now the volume-weighted average across legs; the last leg is kept separately in `lastLegExitPrice`. Where a leg has no usable price or contract count the original value is left alone and the trade is marked `exitPriceApprox` rather than being estimated.
+- Added a Stop Loss price field and R multiple. For a trade that ended on a stop loss with no price entered, the price is derived from the exit of the leg that actually hit the stop (not the weighted average) and marked as derived; typing a value clears that mark. R is always computed from points per contract, never from the total.
+- Added the missing columns to the CSV exports: the cross-journal report had neither Kontrakty nor Komise, so its P/L could not be reconciled from the outside. Both exports now carry Body celkem, Body na kontrakt, Cena SL, R, Komise and Kontrakty.
+- Four hand-edited trades from 18.–20. 8. whose points match neither the price move nor the gross result are flagged `pointsInconsistent` instead of being recalculated — inventing a number for damaged data would be worse than admitting it. They are listed in the test report.
+- Added a test suite (`npm test`, built-in node:test, no new dependencies) that runs the real production functions extracted from app/index.html and main.js, and checks the points identity across the entire journal rather than a sample.
+
 ## 4.5.3 - 2026-09-11
 - Fixed the risk management calendar flagging a day as violating the daily S/L limit as soon as the count *reached* the limit, instead of only once it was exceeded (e.g. a "3 S/L per day" rule marked a day red at exactly 3 stop-losses, even though the rule was still being held; it now only flags at 4 or more). (#9)
 - Added clipboard paste support for the Day tab's screenshot, matching the trade detail form: copy a screenshot (e.g. Win+Shift+S) and press Ctrl+V while a day is expanded to attach it, instead of only being able to pick a file. (#10)

@@ -968,6 +968,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Zisk / ztráta v měně účtu (čistý, po komisi)</label><input id="pnl" type="number" step="any"></div>
         <div class="field"><label>Komise (v měně účtu)</label><input id="commission" type="number" step="any" min="0" value="0"></div>
         <div class="field"><label>Počet kontraktů</label><input id="contracts" type="number" step="1" value="1"></div>
+        <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="sub" id="slPriceHint"></div></div>
         <div class="field full" id="pnlCalcHint" style="margin-top:-6px"></div>
         <div class="field" id="extraLegsField" style="grid-column:1/-1">
           <label>Více cílů u téhož obchodu (TP2, Break Even…) <span class="sub">— nepovinné</span></label>
@@ -1002,6 +1003,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   </div>
 </div>
 
+<script src="points.js"></script>
 <script>
 const DB_VERSION=1;
 const JOURNAL_LIST_KEY='FuturesJournal_profiles';
@@ -1195,6 +1197,76 @@ function signed(t,field='pnl'){
 }
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function sentenceCount(s){return (s.match(/[.!?]+(?=\s|$)/g)||[]).length}
+
+// Verze schématu datového souboru. Zvyšuje se jen tehdy, když migrace
+// doplňuje nová pole; `schemaVersion` je nový top-level klíč souboru deníku
+// a je doplněný i do whitelistu v main.js readJournal().
+const SCHEMA_VERSION=1;
+
+// Migrace bodových polí (spec §3.1). Klíčové je, že se NEPŘEPOČÍTÁVÁ plošně:
+// 45 obchodů v reálném deníku má `points` na kontrakt a 27 celkový součet,
+// takže plošné vynásobení počtem kontraktů by těch 27 rozbilo. Konvenci
+// rozhoduje sdílená funkce FJPoints.classifyTrade, na kterou je test.
+//
+// Obchod, jehož body neodpovídají ani jedné konvenci, se NEDOPOČÍTÁVÁ –
+// dostane příznak `pointsInconsistent` a vyloučí se ze statistik. Vymyslet
+// mu číslo by znamenalo tvářit se, že vadná data jsou v pořádku.
+//
+// Migrace je idempotentní: pole, která už existují, se nepřepisují, takže
+// opakované spuštění ani ruční hodnota se neztratí.
+function migrateTradePointsFields(t){
+ const patch={};
+ const pointValue=getPointValueForInstrument(t.instrument);
+ const hasTotal=t.pointsTotal!=null&&t.pointsTotal!=="";
+ if(!hasTotal){
+  const cls=FJPoints.classifyTrade(t,{pointValue,net:signed(t,'pnl')});
+  if(cls.convention===FJPoints.POINTS_CONVENTION.INCONSISTENT){
+   if(t.pointsInconsistent!==true)patch.pointsInconsistent=true;
+  }else if(cls.pointsTotal!=null){
+   patch.pointsTotal=cls.pointsTotal;
+   patch.pointsPerContract=cls.pointsPerContract;
+   if(t.pointsInconsistent===true)patch.pointsInconsistent=false;
+  }
+ }
+ // Vážená výstupní cena u obchodů s víc nohami (spec §3.2).
+ if(t.lastLegExitPrice==null&&Array.isArray(t.legs)&&t.legs.length>1){
+  const x=FJPoints.exitPriceFields(t);
+  patch.lastLegExitPrice=x.lastLegExitPrice;
+  if(x.approx)patch.exitPriceApprox=true;else patch.exitPrice=x.exitPrice;
+ }
+ // Odvozená cena SL a R (spec §3.3b, §3.3c). Ruční hodnota má přednost:
+ // když už `slPrice` existuje, nesahá se na ni.
+ if(t.slPrice==null||t.slPrice===""){
+  const derived=deriveStopLossPrice(t);
+  if(derived!=null){patch.slPrice=derived;patch.slDerived=true}
+ }
+ const slPrice=patch.slPrice!=null?patch.slPrice:t.slPrice;
+ const perContract=patch.pointsPerContract!=null?patch.pointsPerContract:t.pointsPerContract;
+ const slPoints=FJPoints.slPointsOf(t.entryPrice,slPrice);
+ const rMultiple=FJPoints.rMultipleOf(perContract,slPoints);
+ if(slPoints!=null&&t.slPoints!==slPoints)patch.slPoints=slPoints;
+ if(rMultiple!=null&&t.rMultiple!==rMultiple)patch.rMultiple=rMultiple;
+ return Object.keys(patch).length?patch:null;
+}
+
+// Spustí migraci nad živými daty deníku. Pořadí je záměrné: nejdřív se
+// vytvoří záloha souboru, pak se zapisuje. Nikdy ne naopak.
+async function runPointsMigration(){
+ const data=await ensureActiveJournalData();
+ const rows=Array.isArray(data.trades)?data.trades:[];
+ if(Number(data.schemaVersion||0)>=SCHEMA_VERSION)return {skipped:true};
+ const patches=rows.map(t=>migrateTradePointsFields(t));
+ const changed=patches.filter(Boolean).length;
+ if(!changed){data.schemaVersion=SCHEMA_VERSION;await persistDB();return {changed:0}}
+ // Záloha PŘED zápisem. Když se nepovede, migrace se NESPUSTÍ – radši
+ // zůstat na starých datech než je změnit bez možnosti vrátit se.
+ const backup=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-migraci-bodu');
+ if(!backup||backup.ok!==true)throw new Error(backup?.error||'Zálohu deníku před migrací nelze vytvořit.');
+ rows.forEach((t,i)=>{if(patches[i])Object.assign(t,patches[i],{updatedAt:Date.now()})});
+ data.schemaVersion=SCHEMA_VERSION;
+ await persistDB();
+ return {changed};
+}
 
 async function load(){
  trades=await getAll('trades');
@@ -1449,6 +1521,22 @@ function sideMeta(side){
 }
 // Body pro zobrazení a export: uložené body jsou VŽDY bez znaménka (magnituda),
 // znaménko nese výsledek obchodu.
+// HLAVNÍ ZOBRAZOVANÉ BODOVÉ ČÍSLO (spec §2.1 KOREKCE). Bere `pointsTotal`,
+// tedy celkové body pozice. U obchodů, které dnes v `points` nesou celkový
+// součet (každá noha 1 kontrakt), se hodnota NEZMĚNÍ; u obchodů, kde je
+// `points` na kontrakt, se opraví. Napojit hlavní číslo naopak na
+// `pointsPerContract` by změnilo hodnoty u obchodů, které jsou dnes správné.
+// Fallback na vážený výpočet je pro obchody, které ještě neprošly migrací.
+function tradePointsTotal(t){
+ if(t&&t.pointsTotal!=null&&t.pointsTotal!=="")return Math.abs(Number(t.pointsTotal))||0;
+ return tradeTotalPoints(t);
+}
+// Znaménko nese výsledek obchodu, stejně jako u displayPoints.
+function displayPointsTotal(t){
+ const p=tradePointsTotal(t);
+ if(t.result==='breakeven')return p;
+ return t.result==='stoploss'?-p:p;
+}
 function displayPoints(t){
  const p=Math.abs(Number(t.points||0));
  if(t.result==='breakeven')return p;
@@ -1826,6 +1914,47 @@ function legPillHTML(l,i){
 // celkový bodový zisk pozice (10 bodů) – viz GitHub issue #8. Tahle funkce
 // dopočítá "total" body váhou počtu kontraktů, ať už jde o jeden cíl nebo víc
 // (TP1/TP2/BE), kde se sčítá přes všechny cíle.
+// Odvození ceny Stop Lossu (spec §3.3b). Používá se jen tehdy, když ji
+// uživatel nezadal a obchod skončil na SL. U obchodu s víc cíli se bere cena
+// NOHY, KTERÁ ŠLA NA SL, ne vážený průměr – ten by u částečně ziskové pozice
+// vyšel mimo skutečnou úroveň SL.
+function deriveStopLossPrice(t){
+ const legs=FJPoints.legsOf(t);
+ if(legs){
+  const slLeg=legs.find(l=>l.result==='stoploss');
+  if(!slLeg)return null;
+  const p=Number(slLeg.exitPrice);
+  return Number.isFinite(p)&&p?p:null;
+ }
+ if(t.result!=='stoploss')return null;
+ const p=Number(t.exitPrice);
+ return Number.isFinite(p)&&p?p:null;
+}
+// Riziková pole (spec §3.3c). R se počítá VŽDY z bodů na kontrakt, nikdy
+// z celkových – jinak by u dvoukontraktové pozice vyšlo dvojnásobné.
+function riskFields(t){
+ const slPoints=FJPoints.slPointsOf(t.entryPrice,t.slPrice);
+ const out={slPoints,rMultiple:FJPoints.rMultipleOf(t.pointsPerContract,slPoints)};
+ return out;
+}
+// Popisek pod polem ceny SL: u odvozené hodnoty je potřeba, aby bylo vidět,
+// že ji nezadal uživatel.
+function renderSlPriceHint(t){
+ const hint=$('slPriceHint'); if(!hint)return;
+ if(t&&t.slDerived&&t.slPrice!=null)hint.innerHTML=`<i>Odvozeno z výstupní ceny (${t.slPrice}). Přepsáním se příznak zruší.</i>`;
+ else if(t&&t.rMultiple!=null)hint.textContent=`R = ${t.rMultiple} (${t.slPoints} b riziko)`;
+ else hint.textContent='';
+}
+// Vážená výstupní cena a cena poslední nohy (spec §3.2). Když nohu nejde
+// zvážit (chybí cena nebo počet kontraktů), původní `exitPrice` se NECHÁVÁ
+// být a obchod se označí `exitPriceApprox` – přiznaná nepřesnost je lepší
+// než vymyšlené číslo.
+function weightedExitFields(t){
+ const x=FJPoints.exitPriceFields(t);
+ const out={exitPrice:x.exitPrice,lastLegExitPrice:x.lastLegExitPrice};
+ if(x.approx)out.exitPriceApprox=true;
+ return out;
+}
 function tradeTotalPoints(t){
  if(Array.isArray(t.legs)&&t.legs.length)return t.legs.reduce((a,l)=>a+Math.abs(Number(l.points)||0)*(Number(l.contracts)||1),0);
  return Math.abs(Number(t.points||0))*(Number(t.contracts)||1);
@@ -1833,11 +1962,13 @@ function tradeTotalPoints(t){
 function tradeHTML(t){
  const m=resultMeta(t.result);
  const pnlVal=signed(t,'pnl');
- const rawPoints=Math.abs(Number(t.points||0));
  const sign=t.result==='breakeven'?'±':m.sign;
- const pointsDisplay=`${sign}${rawPoints}`;
- const totalPoints=Math.round(tradeTotalPoints(t)*100)/100;
- const totalPointsDisplay=Math.abs(totalPoints-rawPoints)>0.005?` · celkem ${sign}${totalPoints} b`:'';
+ // Hlavní číslo jsou CELKOVÉ body pozice (spec §2.1 KOREKCE). Body na
+ // kontrakt se vypisují jen doplňkově, když se od celkových liší.
+ const totalPoints=Math.round(tradePointsTotal(t)*100)/100;
+ const pointsDisplay=`${sign}${totalPoints}`;
+ const perContract=t.pointsPerContract!=null&&t.pointsPerContract!==''?Math.abs(Number(t.pointsPerContract)):null;
+ const totalPointsDisplay=(perContract!=null&&Math.abs(perContract-totalPoints)>0.005)?` · ${perContract} b/kontrakt`:'';
  // U obchodů bez uloženého směru se pilulka nezobrazuje vůbec (ne "—"), aby
  // deník bez doplněných směrů vypadal přesně jako dřív.
  const sm=sideMeta(t.side);
@@ -1852,6 +1983,7 @@ function tradeHTML(t){
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
  <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů${totalPointsDisplay} · ${dualMoney(pnlVal,true)}</div>
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
+ ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
  </div>
  <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Strategie: ${esc(t.strategy||'—')}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
@@ -2131,6 +2263,8 @@ function openModal(t=null){
  resetLegRows();
  if($('templateHint'))$('templateHint').textContent='';
  if($('pnlCalcHint'))$('pnlCalcHint').innerHTML='';
+ if($('slPrice'))$('slPrice').value=(t&&t.slPrice!=null&&t.slPrice!=='')?t.slPrice:'';
+ renderSlPriceHint(t||null);
  if($('extraLegsField'))$('extraLegsField').style.display='';
  if(t){
   const legs=Array.isArray(t.legs)&&t.legs.length>1?t.legs:null;
@@ -2508,6 +2642,29 @@ $('tradeForm').addEventListener('submit',async e=>{
   // Pokud byly všechny další cíle v editaci odstraněny, obj.legs zůstává nenastaveno
   // a obchod se uloží jako jediný cíl – to je záměr (odstranění duplicitního cíle).
 
+  // Jednoznačná bodová pole (spec §3.1). Formulář pracuje s `points` jako
+  // s hodnotou NA KONTRAKT (recomputePnlFromInputs násobí počtem kontraktů),
+  // takže legacy pole zůstává, jak je, a vedle něj se zapíše total i
+  // hodnota na kontrakt v jednoznačném pojmenování.
+  Object.assign(obj,FJPoints.pointsFieldsForNewTrade(
+   Array.isArray(obj.legs)&&obj.legs.length?{legs:obj.legs}:{points:obj.points,contracts:obj.contracts}));
+  if(Array.isArray(obj.legs)&&obj.legs.length)Object.assign(obj,weightedExitFields(obj));
+
+  // Cena Stop Lossu: ruční zadání má vždy přednost. Když je prázdná a obchod
+  // skončil na SL, odvodí se z ceny nohy, která na SL šla (NE z váženého
+  // průměru) – spec §3.3b. Příznak `slDerived` se resetuje, jakmile hodnotu
+  // přepíše uživatel.
+  const typedSl=$('slPrice')?.value;
+  if(typedSl!==undefined&&String(typedSl).trim()!==''){
+   obj.slPrice=Number(typedSl);
+   obj.slDerived=false;
+  }else{
+   const derived=deriveStopLossPrice(obj);
+   if(derived!=null){obj.slPrice=derived;obj.slDerived=true}
+   else{delete obj.slPrice;delete obj.slDerived}
+  }
+  Object.assign(obj,riskFields(obj));
+
   // Hrubý výsledek drží invariant "pnlRaw = hrubý − komise", na kterém stojí
   // přepočet komisí (recalcUnitCommission). Po ruční editaci se dopočítá znovu,
   // aby u importovaného obchodu nezůstala stará hodnota od konektoru.
@@ -2655,6 +2812,14 @@ function combineTradeObjects(list){
   // původní, takže každý vícecílový import o směr přišel.
   side:(list.find(t=>t.side==='long'||t.side==='short')?.side)||'',
   points:Math.round(totalPoints*100)/100,
+  // Jednoznačná pole vedle legacy `points` (spec §3.1). `points` je nevážený
+  // součet bodů nohou, takže u nohy o víc kontraktech je to hodnota NA
+  // KONTRAKT – zobrazuje se proto `pointsTotal`, ne `points`.
+  ...FJPoints.pointsFieldsForNewTrade({legs}),
+  // Výstupní cena je objemově vážený průměr přes nohy (spec §3.2). Dřív to
+  // byla cena POSLEDNÍ nohy, takže u ziskového obchodu mohla ukazovat ztrátu
+  // (FDXS 2026-08-11 15:40). Cena poslední nohy zůstává v `lastLegExitPrice`.
+  ...weightedExitFields({legs,exitPrice:lastByExit.exitPrice}),
   pnl:Math.abs(totalPnlRaw),
   pnlRaw:totalPnlRaw,
   grossPnl:Math.round((totalPnlRaw+totalCommission)*100)/100,
@@ -2858,13 +3023,13 @@ function firstTradeIdPerDate(rows){
  return out;
 }
 $('exportCsv').onclick=async()=>{
- const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
  const firstIdByDate=firstTradeIdPerDate(trades);
  const rows=trades.map(t=>{
   const p=t.dailyPlan||{};
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?getDayNote(t.date):null;
-  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPoints(t),signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -3218,7 +3383,7 @@ function generateReportView(allRows=null){
 $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
 $('reportCsv').onclick=async()=>{
- const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body','P/L','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
  const dayNotesByJournal={};
  reportRows.forEach(t=>{if(t.date){const cur=dayNotesByJournal[t.journalId+'|'+t.date];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)dayNotesByJournal[t.journalId+'|'+t.date]=t}});
  const allDayNotes=await collectReportDayNotes();
@@ -3229,7 +3394,7 @@ $('reportCsv').onclick=async()=>{
   // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
   // u pole "pnl" přednostně vrací pnlRaw – ve sloupci Body tak končily PENÍZE,
   // ne body. displayPoints() je stejná funkce, jakou používá i export deníku.
-  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPoints(t),reportSigned(t),t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -3371,6 +3536,9 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   exitPrice:Number(e.exitPrice||0),
   result,
   points:Math.abs(Number(e.points||0)),
+  // Konektor posílá body NA KONTRAKT (main.js processExecution), takže
+  // celkové body jsou jejich násobek počtem kontraktů – spec §3.1.
+  ...FJPoints.pointsFieldsForNewTrade({points:Math.abs(Number(e.points||0)),contracts}),
   pnl:Math.abs(pnlRaw),
   pnlRaw,
   contracts,
@@ -3616,6 +3784,13 @@ async function startJournalApplication(){
    return;
   }
   await openDB();
+  // Migrace bodových polí běží jednou, před prvním vykreslením, ať se
+  // nezobrazí stará dvojznačná čísla. Chyba migrace nesmí shodit aplikaci –
+  // data zůstanou jak jsou a uživatel se to dozví z hlášky.
+  try{
+   const r=await runPointsMigration();
+   if(r&&r.changed)showToast(`Doplněna jednoznačná bodová pole u ${r.changed} obchodů. Záloha deníku byla uložena do safety-backups.`);
+  }catch(e){showToast('Migrace bodových polí se nepodařila: '+e.message)}
   await load();
  }
  catch(e){journalAppStarted=false;showToast('Databázi se nepodařilo otevřít: '+e.message)}

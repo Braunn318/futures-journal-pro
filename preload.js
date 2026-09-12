@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   factoryReset: () => ipcRenderer.invoke('app:factoryReset'),
   readJournal: (journalId) => ipcRenderer.invoke('storage:read', journalId),
   writeJournal: (journalId, data) => ipcRenderer.invoke('storage:write', journalId, data),
+  backupJournal: (journalId, reason) => ipcRenderer.invoke('storage:backupJournal', journalId, reason),
   deleteJournal: (journalId) => ipcRenderer.invoke('storage:deleteJournal', journalId),
   resetStorage: () => ipcRenderer.invoke('storage:reset'),
   captureStatus: () => ipcRenderer.invoke('capture:status'),

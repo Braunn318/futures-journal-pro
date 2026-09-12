@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const nodeCrypto = require('crypto');
+const FJPoints = require('../../app/points.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -127,6 +128,9 @@ function loadFromSource(source, names, globals = {}) {
     console,
     crypto: { randomUUID: () => nodeCrypto.randomUUID() },
     structuredClone,
+    // Produkční kód sahá na globální FJPoints (app/points.js, načtený přes
+    // <script src>), takže ho kontext musí mít taky.
+    FJPoints,
     ...globals
   });
   vm.runInContext(code, context, { filename: 'extracted-from-source.js' });

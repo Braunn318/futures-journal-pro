@@ -1,11 +1,10 @@
 'use strict';
 // Syntetické testy vážení bodů počtem kontraktů.
 //
-// Proč syntetické: ve živém deníku má KAŽDÁ noha každého merged obchodu přesně
-// 1 kontrakt, takže násobení počtem kontraktů v `tradeTotalPoints()` nikdy nic
-// nezmění a reálná data tuhle cestu netestují vůbec. Noha o 2+ kontraktech
-// přitom vznikne hned, jak se dvoukontraktová pozice uzavře jedním fillem –
-// a právě tam se obě konvence `points` rozejdou.
+// Proč syntetické: v živém deníku má nohu o 2+ kontraktech jen 4 obchodů z 34
+// merged (60 nohou z 64 má přesně 1 kontrakt), a žádný z nich nemá víc nohou
+// různé velikosti. Vážení počtem kontraktů tedy reálná data prakticky
+// netestují, přitom právě tam se obě konvence `points` rozejdou.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -29,6 +28,7 @@ const NAMES = [
   'signed',
   'displayPoints',
   'tradeTotalPoints',
+  'weightedExitFields',
   'legFromTrade',
   'mergeSamePriceLegs',
   'labelLegs',
@@ -80,13 +80,14 @@ test('combineTradeObjects sčítá body vážené počtem kontraktů, ne jen per
   const merged = r.combineTradeObjects([tp1, tp2]);
 
   assert.equal(merged.contracts, 3, 'počet kontraktů se sečte přes nohy');
-  assert.equal(
-    merged.points,
-    11,
-    `sloučený obchod má mít 11 bodů (3×2 + 5×1), má ${merged.points} – nohy se sčítají bez vážení počtem kontraktů`
-  );
-  // Až bude oprava hotová, tohle je pole, na které se napojí hlavní zobrazované
-  // číslo (Body v CSV, karta obchodu) – viz spec §2.1 KOREKCE.
+  // Legacy pole `points` si nechává svůj dosavadní význam (nevážený součet).
+  // Přeznačit ho nelze: formulář na něm staví P/L jako points × contracts ×
+  // hodnota bodu, takže by násobil počtem kontraktů dvakrát.
+  assert.equal(merged.points, 8, 'legacy points zůstává neváženým součtem 3 + 5');
+  // Nová pole nesou jednoznačný význam. Na `pointsTotal` se napojuje hlavní
+  // zobrazované číslo (Body v CSV, karta obchodu) – spec §2.1 KOREKCE.
+  assert.equal(merged.pointsTotal, 11, 'pointsTotal je 3×2 + 5×1 = 11');
+  assert.ok(Math.abs(merged.pointsPerContract - 11 / 3) < 0.0001, 'pointsPerContract je 11 / 3 kontrakty');
   assert.equal(r.tradeTotalPoints(merged), 11, 'tradeTotalPoints nad sloučeným obchodem dá správný total');
 });
 
@@ -101,5 +102,34 @@ test('combineTradeObjects nemění merged obchod s jedním kontraktem na nohu', 
 
   assert.equal(merged.contracts, 2);
   assert.equal(merged.points, 8, 'součet 3 + 5 je zároveň total i dnešní hodnota – tady se nic měnit nemá');
+  assert.equal(merged.pointsTotal, 8, 'zobrazená hodnota se u těchto obchodů NESMÍ změnit');
+  assert.equal(merged.pointsPerContract, 4);
   assert.equal(r.tradeTotalPoints(merged), 8);
+});
+
+test('karta obchodu ukazuje celkové body, ne body na kontrakt', () => {
+  // Smoke test skutečného renderovacího kódu: hlavní číslo na kartě musí být
+  // pointsTotal. Kdyby se napojilo na pointsPerContract, změní se hodnoty
+  // u obchodů, které jsou dnes zobrazené správně (spec §2.1 KOREKCE).
+  const r = loadRenderer([
+    'esc', 'money', 'moneyCzk', 'dualMoney', 'signed', 'sideMeta', 'resultMeta',
+    'legPillHTML', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'tradeHTML'
+  ], {
+    settings: { ...SETTINGS, usdCzkRate: 23 },
+    activeJournalId: 'j1',
+    Intl,
+    document: { getElementById: () => null }
+  });
+
+  const html = r.tradeHTML({
+    id: 't1', instrument: 'MES', date: '2026-09-01', entryTime: '16:00', entryPrice: 7700,
+    exitTime: '16:05', exitPrice: 7703, result: 'target', side: 'long',
+    points: 3, pointsTotal: 6, pointsPerContract: 3, contracts: 2,
+    commission: 3.8, pnl: 26.2, pnlRaw: 26.2, rMultiple: 1.5, slPrice: 7698,
+    planFollowed: 'ano', strategy: 'M2', comment: '', images: []
+  });
+
+  assert.match(html, /\+6 bodů/, 'hlavní číslo jsou celkové body (2 kontrakty × 3 body)');
+  assert.match(html, /3 b\/kontrakt/, 'body na kontrakt se ukazují jako doplněk');
+  assert.match(html, /R: <b>1\.50<\/b>/, 'R se zobrazuje na kartě');
 });

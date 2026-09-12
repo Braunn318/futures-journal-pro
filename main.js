@@ -292,7 +292,11 @@ function readJournal(id) {
   return {
     trades: Array.isArray(parsed.trades) ? parsed.trades : [],
     settings: Array.isArray(parsed.settings) ? parsed.settings : [],
-    dayNotes: (parsed.dayNotes && typeof parsed.dayNotes === 'object') ? parsed.dayNotes : {}
+    dayNotes: (parsed.dayNotes && typeof parsed.dayNotes === 'object') ? parsed.dayNotes : {},
+    // POZOR: tenhle seznam je whitelist. Cokoli, co v něm není, se při čtení
+    // tiše zahodí a následný zápis to smaže – u `dayNotes` to už jednou
+    // reálně nastalo. Každý nový top-level klíč sem musí být doplněn.
+    schemaVersion: Number(parsed.schemaVersion) || 0
   };
 }
 function writeJournal(id, data) {
@@ -372,6 +376,25 @@ ipcMain.handle('data:writeAiExportManifest', async (_event, journals) => {
   }
 });
 
+// Tichá bezpečnostní kopie JEDNOHO souboru deníku – používá se před migrací
+// schématu. Dialog se záměrně neotevírá: migrace běží při startu a vyskakovací
+// okno by bralo focus. Pořadí u volajícího je vždy záloha → zápis, nikdy
+// naopak (v minulosti move-then-delete způsobil reálnou ztrátu dat).
+ipcMain.handle('storage:backupJournal', async (_event, journalId, reason) => {
+  try {
+    const source = journalPath(journalId);
+    if (!fs.existsSync(source)) return { ok: true, skipped: true };
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const dir = path.join(app.getPath('userData'), 'safety-backups', `${String(reason || 'migrace').replace(/[^a-zA-Z0-9_-]/g, '-')}-${stamp}`);
+    fs.mkdirSync(dir, { recursive: true });
+    const target = path.join(dir, `${safeJournalId(journalId)}.json`);
+    fs.copyFileSync(source, target);
+    return { ok: true, path: target };
+  } catch (error) {
+    logError('storage:backupJournal', error);
+    return { ok: false, error: error.message };
+  }
+});
 ipcMain.handle('storage:read', async (_event, journalId) => {
   try { return { ok: true, data: readJournal(journalId) }; }
   catch (error) { logError('Storage read', error); return { ok: false, error: error.message }; }
