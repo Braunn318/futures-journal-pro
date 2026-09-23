@@ -847,6 +847,20 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <h3>Číselníky kontextu obchodu</h3>
           <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volba se nemaže, jen skrývá: skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových.</p>
           <div id="taxonomyGroups"></div>
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
+            <h3 style="margin-top:0">Přenos číselníků</h3>
+            <p class="sub">Číselníky patří ke kartě deníku, takže backtest a živý deník mají každý svoje. Tady se dají zkopírovat do jiné karty nebo uložit do souboru a načíst na jiném počítači.</p>
+            <div class="mapping-row" style="margin-top:10px">
+              <select id="taxonomyCopyTarget"></select>
+              <button type="button" class="btn" id="taxonomyCopyBtn">Zkopírovat do karty</button>
+            </div>
+            <div class="mapping-row" style="margin-top:10px">
+              <button type="button" class="btn" id="taxonomyExportBtn">Exportovat do souboru</button>
+              <label class="btn" for="taxonomyImportInput" style="text-align:center;cursor:pointer">Importovat ze souboru</label>
+              <input type="file" id="taxonomyImportInput" accept="application/json,.json" style="display:none">
+            </div>
+            <div class="sub" id="taxonomyTransferNote" style="margin-top:8px"></div>
+          </div>
         </div>
       </div>
       </div>
@@ -1307,6 +1321,7 @@ function fillSettings(){
  if($('useConnectorCommission'))$('useConnectorCommission').value=settings.useConnectorCommission===true?'ano':'ne';
  renderTemplateList();
  renderTaxonomyEditor();
+ renderTaxonomyTransfer();
  fillThemeSettingsUI();
 }
 async function persistSettings(patch){
@@ -1943,10 +1958,29 @@ async function saveTaxonomyConfig(next){
  FJTaxonomy.applyConfig(next);
  await persistSettings({taxonomy:next});
  renderTaxonomyEditor();
+ renderTaxonomyTransfer();
 }
 function taxonomyGroupPatch(cfg,group){
  if(!cfg[group]||typeof cfg[group]!=='object')cfg[group]={};
  return cfg[group];
+}
+// Nabídka cílových karet pro kopii. Aktivní karta v ní není – kopírovat
+// číselník sám do sebe nemá smysl.
+function renderTaxonomyTransfer(){
+ const select=$('taxonomyCopyTarget'); if(!select)return;
+ const targets=journalProfiles.filter(j=>j.id!==activeJournalId);
+ select.innerHTML=targets.length
+  ?targets.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('')
+  :'<option value="">Žádná další karta deníku</option>';
+ select.disabled=!targets.length;
+ if($('taxonomyCopyBtn'))$('taxonomyCopyBtn').disabled=!targets.length;
+ const note=$('taxonomyTransferNote');
+ if(note){
+  const lines=FJTaxonomy.describeConfig(settings.taxonomy);
+  note.innerHTML=lines.length
+   ?`Tato karta má upraveno – ${esc(lines.join(' · '))}`
+   :'Tato karta má výchozí číselníky (žádná úprava), takže není co přenášet.';
+ }
 }
 function renderTaxonomyEditor(){
  const host=$('taxonomyGroups'); if(!host)return;
@@ -2054,6 +2088,63 @@ function wireTaxonomyEditor(){
   };
  });
 }
+
+// Zápis číselníku do JINÉ karty deníku. Čte a zapisuje cílový soubor přímo,
+// protože `persistSettings` umí jen aktivní kartu. Ostatní nastavení cílové
+// karty zůstávají beze změny – přepisuje se výhradně klíč `taxonomy`.
+async function copyTaxonomyToJournal(targetId){
+ const result=await window.desktopAPI.readJournal(targetId);
+ if(!result?.ok)throw new Error(result?.error||'Cílovou kartu deníku nelze načíst.');
+ const data=result.data||{trades:[],settings:[]};
+ data.settings=Array.isArray(data.settings)?data.settings:[];
+ const entry=data.settings.find(s=>s?.key==='main');
+ const clean=FJTaxonomy.sanitizeConfig(settings.taxonomy);
+ if(entry){entry.value={...(entry.value||{}),taxonomy:clean}}
+ else data.settings.push({key:'main',value:{taxonomy:clean}});
+ const written=await window.desktopAPI.writeJournal(targetId,data);
+ if(!written?.ok)throw new Error(written?.error||'Cílovou kartu deníku nelze uložit.');
+}
+$('taxonomyCopyBtn').onclick=async()=>{
+ const targetId=$('taxonomyCopyTarget').value;
+ if(!targetId)return;
+ const target=journalProfiles.find(j=>j.id===targetId);
+ const lines=FJTaxonomy.describeConfig(settings.taxonomy);
+ if(!lines.length){showToast('Tato karta nemá číselníky upravené – není co kopírovat.');return}
+ // Kopie PŘEPÍŠE úpravy cílové karty, proto se potvrzuje a je vidět, co se
+ // přenáší. Obchodů v cílové kartě se to nedotkne: přenáší se popisky
+ // a viditelnost voleb, v datech obchodů jsou klíče.
+ const ok=await showConfirm(`Přenést úpravy číselníků do karty „${target?.name||targetId}"?\n\n${lines.join('\n')}\n\nStávající úpravy číselníků v té kartě se tím přepíšou. Obchody se nemění – v jejich datech jsou klíče, ne popisky.`);
+ if(!ok)return;
+ try{
+  await copyTaxonomyToJournal(targetId);
+  showToast(`Číselníky zkopírovány do karty „${target?.name||targetId}".`);
+ }catch(e){showToast('Kopie se nepodařila: '+e.message)}
+};
+$('taxonomyExportBtn').onclick=async()=>{
+ const journalName=journalProfiles.find(j=>j.id===activeJournalId)?.name||'';
+ const payload=FJTaxonomy.exportPayload(settings.taxonomy,{journalName});
+ if(!Object.keys(payload.taxonomy).length){showToast('Tato karta nemá číselníky upravené – export by byl prázdný.');return}
+ const content=JSON.stringify(payload,null,2);
+ const r=await window.desktopAPI.exportBackupOnce(content,'futures-journal-ciselniky.json');
+ if(r?.ok)showToast('Číselníky uloženy: '+r.path);
+ else if(!r?.canceled)showToast('Uložení se nezdařilo: '+(r?.error||'neznámá chyba'));
+};
+$('taxonomyImportInput').onchange=async e=>{
+ const file=e.target.files?.[0];
+ if(!file)return;
+ try{
+  // Soubor může přijít odkudkoli, takže se z něj bere jen to, co projde
+  // očistou – cizí klíče se zahodí, vlastní volba nesmí přebít výchozí.
+  const incoming=FJTaxonomy.configFromImport(JSON.parse(await file.text()));
+  const lines=FJTaxonomy.describeConfig(incoming);
+  const ok=await showConfirm(`Naimportovat úpravy číselníků do této karty?\n\n${lines.join('\n')}\n\nStávající úpravy této karty se přepíšou. Obchody se nemění – v jejich datech jsou klíče, ne popisky, takže se změní jen to, co se zobrazuje a nabízí.`);
+  if(!ok)return;
+  await saveTaxonomyConfig(incoming);
+  renderAll();
+  showToast('Číselníky naimportovány.');
+ }catch(err){showToast('Import se nepodařil: '+err.message)}
+ finally{e.target.value=''}
+};
 
 // ---- Kontextová pole obchodu (spec §4.2) ----
 // Do dat se ukládají KLÍČE číselníku, ne popisky. Popisek je jen zobrazení,

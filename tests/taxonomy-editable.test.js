@@ -284,3 +284,100 @@ test('sloučení víc cílů respektuje upravený číselník a nezahodí skryt�
   assert.deepEqual([...merged.ofConfirm], ['MEGA_BID'], 'aliasovaná hodnota se nepřepíše');
   assert.equal(merged.confluenceCount, 2);
 });
+
+// ------------------------------------------------- přenos mezi deníky a soubor
+//
+// Číselníky patří ke kartě deníku, takže se musí dát přenést. Import je jediné
+// místo, kam se do konfigurace dostane cizí soubor – proto je na něj nejvíc
+// kontrol: cizí klíč se zahodí a vlastní volba nesmí přebít výchozí klíč.
+
+test('export a import projdou celým kolečkem beze změny', () => {
+  const customKey = FJTaxonomy.makeCustomKey('ENTRY_LEVEL', 'Týdenní open');
+  const config = {
+    ENTRY_LEVEL: {
+      labels: { VWAP: 'VWAP (15min)' },
+      custom: { [customKey]: 'Týdenní open' },
+      hidden: ['LIQUIDITY'],
+      order: ['VWAP', 'VAH']
+    },
+    OF_CONFIRM: { labels: { IMBALANCE: 'Imbalance 3:1' } }
+  };
+
+  const payload = FJTaxonomy.exportPayload(config, { journalName: 'Backtest' });
+  assert.equal(payload.kind, FJTaxonomy.EXPORT_KIND);
+  assert.equal(payload.journalName, 'Backtest');
+
+  // Přes JSON a zpátky, jako přes soubor.
+  const back = FJTaxonomy.configFromImport(JSON.parse(JSON.stringify(payload)));
+  assert.deepEqual(back, config);
+});
+
+test('import přijme i holou konfiguraci bez obalu', () => {
+  const back = FJTaxonomy.configFromImport({ ENTRY_LEVEL: { hidden: ['VWAP'] } });
+  assert.deepEqual(back, { ENTRY_LEVEL: { hidden: ['VWAP'] } });
+});
+
+test('import zahodí cizí klíče a neznámé skupiny', () => {
+  const clean = FJTaxonomy.configFromImport({
+    ENTRY_LEVEL: {
+      labels: { VWAP: 'VWAP jinak', NEEXISTUJE: 'nic' },
+      hidden: ['VAH', 'TAKY_NE'],
+      order: ['VWAP', 'CIZI_KLIC']
+    },
+    NEZNAMA_SKUPINA: { labels: { A: 'B' } }
+  });
+
+  assert.deepEqual(clean, {
+    ENTRY_LEVEL: { labels: { VWAP: 'VWAP jinak' }, hidden: ['VAH'], order: ['VWAP'] }
+  });
+  assert.ok(!('NEZNAMA_SKUPINA' in clean));
+});
+
+test('import nedovolí vlastní volbě přebít výchozí klíč', () => {
+  // Kdyby prošla, import by tiše přeznačil význam hodnoty, kterou už obchody
+  // používají – VWAP by najednou znamenal něco jiného.
+  const clean = FJTaxonomy.configFromImport({
+    ENTRY_LEVEL: { custom: { VWAP: 'Něco úplně jiného', CUSTOM_MOJE: 'Moje volba' } }
+  });
+  assert.deepEqual(clean.ENTRY_LEVEL.custom, { CUSTOM_MOJE: 'Moje volba' });
+  assert.equal(FJTaxonomy.labelOf('ENTRY_LEVEL', 'VWAP'), 'VWAP', 'výchozí popisek zůstal');
+});
+
+test('import odmítne soubor, který není export číselníků', () => {
+  assert.throws(() => FJTaxonomy.configFromImport({ kind: 'futures-journal-backup', trades: [] }),
+    /není export číselníků/);
+  assert.throws(() => FJTaxonomy.configFromImport(null), /platný JSON objekt/);
+  assert.throws(() => FJTaxonomy.configFromImport({ ENTRY_LEVEL: { labels: { NIC: 'x' } } }),
+    /žádnou použitelnou úpravu/, 'soubor bez jediné použitelné položky projít nemá');
+});
+
+test('import nezmění obchody – přenáší se popisky a viditelnost, ne data', () => {
+  const trade = tradeWith({ entryLevels: ['VWAP', 'VAH'], ofConfirm: ['IMBALANCE'] });
+  trade.entryLevels = FJTaxonomy.sanitizeMulti('ENTRY_LEVEL', trade.entryLevels);
+  trade.ofConfirm = FJTaxonomy.sanitizeMulti('OF_CONFIRM', trade.ofConfirm);
+  const before = JSON.parse(JSON.stringify(trade));
+
+  FJTaxonomy.applyConfig(FJTaxonomy.configFromImport({
+    ENTRY_LEVEL: { labels: { VWAP: 'VWAP (15min)' }, hidden: ['VAH'] }
+  }));
+
+  trade.entryLevels = FJTaxonomy.sanitizeMulti('ENTRY_LEVEL', trade.entryLevels);
+  trade.ofConfirm = FJTaxonomy.sanitizeMulti('OF_CONFIRM', trade.ofConfirm);
+
+  assert.deepEqual(trade, before, 'naimportovaný číselník se obchodů nedotkne');
+  assert.equal(FJTaxonomy.labelOf('ENTRY_LEVEL', 'VWAP'), 'VWAP (15min)', 'změnil se jen popisek');
+});
+
+test('popis konfigurace řekne, co se přenáší', () => {
+  const lines = FJTaxonomy.describeConfig({
+    ENTRY_LEVEL: { labels: { VWAP: 'x' }, hidden: ['VAH'], custom: { CUSTOM_A: 'A' }, order: ['VWAP'] },
+    SETUP: {}
+  });
+  assert.equal(lines.length, 1, 'skupina bez úprav se nevypisuje');
+  assert.match(lines[0], /^Hladina vstupu: /);
+  assert.match(lines[0], /1× přejmenováno/);
+  assert.match(lines[0], /1× vlastní volba/);
+  assert.match(lines[0], /1× skryto/);
+  assert.match(lines[0], /vlastní pořadí/);
+  assert.deepEqual(FJTaxonomy.describeConfig({}), [], 'výchozí číselník nemá co přenášet');
+});

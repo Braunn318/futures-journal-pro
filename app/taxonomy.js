@@ -256,6 +256,107 @@
     return base + '_' + Date.now();
   }
 
+  // ------------------------------------------------- přenos mezi deníky
+
+  // Očista importované konfigurace. Soubor může přijít odkudkoli, takže se
+  // z něj bere jen to, co má správný tvar a ukazuje na známý klíč. Cizí klíč
+  // v `labels`/`hidden`/`order` se zahodí; `custom` naopak nové klíče
+  // ZAVÁDÍ, takže se validuje zvlášť a nesmí přebít výchozí klíč.
+  const CUSTOM_KEY_RE = /^[A-Z0-9_]{1,64}$/;
+  const MAX_LABEL = 120;
+
+  function cleanLabel(value) {
+    return (typeof value === 'string' && value.trim()) ? value.trim().slice(0, MAX_LABEL) : null;
+  }
+
+  function sanitizeConfig(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const group of GROUPS) {
+      const g = raw[group.name];
+      if (!g || typeof g !== 'object') continue;
+      const clean = {};
+      const defaults = DEFAULT_ENUMS[group.name] || {};
+
+      const custom = {};
+      if (g.custom && typeof g.custom === 'object') {
+        for (const key of Object.keys(g.custom)) {
+          if (!CUSTOM_KEY_RE.test(key)) continue;
+          // Vlastní volba nesmí přepsat výchozí klíč – jinak by import
+          // tiše přeznačil význam hodnoty, kterou už obchody používají.
+          if (Object.prototype.hasOwnProperty.call(defaults, key)) continue;
+          const label = cleanLabel(g.custom[key]);
+          if (label) custom[key] = label;
+        }
+        if (Object.keys(custom).length) clean.custom = custom;
+      }
+
+      const valid = new Set([...Object.keys(defaults), ...Object.keys(custom)]);
+
+      if (g.labels && typeof g.labels === 'object') {
+        const labels = {};
+        for (const key of Object.keys(g.labels)) {
+          if (!valid.has(key)) continue;
+          const label = cleanLabel(g.labels[key]);
+          if (label) labels[key] = label;
+        }
+        if (Object.keys(labels).length) clean.labels = labels;
+      }
+
+      for (const field of ['hidden', 'visible', 'order']) {
+        if (!Array.isArray(g[field])) continue;
+        const list = [...new Set(g[field].filter(key => valid.has(key)))];
+        if (list.length) clean[field] = list;
+      }
+
+      if (Object.keys(clean).length) out[group.name] = clean;
+    }
+    return out;
+  }
+
+  const EXPORT_KIND = 'futures-journal-taxonomy';
+  const EXPORT_VERSION = 1;
+
+  function exportPayload(config, meta) {
+    return {
+      app: 'futures-journal-pro',
+      kind: EXPORT_KIND,
+      version: EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      ...(meta || {}),
+      taxonomy: sanitizeConfig(config)
+    };
+  }
+
+  // Přijme jak celý exportovaný soubor, tak samotnou konfiguraci – ať se dá
+  // naimportovat i výřez, který si někdo vytáhne ze zálohy deníku.
+  function configFromImport(parsed) {
+    if (!parsed || typeof parsed !== 'object') throw new Error('Soubor není platný JSON objekt.');
+    if (parsed.kind && parsed.kind !== EXPORT_KIND) {
+      throw new Error('Soubor není export číselníků (kind: ' + parsed.kind + ').');
+    }
+    const source = parsed.taxonomy && typeof parsed.taxonomy === 'object' ? parsed.taxonomy : parsed;
+    const clean = sanitizeConfig(source);
+    if (!Object.keys(clean).length) throw new Error('Soubor neobsahuje žádnou použitelnou úpravu číselníku.');
+    return clean;
+  }
+
+  // Krátký popis, co konfigurace obsahuje – do potvrzovacího dialogu, ať
+  // uživatel ví, co přepisuje, ještě než to potvrdí.
+  function describeConfig(config) {
+    const clean = sanitizeConfig(config);
+    return GROUPS.map(group => {
+      const g = clean[group.name];
+      if (!g) return null;
+      const parts = [];
+      if (g.labels) parts.push(Object.keys(g.labels).length + '× přejmenováno');
+      if (g.custom) parts.push(Object.keys(g.custom).length + '× vlastní volba');
+      if (g.hidden && g.hidden.length) parts.push(g.hidden.length + '× skryto');
+      if (g.order) parts.push('vlastní pořadí');
+      return parts.length ? group.label + ': ' + parts.join(', ') : null;
+    }).filter(Boolean);
+  }
+
   return {
     // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
     SETUP, ENTRY_LEVEL, OF_CONFIRM, FILL_STATUS,
@@ -265,6 +366,9 @@
     // dotazy
     allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey,
     visibleOptions, sanitizeMulti, sanitizeSingle, confluenceCount,
-    makeCustomKey
+    makeCustomKey,
+    // přenos mezi deníky a soubor
+    sanitizeConfig, exportPayload, configFromImport, describeConfig,
+    EXPORT_KIND, EXPORT_VERSION
   };
 }));
