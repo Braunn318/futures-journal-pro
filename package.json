@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.6.1",
-  "description": "Futures Journal PRO 4.6.1 – backtest: jednoznačné body u nových obchodů, kontextová pole obchodu (setup, hladina vstupu, order flow, stav naplnění, cena SL) a ruční přidání účtu pro oddělený backtest deník.",
+  "version": "4.6.2",
+  "description": "Futures Journal PRO 4.6.2 – editovatelné číselníky kontextu obchodu: přejmenování popisku, vlastní volby, skrývání místo mazání a změna pořadí.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

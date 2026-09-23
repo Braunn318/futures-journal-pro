@@ -1,18 +1,18 @@
 'use strict';
-// Číselníky pro backtest kontext obchodu (spec §4.2).
+// Číselníky pro kontext obchodu (spec §4.2), editovatelné uživatelem.
 //
-// Proč číselníky a ne volný text: podle čeho se nedá filtrovat, to se nedá
-// vyhodnotit. Dnes je kontext obchodu ve volném komentáři, takže se z něj
-// nedá udělat breakdown podle setupu ani podle hladiny vstupu.
+// ZÁKLADNÍ PRAVIDLO: každá volba má NEMĚNNÝ KLÍČ a EDITOVATELNÝ POPISEK.
+// V datech obchodu je vždy klíč, nikdy popisek. Přejmenování volby proto mění
+// jen to, co se zobrazuje – uložené obchody se nedotkne.
 //
-// Hodnoty jsou STABILNÍ KLÍČE, popisky jsou jen lokalizované řetězce pro UI.
-// Do dat se ukládá klíč, nikdy popisek – jinak by přejmenování popisku
-// znehodnotilo historii.
+// VOLBA SE NIKDY NEMAŽE, jen skrývá. Smazání volby by zneplatnilo obchody,
+// které ji používají: buď by z nich hodnota zmizela, nebo by v breakdownu
+// zůstal řádek bez názvu. Skrytá volba se dál počítá do statistik a pořád se
+// zobrazuje u obchodů, které ji mají – jen se nenabízí u nových.
 //
-// Rozsah podle spec §1.1: zavádí se pět polí, která blokují start sběru dat
-// (setupCode, entryLevels, ofConfirm, fillStatus, slPrice). Zbytek číselníků
-// z §4.2 (target1Level, profileDay, structure, violations…) přijde souběžně
-// se sběrem, proto tu zatím nejsou – ať se nezavádí pole, která nikdo neplní.
+// ALIASY slouží ke slučování voleb, které se ukázaly jako totéž. Aliasovaný
+// klíč zůstává platný (starý obchod ho může mít uložený), ale ve statistikách
+// se počítá pod cílovým klíčem a nenabízí se.
 //
 // Modul se načítá přes <script src> před hlavním skriptem (bundler v projektu
 // není) a zároveň jde načíst v Node testech.
@@ -22,6 +22,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.FJTaxonomy = api;
 }(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+
+  // ---------------------------------------------------------------- výchozí
 
   // Setup – odpovídá Strategy.md.
   const SETUP = {
@@ -48,8 +50,8 @@
     OTHER: 'Jiný / mimo strategii'
   };
 
-  // Hladina, na které ležel vstup. MULTI-SELECT, protože konfluence hladin je
-  // sama o sobě informace – kolik jich bylo, se dopočítává jako confluenceCount.
+  // Hladina, na které ležel vstup. MULTI-SELECT – konfluence hladin je sama
+  // o sobě informace.
   const ENTRY_LEVEL = {
     LIQUIDITY: 'Likvidita',
     VPOC_DAY: 'VPOC dne',
@@ -85,8 +87,7 @@
     NONE: 'Bez potvrzení'
   };
 
-  // Stav naplnění. Povinné u backtest záznamů – bez něj statistika měří jen
-  // přeživší obchody a je systematicky optimistická.
+  // Stav naplnění. Bez něj statistika měří jen přeživší obchody.
   const FILL_STATUS = {
     FILLED: 'naplněno',
     NO_FILL: 'limitka se nenaplnila',
@@ -94,8 +95,29 @@
     SKIPPED: 'setup byl, vědomě vynechán'
   };
 
-  // Popis polí na obchodu: kardinalita rozhoduje, jak se pole chová při
-  // slučování víc cílů do jednoho obchodu (spec §2.1) a jak se vykresluje.
+  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, FILL_STATUS };
+
+  // Sloučené volby. Klíč vlevo zůstává PLATNÝ (starý obchod ho může mít
+  // uložený), ale ve statistikách se počítá pod klíčem vpravo a u nových
+  // obchodů se nenabízí.
+  //
+  // MEGA_BID/MEGA_ASK jsou v praxi totéž co absorpce – rozlišovat je znamenalo
+  // dělit malý vzorek na dvě poloviny, ze kterých nejde nic vyčíst.
+  // VPOC_CANDLE je VPOC jednominutové svíce, tedy VPOC_1M jiným jménem.
+  // VWAP_DEV se ZÁMĚRNĚ neslučuje: odchylka VWAP je jiná hladina než VAH/VAL
+  // a počítá se jinak.
+  const DEFAULT_ALIASES = {
+    OF_CONFIRM: { MEGA_BID: 'ABS_BID', MEGA_ASK: 'ABS_ASK' },
+    ENTRY_LEVEL: { VPOC_CANDLE: 'VPOC_1M' }
+  };
+
+  const GROUPS = [
+    { name: 'SETUP', label: 'Setup', cardinality: 'single' },
+    { name: 'ENTRY_LEVEL', label: 'Hladina vstupu', cardinality: 'multi' },
+    { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
+    { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' }
+  ];
+
   const TRADE_CONTEXT_FIELDS = [
     { key: 'setupCode', cardinality: 'single', enumName: 'SETUP', label: 'Setup' },
     { key: 'entryLevels', cardinality: 'multi', enumName: 'ENTRY_LEVEL', label: 'Hladina vstupu' },
@@ -104,40 +126,145 @@
     { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' }
   ];
 
-  const ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, FILL_STATUS };
+  // ------------------------------------------------------- uživatelská úprava
 
-  function labelOf(enumName, key) {
-    const table = ENUMS[enumName];
-    if (!table) return String(key || '');
-    return table[key] || String(key || '');
+  // Tvar uloženého nastavení (settings.taxonomy):
+  //   { ENTRY_LEVEL: { labels:{KLÍČ:'nový popisek'}, hidden:['KLÍČ'],
+  //                    order:['KLÍČ',…], custom:{KLÍČ:'popisek'} }, … }
+  // Všechno je nepovinné; chybějící skupina znamená „beze změny".
+  let activeConfig = {};
+
+  function applyConfig(config) {
+    activeConfig = (config && typeof config === 'object') ? config : {};
+    return activeConfig;
   }
 
-  function isValidKey(enumName, key) {
-    const table = ENUMS[enumName];
-    return !!(table && Object.prototype.hasOwnProperty.call(table, key));
+  function getConfig() {
+    return activeConfig;
   }
 
-  // Očistí hodnotu multi-select pole: jen známé klíče, bez duplicit, stabilní
-  // pořadí podle číselníku. Neznámý klíč se zahazuje – do dat nesmí prosáknout
-  // překlep, který by pak v breakdownu vytvořil vlastní řádek.
-  function sanitizeMulti(enumName, values) {
-    const table = ENUMS[enumName] || {};
+  function groupConfig(group, config) {
+    const source = config || activeConfig;
+    const g = source && source[group];
+    return (g && typeof g === 'object') ? g : {};
+  }
+
+  // Všechny klíče skupiny včetně vlastních – i skryté a aliasované. Tohle je
+  // množina PLATNÝCH hodnot, ne nabídka pro uživatele.
+  function allKeys(group, config) {
+    const g = groupConfig(group, config);
+    const custom = (g.custom && typeof g.custom === 'object') ? Object.keys(g.custom) : [];
+    const base = Object.keys(DEFAULT_ENUMS[group] || {});
+    const merged = [...base, ...custom.filter(k => !base.includes(k))];
+    const order = Array.isArray(g.order) ? g.order : [];
+    if (!order.length) return merged;
+    // Klíče neuvedené v pořadí (např. nově přidané do výchozího číselníku
+    // aktualizací appky) se přidají na konec, nikdy nezmizí.
+    const ordered = order.filter(k => merged.includes(k));
+    return [...ordered, ...merged.filter(k => !ordered.includes(k))];
+  }
+
+  function aliasesFor(group, config) {
+    const g = groupConfig(group, config);
+    const custom = (g.aliases && typeof g.aliases === 'object') ? g.aliases : {};
+    return { ...(DEFAULT_ALIASES[group] || {}), ...custom };
+  }
+
+  // Aliasovaný klíč se ve statistikách počítá pod cílovým klíčem.
+  function canonicalKey(group, key, config) {
+    const aliases = aliasesFor(group, config);
+    let current = key;
+    // Řetězec aliasů se rozplete, ale s pojistkou proti zacyklení.
+    for (let i = 0; i < 5 && aliases[current]; i++) current = aliases[current];
+    return current;
+  }
+
+  // Skryté klíče: co uživatel skryl, plus aliasované (ty se nenabízejí nikdy).
+  function hiddenKeys(group, config) {
+    const g = groupConfig(group, config);
+    const explicit = Array.isArray(g.hidden) ? g.hidden : [];
+    const unhidden = Array.isArray(g.visible) ? g.visible : [];
+    const aliased = Object.keys(aliasesFor(group, config));
+    return new Set([...explicit, ...aliased].filter(k => !unhidden.includes(k)));
+  }
+
+  function isHidden(group, key, config) {
+    return hiddenKeys(group, config).has(key);
+  }
+
+  function labelOf(group, key, config) {
+    if (!key) return '';
+    const g = groupConfig(group, config);
+    const labels = (g.labels && typeof g.labels === 'object') ? g.labels : {};
+    const custom = (g.custom && typeof g.custom === 'object') ? g.custom : {};
+    const base = DEFAULT_ENUMS[group] || {};
+    // Neznámý klíč se vrací, jak přišel – v UI je pak vidět, že něco nesedí,
+    // místo tichého prázdna.
+    return labels[key] || custom[key] || base[key] || String(key);
+  }
+
+  function isValidKey(group, key, config) {
+    return allKeys(group, config).includes(key);
+  }
+
+  // Nabídka pro NOVÝ obchod: ve zvoleném pořadí, bez skrytých a aliasovaných.
+  // `keepSelected` vrátí i skryté klíče, které obchod už má uložené – jinak by
+  // se editací obchodu jeho hodnota tiše ztratila.
+  function visibleOptions(group, keepSelected, config) {
+    const keep = new Set(Array.isArray(keepSelected) ? keepSelected : (keepSelected ? [keepSelected] : []));
+    const hidden = hiddenKeys(group, config);
+    return allKeys(group, config)
+      .filter(k => !hidden.has(k) || keep.has(k))
+      .map(k => ({ key: k, label: labelOf(group, k, config), hidden: hidden.has(k) }));
+  }
+
+  // Očistí multi-select hodnotu: jen PLATNÉ klíče, bez duplicit, ve stabilním
+  // pořadí. Skryté ani aliasované klíče se NEZAHAZUJÍ – obchod, který je má,
+  // si je musí ponechat. Zahazuje se jen klíč, který v číselníku vůbec není.
+  function sanitizeMulti(group, values, config) {
     const wanted = new Set(Array.isArray(values) ? values : []);
-    return Object.keys(table).filter(k => wanted.has(k));
+    return allKeys(group, config).filter(k => wanted.has(k));
   }
 
-  function sanitizeSingle(enumName, value) {
-    return isValidKey(enumName, value) ? value : '';
+  function sanitizeSingle(group, value, config) {
+    return isValidKey(group, value, config) ? value : '';
   }
 
-  // Počet hladin v konfluenci: `NONE` se nepočítá, je to výslovné „žádná".
-  function confluenceCount(entryLevels) {
-    return sanitizeMulti('ENTRY_LEVEL', entryLevels).filter(k => k !== 'NONE').length;
+  // Konfluence: `NONE` je výslovné „žádná hladina", takže se nepočítá.
+  function confluenceCount(entryLevels, config) {
+    return sanitizeMulti('ENTRY_LEVEL', entryLevels, config).filter(k => k !== 'NONE').length;
+  }
+
+  // Klíč pro vlastní volbu. Odvozuje se z popisku, aby byl čitelný i v CSV,
+  // ale po vytvoření se už NIKDY nemění – přejmenování volby mění jen popisek.
+  function makeCustomKey(group, label, config) {
+    const base = 'CUSTOM_' + String(label || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+      .slice(0, 32);
+    const taken = new Set(allKeys(group, config));
+    if (base === 'CUSTOM_') return uniqueKey('CUSTOM_VOLBA', taken);
+    return uniqueKey(base, taken);
+  }
+
+  function uniqueKey(base, taken) {
+    if (!taken.has(base)) return base;
+    for (let i = 2; i < 999; i++) {
+      const candidate = base + '_' + i;
+      if (!taken.has(candidate)) return candidate;
+    }
+    return base + '_' + Date.now();
   }
 
   return {
+    // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
     SETUP, ENTRY_LEVEL, OF_CONFIRM, FILL_STATUS,
-    ENUMS, TRADE_CONTEXT_FIELDS,
-    labelOf, isValidKey, sanitizeMulti, sanitizeSingle, confluenceCount
+    ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, TRADE_CONTEXT_FIELDS,
+    // konfigurace
+    applyConfig, getConfig, groupConfig,
+    // dotazy
+    allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey,
+    visibleOptions, sanitizeMulti, sanitizeSingle, confluenceCount,
+    makeCustomKey
   };
 }));

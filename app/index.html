@@ -119,6 +119,11 @@ canvas{width:100%;height:100%}
 .chip:hover{border-color:var(--hover-border)}
 .chip.on{background:rgba(var(--blue-rgb),.18);border-color:var(--blue)}
 .pill.context-pill{background:rgba(var(--tint-rgb),.10);font-size:10px;padding:1px 6px;opacity:.9}
+.tax-row{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}
+.tax-row.hidden-option input{opacity:.5;font-style:italic}
+.tax-row .tax-key{font-size:10px;color:var(--muted);font-family:ui-monospace,Consolas,monospace}
+.tax-actions{display:flex;gap:4px}
+.tax-actions button{padding:3px 8px;font-size:12px;min-width:auto}
 /* Směr obchodu je záměrně modrá/žlutá, ne zelená/červená – ta je v celé aplikaci
    vyhrazená pro zisk/ztrátu a směr je na výsledku nezávislý. */
 .pill.side-pill.long{background:rgba(var(--blue-rgb),.15);color:var(--blue)}
@@ -701,6 +706,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <button class="active" data-subtab="settingsGeneral">Obecné</button>
         <button data-subtab="settingsRisk">Riziko</button>
         <button data-subtab="settingsTemplates">Šablony</button>
+        <button data-subtab="settingsTaxonomy">Číselníky</button>
         <button data-subtab="settingsBackup">Data a zálohy</button>
       </div>
 
@@ -831,6 +837,16 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <button class="btn danger" id="backfillSideBtn" style="margin-top:10px">Doplnit směr v aktivním deníku</button>
             <div class="sub" id="backfillSideReport" style="margin-top:10px"></div>
           </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="subsection" id="settingsTaxonomy">
+      <div class="settings-grid">
+        <div class="card">
+          <h3>Číselníky kontextu obchodu</h3>
+          <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volba se nemaže, jen skrývá: skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových.</p>
+          <div id="taxonomyGroups"></div>
         </div>
       </div>
       </div>
@@ -1270,6 +1286,9 @@ async function load(){
  if(!settings.risk||typeof settings.risk!=='object')settings.risk={};
  // Jednorázová migrace ze starého jednoduchého denního limitu, pokud nový ještě nebyl nastaven.
  if(!settings.risk.maxDailyDrawdown && settings.dailyLossLimit) settings.risk.maxDailyDrawdown=settings.dailyLossLimit;
+ // Uživatelská úprava číselníků se musí projevit dřív, než se cokoli
+ // vykreslí – jinak by seznam obchodů ukázal výchozí popisky.
+ FJTaxonomy.applyConfig(settings.taxonomy);
  fillSettings(); renderAll();
  setTimeout(initAccountOverview,60);
 }
@@ -1287,6 +1306,7 @@ function fillSettings(){
  $('riskProfitTargetPerDay').value=r.profitTargetPerDay||'';
  if($('useConnectorCommission'))$('useConnectorCommission').value=settings.useConnectorCommission===true?'ano':'ne';
  renderTemplateList();
+ renderTaxonomyEditor();
  fillThemeSettingsUI();
 }
 async function persistSettings(patch){
@@ -1911,23 +1931,151 @@ function legPillHTML(l,i){
 // celkový bodový zisk pozice (10 bodů) – viz GitHub issue #8. Tahle funkce
 // dopočítá "total" body váhou počtu kontraktů, ať už jde o jeden cíl nebo víc
 // (TP1/TP2/BE), kde se sčítá přes všechny cíle.
+// ---- Editor číselníků (Nastavení → Číselníky) ----
+// Úpravy se ukládají do nastavení deníku jako "co se liší od výchozího",
+// ne jako celý číselník. Když se výchozí číselník v nové verzi appky
+// rozšíří, nové volby se objeví i tomu, kdo si už něco upravil.
+function taxonomyConfig(){
+ const cfg=settings.taxonomy;
+ return (cfg&&typeof cfg==='object')?structuredClone(cfg):{};
+}
+async function saveTaxonomyConfig(next){
+ FJTaxonomy.applyConfig(next);
+ await persistSettings({taxonomy:next});
+ renderTaxonomyEditor();
+}
+function taxonomyGroupPatch(cfg,group){
+ if(!cfg[group]||typeof cfg[group]!=='object')cfg[group]={};
+ return cfg[group];
+}
+function renderTaxonomyEditor(){
+ const host=$('taxonomyGroups'); if(!host)return;
+ host.innerHTML=FJTaxonomy.GROUPS.map(group=>{
+  const keys=FJTaxonomy.allKeys(group.name);
+  const aliases=FJTaxonomy.aliasesFor(group.name);
+  const rows=keys.map((key,index)=>{
+   const hidden=FJTaxonomy.isHidden(group.name,key);
+   const alias=aliases[key];
+   const aliasNote=alias?` → sloučeno do „${esc(FJTaxonomy.labelOf(group.name,alias))}"`:'';
+   return `<div class="tax-row${hidden?' hidden-option':''}" data-group="${esc(group.name)}" data-key="${esc(key)}">
+    <div><input type="text" class="tax-label" value="${esc(FJTaxonomy.labelOf(group.name,key))}" aria-label="Popisek volby">
+     <div class="tax-key">${esc(key)}${aliasNote}</div></div>
+    <div class="tax-actions">
+     <button type="button" class="btn tax-up" ${index===0?'disabled':''} title="Posunout nahoru">↑</button>
+     <button type="button" class="btn tax-down" ${index===keys.length-1?'disabled':''} title="Posunout dolů">↓</button>
+    </div>
+    <div class="tax-actions"><button type="button" class="btn tax-toggle">${hidden?'Zobrazit':'Skrýt'}</button></div>
+    <div class="sub" style="font-size:11px">${hidden?'skrytá':''}</div>
+   </div>`;
+  }).join('');
+  return `<details style="margin-bottom:14px"${group.name==='ENTRY_LEVEL'?' open':''}>
+   <summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">${esc(group.label)} <span class="sub">(${keys.length} voleb)</span></summary>
+   <div style="margin-top:10px">${rows}</div>
+   <div class="mapping-row" style="margin-top:10px">
+    <input type="text" class="tax-new" data-group="${esc(group.name)}" placeholder="Nová volba – napiš popisek">
+    <button type="button" class="btn tax-add" data-group="${esc(group.name)}">Přidat volbu</button>
+   </div>
+  </details>`;
+ }).join('');
+ wireTaxonomyEditor();
+}
+function wireTaxonomyEditor(){
+ // Přejmenování: mění se POUZE popisek, klíč zůstává. Proto se dá popisek
+ // upravit i u volby, která je už použitá ve stovkách obchodů.
+ document.querySelectorAll('#taxonomyGroups .tax-label').forEach(input=>{
+  input.onchange=async()=>{
+   const row=input.closest('.tax-row');
+   const group=row.dataset.group,key=row.dataset.key;
+   const value=String(input.value||'').trim();
+   const cfg=taxonomyConfig();
+   const g=taxonomyGroupPatch(cfg,group);
+   g.labels=g.labels||{};
+   const isCustom=g.custom&&Object.prototype.hasOwnProperty.call(g.custom,key);
+   if(!value){
+    // Prázdný popisek by udělal volbu bez názvu – vrátí se výchozí.
+    delete g.labels[key];
+    if(isCustom&&!g.custom[key])g.custom[key]=key;
+   }else if(isCustom){g.custom[key]=value;delete g.labels[key]}
+   else if(value===FJTaxonomy.DEFAULT_ENUMS[group]?.[key])delete g.labels[key];
+   else g.labels[key]=value;
+   await saveTaxonomyConfig(cfg);
+   showToast('Popisek upraven. Uložené obchody se nemění – v datech je klíč, ne text.');
+  };
+ });
+ // Skrytí: nikdy ne mazání. Smazaná volba by zneplatnila obchody, které ji
+ // používají; skrytá se dál počítá do statistik.
+ document.querySelectorAll('#taxonomyGroups .tax-toggle').forEach(btn=>{
+  btn.onclick=async()=>{
+   const row=btn.closest('.tax-row');
+   const group=row.dataset.group,key=row.dataset.key;
+   const cfg=taxonomyConfig();
+   const g=taxonomyGroupPatch(cfg,group);
+   g.hidden=Array.isArray(g.hidden)?g.hidden:[];
+   g.visible=Array.isArray(g.visible)?g.visible:[];
+   if(FJTaxonomy.isHidden(group,key)){
+    g.hidden=g.hidden.filter(k=>k!==key);
+    if(!g.visible.includes(key))g.visible.push(key);
+   }else{
+    g.visible=g.visible.filter(k=>k!==key);
+    if(!g.hidden.includes(key))g.hidden.push(key);
+   }
+   await saveTaxonomyConfig(cfg);
+  };
+ });
+ const move=async(row,delta)=>{
+  const group=row.dataset.group,key=row.dataset.key;
+  const cfg=taxonomyConfig();
+  const g=taxonomyGroupPatch(cfg,group);
+  const keys=FJTaxonomy.allKeys(group);
+  const from=keys.indexOf(key),to=from+delta;
+  if(from<0||to<0||to>=keys.length)return;
+  keys.splice(to,0,keys.splice(from,1)[0]);
+  g.order=keys;
+  await saveTaxonomyConfig(cfg);
+ };
+ document.querySelectorAll('#taxonomyGroups .tax-up').forEach(b=>b.onclick=()=>move(b.closest('.tax-row'),-1));
+ document.querySelectorAll('#taxonomyGroups .tax-down').forEach(b=>b.onclick=()=>move(b.closest('.tax-row'),1));
+ document.querySelectorAll('#taxonomyGroups .tax-add').forEach(btn=>{
+  btn.onclick=async()=>{
+   const group=btn.dataset.group;
+   const input=document.querySelector(`#taxonomyGroups .tax-new[data-group="${CSS.escape(group)}"]`);
+   const label=String(input.value||'').trim();
+   if(!label){showToast('Napiš popisek nové volby.');return}
+   const cfg=taxonomyConfig();
+   const g=taxonomyGroupPatch(cfg,group);
+   g.custom=g.custom||{};
+   // Klíč se odvodí z popisku jen jednou, při vytvoření. Další
+   // přejmenování už mění výhradně popisek.
+   const key=FJTaxonomy.makeCustomKey(group,label);
+   g.custom[key]=label;
+   input.value='';
+   await saveTaxonomyConfig(cfg);
+   showToast(`Volba „${label}" přidána pod klíčem ${key}.`);
+  };
+ });
+}
+
 // ---- Kontextová pole obchodu (spec §4.2) ----
 // Do dat se ukládají KLÍČE číselníku, ne popisky. Popisek je jen zobrazení,
 // takže se dá přeložit nebo upravit bez znehodnocení historie.
-function fillContextSelect(id,enumName,emptyLabel){
+function fillContextSelect(id,enumName,emptyLabel,selected){
  const el=$(id); if(!el)return;
- const table=FJTaxonomy.ENUMS[enumName]||{};
+ // `selected` se předává, aby se u obchodu, který má uloženou skrytou volbu,
+ // ta volba pořád nabídla – jinak by se editací obchodu tiše ztratila.
+ const options=FJTaxonomy.visibleOptions(enumName,selected);
  el.innerHTML=`<option value="">${esc(emptyLabel)}</option>`
-  +Object.keys(table).map(k=>`<option value="${esc(k)}">${esc(table[k])}</option>`).join('');
+  +options.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('');
 }
 // Mřížka dlaždic pro multi-select. Stav drží samotný DOM (class "on"), ať
 // není potřeba další zdroj pravdy vedle formuláře.
 function renderChipGrid(id,enumName,selected){
  const el=$(id); if(!el)return;
- const table=FJTaxonomy.ENUMS[enumName]||{};
  const on=new Set(FJTaxonomy.sanitizeMulti(enumName,selected));
- el.innerHTML=Object.keys(table).map(k=>
-  `<span class="chip${on.has(k)?' on':''}" data-key="${esc(k)}" role="button" tabindex="0">${esc(table[k])}</span>`).join('');
+ // Skrytá volba se nenabízí, ale pokud ji obchod má, zůstane v mřížce
+ // vybraná – editace obchodu nesmí jeho data osekat.
+ const options=FJTaxonomy.visibleOptions(enumName,[...on]);
+ el.innerHTML=options.map(o=>
+  `<span class="chip${on.has(o.key)?' on':''}" data-key="${esc(o.key)}" role="button" tabindex="0"${o.hidden?' title="Skrytá volba – zůstává u tohoto obchodu, novým se nenabízí"':''}>${esc(o.label)}${o.hidden?' ·':''}</span>`).join('');
  el.querySelectorAll('.chip').forEach(chip=>{
   const toggle=()=>{chip.classList.toggle('on');updateConfluenceHint()};
   chip.onclick=toggle;
@@ -2329,8 +2477,8 @@ function openModal(t=null){
  renderSlPriceHint(t||null);
  // Číselníky se plní z taxonomy.js, ne z HTML – jeden zdroj pravdy pro UI,
  // statistiky i export.
- fillContextSelect('setupCode','SETUP','— nevyplněno —');
- fillContextSelect('fillStatus','FILL_STATUS','— nevyplněno —');
+ fillContextSelect('setupCode','SETUP','— nevyplněno —',t&&t.setupCode);
+ fillContextSelect('fillStatus','FILL_STATUS','— nevyplněno —',t&&t.fillStatus);
  if($('setupCode'))$('setupCode').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode);
  if($('fillStatus'))$('fillStatus').value=FJTaxonomy.sanitizeSingle('FILL_STATUS',t&&t.fillStatus);
  renderChipGrid('entryLevels','ENTRY_LEVEL',t&&t.entryLevels);
