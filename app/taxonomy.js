@@ -87,6 +87,14 @@
     NONE: 'Bez potvrzení'
   };
 
+  // Trend v době vstupu. SINGLE-SELECT – trh je v jednu chvíli v jednom
+  // z těch tří stavů, ne ve dvou naráz.
+  const TREND = {
+    LONG: 'Long',
+    SHORT: 'Short',
+    RANGE: 'Range'
+  };
+
   // Stav naplnění. Bez něj statistika měří jen přeživší obchody.
   const FILL_STATUS = {
     FILLED: 'naplněno',
@@ -95,7 +103,7 @@
     SKIPPED: 'setup byl, vědomě vynechán'
   };
 
-  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, FILL_STATUS };
+  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS };
 
   // Sloučené volby. Klíč vlevo zůstává PLATNÝ (starý obchod ho může mít
   // uložený), ale ve statistikách se počítá pod klíčem vpravo a u nových
@@ -111,16 +119,34 @@
     ENTRY_LEVEL: { VPOC_CANDLE: 'VPOC_1M' }
   };
 
+  // `optionsFrom` znamená, že skupina SDÍLÍ SEZNAM VOLEB s jinou skupinou.
+  // Hladina je hladina, ať se na ni kouká jako na místo vstupu, nebo jako na
+  // překážku před targetem – proto se udržuje na jednom místě a přejmenování
+  // i nová vlastní volba platí rovnou pro všechny tři kolonky. Skrývání a
+  // pořadí si ale každá kolonka může nastavit vlastní.
   const GROUPS = [
     { name: 'SETUP', label: 'Setup', cardinality: 'single' },
+    { name: 'TREND', label: 'Trend', cardinality: 'single' },
     { name: 'ENTRY_LEVEL', label: 'Hladina vstupu', cardinality: 'multi' },
+    { name: 'SR_TARGET', label: 'SR proti targetu', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
+    { name: 'SR_SL', label: 'SR proti S/L', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
     { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' }
   ];
 
+  const GROUP_BY_NAME = Object.fromEntries(GROUPS.map(g => [g.name, g]));
+
+  // Skupina, ze které se berou volby a jejich popisky.
+  function vocabularyOf(group) {
+    return GROUP_BY_NAME[group]?.optionsFrom || group;
+  }
+
   const TRADE_CONTEXT_FIELDS = [
     { key: 'setupCode', cardinality: 'single', enumName: 'SETUP', label: 'Setup' },
+    { key: 'trend', cardinality: 'single', enumName: 'TREND', label: 'Trend' },
     { key: 'entryLevels', cardinality: 'multi', enumName: 'ENTRY_LEVEL', label: 'Hladina vstupu' },
+    { key: 'srTarget', cardinality: 'multi', enumName: 'SR_TARGET', label: 'SR proti targetu' },
+    { key: 'srStopLoss', cardinality: 'multi', enumName: 'SR_SL', label: 'SR proti S/L' },
     { key: 'ofConfirm', cardinality: 'multi', enumName: 'OF_CONFIRM', label: 'Order flow potvrzení' },
     { key: 'fillStatus', cardinality: 'single', enumName: 'FILL_STATUS', label: 'Stav naplnění' },
     { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' }
@@ -152,9 +178,13 @@
   // Všechny klíče skupiny včetně vlastních – i skryté a aliasované. Tohle je
   // množina PLATNÝCH hodnot, ne nabídka pro uživatele.
   function allKeys(group, config) {
-    const g = groupConfig(group, config);
+    // Volby i vlastní volby se berou ze zdrojové skupiny, pořadí si ale může
+    // každá kolonka nastavit vlastní (níž `groupConfig(group)`).
+    const vocab = vocabularyOf(group);
+    const v = groupConfig(vocab, config);
+    const g = vocab === group ? v : { ...groupConfig(group, config), custom: v.custom };
     const custom = (g.custom && typeof g.custom === 'object') ? Object.keys(g.custom) : [];
-    const base = Object.keys(DEFAULT_ENUMS[group] || {});
+    const base = Object.keys(DEFAULT_ENUMS[vocab] || {});
     const merged = [...base, ...custom.filter(k => !base.includes(k))];
     const order = Array.isArray(g.order) ? g.order : [];
     if (!order.length) return merged;
@@ -165,9 +195,10 @@
   }
 
   function aliasesFor(group, config) {
-    const g = groupConfig(group, config);
+    const vocab = vocabularyOf(group);
+    const g = groupConfig(vocab, config);
     const custom = (g.aliases && typeof g.aliases === 'object') ? g.aliases : {};
-    return { ...(DEFAULT_ALIASES[group] || {}), ...custom };
+    return { ...(DEFAULT_ALIASES[vocab] || {}), ...custom };
   }
 
   // Aliasovaný klíč se ve statistikách počítá pod cílovým klíčem.
@@ -181,7 +212,14 @@
 
   // Skryté klíče: co uživatel skryl, plus aliasované (ty se nenabízejí nikdy).
   function hiddenKeys(group, config) {
-    const g = groupConfig(group, config);
+    // Kolonka si smí skrýt volbu sama pro sebe. Když vlastní nastavení nemá,
+    // zdědí ho ze zdrojové skupiny – co je skryté u hladiny vstupu, nemá
+    // smysl nabízet ani u SR kolonek.
+    const own = groupConfig(group, config);
+    const vocab = vocabularyOf(group);
+    const inherited = vocab === group ? {} : groupConfig(vocab, config);
+    const hasOwn = Array.isArray(own.hidden) || Array.isArray(own.visible);
+    const g = hasOwn ? own : inherited;
     const explicit = Array.isArray(g.hidden) ? g.hidden : [];
     const unhidden = Array.isArray(g.visible) ? g.visible : [];
     const aliased = Object.keys(aliasesFor(group, config));
@@ -194,10 +232,13 @@
 
   function labelOf(group, key, config) {
     if (!key) return '';
-    const g = groupConfig(group, config);
+    // Popisek je vlastnost VOLBY, ne kolonky – přejmenovaná hladina se tak
+    // stejně jmenuje u vstupu i u obou SR kolonek.
+    const vocab = vocabularyOf(group);
+    const g = groupConfig(vocab, config);
     const labels = (g.labels && typeof g.labels === 'object') ? g.labels : {};
     const custom = (g.custom && typeof g.custom === 'object') ? g.custom : {};
-    const base = DEFAULT_ENUMS[group] || {};
+    const base = DEFAULT_ENUMS[vocab] || {};
     // Neznámý klíč se vrací, jak přišel – v UI je pak vidět, že něco nesedí,
     // místo tichého prázdna.
     return labels[key] || custom[key] || base[key] || String(key);
@@ -276,7 +317,7 @@
       const g = raw[group.name];
       if (!g || typeof g !== 'object') continue;
       const clean = {};
-      const defaults = DEFAULT_ENUMS[group.name] || {};
+      const defaults = DEFAULT_ENUMS[vocabularyOf(group.name)] || {};
 
       const custom = {};
       if (g.custom && typeof g.custom === 'object') {
@@ -359,8 +400,8 @@
 
   return {
     // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
-    SETUP, ENTRY_LEVEL, OF_CONFIRM, FILL_STATUS,
-    ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, TRADE_CONTEXT_FIELDS,
+    SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS,
+    ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, TRADE_CONTEXT_FIELDS,
     // konfigurace
     applyConfig, getConfig, groupConfig,
     // dotazy

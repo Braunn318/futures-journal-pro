@@ -143,13 +143,49 @@ test('import z konektoru označí obchod jako naplněný', () => {
 test('popis polí drží kardinalitu, na které stojí pravidla slučování', () => {
   const byKey = Object.fromEntries(FJTaxonomy.TRADE_CONTEXT_FIELDS.map(f => [f.key, f]));
   assert.equal(byKey.setupCode.cardinality, 'single');
+  assert.equal(byKey.trend.cardinality, 'single');
   assert.equal(byKey.entryLevels.cardinality, 'multi');
+  assert.equal(byKey.srTarget.cardinality, 'multi');
+  assert.equal(byKey.srStopLoss.cardinality, 'multi');
   assert.equal(byKey.ofConfirm.cardinality, 'multi');
   assert.equal(byKey.fillStatus.cardinality, 'single');
   assert.equal(byKey.slPrice.cardinality, 'number');
-  // Každé pole s číselníkem musí na existující číselník ukazovat.
+  // Každé pole s číselníkem musí mít použitelný seznam voleb. U odvozené
+  // skupiny (SR kolonky) vlastní enum neexistuje – volby se berou ze zdrojové
+  // skupiny, takže se kontroluje přes vocabularyOf.
   for (const field of FJTaxonomy.TRADE_CONTEXT_FIELDS) {
     if (!field.enumName) continue;
-    assert.ok(FJTaxonomy.ENUMS[field.enumName], `pole ${field.key} ukazuje na neexistující číselník ${field.enumName}`);
+    assert.ok(FJTaxonomy.GROUP_BY_NAME[field.enumName],
+      `pole ${field.key} ukazuje na neexistující skupinu ${field.enumName}`);
+    assert.ok(FJTaxonomy.allKeys(field.enumName).length,
+      `skupina ${field.enumName} nemá žádné volby`);
   }
+});
+
+test('Trend má tři stavy a je single-select', () => {
+  assert.deepEqual(Object.keys(FJTaxonomy.TREND), ['LONG', 'SHORT', 'RANGE']);
+  assert.equal(FJTaxonomy.labelOf('TREND', 'RANGE'), 'Range');
+  assert.equal(FJTaxonomy.sanitizeSingle('TREND', 'LONG'), 'LONG');
+  assert.equal(FJTaxonomy.sanitizeSingle('TREND', 'BOKEM'), '', 'neznámý stav se zahodí');
+});
+
+test('SR kolonky sdílejí seznam hladin se vstupem', () => {
+  // Hladina je hladina, ať je to místo vstupu nebo překážka před targetem.
+  // Díky sdílení se nová hladina přidává jen jednou.
+  assert.deepEqual(FJTaxonomy.allKeys('SR_TARGET'), FJTaxonomy.allKeys('ENTRY_LEVEL'));
+  assert.deepEqual(FJTaxonomy.allKeys('SR_SL'), FJTaxonomy.allKeys('ENTRY_LEVEL'));
+  assert.equal(FJTaxonomy.vocabularyOf('SR_TARGET'), 'ENTRY_LEVEL');
+  assert.equal(FJTaxonomy.vocabularyOf('ENTRY_LEVEL'), 'ENTRY_LEVEL', 'zdrojová skupina je sama sobě zdrojem');
+});
+
+test('nové kontextové kolonky přežijí sloučení víc cílů', () => {
+  const r = renderer();
+  const tp1 = contextTrade({ exitTime: '16:05', exitPrice: 7703, trend: 'LONG', srTarget: ['VAH'], srStopLoss: ['VWAP'] });
+  const tp2 = contextTrade({ exitTime: '16:09', exitPrice: 7705, points: 5, pnlRaw: 23.1, pnl: 23.1, srTarget: ['LIQUIDITY'] });
+
+  const merged = r.combineTradeObjects([tp1, tp2]);
+
+  assert.equal(merged.trend, 'LONG', 'single-select bere první neprázdný');
+  assert.deepEqual([...merged.srTarget], ['LIQUIDITY', 'VAH'], 'multi-select se sjednocuje');
+  assert.deepEqual([...merged.srStopLoss], ['VWAP']);
 });
