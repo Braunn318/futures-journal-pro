@@ -3,6 +3,7 @@
 All notable changes are logged here (one file, newest first).
 
 ## 4.6.2 - 2026-09-23
+- Fixed a crash that made the journal impossible to open at all: the enumeration editor referenced a variable before it was declared, and since it renders while the journal loads, the error surfaced as "Databázi se nepodařilo otevřít: Cannot access sourceLabel before initialization". The settings rendering had no test coverage, which is how it shipped; it now has smoke tests that render the editor, the transfer panel and the chip grids against a stub DOM, and they reproduce this exact failure when the fix is reverted.
 - Nastavení → Číselníky: the context dropdowns are now editable. A label can be renamed, custom options can be added, options can be reordered, and an option can be hidden so it stops being offered on new trades.
 - Renaming only ever changes the label. Every option has an immutable key and that key is what a trade stores, so a rename is purely a display change and cannot touch saved trades — a level can be reworded after hundreds of trades already use it.
 - There is no delete, by design. Deleting an option would leave the trades that use it holding a value outside the enumeration. Hiding is the replacement: a hidden option still counts in statistics, still shows on the trades that have it, and is still offered when editing such a trade so its value cannot be silently dropped. Hiding is reversible.

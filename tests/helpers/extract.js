@@ -96,8 +96,13 @@ function matchBracket(src, open) {
 
 // Vyřízne zdrojový text jedné deklarace: `function NAME(...) {...}`
 // nebo `const|let|var NAME = ...`.
+//
+// Název se do regexu escapuje: jedna funkce v projektu se jmenuje `$` (zkratka
+// za document.getElementById) a bez escapování by se z ní stala kotva konce
+// řádku, takže by se deklarace „nenašla".
 function extractDeclaration(src, name) {
-  const fnRe = new RegExp('(^|[\\n;])[ \\t]*(?:async[ \\t]+)?function[ \\t]+' + name + '[ \\t]*\\(');
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const fnRe = new RegExp('(^|[\\n;])[ \\t]*(?:async[ \\t]+)?function[ \\t]+' + escaped + '[ \\t]*\\(');
   let m = fnRe.exec(src);
   if (m) {
     const start = m.index + m[1].length;
@@ -106,7 +111,7 @@ function extractDeclaration(src, name) {
     if (brace < 0) throw new Error('extract: tělo funkce "' + name + '" nenalezeno');
     return src.slice(start, matchBracket(src, brace) + 1);
   }
-  const varRe = new RegExp('(^|[\\n;])[ \\t]*(?:const|let|var)[ \\t]+' + name + '[ \\t]*=');
+  const varRe = new RegExp('(^|[\\n;])[ \\t]*(?:const|let|var)[ \\t]+' + escaped + '[ \\t]*=');
   m = varRe.exec(src);
   if (m) {
     const start = m.index + m[1].length;

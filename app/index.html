@@ -1990,6 +1990,12 @@ function renderTaxonomyEditor(){
  host.innerHTML=FJTaxonomy.GROUPS.map(group=>{
   const keys=FJTaxonomy.allKeys(group.name);
   const aliases=FJTaxonomy.aliasesFor(group.name);
+  // Odvozená skupina sdílí seznam voleb, takže se v ní nepřejmenovává ani
+  // nepřidává – to se dělá jednou u zdrojové skupiny a platí pro všechny.
+  // POZOR na pořadí: `rows` níž tenhle příznak používá, takže musí být
+  // deklarovaný PŘED nimi.
+  const source=FJTaxonomy.vocabularyOf(group.name);
+  const sourceLabel=source===group.name?null:(FJTaxonomy.GROUP_BY_NAME[source]?.label||source);
   const rows=keys.map((key,index)=>{
    const hidden=FJTaxonomy.isHidden(group.name,key);
    const alias=aliases[key];
@@ -2005,10 +2011,6 @@ function renderTaxonomyEditor(){
     <div class="sub" style="font-size:11px">${hidden?'skrytá':''}</div>
    </div>`;
   }).join('');
-  // Odvozená skupina sdílí seznam voleb, takže se v ní nepřejmenovává ani
-  // nepřidává – to se dělá jednou u zdrojové skupiny a platí pro všechny.
-  const source=FJTaxonomy.vocabularyOf(group.name);
-  const sourceLabel=source===group.name?null:(FJTaxonomy.GROUP_BY_NAME[source]?.label||source);
   return `<details style="margin-bottom:14px"${group.name==='ENTRY_LEVEL'?' open':''}>
    <summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">${esc(group.label)} <span class="sub">(${keys.length} voleb)</span></summary>
    ${sourceLabel?`<p class="sub" style="margin-top:8px">Používá stejný seznam voleb jako <b>${esc(sourceLabel)}</b> – hladina je hladina, ať se na ni koukáš jako na místo vstupu, nebo jako na překážku. Přejmenovat volbu a přidat novou jde u „${esc(sourceLabel)}" a platí to pro obě kolonky. Skrýt a přeuspořádat si tady můžeš zvlášť.</p>`:''}
