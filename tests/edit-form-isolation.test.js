@@ -135,13 +135,20 @@ test('obchod bez obrázků otevře prázdný formulář a nespadne', () => {
 // ---------- Denní poznámky ----------
 
 function dayNotes(stored) {
-  const db = { data: { trades: [], settings: [], dayNotes: stored } };
-  const r = loadRenderer(['emptyDayNote', 'getDayNote', 'saveDayNote'], {
-    db,
-    ensureActiveJournalData: async () => db.data,
-    persistDB: async () => {}
-  });
-  return { db, ...r };
+  const r = loadRenderer(
+    ['emptyDayNote', 'getDayNote', 'ensureActiveJournalData', 'commitJournal', 'saveDayNote'],
+    {
+      db: { data: { trades: [], settings: [], dayNotes: stored }, close() {} },
+      activeJournalId: 'j1',
+      window: { desktopAPI: { writeJournal: async () => ({ ok: true }) } }
+    });
+  return {
+    getDayNote: r.getDayNote,
+    saveDayNote: r.saveDayNote,
+    // Uložením se `db` nahradí novým objektem (viz commitJournal), takže se
+    // uložený stav musí číst z kontextu, ne z reference, se kterou test začínal.
+    stored: () => vm.runInContext('db.data.dayNotes', r.__context)
+  };
 }
 
 test('getDayNote vrací vlastní seznam obrázků, ne ten uložený', () => {
@@ -163,8 +170,8 @@ test('odebrání obrázku ze dne se projeví teprve po uložení', async () => {
   note.images.splice(1, 1);
   await api.saveDayNote('2026-09-25', { images: note.images });
 
-  assert.deepEqual([...api.db.data.dayNotes['2026-09-25'].images], ['a', 'c']);
-  assert.equal(api.db.data.dayNotes['2026-09-25'].comment, 'den', 'ostatní pole zůstanou');
+  assert.deepEqual([...api.stored()['2026-09-25'].images], ['a', 'c']);
+  assert.equal(api.stored()['2026-09-25'].comment, 'den', 'ostatní pole zůstanou');
 });
 
 test('poznámka bez textu i obrázků se uložením smaže', async () => {
@@ -175,5 +182,5 @@ test('poznámka bez textu i obrázků se uložením smaže', async () => {
   note.images.splice(0, 1);
   await api.saveDayNote('2026-09-25', { images: note.images });
 
-  assert.equal('2026-09-25' in api.db.data.dayNotes, false);
+  assert.equal('2026-09-25' in api.stored(), false);
 });

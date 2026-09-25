@@ -1149,27 +1149,45 @@ async function ensureActiveJournalData(){
  db={data,close(){}};
  return db.data;
 }
-async function persistDB(){
- const data=await ensureActiveJournalData();
- const result=await window.desktopAPI.writeJournal(activeJournalId,data);
+// Jediná cesta, kterou se deník zapisuje. Úprava se provede na KOPII dat a do
+// paměti se propíše teprve po úspěšném zápisu na disk. Dřív se měnila data
+// v paměti a teprve pak se zapisovalo, takže neúspěšný zápis (plný disk,
+// zamčený soubor, spadlý zápis) nechal aplikaci ukazovat změnu, která nikde
+// není – a ta se při nejbližším úspěšném uložení čehokoli jiného buď tiše
+// zafixovala, nebo naopak zmizela. Když zápis selže, `apply` se zahodí
+// i s kopií a aplikace dál ukazuje přesně to, co v deníku opravdu je.
+//
+// `apply` je ZÁMĚRNĚ synchronní: mezi vytvořením kopie a zápisem nesmí být
+// žádné čekání, jinak by se do té mezery vešel jiný zápis (třeba automatický
+// import z konektoru) a jeho výsledek by se kopií přepsal.
+//
+// Kopírovat celý deník je levné právě proto, že screenshoty v něm jsou jen
+// jako odkazy na soubory – deník má řádově stovky kB, ne stovky MB.
+async function commitJournal(apply){
+ const current=await ensureActiveJournalData();
+ const next=structuredClone(current);
+ const outcome=apply(next);
+ const result=await window.desktopAPI.writeJournal(activeJournalId,next);
  if(!result?.ok)throw new Error(result?.error||'Data deníku nelze uložit.');
+ db={data:next,close(){}};
+ return outcome;
 }
 async function getAll(name){
  const data=await ensureActiveJournalData();
  return structuredClone(data[name]||[]);
 }
 async function put(name,val){
- const data=await ensureActiveJournalData();
- const rows=data[name]||(data[name]=[]);
- const key=name==='trades'?'id':'key';
- const idx=rows.findIndex(x=>x?.[key]===val?.[key]);
- if(idx>=0)rows[idx]=structuredClone(val);else rows.push(structuredClone(val));
- await persistDB();
+ await commitJournal(journal=>{
+  const rows=journal[name]||(journal[name]=[]);
+  const key=name==='trades'?'id':'key';
+  const idx=rows.findIndex(x=>x?.[key]===val?.[key]);
+  if(idx>=0)rows[idx]=structuredClone(val);else rows.push(structuredClone(val));
+ });
 }
 async function del(name,keyValue){
- const data=await ensureActiveJournalData();
- data[name]=(data[name]||[]).filter(x=>x?.id!==keyValue&&x?.key!==keyValue);
- await persistDB();
+ await commitJournal(journal=>{
+  journal[name]=(journal[name]||[]).filter(x=>x?.id!==keyValue&&x?.key!==keyValue);
+ });
 }
 function emptyDayNote(){return {comment:'',preview:'',notes:'',images:[]}}
 function getDayNote(date){
@@ -1182,17 +1200,15 @@ function getDayNote(date){
  return n?{...emptyDayNote(),...n,images:Array.isArray(n.images)?[...n.images]:[]}:emptyDayNote();
 }
 async function saveDayNote(date,patch){
- const data=await ensureActiveJournalData();
- const current=data.dayNotes[date]||emptyDayNote();
- const next={...current,...patch};
- const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length);
- if(isEmpty)delete data.dayNotes[date];else data.dayNotes[date]=next;
- await persistDB();
+ await commitJournal(journal=>{
+  const current=journal.dayNotes[date]||emptyDayNote();
+  const next={...current,...patch};
+  const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length);
+  if(isEmpty)delete journal.dayNotes[date];else journal.dayNotes[date]=next;
+ });
 }
 async function clearStore(name){
- const data=await ensureActiveJournalData();
- data[name]=[];
- await persistDB();
+ await commitJournal(journal=>{journal[name]=[]});
 }
 
 const $=id=>document.getElementById(id);
@@ -1334,16 +1350,24 @@ async function runPointsMigration(){
  const data=await ensureActiveJournalData();
  const rows=Array.isArray(data.trades)?data.trades:[];
  if(Number(data.schemaVersion||0)>=SCHEMA_VERSION)return {skipped:true};
- const patches=rows.map(t=>migrateTradePointsFields(t));
- const changed=patches.filter(Boolean).length;
- if(!changed){data.schemaVersion=SCHEMA_VERSION;await persistDB();return {changed:0}}
+ // Úpravy se sbírají podle ID obchodu, ne podle pořadí v poli: mezi jejich
+ // spočítáním a zápisem se čeká na zálohu a do té mezery se vejde automatický
+ // import z konektoru, po kterém by pořadí už nesedělo.
+ const patches=new Map();
+ for(const t of rows){const p=migrateTradePointsFields(t);if(p)patches.set(t.id,p)}
+ const changed=patches.size;
+ if(!changed){await commitJournal(journal=>{journal.schemaVersion=SCHEMA_VERSION});return {changed:0}}
  // Záloha PŘED zápisem. Když se nepovede, migrace se NESPUSTÍ – radši
  // zůstat na starých datech než je změnit bez možnosti vrátit se.
  const backup=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-oznacenim-legacy-bodu');
  if(!backup||backup.ok!==true)throw new Error(backup?.error||'Zálohu deníku před migrací nelze vytvořit.');
- rows.forEach((t,i)=>{if(patches[i])Object.assign(t,patches[i])});
- data.schemaVersion=SCHEMA_VERSION;
- await persistDB();
+ await commitJournal(journal=>{
+  for(const t of (Array.isArray(journal.trades)?journal.trades:[])){
+   const p=patches.get(t.id);
+   if(p)Object.assign(t,p);
+  }
+  journal.schemaVersion=SCHEMA_VERSION;
+ });
  return {changed};
 }
 async function load(){
@@ -1527,21 +1551,30 @@ if($('backfillSideBtn'))$('backfillSideBtn').onclick=async()=>{
  const ok=await showConfirm(`Projde obchody v deníku „${jName}", u kterých ještě není vyplněný směr, a doplní ho podle vstupní/výstupní ceny a uloženého hrubého výsledku.\n\nZisk, ztráta, body ani výsledek se NIJAK nemění – doplní se pouze směr.\n\nObchody, u kterých směr určit nejde (chybějící ceny, stejná vstupní i výstupní cena, nulový hrubý výsledek), zůstanou bez směru a doplníš je ručně.\n\nNejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova). Pokračovat?`);
  if(!ok)return;
  // POZOR: modulové pole `trades` je klon (getAll dělá structuredClone), takže
- // úpravy v něm by se neuložily. Pracuje se přímo nad živými daty deníku a
- // zapisuje se jednou, ne jako u přepočtu komisí obchod po obchodu.
+ // úpravy v něm by se neuložily. Čte se z živých dat deníku a zapisuje se
+ // jednou, ne jako u přepočtu komisí obchod po obchodu.
  const data=await ensureActiveJournalData();
  const rows=Array.isArray(data.trades)?data.trades:[];
  let filled=0,longs=0,shorts=0,already=0;
  const skipped=[],suspects=[];
+ // Nejdřív se jen spočítá, co se kde doplní; do deníku to zapíše až
+ // commitJournal, takže neúspěšný zápis nenechá v paměti poloviční výsledek.
+ const sides=new Map();
  for(const t of rows){
   if(looksLikeStopLossSavedAsWin(t))suspects.push(t);
   const r=inferSideForTrade(t);
   if(r.reason==='already'){already++;continue}
   if(!r.side){skipped.push(t);continue}
-  t.side=r.side; t.updatedAt=Date.now(); filled++;
+  sides.set(t.id,r.side); filled++;
   if(r.side==='long')longs++;else shorts++;
  }
- if(filled)await persistDB();
+ if(filled)await commitJournal(journal=>{
+  for(const t of (Array.isArray(journal.trades)?journal.trades:[])){
+   const side=sides.get(t.id);
+   if(!side)continue;
+   t.side=side; t.updatedAt=Date.now();
+  }
+ });
  await load();
  const nameOf=t=>`${t.date||'?'} ${t.instrument||'?'}`;
  const listOf=arr=>esc(arr.slice(0,10).map(nameOf).join(', '))+(arr.length>10?` a další ${arr.length-10}`:'');
@@ -2971,9 +3004,9 @@ $('tradeForm').addEventListener('submit',async e=>{
  a.classList.remove('show');a.textContent='';
  try{
   const data=await ensureActiveJournalData();
-  trades=Array.isArray(data.trades)?data.trades:(data.trades=[]);
-
-  const existing=trades.find(t=>t.id===$('tradeId').value);
+  // Jen se čte – zapisuje se až přes commitJournal, aby neúspěšné uložení
+  // nenechalo obchod "uložený" v paměti a nikde jinde.
+  const existing=(Array.isArray(data.trades)?data.trades:[]).find(t=>t.id===$('tradeId').value);
   const id=$('tradeId').value||crypto.randomUUID();
   const obj={
    // Původní obchod se rozbalí, aby úprava ve formuláři nesmazala pole, která
@@ -3095,14 +3128,12 @@ $('tradeForm').addEventListener('submit',async e=>{
   // aby u importovaného obchodu nezůstala stará hodnota od konektoru.
   obj.grossPnl=Math.round((Number(obj.pnlRaw||0)+Number(obj.commission||0))*100)/100;
 
-  const idx=trades.findIndex(t=>t.id===id);
-  if(idx>=0)trades[idx]=obj;else trades.push(obj);
-  data.trades=trades;
+  await commitJournal(journal=>{
+   const rows=Array.isArray(journal.trades)?journal.trades:(journal.trades=[]);
+   const idx=rows.findIndex(t=>t.id===id);
+   if(idx>=0)rows[idx]=obj;else rows.push(obj);
+  });
 
-  const result=await window.desktopAPI.writeJournal(activeJournalId,data);
-  if(!result?.ok)throw new Error(result?.error||'Data deníku nelze uložit.');
-
-  db={data,close(){}};
   $('tradeModal').classList.remove('open');
   await load();
   showToast(existing?'Obchod byl upraven.':'Obchod byl uložen.');
@@ -3303,14 +3334,13 @@ $('confirmMergeTrade').onclick=async()=>{
  try{
   if(pendingMergeTrades.length<2)throw new Error('Vyber alespoň dva obchody.');
   const merged=combineTradeObjects(pendingMergeTrades);
-  const data=await ensureActiveJournalData();
-  data.trades=Array.isArray(data.trades)?data.trades:[];
-  const removeIds=new Set(pendingMergeTrades.map(t=>t.id));
-  data.trades=data.trades.filter(t=>!removeIds.has(t.id));
   merged.id=crypto.randomUUID();
-  data.trades.push(merged);
-  const w=await window.desktopAPI.writeJournal(activeJournalId,data);
-  if(!w?.ok)throw new Error(w?.error||'Sloučený obchod nelze uložit.');
+  const removeIds=new Set(pendingMergeTrades.map(t=>t.id));
+  await commitJournal(journal=>{
+   const rows=Array.isArray(journal.trades)?journal.trades:[];
+   journal.trades=rows.filter(t=>!removeIds.has(t.id));
+   journal.trades.push(merged);
+  });
   closeMergeModal();
   await load();
   showToast(`Sloučeno obchodů: ${removeIds.size} → 1.`);
