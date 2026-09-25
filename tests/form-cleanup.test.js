@@ -66,16 +66,23 @@ test('sloučení pořád spojí komentáře, které uživatel napsal', () => {
   assert.equal(merged.comment, 'první cíl na VWAP | druhý až na VAH');
 });
 
-test('formulář obchodu už nemá pole obchodního plánu', () => {
+test('formulář obchodu nemá plánovací pole, ale má setup, psychologii a komentář', () => {
+  // Pryč je šest plánovacích polí, která zůstávala prázdná.
   for (const id of ['tradePlanInstrument', 'tradePlanMaxTrades', 'tradePlanLossLimit',
-    'tradePlanProfitTarget', 'tradePlanFromTime', 'tradePlanToTime', 'tradePlanSetup',
-    'tradePlanPsychology', 'tradePlanNote']) {
+    'tradePlanProfitTarget', 'tradePlanFromTime', 'tradePlanToTime']) {
     assert.ok(!HTML.includes(id), 'pole ' + id + ' se do formuláře nesmí vrátit');
   }
-  // Uložený plán staršího obchodu se ale zahazovat nesmí – karta obchodu ho
-  // dál vypisuje a oba CSV exporty ho dál vyvážejí.
+  // Tyhle tři se naopak vypustit NESMÍ – vyplňují se u obchodu běžně a při
+  // prvním úklidu formuláře zmizely omylem (2026-09-25).
+  for (const id of ['tradePlanSetup', 'tradePlanPsychology', 'tradePlanNote']) {
+    assert.ok(HTML.includes('id="' + id + '"'), 'pole ' + id + ' ve formuláři chybí');
+  }
+  assert.match(HTML, /<label>Komentář k setupu/, 'poslední z nich se jmenuje „Komentář k setupu"');
+  // Uložený plán staršího obchodu se zahazovat nesmí – karta obchodu ho dál
+  // vypisuje a oba CSV exporty ho dál vyvážejí, včetně šesti zrušených polí.
   assert.match(HTML, /t\.dailyPlan\.instrument/, 'karta obchodu plán dál zobrazuje');
   assert.match(HTML, /'Plán: Instrument'/, 'CSV export plán dál vyváží');
+  assert.match(HTML, /\.\.\.existingPlan/, 'zrušená pole se přebírají z původního obchodu');
 });
 
 test('hladiny jsou ve formuláři v jedné sbalitelné položce', () => {
@@ -83,12 +90,11 @@ test('hladiny jsou ve formuláři v jedné sbalitelné položce', () => {
   const end = block.indexOf('</details>');
   assert.ok(end > 0, 'sbalitelná položka „Hladiny" ve formuláři chybí');
   const inside = block.slice(0, end);
-  for (const id of ['entryLevels', 'srTarget', 'srStopLoss']) {
+  for (const id of ['entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm']) {
     assert.ok(inside.includes('id="' + id + '"'), id + ' patří dovnitř položky Hladiny');
   }
-  // Trend a order flow zůstávají mimo – nejsou to hladiny.
+  // Trend zůstává mimo – jsou to tři dlaždice, sbalovat je nemá co ušetřit.
   assert.ok(!inside.includes('id="trend"'));
-  assert.ok(!inside.includes('id="ofConfirm"'));
 });
 
 // Mřížka dlaždic pro `readChipGrid`: uzel s vybranými klíči.
@@ -100,6 +106,7 @@ function chipDom(selection) {
     entryLevels: node(selection.entryLevels || []),
     srTarget: node(selection.srTarget || []),
     srStopLoss: node(selection.srStopLoss || []),
+    ofConfirm: node(selection.ofConfirm || []),
     levelsSummary: { id: 'levelsSummary', textContent: '' }
   };
   return {
@@ -131,4 +138,10 @@ test('sbalená položka u prázdného obchodu řekne, že je prázdná', () => {
 
 test('shrnutí bere popisky z číselníku, ne uložené klíče', () => {
   assert.match(summaryOf({ entryLevels: ['VPOC_DAY'] }), /Vstup: VPOC dne/);
+});
+
+test('shrnutí počítá i s order flow, které je ve stejné položce', () => {
+  const summary = summaryOf({ entryLevels: ['VWAP'], ofConfirm: ['ABS_BID', 'IMBALANCE'] });
+  assert.match(summary, /Vstup: VWAP/);
+  assert.match(summary, /OF: Absorpce na bidu \+ Imbalance/);
 });

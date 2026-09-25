@@ -1039,8 +1039,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
           <div class="field full"><label>SR proti targetu <span class="sub">— hladiny, které stojí v cestě k cíli; lze vybrat víc</span></label><div id="srTarget" class="chip-grid"></div></div>
           <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem; lze vybrat víc</span></label><div id="srStopLoss" class="chip-grid"></div></div>
+          <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
         </details>
-        <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
         <div class="field full" id="pnlCalcHint" style="margin-top:-6px"></div>
         <div class="field" id="extraLegsField" style="grid-column:1/-1">
           <label>Více cílů u téhož obchodu (TP2, Break Even…) <span class="sub">— nepovinné</span></label>
@@ -1051,6 +1051,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Strategie</label><input id="strategy" placeholder="Volitelné"></div>
         <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
         
+        <div class="field full"><label>Setup / scénář <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanSetup" placeholder="Volitelné"></textarea></div>
+        <div class="field full"><label>Psychologický checklist <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanPsychology" placeholder="Volitelné"></textarea></div>
+        <div class="field full"><label>Komentář k setupu <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanNote" placeholder="Volitelné"></textarea></div>
         <div class="field full"><label>Komentář <span class="optional-badge" title="Tohle je pole, které uvidíš u obchodu v přehledu Deníku.">Viditelné</span></label><textarea id="comment" placeholder="Volitelné"></textarea></div>
         <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tohle okno otevřené.</div><div class="image-preview" id="imagePreview"></div></div>
       </div>
@@ -2330,7 +2333,7 @@ function updateConfluenceHint(){
 // Shrnutí vybraných hladin do hlavičky sbalené položky. Bez něj by sbalení
 // schovalo i to, co u obchodu vyplněné je, a při editaci by nebylo poznat,
 // jestli tam něco je, bez rozkliknutí.
-const LEVEL_FIELDS=[['entryLevels','ENTRY_LEVEL','Vstup'],['srTarget','SR_TARGET','SR→TG'],['srStopLoss','SR_SL','SR→SL']];
+const LEVEL_FIELDS=[['entryLevels','ENTRY_LEVEL','Vstup'],['srTarget','SR_TARGET','SR→TG'],['srStopLoss','SR_SL','SR→SL'],['ofConfirm','OF_CONFIRM','OF']];
 function updateLevelsSummary(){
  const out=$('levelsSummary'); if(!out)return;
  const parts=[];
@@ -2508,7 +2511,7 @@ function tradeHTML(t){
  ${t.dailyPlan.fromTime||t.dailyPlan.toTime?`<div><b>Čas:</b> ${esc(t.dailyPlan.fromTime||'—')}–${esc(t.dailyPlan.toTime||'—')}</div>`:''}
  ${t.dailyPlan.setup?`<div><b>Setup:</b> ${esc(t.dailyPlan.setup)}</div>`:''}
  ${t.dailyPlan.psychology?`<div><b>Psychologie:</b> ${esc(t.dailyPlan.psychology)}</div>`:''}
- ${t.dailyPlan.note?`<div><b>Poznámka:</b> ${esc(t.dailyPlan.note)}</div>`:''}
+ ${t.dailyPlan.note?`<div><b>Komentář k setupu:</b> ${esc(t.dailyPlan.note)}</div>`:''}
  </div></details>`:''}
  <div class="thumbs">${(t.images||[]).map(i=>`<img src="${i}" loading="lazy" decoding="async" onclick="openImage('${i}')">`).join('')}</div></div>
  <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
@@ -2840,8 +2843,13 @@ function openModal(t=null){
  // splice, a kdyby to bylo pole uloženého obchodu, obrázek by zmizel i při
  // zavření okna bez uložení – a natrvalo při nejbližším zápisu deníku.
  // Protějšek k `images:[...editImages]` v ukládání obchodu.
+ const p=t.dailyPlan||{};
+ $('tradePlanSetup').value=p.setup||'';
+ $('tradePlanPsychology').value=p.psychology||'';
+ $('tradePlanNote').value=p.note||'';
  editImages=[...(t.images||[])];showPreviews()}
- else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;}
+ else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;
+ ['tradePlanSetup','tradePlanPsychology','tradePlanNote'].forEach(id=>$(id).value='')}
  if($('formAlert')){$('formAlert').classList.remove('show');$('formAlert').textContent=''};$('tradeModal').classList.add('open')
  // ZÁMĚRNĚ se tu NEVOLÁ žádný přepočet. Programové nastavení .value nespouští
  // událost "input", takže otevření staršího obchodu nemůže tiše přepsat jeho
@@ -3189,11 +3197,20 @@ $('tradeForm').addEventListener('submit',async e=>{
   obj.pnlRaw=typedPnl;
   obj.result=classifyResult(obj.pnlRaw);
 
-  // Obchodní plán k jednotlivému obchodu se ve formuláři už nevyplňuje –
-  // devět polí, která zůstávala prázdná, jen odsouvala screenshoty mimo
-  // obrazovku. `obj` dědí z původního obchodu, takže `dailyPlan` dříve
-  // uloženého obchodu zůstává, jak byl: pořád se zobrazuje na kartě
-  // obchodu a vyváží se do CSV, jen ho nejde editovat.
+  // Setup, psychologický checklist a komentář k setupu se ukládají do
+  // `dailyPlan` vedle sebe, jako se ukládaly vždycky. Z formuláře zmizelo
+  // jen šest plánovacích polí (instrument plánu, max. obchodů, limit ztráty,
+  // denní cíl, od/do) – ta se proto přebírají z původního obchodu, aby je
+  // editace staršího obchodu nesmazala.
+  const existingPlan=(existing&&existing.dailyPlan)||{};
+  const plan={
+   ...existingPlan,
+   date:existingPlan.date||obj.date||new Date().toISOString().slice(0,10),
+   setup:$('tradePlanSetup')?.value?.trim()||'',
+   psychology:$('tradePlanPsychology')?.value?.trim()||'',
+   note:$('tradePlanNote')?.value?.trim()||''
+  };
+  obj.dailyPlan=Object.entries(plan).some(([k,v])=>k!=='date'&&String(v||'').trim())?plan:null;
 
   obj.points=obj.points===''?0:Math.abs(Number(obj.points)||0);
   obj.pnl=obj.pnl===''?0:Math.abs(Number(obj.pnl)||0);
