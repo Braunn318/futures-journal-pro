@@ -1174,7 +1174,12 @@ async function del(name,keyValue){
 function emptyDayNote(){return {comment:'',preview:'',notes:'',images:[]}}
 function getDayNote(date){
  const n=(db?.data?.dayNotes||{})[date];
- return n?{...emptyDayNote(),...n}:emptyDayNote();
+ // Rozbalení je mělké, takže `images` by jinak ukazovalo na TOTÉŽ pole jako
+ // uložená poznámka. Volající do něj přidávají a ubírají (removeDayImage,
+ // vkládání ze schránky) ještě předtím, než se uloží – uložená data by se tím
+ // měnila i v případě, že zápis vůbec neproběhne. Poznámka se smí změnit jen
+ // uložením, proto kopie.
+ return n?{...emptyDayNote(),...n,images:Array.isArray(n.images)?[...n.images]:[]}:emptyDayNote();
 }
 async function saveDayNote(date,patch){
  const data=await ensureActiveJournalData();
@@ -2712,7 +2717,11 @@ function openModal(t=null){
  $('tradePlanSetup').value=p.setup||'';
  $('tradePlanPsychology').value=p.psychology||'';
  $('tradePlanNote').value=p.note||'';
- editImages=t.images||[];showPreviews()}
+ // Kopie, ne tentýž seznam: odebrání obrázku ve formuláři (removeImg) volá
+ // splice, a kdyby to bylo pole uloženého obchodu, obrázek by zmizel i při
+ // zavření okna bez uložení – a natrvalo při nejbližším zápisu deníku.
+ // Protějšek k `images:[...editImages]` v ukládání obchodu.
+ editImages=[...(t.images||[])];showPreviews()}
  else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;
  ['tradePlanInstrument','tradePlanMaxTrades','tradePlanLossLimit','tradePlanProfitTarget','tradePlanFromTime','tradePlanToTime','tradePlanSetup','tradePlanPsychology','tradePlanNote'].forEach(id=>$(id).value='')}
  if($('formAlert')){$('formAlert').classList.remove('show');$('formAlert').textContent=''};$('tradeModal').classList.add('open')
