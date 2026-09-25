@@ -115,6 +115,15 @@ canvas{width:100%;height:100%}
 /* Dlaždice číselníků: vyplnit jeden obchod má trvat do 15 s, takže se vybírá
    klikem do mřížky, ne rozbalovacím seznamem. */
 .chip-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+/* Tři kolonky s hladinami zabrané do jedné sbalitelné položky: rozbalené
+   zabíraly přes polovinu okna a screenshoty na konci formuláře se daly
+   najít jen dlouhým scrollováním. Sbalené se ve shrnutí vypíše, co je
+   vybrané, takže sbalení nic neschová. */
+.chip-collapse>summary{cursor:pointer;color:var(--muted);font-size:13px;user-select:none}
+.chip-collapse>summary:hover{color:var(--text)}
+.chip-collapse>summary #levelsSummary{margin-left:6px}
+.chip-collapse[open]>summary{margin-bottom:6px}
+.chip-collapse>.field{margin-top:10px}
 .chip{border:1px solid var(--line);background:var(--input-bg);color:var(--text);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer;user-select:none}
 .chip:hover{border-color:var(--hover-border)}
 .chip.on{background:rgba(var(--blue-rgb),.18);border-color:var(--blue)}
@@ -1025,9 +1034,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
         <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
         <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
-        <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
-        <div class="field full"><label>SR proti targetu <span class="sub">— hladiny, které stojí v cestě k cíli; lze vybrat víc</span></label><div id="srTarget" class="chip-grid"></div></div>
-        <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem; lze vybrat víc</span></label><div id="srStopLoss" class="chip-grid"></div></div>
+        <details class="field full chip-collapse" id="levelsBlock">
+          <summary>Hladiny <span class="sub" id="levelsSummary"></span></summary>
+          <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
+          <div class="field full"><label>SR proti targetu <span class="sub">— hladiny, které stojí v cestě k cíli; lze vybrat víc</span></label><div id="srTarget" class="chip-grid"></div></div>
+          <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem; lze vybrat víc</span></label><div id="srStopLoss" class="chip-grid"></div></div>
+        </details>
         <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
         <div class="field full" id="pnlCalcHint" style="margin-top:-6px"></div>
         <div class="field" id="extraLegsField" style="grid-column:1/-1">
@@ -1039,21 +1051,6 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Strategie</label><input id="strategy" placeholder="Volitelné"></div>
         <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
         
-        <div class="field full">
-          <label>Obchodní plán k tomuto obchodu <span class="optional-badge">nepovinné</span></label>
-          <div class="formgrid trade-plan-editor">
-            <div class="field"><label>Instrument plánu</label><input id="tradePlanInstrument" placeholder="např. NQ"></div>
-            <div class="field"><label>Maximální počet obchodů</label><input id="tradePlanMaxTrades" type="number" step="1"></div>
-            <div class="field"><label>Limit ztráty</label><input id="tradePlanLossLimit" type="number" step="any"></div>
-            <div class="field"><label>Denní cíl</label><input id="tradePlanProfitTarget" type="number" step="any"></div>
-            <div class="field"><label>Obchodovat od</label><input id="tradePlanFromTime" type="time"></div>
-            <div class="field"><label>Obchodovat do</label><input id="tradePlanToTime" type="time"></div>
-            <div class="field full"><label>Setup / scénář</label><textarea id="tradePlanSetup" placeholder="Volitelné"></textarea></div>
-            <div class="field full"><label>Psychologický checklist</label><textarea id="tradePlanPsychology" placeholder="Volitelné"></textarea></div>
-            <div class="field full"><label>Poznámka k plánu</label><textarea id="tradePlanNote" placeholder="Volitelné"></textarea></div>
-          </div>
-        </div>
-
         <div class="field full"><label>Komentář <span class="optional-badge" title="Tohle je pole, které uvidíš u obchodu v přehledu Deníku.">Viditelné</span></label><textarea id="comment" placeholder="Volitelné"></textarea></div>
         <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tohle okno otevřené.</div><div class="image-preview" id="imagePreview"></div></div>
       </div>
@@ -2290,7 +2287,7 @@ function renderChipGrid(id,enumName,selected){
  el.innerHTML=options.map(o=>
   `<span class="chip${on.has(o.key)?' on':''}" data-key="${esc(o.key)}" role="button" tabindex="0"${o.hidden?' title="Skrytá volba – zůstává u tohoto obchodu, novým se nenabízí"':''}>${esc(o.label)}${o.hidden?' ·':''}</span>`).join('');
  el.querySelectorAll('.chip').forEach(chip=>{
-  const toggle=()=>{chip.classList.toggle('on');updateConfluenceHint()};
+  const toggle=()=>{chip.classList.toggle('on');updateConfluenceHint();updateLevelsSummary()};
   chip.onclick=toggle;
   chip.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();toggle()}};
  });
@@ -2329,6 +2326,19 @@ function updateConfluenceHint(){
  const hint=$('confluenceHint'); if(!hint)return;
  const n=FJTaxonomy.confluenceCount(readChipGrid('entryLevels','ENTRY_LEVEL'));
  hint.textContent=n?`Konfluence: ${n}`:'';
+}
+// Shrnutí vybraných hladin do hlavičky sbalené položky. Bez něj by sbalení
+// schovalo i to, co u obchodu vyplněné je, a při editaci by nebylo poznat,
+// jestli tam něco je, bez rozkliknutí.
+const LEVEL_FIELDS=[['entryLevels','ENTRY_LEVEL','Vstup'],['srTarget','SR_TARGET','SR→TG'],['srStopLoss','SR_SL','SR→SL']];
+function updateLevelsSummary(){
+ const out=$('levelsSummary'); if(!out)return;
+ const parts=[];
+ for(const [id,enumName,label] of LEVEL_FIELDS){
+  const keys=readChipGrid(id,enumName);
+  if(keys.length)parts.push(label+': '+keys.map(k=>FJTaxonomy.labelOf(enumName,k)).join(' + '));
+ }
+ out.textContent=parts.length?'— '+parts.join(' · '):'— nevyplněno';
 }
 // Sjednocení kontextových polí ze víc nohou jedné pozice. Pravidla podle
 // spec §2.1: multi-select se sjednocuje, single-select bere první neprázdný.
@@ -2785,6 +2795,10 @@ function openModal(t=null){
  renderChipGrid('srStopLoss','SR_SL',t&&t.srStopLoss);
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
  updateConfluenceHint();
+ // Sbalené při každém otevření – rozbalený stav by si <details> pamatoval
+ // z minulého obchodu a smysl sbalení (kratší formulář) by se ztratil.
+ if($('levelsBlock'))$('levelsBlock').open=false;
+ updateLevelsSummary();
  if($('extraLegsField'))$('extraLegsField').style.display='';
  if(t){
   const legs=Array.isArray(t.legs)&&t.legs.length>1?t.legs:null;
@@ -2822,23 +2836,12 @@ function openModal(t=null){
     row.querySelector('.leg-contracts').value=l.contracts??1;
    });
   }
- const p=t.dailyPlan||{};
- $('tradePlanInstrument').value=p.instrument||'';
- $('tradePlanMaxTrades').value=p.maxTrades||'';
- $('tradePlanLossLimit').value=p.lossLimit||'';
- $('tradePlanProfitTarget').value=p.profitTarget||'';
- $('tradePlanFromTime').value=p.fromTime||'';
- $('tradePlanToTime').value=p.toTime||'';
- $('tradePlanSetup').value=p.setup||'';
- $('tradePlanPsychology').value=p.psychology||'';
- $('tradePlanNote').value=p.note||'';
  // Kopie, ne tentýž seznam: odebrání obrázku ve formuláři (removeImg) volá
  // splice, a kdyby to bylo pole uloženého obchodu, obrázek by zmizel i při
  // zavření okna bez uložení – a natrvalo při nejbližším zápisu deníku.
  // Protějšek k `images:[...editImages]` v ukládání obchodu.
  editImages=[...(t.images||[])];showPreviews()}
- else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;
- ['tradePlanInstrument','tradePlanMaxTrades','tradePlanLossLimit','tradePlanProfitTarget','tradePlanFromTime','tradePlanToTime','tradePlanSetup','tradePlanPsychology','tradePlanNote'].forEach(id=>$(id).value='')}
+ else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;}
  if($('formAlert')){$('formAlert').classList.remove('show');$('formAlert').textContent=''};$('tradeModal').classList.add('open')
  // ZÁMĚRNĚ se tu NEVOLÁ žádný přepočet. Programové nastavení .value nespouští
  // událost "input", takže otevření staršího obchodu nemůže tiše přepsat jeho
@@ -3186,19 +3189,11 @@ $('tradeForm').addEventListener('submit',async e=>{
   obj.pnlRaw=typedPnl;
   obj.result=classifyResult(obj.pnlRaw);
 
-  const plan={
-   date:obj.date||new Date().toISOString().slice(0,10),
-   instrument:$('tradePlanInstrument')?.value?.trim()||'',
-   maxTrades:$('tradePlanMaxTrades')?.value||'',
-   lossLimit:$('tradePlanLossLimit')?.value||'',
-   profitTarget:$('tradePlanProfitTarget')?.value||'',
-   fromTime:$('tradePlanFromTime')?.value||'',
-   toTime:$('tradePlanToTime')?.value||'',
-   setup:$('tradePlanSetup')?.value?.trim()||'',
-   psychology:$('tradePlanPsychology')?.value?.trim()||'',
-   note:$('tradePlanNote')?.value?.trim()||''
-  };
-  obj.dailyPlan=Object.entries(plan).some(([k,v])=>k!=='date'&&String(v||'').trim())?plan:null;
+  // Obchodní plán k jednotlivému obchodu se ve formuláři už nevyplňuje –
+  // devět polí, která zůstávala prázdná, jen odsouvala screenshoty mimo
+  // obrazovku. `obj` dědí z původního obchodu, takže `dailyPlan` dříve
+  // uloženého obchodu zůstává, jak byl: pořád se zobrazuje na kartě
+  // obchodu a vyváží se do CSV, jen ho nejde editovat.
 
   obj.points=obj.points===''?0:Math.abs(Number(obj.points)||0);
   obj.pnl=obj.pnl===''?0:Math.abs(Number(obj.pnl)||0);
@@ -3232,7 +3227,6 @@ $('tradeForm').addEventListener('submit',async e=>{
    obj.commission=Math.round(totalCommission*100)/100;
    obj.contracts=totalContracts||obj.contracts;
    obj.legs=legs;
-   if(!obj.comment)obj.comment=`Ručně zadáno s ${legs.length} cíli (${legs.map(l=>l.label).join('/')}).`;
   }
   // Pokud byly všechny další cíle v editaci odstraněny, obj.legs zůstává nenastaveno
   // a obchod se uloží jako jediný cíl – to je záměr (odstranění duplicitního cíle).
@@ -3459,7 +3453,12 @@ function combineTradeObjects(list){
   commission:Math.round(totalCommission*100)/100,
   strategy:first.strategy||list.find(t=>t.strategy)?.strategy||'',
   planFollowed:list.every(t=>t.planFollowed==='ano')?'ano':'ne',
-  comment:comments.length?comments.join(' | '):`Sloučeno z ${legs.length} cílů stejné pozice (TP1/TP2/BE).`,
+  // Komentář je pole uživatele – appka do něj nic nedopisuje. Sloučení
+  // spojí to, co si napsal u jednotlivých cílů, a když nic nenapsal,
+  // zůstane prázdné. Dřív se sem doplňovala věta „Sloučeno z N cílů…",
+  // takže i jednocílový automatický import měl v Deníku větu, kterou
+  // nikdo nenapsal a která o obchodu nic neříkala.
+  comment:comments.join(' | '),
   images:list.flatMap(t=>t.images||[]).slice(0,3),
   createdAt:list.reduce((min,t)=>Math.min(min,t.createdAt||Date.now()),Date.now()),
   updatedAt:Date.now(),

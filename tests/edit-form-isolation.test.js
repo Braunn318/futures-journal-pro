@@ -62,6 +62,7 @@ function tradeForm() {
     renderSingleChipGrid() {},
     renderChipGrid() {},
     updateConfluenceHint() {},
+    updateLevelsSummary() {},
     appendBlankLegRow() { return dom.document.getElementById('legRow'); },
     showPreviews() {},
     updateResultBadge() {},
