@@ -115,15 +115,34 @@ canvas{width:100%;height:100%}
 /* Dlaždice číselníků: vyplnit jeden obchod má trvat do 15 s, takže se vybírá
    klikem do mřížky, ne rozbalovacím seznamem. */
 .chip-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-/* Tři kolonky s hladinami zabrané do jedné sbalitelné položky: rozbalené
-   zabíraly přes polovinu okna a screenshoty na konci formuláře se daly
-   najít jen dlouhým scrollováním. Sbalené se ve shrnutí vypíše, co je
-   vybrané, takže sbalení nic neschová. */
-.chip-collapse>summary{cursor:pointer;color:var(--muted);font-size:13px;user-select:none}
-.chip-collapse>summary:hover{color:var(--text)}
-.chip-collapse>summary #levelsSummary{margin-left:6px}
+/* Sbalitelná položka „Hladiny" – ve formuláři obchodu i na kartě v Deníku.
+   Rozbalené hladiny zabíraly přes polovinu formuláře a na kartě pět řádků,
+   takže se ke screenshotům nedalo dojet bez dlouhého scrollování.
+
+   Hlavička vypadá jako OVLÁDACÍ PRVEK, ne jako popisek pole: modrá, tučná,
+   s rámečkem a šipkou. První verze byla šedý text velikosti popisku a
+   uživatel ji ve formuláři nenašel – opticky splývala s popisky ostatních
+   polí a nebylo poznat, že je na co kliknout. */
+.chip-collapse>summary{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid rgba(var(--blue-rgb),.35);border-radius:10px;background:rgba(var(--blue-rgb),.08);color:var(--blue);font-weight:800;font-size:13px;letter-spacing:.02em}
+/* Vlastní šipka místo nativní značky – jinak by byly vedle sebe dvě. Stejné
+   SVG i stejné otáčení jako u rozbalovací hlavičky obchodního dne. */
+.chip-collapse>summary{list-style:none}
+.chip-collapse>summary::-webkit-details-marker{display:none}
+.chip-collapse>summary .chev{width:14px;height:14px;flex:none;transition:transform .18s ease}
+.chip-collapse[open]>summary .chev{transform:rotate(90deg)}
+.chip-collapse>summary:hover{background:rgba(var(--blue-rgb),.16);border-color:var(--blue)}
+/* Shrnutí vybraných hladin zůstává nenápadné, ať je poznat, co je tlačítko
+   a co už je obsah. */
+.chip-collapse>summary .sub{font-weight:600}
 .chip-collapse[open]>summary{margin-bottom:6px}
 .chip-collapse>.field{margin-top:10px}
+/* Na kartě obchodu je totéž o kousek menší, aby sloupec s kontextem
+   nepřerostl zbytek karty. */
+.card-levels{margin-top:6px}
+.card-levels>summary{padding:4px 8px;font-size:11px;letter-spacing:.01em}
+.card-levels>summary .chev{width:12px;height:12px}
+.card-levels .trade-legs{margin-top:6px}
+.day-levels-btn{padding:5px 10px;font-size:12px}
 .chip{border:1px solid var(--line);background:var(--input-bg);color:var(--text);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer;user-select:none}
 .chip:hover{border-color:var(--hover-border)}
 .chip.on{background:rgba(var(--blue-rgb),.18);border-color:var(--blue)}
@@ -1035,7 +1054,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
         <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
         <details class="field full chip-collapse" id="levelsBlock">
-          <summary>Hladiny <span class="sub" id="levelsSummary"></span></summary>
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Hladiny <span class="sub" id="levelsSummary"></span></summary>
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
           <div class="field full"><label>SR proti targetu <span class="sub">— hladiny, které stojí v cestě k cíli; lze vybrat víc</span></label><div id="srTarget" class="chip-grid"></div></div>
           <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem; lze vybrat víc</span></label><div id="srStopLoss" class="chip-grid"></div></div>
@@ -2375,10 +2394,22 @@ function mergeContextFields(list){
 }
 // Štítky kontextu na kartě obchodu. Bez nich není v seznamu vidět, jestli je
 // obchod okontextovaný, a díry ve vzorku se pozná až v analýze.
+//
+// Dělí se na dvě části podle toho, co je ve formuláři sbalené: Setup, Trend
+// a stav naplnění jsou vidět vždycky, hladiny a order flow se na kartě sbalují
+// (levelPillsHTML), protože jich je u okontextovaného obchodu tolik, že den se
+// třemi obchody nešel projít bez scrollování.
 function contextPillsHTML(t){
  const parts=[];
  if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
  if(t.trend)parts.push(`<span class="pill context-pill" title="Trend">${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
+ if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
+ return parts.join(' ');
+}
+// Hladiny a order flow – to, co se na kartě sbaluje. Vrací i počet pilulek,
+// protože hlavička sbalené položky říká, kolik jich je pod ní schovaných.
+function levelPillsHTML(t){
+ const parts=[];
  const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
  if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + '))}</span>`);
  const srT=FJTaxonomy.sanitizeMulti('SR_TARGET',t.srTarget);
@@ -2387,8 +2418,21 @@ function contextPillsHTML(t){
  if(srS.length)parts.push(`<span class="pill context-pill" title="SR proti S/L">SR→SL: ${esc(srS.map(k=>FJTaxonomy.labelOf('SR_SL',k)).join(', '))}</span>`);
  const of=FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm);
  if(of.length)parts.push(`<span class="pill context-pill" title="Order flow potvrzení">OF: ${esc(of.map(k=>FJTaxonomy.labelOf('OF_CONFIRM',k)).join(', '))}</span>`);
- if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
- return parts.join(' ');
+ return {html:parts.join(' '),count:parts.length};
+}
+// Sbalitelná položka s hladinami na kartě obchodu. Samostatná funkce proto, že
+// `tradeHTML` táhne půlku rendereru a tohle jde otestovat zvlášť.
+//
+// Rozbalený stav se pamatuje v `openTradeLevels` podle id obchodu: seznam se
+// překresluje celý z řetězce (renderTrades), takže atribut `open` na živém
+// prvku by se při každém uložení obchodu nebo změně filtru ztratil.
+function tradeLevelsBlockHTML(t){
+ const {html,count}=levelPillsHTML(t);
+ if(!count)return '';
+ const open=openTradeLevels.has(t.id)?' open':'';
+ return `<details class="chip-collapse card-levels"${open} data-levels="${esc(t.id)}" ontoggle="rememberTradeLevels('${esc(t.id)}',this.open)">`
+  +`<summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Hladiny <span class="sub">(${count})</span></summary>`
+  +`<div class="trade-legs">${html}</div></details>`;
 }
 // Odvození ceny Stop Lossu (spec §3.3b). Používá se jen tehdy, když ji
 // uživatel nezadal a obchod skončil na SL. U obchodu s víc cíli se bere cena
@@ -2491,6 +2535,11 @@ function tradeHTML(t){
  // z exekucí NinjaTraderu.", což bylo rušivé (viz GitHub issue #8). Místo textu
  // se teď zobrazí jen malý štítek, pokud obchod pochází z importu.
  const isImported=!!(t.sourceEventId||(Array.isArray(t.sourceEventIds)&&t.sourceEventIds.length));
+ // Buňka s kontextem se vykresluje jen tehdy, když je co ukázat: karta je
+ // čtyřsloupcová mřížka a obchod bez kontextu má buněk jen tři, jak to bylo
+ // vždycky – prázdná buňka by mu posunula zbytek karty o sloupec.
+ const ctxPills=contextPillsHTML(t);
+ const levelsBlock=tradeLevelsBlockHTML(t);
  const importedBadge=isImported?`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Automaticky naimportováno z konektoru">⚡ Auto import</span>`:'';
  return `<div class="card trade">
  <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
@@ -2500,7 +2549,7 @@ function tradeHTML(t){
  ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
  </div>
- ${contextPillsHTML(t)?`<div class="trade-legs" style="margin-top:6px">${contextPillsHTML(t)}</div>`:''}
+ ${(ctxPills||levelsBlock)?`<div>${ctxPills?`<div class="trade-legs" style="margin-top:6px">${ctxPills}</div>`:''}${levelsBlock}</div>`:''}
  <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Strategie: ${esc(t.strategy||'—')}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
  <div>${t.comment?`<div class="comment">${esc(t.comment)}</div>`:''}${importedBadge?`<div class="sub" style="margin-top:2px">${importedBadge}</div>`:''}
  ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
@@ -2518,6 +2567,11 @@ function tradeHTML(t){
 }
 
 const openDayNotes=new Set();
+// Obchody, které mají na kartě rozbalené hladiny. Stejný důvod jako u
+// `openDayNotes`: seznam obchodů se překresluje celý, takže stav rozbalení
+// musí žít mimo DOM, jinak by ho každé uložení obchodu zavřelo.
+const openTradeLevels=new Set();
+window.rememberTradeLevels=(id,open)=>{if(open)openTradeLevels.add(id);else openTradeLevels.delete(id)};
 const extraEmptyDays=new Set();
 const DOW_LABELS=['Ne','Po','Út','St','Čt','Pá','So'];
 function czPluralObchod(n){if(n===1)return 'obchod';if(n>=2&&n<=4)return 'obchody';return 'obchodů'}
@@ -2539,11 +2593,20 @@ function dayGroupHTML(date,dayTrades){
  const open=openDayNotes.has(date);
  const d=new Date(date+'T00:00:00');
  const weekday=isNaN(d)?'':DOW_LABELS[d.getDay()];
+ // Tlačítko na hromadné rozbalení hladin. Počítá se jen z obchodů, které
+ // hladiny vyplněné mají – obchod bez kontextu nemá co rozbalovat a jinak
+ // by tlačítko tvrdilo „Rozbalit" i ve chvíli, kdy je rozbalené všechno.
+ const withLevels=dayTrades.filter(t=>levelPillsHTML(t).count);
+ const allOpen=withLevels.length&&withLevels.every(t=>openTradeLevels.has(t.id));
+ const levelsBtn=withLevels.length
+  ?`<button type="button" class="btn day-levels-btn" onclick="event.stopPropagation();toggleDayLevels('${date}',this)" title="Rozbalí nebo sbalí hladiny u všech obchodů tohoto dne">${allOpen?'Sbalit hladiny':'Rozbalit hladiny'}</button>`
+  :'';
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
  <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}</span>
  <div class="spacer"></div>
+ ${levelsBtn}
  <span class="stat ${kpi.pnl>=0?'pos':'neg'}">${kpi.pnl>=0?'+':''}${money(kpi.pnl)}</span>
  </div>
  <div class="day-comment-row"><span class="lbl">Komentář</span><input type="text" placeholder="Volitelné" value="${esc(note.comment)}" onclick="event.stopPropagation()" onblur="saveDayField('${date}','comment',this.value)"></div>
@@ -2568,6 +2631,23 @@ window.toggleDayNote=date=>{
  if(el)el.classList.toggle('open',openDayNotes.has(date));else renderTrades();
 };
 window.saveDayField=async(date,field,value)=>{await saveDayNote(date,{[field]:value})};
+// Hromadné rozbalení/sbalení hladin u všech obchodů jednoho dne. Pracuje
+// přímo s DOM, ne přes renderTrades(): překreslení celého seznamu by uskočilo
+// scrollem, stejně jako u toggleDayNote.
+window.toggleDayLevels=(date,btn)=>{
+ const wrap=findDayWrap(date);
+ if(!wrap){renderTrades();return}
+ const blocks=[...wrap.querySelectorAll('details[data-levels]')];
+ if(!blocks.length)return;
+ const target=!blocks.every(b=>b.open);
+ blocks.forEach(b=>{
+  b.open=target;
+  // `ontoggle` se při programové změně spustí taky, ale až asynchronně –
+  // množina se proto srovná rovnou tady, ať je stav platný okamžitě.
+  if(target)openTradeLevels.add(b.dataset.levels);else openTradeLevels.delete(b.dataset.levels);
+ });
+ if(btn)btn.textContent=target?'Sbalit hladiny':'Rozbalit hladiny';
+};
 window.saveDayDetail=async(date)=>{
  const wrap=findDayWrap(date);
  if(wrap){

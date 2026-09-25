@@ -114,7 +114,7 @@ test('karta obchodu ukazuje celkové body, ne body na kontrakt', () => {
   // u obchodů, které jsou dnes zobrazené správně (spec §2.1 KOREKCE).
   const r = loadRenderer([
     'esc', 'money', 'moneyCzk', 'dualMoney', 'signed', 'sideMeta', 'resultMeta',
-    'legPillHTML', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'contextPillsHTML', 'tradeHTML'
+    'legPillHTML', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML', 'tradeHTML'
   ], {
     settings: { ...SETTINGS, usdCzkRate: 23 },
     activeJournalId: 'j1',

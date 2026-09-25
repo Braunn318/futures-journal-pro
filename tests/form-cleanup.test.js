@@ -145,3 +145,92 @@ test('shrnutí počítá i s order flow, které je ve stejné položce', () => {
   assert.match(summary, /Vstup: VWAP/);
   assert.match(summary, /OF: Absorpce na bidu \+ Imbalance/);
 });
+
+// --- Sbalené hladiny na kartě obchodu (zadání z 2026-09-25, druhé kolo) -----
+//
+// V Deníku byly hladiny rozepsané jako sloupec pilulek u každé karty, takže
+// den se třemi obchody byl zase dlouhý. Sbalují se stejně jako ve formuláři:
+// Setup, Trend a stav naplnění zůstávají vidět, hladiny a order flow jdou pod
+// rozklikávací položku.
+
+function pills() {
+  return loadRenderer(['esc', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML'],
+    { FJTaxonomy });
+}
+
+function contextTrade(overrides) {
+  return {
+    id: 'card-1', setupCode: 'M2_OF', trend: 'LONG', fillStatus: 'FILLED',
+    entryLevels: ['VPOC_IB'], srTarget: ['VPOC_1M'], srStopLoss: ['VWAP'],
+    ofConfirm: ['CLOSE_VS_VPOC_OK'],
+    ...overrides
+  };
+}
+
+test('na kartě zůstává vidět Setup a Trend, hladiny se sbalují', () => {
+  const r = pills();
+  const visible = r.contextPillsHTML(contextTrade());
+  assert.match(visible, /M2 \+ Order Flow/, 'Setup zůstává vidět');
+  assert.match(visible, /Long/, 'Trend zůstává vidět');
+  for (const hidden of ['VPOC IB', 'SR→TG', 'SR→SL', 'OF:']) {
+    assert.ok(!visible.includes(hidden), hidden + ' patří do sbalené části');
+  }
+  // Stav naplnění se pořád ukazuje jen tehdy, když obchod naplněný NENÍ.
+  assert.ok(!r.contextPillsHTML(contextTrade()).includes('naplněno'));
+  assert.match(r.contextPillsHTML(contextTrade({ fillStatus: 'NO_FILL' })), /limitka se nenaplnila/);
+});
+
+test('sbalená část nese všechny čtyři skupiny a svůj počet', () => {
+  const { html, count } = pills().levelPillsHTML(contextTrade());
+  assert.equal(count, 4, 'hladina vstupu, obě SR kolonky a order flow');
+  assert.match(html, /VPOC IB/, 'popisky z číselníku, ne uložené klíče');
+  assert.match(html, /SR→TG: VPOC 1M/);
+  assert.match(html, /SR→SL: VWAP/);
+  assert.match(html, /OF: Uzavření vůči VPOC v pořádku/);
+});
+
+test('obchod bez hladin sbalitelnou položku nedostane', () => {
+  const r = pills();
+  const bare = { id: 'card-2', setupCode: 'M2_OF' };
+  assert.equal(r.levelPillsHTML(bare).count, 0);
+  assert.equal(r.tradeLevelsBlockHTML(bare), '', 'prázdná rozklikávací položka by jen mátla');
+});
+
+test('rozbalený stav se pamatuje podle id obchodu, ne v DOM', () => {
+  // Seznam obchodů se překresluje celý (renderTrades), takže atribut `open`
+  // na živém prvku by se ztratil při každém uložení obchodu nebo změně filtru.
+  const r = pills();
+  const closed = r.tradeLevelsBlockHTML(contextTrade());
+  assert.match(closed, /data-levels="card-1"/);
+  assert.match(closed, /ontoggle="rememberTradeLevels\('card-1',this\.open\)"/);
+  assert.ok(!/<details[^>]* open/.test(closed), 've výchozím stavu sbaleno');
+
+  r.openTradeLevels.add('card-1');
+  assert.match(r.tradeLevelsBlockHTML(contextTrade()), /<details[^>]* open/, 'zapamatovaný obchod se vykreslí rozbalený');
+});
+
+test('hlavička sbalené položky říká, kolik pilulek skrývá', () => {
+  assert.match(pills().tradeLevelsBlockHTML(contextTrade()), /Hladiny <span class="sub">\(4\)<\/span>/);
+});
+
+test('tlačítko dne nesmí zavřít celý den', () => {
+  // Hlavička dne má vlastní onclick na rozbalení poznámek; bez zastavení
+  // bubliny by tlačítko dělalo obojí a pozná se to až proklikem.
+  const src = inlineScripts(HTML);
+  assert.match(src, /class="btn day-levels-btn" onclick="event\.stopPropagation\(\);toggleDayLevels/);
+  assert.match(src, /Sbalit hladiny/);
+  assert.match(src, /Rozbalit hladiny/);
+  // Tlačítko se vykresluje jen tam, kde je co rozbalovat.
+  assert.match(src, /const withLevels=dayTrades\.filter\(t=>levelPillsHTML\(t\)\.count\)/);
+});
+
+test('hlavička sbalené položky vypadá jako ovládací prvek, ne jako popisek', () => {
+  // Původní verze byla šedý text velikosti popisku a uživatel ji ve formuláři
+  // nenašel. Test drží to, co ji odlišuje: barva, tučnost a vlastní šipka.
+  const css = HTML.slice(HTML.indexOf('.chip-collapse>summary{'), HTML.indexOf('.card-levels{'));
+  assert.match(css, /color:var\(--blue\)/);
+  assert.match(css, /font-weight:800/);
+  assert.match(css, /\.chip-collapse\[open\]>summary \.chev\{transform:rotate\(90deg\)\}/, 'šipka se otáčí při rozbalení');
+  assert.match(css, /::-webkit-details-marker\{display:none\}/, 'nativní značka se vypíná, ať nejsou šipky dvě');
+  assert.ok(HTML.includes('<summary><svg class="chev"'), 'vlastní šipka je i v hlavičce ve formuláři');
+});
