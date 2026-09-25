@@ -1017,7 +1017,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="formgrid">
             <div class="field"><label>Pokračování po výstupu <span class="sub">— v ticích, ve směru obchodu</span></label><input id="postExitFavorableTicks" type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
             <div class="field"><label>Protipohyb po výstupu <span class="sub">— v ticích, proti směru obchodu</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
-            <div class="field full sub" id="postExitRuleHint">Měř 15 minut od výstupu, nebo do konce obchodního okna, co nastane dřív. Obě hodnoty od výstupní ceny, v ticích, vždy kladně.<br>U obchodu ukončeného na Stop Lossu čti „pokračování" jako <i>o kolik by širší SL vyšel</i>.</div>
+            <div class="field full sub" id="postExitRuleHint">Zadej počet ticků po výstupu: <b>Pokračování</b> ve směru obchodu (tvým směrem), <b>Protipohyb</b> proti němu. Obě hodnoty od výstupní ceny a vždy kladně.<br>U obchodu ukončeného na Stop Lossu čti „pokračování" jako <i>o kolik by širší SL vyšel</i>.</div>
             <div class="field"><label>Protipohyb přišel dřív než pokračování</label><select id="postExitAdverseFirst"><option value="ne">Ne</option><option value="ano">Ano</option></select></div>
             <div class="field" id="postExitDerivedField"><label>Dopočítá se <span class="sub">— needitovatelné</span></label><div class="sub" id="postExitDerivedHint">—</div></div>
           </div>
