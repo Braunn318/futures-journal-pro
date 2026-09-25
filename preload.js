@@ -2,10 +2,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('desktopAPI', {
   getBackupPath: () => ipcRenderer.invoke('backup:getPath'),
-  saveBackup: (content) => ipcRenderer.invoke('backup:save', content),
-  loadBackup: () => ipcRenderer.invoke('backup:load'),
   changeBackupPath: () => ipcRenderer.invoke('backup:changePath'),
   exportBackupOnce: (content, suggestedName) => ipcRenderer.invoke('backup:exportOnce', content, suggestedName),
+  // Zálohy všech deníků skládá a rozebírá hlavní proces – obsahují screenshoty
+  // a přes IPC by to byly desítky až stovky MB v jedné zprávě.
+  saveJournalsBackup: (meta) => ipcRenderer.invoke('backup:saveJournals', meta),
+  restoreJournalsBackup: () => ipcRenderer.invoke('backup:restoreJournals'),
+  exportJournalOnce: (journalId, suggestedName) => ipcRenderer.invoke('backup:exportJournalOnce', journalId, suggestedName),
   getDataLocation: () => ipcRenderer.invoke('data:getLocation'),
   chooseDataLocation: () => ipcRenderer.invoke('data:chooseLocation'),
   resetDataLocationToDefault: () => ipcRenderer.invoke('data:resetLocationToDefault'),
@@ -40,9 +43,13 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureTestSnapshotRaceSequence: () => ipcRenderer.invoke('capture:testSnapshotRaceSequence'),
   captureInstallCTraderConnector: () => ipcRenderer.invoke('capture:installCTraderConnector'),
   captureExportCTraderConnector: () => ipcRenderer.invoke('capture:exportCTraderConnector'),
-  copyImageToClipboard: (dataUrl) => ipcRenderer.invoke('image:copyToClipboard', dataUrl),
-  openImageExternally: (dataUrl) => ipcRenderer.invoke('image:openExternally', dataUrl),
-  saveImageAs: (dataUrl) => ipcRenderer.invoke('image:saveAs', dataUrl),
+  copyImageToClipboard: (source) => ipcRenderer.invoke('image:copyToClipboard', source),
+  openImageExternally: (source) => ipcRenderer.invoke('image:openExternally', source),
+  saveImageAs: (source) => ipcRenderer.invoke('image:saveAs', source),
+  // Uloží jeden obrázek do úložiště screenshotů a vrátí krátký odkaz, který
+  // se zapíše k obchodu místo base64.
+  storeImage: (dataUrl) => ipcRenderer.invoke('image:store', dataUrl),
+  storeCaptureImage: (filePath) => ipcRenderer.invoke('image:storeCapture', filePath),
   captureInstallNinjaConnector: () => ipcRenderer.invoke('capture:installNinjaConnector'),
   capturePrepareTradingViewPine: () => ipcRenderer.invoke('capture:prepareTradingViewPine'),
   capturePrepareTradingViewWorker: () => ipcRenderer.invoke('capture:prepareTradingViewWorker'),

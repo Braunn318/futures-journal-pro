@@ -1,8 +1,18 @@
-const { app, BrowserWindow, ipcMain, dialog, desktopCapturer, screen, shell, clipboard, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, desktopCapturer, screen, shell, clipboard, Tray, Menu, nativeImage, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
+
+// Screenshoty obchodů se nedrží v JSONu deníku, ale jako obyčejné soubory, na
+// které deník odkazuje adresou "fjimg://store/<otisk>.<přípona>" (viz sekce
+// "Úložiště screenshotů" níž). Aby <img src="fjimg://…"> uvnitř aplikace
+// fungoval, musí být schéma zaregistrované JEŠTĚ PŘED tím, než je Electron
+// připravený – proto je tohle volání hned u requirů, ne až v app.whenReady().
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'fjimg',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true }
+}]);
 
 let mainWindow;
 let tray = null;
@@ -29,12 +39,17 @@ if (!hasSingleInstanceLock) {
 const settingsPath = () => path.join(resolveDataDir(), 'backup-settings.json');
 const logPath = () => path.join(resolveDataDir(), 'futures-journal-error.log');
 
-function logError(context, error) {
+function appendLog(context, text) {
   try {
     fs.mkdirSync(path.dirname(logPath()), { recursive: true });
-    fs.appendFileSync(logPath(), `[${new Date().toISOString()}] ${context}: ${error?.stack || error}\n`, 'utf8');
+    fs.appendFileSync(logPath(), `[${new Date().toISOString()}] ${context}: ${text}\n`, 'utf8');
   } catch {}
 }
+function logError(context, error) { appendLog(context, error?.stack || error); }
+// Do stejného protokolu patří i události, které nejsou chyba, ale u kterých je
+// důležité vědět, že a kdy proběhly – hlavně jednorázový přesun screenshotů
+// z JSONu deníku do samostatných souborů.
+function logInfo(context, message) { appendLog(context, message); }
 function readSettings() {
   try { return JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); }
   catch { return {}; }
@@ -239,7 +254,11 @@ function createWindow() {
   // nebo ho otevřít ve výchozím prohlížeči obrázků nastaveném ve Windows.
   mainWindow.webContents.on('context-menu', (_event, params) => {
     if (params.mediaType !== 'image' || !params.srcURL) return;
-    const img = nativeImage.createFromDataURL(params.srcURL);
+    // Screenshot je buď odkaz do úložiště ("fjimg://…"), nebo – u obrázku
+    // právě vloženého do formuláře, než se uloží – ještě base64.
+    const parsed = imageToBuffer(params.srcURL);
+    if (!parsed) return;
+    const img = nativeImage.createFromBuffer(parsed.buffer);
     const menu = Menu.buildFromTemplate([
       { label: 'Kopírovat obrázek', click: () => clipboard.writeImage(img) },
       { label: 'Otevřít ve výchozím prohlížeči obrázků', click: () => openImageExternally(params.srcURL) },
@@ -289,7 +308,7 @@ function readJournal(id) {
   const file = journalPath(id);
   if (!fs.existsSync(file)) return defaultJournalData();
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-  return {
+  const journal = {
     trades: Array.isArray(parsed.trades) ? parsed.trades : [],
     settings: Array.isArray(parsed.settings) ? parsed.settings : [],
     dayNotes: (parsed.dayNotes && typeof parsed.dayNotes === 'object') ? parsed.dayNotes : {},
@@ -298,14 +317,161 @@ function readJournal(id) {
     // reálně nastalo. Každý nový top-level klíč sem musí být doplněn.
     schemaVersion: Number(parsed.schemaVersion) || 0
   };
+  // Jednorázový přesun starých base64 obrázků do souborů. Proběhne při prvním
+  // otevření deníku po aktualizaci a pak už nikdy (podruhé nenajde co
+  // převádět). Pořadí je záměrné: obrázky jsou na disku DŘÍV, než se z deníku
+  // odstraní jejich base64 podoba, a před přepsáním deníku se ještě udělá
+  // záloha – když se cokoli přeruší, původní soubor zůstane nedotčený a
+  // migrace se zopakuje při dalším otevření.
+  const moved = deflateJournalImages(journal);
+  if (moved) {
+    backupJournalFile(id, 'pred-presunem-screenshotu');
+    writeJournalFile(id, journal);
+    logInfo('Přesun screenshotů do souborů', `deník ${safeJournalId(id)}: ${moved} obrázků`);
+  }
+  return journal;
 }
-function writeJournal(id, data) {
+function writeJournalFile(id, data) {
   fs.mkdirSync(dataRoot(), { recursive: true });
   const target = journalPath(id);
   const temp = `${target}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(data, null, 2), 'utf8');
   fs.renameSync(temp, target);
+}
+function writeJournal(id, data) {
+  // Pojistka: i kdyby do zápisu přišel obrázek jako base64 (obnovená starší
+  // záloha, ruční import JSONu), do souboru deníku se nedostane – uloží se
+  // jako samostatný soubor a v deníku zůstane jen odkaz. Bez toho by se deník
+  // mohl kdykoli znovu nafouknout na stovky MB a renderer by se při ukládání
+  // obchodu zase začal ukončovat na nedostatek paměti.
+  deflateJournalImages(data);
+  writeJournalFile(id, data);
   writeAiExportMirror(id, data);
+}
+
+// ---------- Úložiště screenshotů (obrázky mimo JSON deníku) ----------
+// Screenshoty jsou jediná objemná část deníku: pár stovek obrázků v base64
+// udělá ze souboru deníku stovky MB. Takový soubor se při KAŽDÉM uložení
+// obchodu celý posílal mezi rendererem a hlavním procesem, celý znovu
+// serializoval a celý znovu vykresloval – rendereru na tom došla paměť a
+// Electron ho ukončil ("Aplikace se neočekávaně ukončila", v chybovém
+// protokolu "Renderer process ended"). Obrázky proto leží jako obyčejné
+// soubory a v deníku po nich zůstane jen krátký odkaz.
+const IMAGE_SCHEME = 'fjimg';
+const IMAGE_REF_PREFIX = `${IMAGE_SCHEME}://store/`;
+// Jméno souboru je otisk jeho obsahu: stejný obrázek se na disku neuloží
+// dvakrát a přesun obchodu mezi deníky nevyžaduje kopírování souborů.
+const IMAGE_NAME_RE = /^[a-f0-9]{64}\.[a-z0-9]{1,5}$/;
+const IMAGE_CONTENT_TYPES = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
+  gif: 'image/gif', bmp: 'image/bmp', avif: 'image/avif', svg: 'image/svg+xml'
+};
+const imagesRoot = () => path.join(dataRoot(), 'images');
+
+function isImageRef(value) {
+  return typeof value === 'string'
+    && value.startsWith(IMAGE_REF_PREFIX)
+    && IMAGE_NAME_RE.test(value.slice(IMAGE_REF_PREFIX.length));
+}
+function imageRefName(ref) { return isImageRef(ref) ? ref.slice(IMAGE_REF_PREFIX.length) : null; }
+// Cesta se skládá jen ze jména, které prošlo IMAGE_NAME_RE – přes ten se
+// neprotlačí ".." ani podadresář, takže odkaz nikdy neukáže mimo složku
+// s obrázky, ať přijde odkudkoli.
+function imageRefPath(ref) {
+  const name = imageRefName(ref);
+  return name ? path.join(imagesRoot(), name) : null;
+}
+function imageExtension(mime) {
+  const subtype = String(mime || '').split('/')[1] || '';
+  const ext = subtype.split('+')[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+  if (!ext) return 'png';
+  return ext === 'jpeg' ? 'jpg' : ext;
+}
+function storeImageBuffer(buffer, ext) {
+  fs.mkdirSync(imagesRoot(), { recursive: true });
+  const name = `${crypto.createHash('sha256').update(buffer).digest('hex')}.${ext}`;
+  const file = path.join(imagesRoot(), name);
+  // Zápis přes dočasný soubor: přerušení uprostřed nenechá na disku půlku
+  // obrázku, která by se podle jména tvářila jako platný screenshot.
+  if (!fs.existsSync(file)) {
+    const temp = `${file}.tmp`;
+    fs.writeFileSync(temp, buffer);
+    fs.renameSync(temp, file);
+  }
+  return IMAGE_REF_PREFIX + name;
+}
+function storeImageDataUrl(dataUrl) {
+  const parsed = dataUrlToBuffer(dataUrl);
+  return parsed ? storeImageBuffer(parsed.buffer, parsed.ext) : null;
+}
+// Obrázek může přijít jako odkaz (běžný stav) nebo jako base64 (starší záloha,
+// import). Když se přečíst nedá, vrací se null a volající to bere jako
+// "nedá se zpracovat", nikdy jako "smaž".
+function imageToBuffer(source) {
+  if (isImageRef(source)) {
+    const file = imageRefPath(source);
+    if (!file || !fs.existsSync(file)) return null;
+    return { buffer: fs.readFileSync(file), ext: path.extname(file).slice(1).toLowerCase() };
+  }
+  return dataUrlToBuffer(source);
+}
+function imageToDataUrl(source) {
+  const parsed = imageToBuffer(source);
+  if (!parsed) return null;
+  const mime = IMAGE_CONTENT_TYPES[parsed.ext] || 'application/octet-stream';
+  return `data:${mime};base64,${parsed.buffer.toString('base64')}`;
+}
+// Projde celou strukturu deníku a převede obrázkové řetězce funkcí "convert".
+// Prochází se celý strom, ne jen známá pole "images": obrázky jsou u obchodů,
+// u jejich cílů i u denních poznámek a každé další místo by se jinak tiše
+// přehlédlo a zůstalo by v JSONu jako base64. Když "convert" vrátí null,
+// hodnota se nechá být – neznámý formát se nikdy nezahodí.
+function mapImageStrings(value, convert, seen) {
+  const visited = seen || new Set();
+  if (!value || typeof value !== 'object' || visited.has(value)) return 0;
+  visited.add(value);
+  let changed = 0;
+  for (const key of Object.keys(value)) {
+    const item = value[key];
+    if (typeof item === 'string') {
+      const next = convert(item);
+      if (next != null && next !== item) { value[key] = next; changed++; }
+    } else if (item && typeof item === 'object') {
+      changed += mapImageStrings(item, convert, visited);
+    }
+  }
+  return changed;
+}
+// base64 v datech deníku -> soubor na disku + odkaz. Vrací počet převodů.
+function deflateJournalImages(data) {
+  return mapImageStrings(data, value => value.startsWith('data:image/') ? storeImageDataUrl(value) : null);
+}
+// Opačný směr. Používá se JEN při tvorbě zálohy/exportu, aby výsledný soubor
+// byl soběstačný a šel obnovit i na stroji, kde složka s obrázky není.
+function inflateJournalImages(data) {
+  return mapImageStrings(data, value => isImageRef(value) ? imageToDataUrl(value) : null);
+}
+// Obsluha adres "fjimg://store/<jméno>" – díky ní stačí v rendereru napsat
+// <img src="<odkaz>"> a obrázek se načte přímo ze souboru, bez base64 a bez
+// posílání dat přes IPC. Jméno je otisk obsahu, takže se smí cachovat natrvalo.
+function registerImageProtocol() {
+  try {
+    protocol.handle(IMAGE_SCHEME, request => {
+      const name = decodeURIComponent(new URL(request.url).pathname).replace(/^\/+/, '');
+      if (!IMAGE_NAME_RE.test(name)) return new Response('', { status: 400 });
+      const file = path.join(imagesRoot(), name);
+      if (!fs.existsSync(file)) return new Response('', { status: 404 });
+      const ext = path.extname(file).slice(1).toLowerCase();
+      return new Response(fs.readFileSync(file), {
+        headers: {
+          'content-type': IMAGE_CONTENT_TYPES[ext] || 'application/octet-stream',
+          'cache-control': 'public, max-age=31536000, immutable'
+        }
+      });
+    });
+  } catch (error) {
+    logError('registerImageProtocol', error);
+  }
 }
 
 // ---------- "Odlehčený" export bez screenshotů – pro čtení jinými nástroji ----------
@@ -380,16 +546,19 @@ ipcMain.handle('data:writeAiExportManifest', async (_event, journals) => {
 // schématu. Dialog se záměrně neotevírá: migrace běží při startu a vyskakovací
 // okno by bralo focus. Pořadí u volajícího je vždy záloha → zápis, nikdy
 // naopak (v minulosti move-then-delete způsobil reálnou ztrátu dat).
+function backupJournalFile(journalId, reason) {
+  const source = journalPath(journalId);
+  if (!fs.existsSync(source)) return { ok: true, skipped: true };
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dir = path.join(app.getPath('userData'), 'safety-backups', `${String(reason || 'migrace').replace(/[^a-zA-Z0-9_-]/g, '-')}-${stamp}`);
+  fs.mkdirSync(dir, { recursive: true });
+  const target = path.join(dir, `${safeJournalId(journalId)}.json`);
+  fs.copyFileSync(source, target);
+  return { ok: true, path: target };
+}
 ipcMain.handle('storage:backupJournal', async (_event, journalId, reason) => {
   try {
-    const source = journalPath(journalId);
-    if (!fs.existsSync(source)) return { ok: true, skipped: true };
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const dir = path.join(app.getPath('userData'), 'safety-backups', `${String(reason || 'migrace').replace(/[^a-zA-Z0-9_-]/g, '-')}-${stamp}`);
-    fs.mkdirSync(dir, { recursive: true });
-    const target = path.join(dir, `${safeJournalId(journalId)}.json`);
-    fs.copyFileSync(source, target);
-    return { ok: true, path: target };
+    return backupJournalFile(journalId, reason);
   } catch (error) {
     logError('storage:backupJournal', error);
     return { ok: false, error: error.message };
@@ -413,44 +582,6 @@ ipcMain.handle('storage:reset', async () => {
 });
 
 ipcMain.handle('backup:getPath', async () => readSettings().backupPath || null);
-ipcMain.handle('backup:save', async (_event, content) => {
-  try {
-    let { backupPath } = readSettings();
-    if (!backupPath) {
-      const result = await dialog.showSaveDialog(mainWindow, {
-        title: 'Vyber umístění aktuální zálohy',
-        defaultPath: 'FuturesJournal_AKTUALNI_ZALOHA.json',
-        filters: [{ name: 'Záloha Futures Journal', extensions: ['json'] }]
-      });
-      if (result.canceled || !result.filePath) return { ok: false };
-      backupPath = result.filePath;
-      writeSettings({ backupPath });
-    }
-    fs.writeFileSync(backupPath, content, 'utf8');
-    return { ok: true, path: backupPath };
-  } catch (error) {
-    logError('Backup save', error);
-    return { ok: false, error: error.message };
-  }
-});
-ipcMain.handle('backup:load', async () => {
-  try {
-    let { backupPath } = readSettings();
-    if (!backupPath || !fs.existsSync(backupPath)) {
-      const result = await dialog.showOpenDialog(mainWindow, {
-        title: 'Vyber zálohu k obnovení', properties: ['openFile'],
-        filters: [{ name: 'Záloha Futures Journal', extensions: ['json'] }]
-      });
-      if (result.canceled || !result.filePaths[0]) return { ok: false };
-      backupPath = result.filePaths[0];
-      writeSettings({ backupPath });
-    }
-    return { ok: true, path: backupPath, content: fs.readFileSync(backupPath, 'utf8') };
-  } catch (error) {
-    logError('Backup load', error);
-    return { ok: false, error: error.message };
-  }
-});
 // Umožní znovu zvolit umístění "Aktualizovat zálohu na SSD" – jinak si appka
 // napořád pamatuje jen tu VŮBEC první zvolenou cestu bez možnosti změny.
 ipcMain.handle('backup:changePath', async () => {
@@ -470,21 +601,117 @@ ipcMain.handle('backup:changePath', async () => {
 });
 // "Stáhnout zálohu JSON" – na rozdíl od "Aktualizovat na SSD" si nic
 // nepamatuje, pokaždé se ukáže skutečný dialog Uložit jako.
+async function exportFileOnce(content, suggestedName) {
+  const name = suggestedName || 'futures-journal-export.json';
+  const ext = path.extname(name).replace('.', '') || 'json';
+  const extLabels = { json: 'JSON soubor', csv: 'CSV soubor', txt: 'Textový soubor' };
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Uložit soubor',
+    defaultPath: path.join(app.getPath('documents'), name),
+    filters: [{ name: extLabels[ext] || `Soubor .${ext}`, extensions: [ext] }]
+  });
+  if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+  fs.writeFileSync(result.filePath, content, 'utf8');
+  return { ok: true, path: result.filePath };
+}
 ipcMain.handle('backup:exportOnce', async (_event, content, suggestedName) => {
   try {
-    const name = suggestedName || 'futures-journal-export.json';
-    const ext = path.extname(name).replace('.', '') || 'json';
-    const extLabels = { json: 'JSON soubor', csv: 'CSV soubor', txt: 'Textový soubor' };
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Uložit soubor',
-      defaultPath: path.join(app.getPath('documents'), name),
-      filters: [{ name: extLabels[ext] || `Soubor .${ext}`, extensions: [ext] }]
-    });
-    if (result.canceled || !result.filePath) return { ok: false, canceled: true };
-    fs.writeFileSync(result.filePath, content, 'utf8');
-    return { ok: true, path: result.filePath };
+    return await exportFileOnce(content, suggestedName);
   } catch (error) {
     logError('backup:exportOnce', error);
+    return { ok: false, error: error.message };
+  }
+});
+
+// ---------- Zálohy deníků ----------
+// Záloha se skládá TADY, v hlavním procesu, a ne v rendereru: obsahuje i
+// screenshoty, takže jde o desítky až stovky MB. Kdyby si ten text renderer
+// sestavoval sám a posílal ho přes IPC, byl by to přesně ten druh obřího
+// přenosu, kvůli kterému se aplikace při ukládání obchodu ukončovala.
+// Obrázky se do zálohy vkládají jako base64, aby byl soubor soběstačný a šel
+// obnovit i na stroji, kde složka s obrázky neexistuje.
+function buildJournalsBackup(meta) {
+  const profiles = Array.isArray(meta?.profiles) ? meta.profiles : [];
+  const journals = profiles.map(profile => {
+    const data = readJournal(profile.id);
+    inflateJournalImages(data);
+    // dayNotes se dřív do zálohy nedávaly vůbec, takže obnova ze zálohy tiše
+    // smazala denní komentáře, náhledy a poznámky. Patří sem stejně jako obchody.
+    return { profile, trades: data.trades, settings: data.settings, dayNotes: data.dayNotes };
+  });
+  return JSON.stringify({
+    app: 'Futures Journal',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    activeJournalId: meta?.activeJournalId || profiles[0]?.id || '',
+    profiles,
+    journals
+  });
+}
+function restoreJournalsBackup(content) {
+  const data = JSON.parse(content);
+  if (!data || !Array.isArray(data.profiles) || !Array.isArray(data.journals)) throw new Error('Neplatná záloha.');
+  for (const entry of data.journals) {
+    const id = entry?.profile?.id;
+    if (!id) continue;
+    // writeJournal si base64 obrázky ze zálohy sám uloží jako soubory.
+    writeJournal(id, {
+      trades: Array.isArray(entry.trades) ? entry.trades : [],
+      settings: Array.isArray(entry.settings) ? entry.settings : [],
+      dayNotes: (entry.dayNotes && typeof entry.dayNotes === 'object') ? entry.dayNotes : {}
+    });
+  }
+  return { activeJournalId: data.activeJournalId || data.profiles[0]?.id || '', profiles: data.profiles };
+}
+ipcMain.handle('backup:saveJournals', async (_event, meta) => {
+  try {
+    let { backupPath } = readSettings();
+    if (!backupPath) {
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Vyber umístění aktuální zálohy',
+        defaultPath: 'FuturesJournal_AKTUALNI_ZALOHA.json',
+        filters: [{ name: 'Záloha Futures Journal', extensions: ['json'] }]
+      });
+      if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+      backupPath = result.filePath;
+      writeSettings({ ...readSettings(), backupPath });
+    }
+    fs.writeFileSync(backupPath, buildJournalsBackup(meta), 'utf8');
+    return { ok: true, path: backupPath };
+  } catch (error) {
+    logError('backup:saveJournals', error);
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('backup:restoreJournals', async () => {
+  try {
+    let { backupPath } = readSettings();
+    if (!backupPath || !fs.existsSync(backupPath)) {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Vyber zálohu k obnovení', properties: ['openFile'],
+        filters: [{ name: 'Záloha Futures Journal', extensions: ['json'] }]
+      });
+      if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
+      backupPath = result.filePaths[0];
+      writeSettings({ ...readSettings(), backupPath });
+    }
+    const restored = restoreJournalsBackup(fs.readFileSync(backupPath, 'utf8'));
+    return { ok: true, path: backupPath, ...restored };
+  } catch (error) {
+    logError('backup:restoreJournals', error);
+    return { ok: false, error: error.message };
+  }
+});
+// "Stáhnout zálohu JSON" u jednoho deníku – stejný tvar { settings, trades },
+// jaký umí načíst tlačítko "Nahrát zálohu JSON".
+ipcMain.handle('backup:exportJournalOnce', async (_event, journalId, suggestedName) => {
+  try {
+    const data = readJournal(journalId);
+    inflateJournalImages(data);
+    const main = (data.settings || []).find(s => s?.key === 'main')?.value || {};
+    return await exportFileOnce(JSON.stringify({ settings: main, trades: data.trades, dayNotes: data.dayNotes }, null, 2), suggestedName);
+  } catch (error) {
+    logError('backup:exportJournalOnce', error);
     return { ok: false, error: error.message };
   }
 });
@@ -1331,11 +1558,17 @@ ipcMain.handle('capture:openConnectorFolder', async () => {
 function dataUrlToBuffer(dataUrl) {
   const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || '');
   if (!match) return null;
-  const ext = match[1].split('/')[1].split('+')[0] === 'jpeg' ? 'jpg' : match[1].split('/')[1].split('+')[0];
-  return { buffer: Buffer.from(match[2], 'base64'), ext };
+  return { buffer: Buffer.from(match[2], 'base64'), ext: imageExtension(match[1]) };
 }
-function openImageExternally(dataUrl) {
-  const parsed = dataUrlToBuffer(dataUrl);
+function openImageExternally(source) {
+  // U obrázku uloženého jako soubor se otevře rovnou on – není důvod dělat
+  // kopii v TEMPu a plnit disk druhou sadou screenshotů.
+  const stored = imageRefPath(source);
+  if (stored && fs.existsSync(stored)) {
+    shell.openPath(stored).then(err => { if (err) logError('openImageExternally', err); });
+    return { ok: true };
+  }
+  const parsed = dataUrlToBuffer(source);
   if (!parsed) return { ok: false, error: 'Neplatný formát obrázku.' };
   try {
     const tmpDir = path.join(app.getPath('temp'), 'futures-journal-screenshots');
@@ -1349,8 +1582,8 @@ function openImageExternally(dataUrl) {
     return { ok: false, error: error.message };
   }
 }
-async function saveImageAs(dataUrl) {
-  const parsed = dataUrlToBuffer(dataUrl);
+async function saveImageAs(source) {
+  const parsed = imageToBuffer(source);
   if (!parsed) return { ok: false, error: 'Neplatný formát obrázku.' };
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Uložit obrázek jako',
@@ -1361,8 +1594,8 @@ async function saveImageAs(dataUrl) {
   fs.writeFileSync(result.filePath, parsed.buffer);
   return { ok: true, path: result.filePath };
 }
-ipcMain.handle('image:copyToClipboard', async (_event, dataUrl) => {
-  const parsed = dataUrlToBuffer(dataUrl);
+ipcMain.handle('image:copyToClipboard', async (_event, source) => {
+  const parsed = imageToBuffer(source);
   if (!parsed) return { ok: false, error: 'Neplatný formát obrázku.' };
   try {
     clipboard.writeImage(nativeImage.createFromBuffer(parsed.buffer));
@@ -1372,8 +1605,31 @@ ipcMain.handle('image:copyToClipboard', async (_event, dataUrl) => {
     return { ok: false, error: error.message };
   }
 });
-ipcMain.handle('image:openExternally', async (_event, dataUrl) => openImageExternally(dataUrl));
-ipcMain.handle('image:saveAs', async (_event, dataUrl) => saveImageAs(dataUrl));
+ipcMain.handle('image:openExternally', async (_event, source) => openImageExternally(source));
+ipcMain.handle('image:saveAs', async (_event, source) => saveImageAs(source));
+// Renderer sem posílá JEDEN obrázek (zmenšený a převedený na WebP) a dostane
+// zpátky krátký odkaz, který si uloží k obchodu. Přes IPC tak nikdy neteče
+// celý deník s obrázky, jen jednotky set kB.
+ipcMain.handle('image:store', async (_event, dataUrl) => {
+  try {
+    const ref = storeImageDataUrl(dataUrl);
+    return ref ? { ok: true, ref } : { ok: false, error: 'Neplatný formát obrázku.' };
+  } catch (error) {
+    logError('image:store', error);
+    return { ok: false, error: error.message };
+  }
+});
+// Automatické screenshoty jsou už na disku jako PNG – uloží se do úložiště
+// rovnou ze souboru, bez oklikou přes base64 v rendereru.
+ipcMain.handle('image:storeCapture', async (_event, filePath) => {
+  try {
+    const resolved = path.resolve(String(filePath || ''));
+    if (!resolved.startsWith(path.resolve(screenshotRoot()))) throw new Error('Neplatná cesta screenshotu.');
+    return { ok: true, ref: storeImageBuffer(fs.readFileSync(resolved), imageExtension(`image/${path.extname(resolved).slice(1) || 'png'}`)) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
 
 ipcMain.handle('capture:testExecutionSequence', async () => {
   const base = Date.now();
@@ -1451,6 +1707,7 @@ app.whenReady().then(() => {
     const loginState = app.getLoginItemSettings({ path: process.execPath, args: ['--background'] });
     if (!loginState.openAtLogin) logError('Windows auto-start', 'Automatické spuštění se nepodařilo aktivovat.');
   }
+  registerImageProtocol();
   startCaptureServer();
   startRelayPolling();
   createTray();

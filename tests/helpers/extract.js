@@ -118,7 +118,25 @@ function extractDeclaration(src, name) {
     let i = m.index + m[0].length;
     while (/\s/.test(src[i])) i++;
     if (src[i] === '{' || src[i] === '[' || src[i] === '(') {
-      return src.slice(start, matchBracket(src, i) + 1) + ';';
+      let end = matchBracket(src, i);
+      // Závorka za "=" nemusí být hodnota, ale seznam parametrů šipkové funkce.
+      // Bez téhle větve se z `const imagesRoot = () => path.join(…)` vyřízlo jen
+      // `const imagesRoot = ()` a vyhodnocení spadlo na syntaxi – tímhle tvarem
+      // je v main.js zapsaná většina cest k datovým složkám, takže by se žádná
+      // z nich nedala otestovat.
+      let after = end + 1;
+      while (/\s/.test(src[after])) after++;
+      if (src[after] === '=' && src[after + 1] === '>') {
+        after += 2;
+        while (/\s/.test(src[after])) after++;
+        if (src[after] === '{' || src[after] === '[' || src[after] === '(') {
+          end = matchBracket(src, after);
+        } else {
+          const nl = src.indexOf('\n', after);
+          end = (nl < 0 ? src.length : nl) - 1;
+        }
+      }
+      return src.slice(start, end + 1) + ';';
     }
     const nl = src.indexOf('\n', i);
     return src.slice(start, nl < 0 ? src.length : nl);

@@ -1073,6 +1073,53 @@ async function removeLegacyDefaultJournal(){
 function currentDBName(){return 'FuturesJournalDB_'+activeJournalId}
 let db={data:{trades:[],settings:[]},close(){}}, trades=[], settings={startingBalance:100000,currency:'USD',usdCzkRate:23,dailyLossLimit:5000,dailyPointLimit:100,breakEvenEnabled:false,breakEvenThreshold:0,autoMergeLegs:true,templates:[],risk:{}};
 let editImages=[], calendarDate=new Date();
+
+// ---------- Screenshoty: zmenšení a uložení mimo deník ----------
+// K obchodu se neukládá obrázek, ale krátký odkaz do úložiště screenshotů
+// (viz sekce "Úložiště screenshotů" v main.js). Dřív se base64 obrázky držely
+// přímo v JSONu deníku, takže se při KAŽDÉM uložení obchodu posílal mezi
+// procesy a znovu vykresloval soubor o stovkách MB – renderer na to dojel na
+// paměť a aplikace hlásila "Aplikace se neočekávaně ukončila".
+const MAX_SHOT_EDGE=2560;
+const SHOT_QUALITY=0.92;
+function loadImageElement(src){
+ return new Promise((resolve,reject)=>{
+  const img=new Image();
+  img.onload=()=>resolve(img);
+  img.onerror=()=>reject(new Error('Obrázek se nepodařilo načíst.'));
+  img.src=src;
+ });
+}
+// PNG screenshot grafu má běžně přes 1 MB; jako WebP vypadá stejně a zabere
+// zlomek. Když se převod nepovede nebo by výsledek byl větší, použije se
+// originál – obrázek se kvůli úspoře místa nikdy nezahodí ani nezhorší.
+async function shrinkScreenshot(dataUrl){
+ try{
+  const img=await loadImageElement(dataUrl);
+  const longest=Math.max(img.naturalWidth,img.naturalHeight);
+  if(!longest)return dataUrl;
+  const scale=Math.min(1,MAX_SHOT_EDGE/longest);
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.round(img.naturalWidth*scale);
+  canvas.height=Math.round(img.naturalHeight*scale);
+  if(!canvas.width||!canvas.height)return dataUrl;
+  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  const webp=canvas.toDataURL('image/webp',SHOT_QUALITY);
+  return (webp.startsWith('data:image/webp')&&webp.length<dataUrl.length)?webp:dataUrl;
+ }catch{return dataUrl}
+}
+// Vrátí odkaz na uložený obrázek, nebo null, když se uložit nepodařilo.
+// Mimo desktopovou aplikaci (samotný prohlížeč) úložiště není a obrázek
+// zůstane jako base64 – chová se to pak jako dřív, jen bez úspory.
+async function storeScreenshot(dataUrl){
+ if(typeof dataUrl!=='string')return null;
+ if(!dataUrl.startsWith('data:image/'))return dataUrl;
+ if(!window.desktopAPI?.storeImage)return dataUrl;
+ const r=await window.desktopAPI.storeImage(await shrinkScreenshot(dataUrl));
+ if(r?.ok&&r.ref)return r.ref;
+ showToast('Obrázek se nepodařilo uložit: '+(r?.error||'neznámá chyba'));
+ return null;
+}
 let tradeFormBaseline='';
 function tradeFormSnapshot(){
  const vals=[...$('tradeForm').querySelectorAll('input,select,textarea')].map(el=>el.type==='file'?'':el.value);
@@ -2338,7 +2385,7 @@ function tradeHTML(t){
  ${t.dailyPlan.psychology?`<div><b>Psychologie:</b> ${esc(t.dailyPlan.psychology)}</div>`:''}
  ${t.dailyPlan.note?`<div><b>Poznámka:</b> ${esc(t.dailyPlan.note)}</div>`:''}
  </div></details>`:''}
- <div class="thumbs">${(t.images||[]).map(i=>`<img src="${i}" onclick="openImage('${i}')">`).join('')}</div></div>
+ <div class="thumbs">${(t.images||[]).map(i=>`<img src="${i}" loading="lazy" decoding="async" onclick="openImage('${i}')">`).join('')}</div></div>
  <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
 }
 
@@ -2354,7 +2401,7 @@ function dayKpis(dayTrades){
 }
 function dayThumbsHTML(date){
  const note=getDayNote(date);
- const shotsHTML=(note.images||[]).map((src,i)=>`<div class="day-thumb-wrap"><img src="${src}" onclick="openImage('${src}')"><button type="button" title="Odebrat" onclick="event.stopPropagation();removeDayImage('${date}',${i})">✕</button></div>`).join('');
+ const shotsHTML=(note.images||[]).map((src,i)=>`<div class="day-thumb-wrap"><img src="${src}" loading="lazy" decoding="async" onclick="openImage('${src}')"><button type="button" title="Odebrat" onclick="event.stopPropagation();removeDayImage('${date}',${i})">✕</button></div>`).join('');
  const addShotBtn=(note.images||[]).length<3?`<button type="button" class="day-add-shot" onclick="event.stopPropagation();triggerDayShotPicker('${date}')" title="Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tento den rozbalený.">+ Přidat obrázek</button>`:'';
  return shotsHTML+addShotBtn;
 }
@@ -2420,7 +2467,8 @@ async function handleDayShotInputChange(e){
  for(const f of files){
   if(f.size>3_000_000){showToast('Jeden obrázek je větší než 3 MB. Zvol menší soubor.');continue}
   const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});
-  note.images.push(data);
+  const ref=await storeScreenshot(data);
+  if(ref)note.images.push(ref);
  }
  e.target.value='';
  await saveDayNote(date,{images:note.images});
@@ -2865,7 +2913,9 @@ $('instrument').addEventListener('change',()=>{
 $('screenshots').addEventListener('change',async e=>{
  const files=[...e.target.files].slice(0,3-editImages.length);
  for(const f of files){if(f.size>3_000_000){showToast('Jeden obrázek je větší než 3 MB. Zvol menší soubor.');continue}
-  const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});editImages.push(data)}
+  const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});
+  const ref=await storeScreenshot(data);
+  if(ref)editImages.push(ref)}
  showPreviews();e.target.value='';
 });
 $('dayShotInput').addEventListener('change',handleDayShotInputChange);
@@ -2882,7 +2932,8 @@ document.addEventListener('paste',async e=>{
    if(!file)continue;
    if(file.size>3_000_000){showToast('Vložený obrázek je větší než 3 MB.');continue}
    const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
-   editImages.push(data);
+   const ref=await storeScreenshot(data);
+   if(ref)editImages.push(ref);
   }
   showPreviews();
   return;
@@ -2898,7 +2949,8 @@ document.addEventListener('paste',async e=>{
   if(!file)continue;
   if(file.size>3_000_000){showToast('Vložený obrázek je větší než 3 MB.');continue}
   const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
-  note.images.push(data);
+  const ref=await storeScreenshot(data);
+  if(ref)note.images.push(ref);
  }
  await saveDayNote(date,{images:note.images});
  const el=findDayWrap(date)?.querySelector('.day-thumbs');
@@ -3411,16 +3463,17 @@ $('exportCsv').onclick=async()=>{
 };
 $('printPdf').onclick=()=>window.print();
 $('exportJson').onclick=async()=>{
- const content=JSON.stringify({settings,trades},null,2);
- if(window.desktopAPI?.exportBackupOnce){
-  const r=await window.desktopAPI.exportBackupOnce(content,'futures-journal-zaloha.json');
+ // Screenshoty jsou v deníku jen jako odkazy na soubory; aby byla stažená
+ // záloha soběstačná, vkládá je do ní zpátky hlavní proces.
+ if(window.desktopAPI?.exportJournalOnce){
+  const r=await window.desktopAPI.exportJournalOnce(activeJournalId,'futures-journal-zaloha.json');
   if(r?.ok)showToast('Záloha uložena: '+r.path);
   else if(!r?.canceled)showToast('Uložení se nezdařilo: '+(r?.error||'neznámá chyba'));
- }else{
-  download(new Blob([content],{type:'application/json'}),'futures-journal-zaloha.json');
+  return;
  }
+ download(new Blob([JSON.stringify({settings,trades},null,2)],{type:'application/json'}),'futures-journal-zaloha.json');
 };
-$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const t of data.trades)await put('trades',t);if(data.settings)await put('settings',{key:'main',value:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
+$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const t of data.trades){if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
 $('clearAll').onclick=async()=>{if(await showConfirm('Tato akce smaže všechny obchody a nastavení pouze v aktuálním deníku. Pokračovat?')){await clearStore('trades');await clearStore('settings');safeReload()}};
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 
@@ -3579,23 +3632,18 @@ if($('promptModalCancel'))$('promptModalCancel').onclick=()=>resolvePrompt(null)
 if($('promptModalOk'))$('promptModalOk').onclick=()=>resolvePrompt($('promptModalInput').value);
 if($('promptModalInput'))$('promptModalInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('promptModalOk').click()}});
 if($('promptModal'))$('promptModal').onclick=e=>{if(e.target===$('promptModal'))resolvePrompt(null)};
-async function collectAllJournalsBackup(){
- const journals=[];
- for(const profile of journalProfiles){
-  const result=await window.desktopAPI.readJournal(profile.id);
-  if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
-  journals.push({profile,trades:result.data?.trades||[],settings:result.data?.settings||[]});
- }
- return {app:'Futures Journal',version:2,exportedAt:new Date().toISOString(),activeJournalId,profiles:journalProfiles,journals};
+// Kompletní záloha obsahuje i screenshoty, tedy desítky až stovky MB. Renderer
+// si ji proto nesestavuje sám: pošle jen seznam deníků a hlavní proces si
+// obchody i obrázky načte z disku a zapíše soubor rovnou. Kdyby ten text
+// procházel přes IPC, byl by to přesně ten obří přenos, kvůli kterému se
+// aplikace ukončovala.
+function journalsBackupMeta(){
+ return {activeJournalId,profiles:journalProfiles};
 }
-async function restoreAllJournalsBackup(data){
- if(!data||!Array.isArray(data.profiles)||!Array.isArray(data.journals))throw new Error('Neplatná záloha.');
- for(const j of data.journals){
-  const result=await window.desktopAPI.writeJournal(j.profile.id,{trades:j.trades||[],settings:j.settings||[]});
-  if(!result?.ok)throw new Error(result?.error||`Deník ${j.profile.name} nelze obnovit.`);
- }
- journalProfiles=data.profiles;
- activeJournalId=data.activeJournalId||data.profiles[0].id;
+function applyRestoredJournals(restored){
+ if(!restored||!Array.isArray(restored.profiles)||!restored.profiles.length)throw new Error('Neplatná záloha.');
+ journalProfiles=restored.profiles;
+ activeJournalId=restored.activeJournalId||restored.profiles[0].id;
  saveJournalProfiles();
  safeReload();
 }
@@ -3608,20 +3656,20 @@ async function refreshBackupPathInfo(){
 if(window.desktopAPI){
  $('updateBackup').onclick=async()=>{
   try{
-   const data=await collectAllJournalsBackup();
-   const result=await window.desktopAPI.saveBackup(JSON.stringify(data));
-   if(result?.ok){
-    $('backupPathInfo').textContent=`Aktuální záloha: ${result.path}`;
-    showToast('Kompletní záloha byla aktualizována.');
-   }
+   const result=await window.desktopAPI.saveJournalsBackup(journalsBackupMeta());
+   if(result?.canceled)return;
+   if(!result?.ok)throw new Error(result?.error||'neznámá chyba');
+   $('backupPathInfo').textContent=`Aktuální záloha: ${result.path}`;
+   showToast('Kompletní záloha byla aktualizována.');
   }catch(err){showToast('Zálohu se nepodařilo vytvořit: '+err.message)}
  };
  $('restoreBackup').onclick=async()=>{
   try{
-   const result=await window.desktopAPI.loadBackup();
-   if(!result?.ok)return;
    if(!(await showConfirm('Obnova přepíše současná data všech deníků. Pokračovat?')))return;
-   await restoreAllJournalsBackup(JSON.parse(result.content));
+   const result=await window.desktopAPI.restoreJournalsBackup();
+   if(result?.canceled)return;
+   if(!result?.ok)throw new Error(result?.error||'neznámá chyba');
+   applyRestoredJournals(result);
   }catch(err){showToast('Zálohu se nepodařilo obnovit: '+err.message)}
  };
  if($('changeBackupPath'))$('changeBackupPath').onclick=async()=>{
@@ -3852,8 +3900,12 @@ async function capturedImages(e){
  const paths=Array.isArray(e.screenshotPaths)?e.screenshotPaths:[];
  const images=[];
  for(const p of paths.slice(0,3)){
-  const r=await window.desktopAPI.captureReadScreenshot(p);
-  if(r?.ok&&r.dataUrl)images.push(r.dataUrl);
+  // Automatický screenshot už na disku je – hlavní proces si ho přebere
+  // rovnou ze souboru a vrátí jen odkaz, přes IPC neteče žádný obrázek.
+  const r=await window.desktopAPI.storeCaptureImage?.(p);
+  if(r?.ok&&r.ref){images.push(r.ref);continue}
+  const legacy=await window.desktopAPI.captureReadScreenshot(p);
+  if(legacy?.ok&&legacy.dataUrl)images.push(legacy.dataUrl);
  }
  return images;
 }

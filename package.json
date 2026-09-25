@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.6.2",
-  "description": "Futures Journal PRO 4.6.2 – editovatelné číselníky kontextu obchodu: přejmenování popisku, vlastní volby, skrývání místo mazání a změna pořadí.",
+  "version": "4.6.3",
+  "description": "Futures Journal PRO 4.6.3 – screenshoty se ukládají mimo JSON deníku, takže se aplikace při ukládání obchodu neukončuje na nedostatek paměti.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",
