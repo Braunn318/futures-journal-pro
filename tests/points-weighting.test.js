@@ -33,7 +33,7 @@ const NAMES = [
   'mergeSamePriceLegs',
   'labelLegs',
   'mergeContextFields',
-  'combineTradeObjects'
+  'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects'
 ];
 
 function renderer() {

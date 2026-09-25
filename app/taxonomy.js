@@ -149,7 +149,14 @@
     { key: 'srStopLoss', cardinality: 'multi', enumName: 'SR_SL', label: 'SR proti S/L' },
     { key: 'ofConfirm', cardinality: 'multi', enumName: 'OF_CONFIRM', label: 'Order flow potvrzení' },
     { key: 'fillStatus', cardinality: 'single', enumName: 'FILL_STATUS', label: 'Stav naplnění' },
-    { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' }
+    { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' },
+    // Chování ceny PO VÝSTUPU. merge: 'lastExit' znamená, že u sloučeného
+    // obchodu se hodnota NEBERE z první nohy jako u ostatních jednohodnotových
+    // polí, ale z nohy s nejpozdějším časem výstupu – měří se pokračování ceny
+    // po tom, co pozice fakticky skončila, ne po částečném výstupu uprostřed.
+    { key: 'postExitFavorableTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Pokračování po výstupu (ticky)' },
+    { key: 'postExitAdverseTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Protipohyb po výstupu (ticky)' },
+    { key: 'postExitAdverseFirst', cardinality: 'bool', enumName: null, merge: 'lastExit', label: 'Protipohyb přišel dřív' }
   ];
 
   // ------------------------------------------------------- uživatelská úprava

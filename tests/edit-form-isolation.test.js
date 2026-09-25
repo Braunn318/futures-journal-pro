@@ -65,6 +65,7 @@ function tradeForm() {
     appendBlankLegRow() { return dom.document.getElementById('legRow'); },
     showPreviews() {},
     updateResultBadge() {},
+    renderPostExitHints() {},
     updateLegBadge() {},
     tradeFormSnapshot: () => ''
   });

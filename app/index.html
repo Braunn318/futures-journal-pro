@@ -190,6 +190,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .day.week-summary .num{color:var(--blue);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
 .day-flag{position:absolute;top:6px;right:8px;font-size:14px}
 .limitbox{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+.post-exit-warn{color:var(--yellow)}
 .field input,.field select,.field textarea{width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px}
 textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.full{grid-column:1/-1}
 .modal{position:fixed;inset:0;background:rgba(var(--shadow-rgb),.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;pointer-events:none}
@@ -802,20 +803,21 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="settings-grid">
         <div class="card">
           <h3>Šablony podle instrumentu</h3>
-          <p class="sub">Pro daný instrument lze předvyplnit strategii, dodržení plánu, komentář, hodnotu bodu a výchozí komisi — při ručním přidání i při automatickém importu.</p>
-          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 1.1fr auto;margin-top:12px;font-weight:700;color:var(--muted);font-size:12px">
-            <div>Instrument</div><div>Strategie</div><div>Plán</div><div>Bod ($)</div><div>Komise ($/ks)</div><div>Komentář</div><div></div>
+          <p class="sub">Pro daný instrument lze předvyplnit strategii, dodržení plánu, komentář, hodnotu bodu, velikost ticku a výchozí komisi — při ručním přidání i při automatickém importu.</p>
+          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto;margin-top:12px;font-weight:700;color:var(--muted);font-size:12px">
+            <div>Instrument</div><div>Strategie</div><div>Plán</div><div>Bod ($)</div><div>Tick</div><div>Komise ($/ks)</div><div>Komentář</div><div></div>
           </div>
-          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 1.1fr auto">
+          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
             <input id="tplNewInstrument" placeholder="např. MES">
             <input id="tplNewStrategy" placeholder="Strategie">
             <select id="tplNewPlan"><option value="">—</option><option value="ano">Ano</option><option value="ne">Ne</option></select>
             <input id="tplNewPointValue" type="number" step="any" min="0" placeholder="5,00">
+            <input id="tplNewTickSize" type="number" step="any" min="0" placeholder="0,25" title="Velikost ticku – nejmenší pohyb ceny. Potřebná pro dopočty chování ceny po výstupu.">
             <input id="tplNewCommission" type="number" step="any" min="0" placeholder="1,90">
             <input id="tplNewComment" placeholder="Komentář">
             <button class="btn primary" id="addTemplate" style="padding:8px 10px">＋</button>
           </div>
-          <div class="sub" style="margin-top:8px">Pár běžných kontraktů má hodnotu bodu předvyplněnou automaticky, i bez šablony: ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5. Přidáním šablony pro daný instrument (i jen s vyplněným polem "Bod") si můžeš tuhle vestavěnou hodnotu přepsat vlastní. Komise ve výchozím stavu vestavěnou hodnotu nemá – dokud ji nevyplníš, nic se nemění.</div>
+          <div class="sub" style="margin-top:8px">Pár běžných kontraktů má hodnotu bodu předvyplněnou automaticky, i bez šablony: ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5. Přidáním šablony pro daný instrument (i jen s vyplněným polem "Bod") si můžeš tuhle vestavěnou hodnotu přepsat vlastní. Komise ve výchozím stavu vestavěnou hodnotu nemá – dokud ji nevyplníš, nic se nemění. Sloupec <b>Tick</b> je velikost ticku (nejmenší pohyb ceny) – potřebuje ji dopočet chování ceny po výstupu. Vestavěně ji mají též kontrakty: ES/MES/NQ/MNQ 0,25, YM/MYM 1, RTY/M2K 0,1. U jiného instrumentu se NEHÁDÁ – bez vyplněné hodnoty zůstanou tikové dopočty prázdné.</div>
           <div id="templateList" style="margin-top:12px"></div>
           <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
             <label>Komise u nových importovaných obchodů (NinjaTrader / cTrader)</label>
@@ -1011,6 +1013,15 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Komise (v měně účtu)</label><input id="commission" type="number" step="any" min="0" value="0"></div>
         <div class="field"><label>Počet kontraktů</label><input id="contracts" type="number" step="1" value="1"></div>
         <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="sub" id="slPriceHint"></div></div>
+        <div class="field full" id="postExitBlock">
+          <div class="formgrid">
+            <div class="field"><label>Pokračování po výstupu <span class="sub">— v ticích, ve směru obchodu</span></label><input id="postExitFavorableTicks" type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
+            <div class="field"><label>Protipohyb po výstupu <span class="sub">— v ticích, proti směru obchodu</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
+            <div class="field full sub" id="postExitRuleHint">Měř 15 minut od výstupu, nebo do konce obchodního okna, co nastane dřív. Obě hodnoty od výstupní ceny, v ticích, vždy kladně.<br>U obchodu ukončeného na Stop Lossu čti „pokračování" jako <i>o kolik by širší SL vyšel</i>.</div>
+            <div class="field"><label>Protipohyb přišel dřív než pokračování</label><select id="postExitAdverseFirst"><option value="ne">Ne</option><option value="ano">Ano</option></select></div>
+            <div class="field" id="postExitDerivedField"><label>Dopočítá se <span class="sub">— needitovatelné</span></label><div class="sub" id="postExitDerivedHint">—</div></div>
+          </div>
+        </div>
         <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
         <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
         <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
@@ -1430,6 +1441,20 @@ function getPointValueForInstrument(instrument){
  if(code && BUILTIN_POINT_VALUES[code]!==undefined) return BUILTIN_POINT_VALUES[code];
  return null;
 }
+// Vestavěná tabulka velikosti ticku (nejmenší pohyb ceny) pro tytéž běžné
+// kontrakty jako u hodnoty bodu. Používá se na přepočet bodů na tiky
+// u chování ceny po výstupu. Pro jiný instrument se velikost ticku NEHÁDÁ –
+// buď je vyplněná v šabloně instrumentu, nebo se dopočty nezobrazí.
+const BUILTIN_TICK_SIZES={
+ ES:0.25, MES:0.25, NQ:0.25, MNQ:0.25, YM:1, MYM:1, RTY:0.1, M2K:0.1
+};
+function getTickSizeForInstrument(instrument,src=settings){
+ const tpl=findTemplate(instrument,src);
+ if(tpl && tpl.tickSize!==undefined && tpl.tickSize!==null && tpl.tickSize!=='' && Number(tpl.tickSize)>0) return Number(tpl.tickSize);
+ const code=normalizeInstrumentCode(instrument);
+ if(code && BUILTIN_TICK_SIZES[code]!==undefined) return BUILTIN_TICK_SIZES[code];
+ return null;
+}
 // `src` je zdroj nastavení. Ve výchozím stavu globální `settings` aktivního
 // deníku; automatický import ale zapisuje do deníku podle mapování účtů a běží
 // i před přihlášením (kdy `settings` ještě nejsou načtené), takže si tam předává
@@ -1452,11 +1477,12 @@ function renderTemplateList(){
  if(dl)dl.innerHTML=list.map(t=>`<option value="${esc(t.instrument)}">`).join('');
  const box=$('templateList');
  if(!box)return;
- box.innerHTML=list.length?list.map(t=>`<div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 1.1fr auto">
+ box.innerHTML=list.length?list.map(t=>`<div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
   <div><b>${esc(t.instrument)}</b></div>
   <div>${esc(t.strategy||'—')}</div>
   <div>${t.planFollowed==='ano'?'Dodržen':t.planFollowed==='ne'?'Nedodržen':'—'}</div>
   <div>${t.pointValue?('$'+Number(t.pointValue).toFixed(2)):'—'}</div>
+  <div>${t.tickSize?String(t.tickSize):'—'}</div>
   <div>${t.defaultCommission!=null?('$'+Number(t.defaultCommission).toFixed(2)):'—'}</div>
   <div class="sub">${esc(t.comment||'—')}</div>
   <button class="btn danger" data-tpl-id="${esc(t.id)}" style="padding:6px 9px">🗑️</button>
@@ -1470,9 +1496,10 @@ $('addTemplate').onclick=async()=>{
  if(!instrument){showToast('Vyplň instrument šablony.');return}
  const pv=$('tplNewPointValue').value;
  const cm=$('tplNewCommission').value;
- const tpl={id:crypto.randomUUID(),instrument,strategy:$('tplNewStrategy').value.trim(),planFollowed:$('tplNewPlan').value,comment:$('tplNewComment').value.trim(),pointValue:pv===''?null:Math.abs(Number(pv))||null,defaultCommission:cm===''?null:Math.abs(Number(cm))||0};
+ const ts=$('tplNewTickSize').value;
+ const tpl={id:crypto.randomUUID(),instrument,strategy:$('tplNewStrategy').value.trim(),planFollowed:$('tplNewPlan').value,comment:$('tplNewComment').value.trim(),pointValue:pv===''?null:Math.abs(Number(pv))||null,tickSize:ts===''?null:Math.abs(Number(ts))||null,defaultCommission:cm===''?null:Math.abs(Number(cm))||0};
  await persistSettings({templates:[...(settings.templates||[]),tpl]});
- $('tplNewInstrument').value='';$('tplNewStrategy').value='';$('tplNewPlan').value='';$('tplNewComment').value='';$('tplNewPointValue').value='';$('tplNewCommission').value='';
+ $('tplNewInstrument').value='';$('tplNewStrategy').value='';$('tplNewPlan').value='';$('tplNewComment').value='';$('tplNewPointValue').value='';$('tplNewTickSize').value='';$('tplNewCommission').value='';
  showToast('Šablona byla přidána.');
 };
 if($('saveConnectorCommissionSetting'))$('saveConnectorCommissionSetting').onclick=async()=>{
@@ -2305,15 +2332,27 @@ function updateConfluenceHint(){
 }
 // Sjednocení kontextových polí ze víc nohou jedné pozice. Pravidla podle
 // spec §2.1: multi-select se sjednocuje, single-select bere první neprázdný.
+// Pole označená `merge:'lastExit'` (chování ceny po výstupu) se berou z nohy
+// s NEJPOZDĚJŠÍM časem výstupu – měří se, co cena udělala po skutečném konci
+// pozice, ne po částečném výstupu uprostřed. Když nejpozdější noha vyplněná
+// není, sáhne se po další v pořadí odzadu, ať se vyplněný údaj neztratí.
 function mergeContextFields(list){
  const out={};
+ const byExitDesc=[...list].sort((a,b)=>(String(b?.date||'')+String(b?.exitTime||'')).localeCompare(String(a?.date||'')+String(a?.exitTime||'')));
+ const hasValue=(t,key)=>t&&t[key]!==undefined&&t[key]!==null&&t[key]!=='';
+ const lastExitKeys=FJTaxonomy.TRADE_CONTEXT_FIELDS.filter(f=>f.merge==='lastExit').map(f=>f.key);
+ const lastExitSource=byExitDesc.find(t=>lastExitKeys.some(k=>hasValue(t,k)))||null;
  for(const field of FJTaxonomy.TRADE_CONTEXT_FIELDS){
   if(field.cardinality==='multi'){
    const union=list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]);
    const clean=FJTaxonomy.sanitizeMulti(field.enumName,union);
    if(clean.length)out[field.key]=clean;
+  }else if(field.merge==='lastExit'){
+   // Skupina se bere z JEDNÉ nohy vcelku – jinak by se stalo, že čísla jsou
+   // z jedné nohy a příznak z jiné, a popisovaly by dva různé okamžiky.
+   if(lastExitSource&&lastExitSource[field.key]!==undefined)out[field.key]=lastExitSource[field.key];
   }else{
-   const first=list.find(t=>t?.[field.key]!==undefined&&t?.[field.key]!==null&&t?.[field.key]!=='');
+   const first=list.find(t=>hasValue(t,field.key));
    if(first)out[field.key]=first[field.key];
   }
  }
@@ -2360,6 +2399,44 @@ function riskFields(t){
  const slPoints=FJPoints.slPointsOf(t.entryPrice,t.slPrice);
  const out={slPoints,rMultiple:FJPoints.rMultipleOf(t.pointsPerContract,slPoints)};
  return out;
+}
+// Dopočítaná tiková pole k chování ceny po výstupu. Ukládají se NA OBCHOD
+// (ne jen zobrazují), protože je potřebuje pozdější analýza – SL sweep
+// a mřížka SL × TP se z nich počítají přímo, bez znalosti velikosti ticku.
+//
+// Pole, na které chybí vstup (cena SL, směr obchodu, velikost ticku), se
+// ZAHAZUJE, ne nuluje: prázdno znamená „nevím", nula „nula ticků", a v
+// analýze by se to od sebe nedalo odlišit.
+//
+// POZOR NA `touchedEntry` A `touchedSl` PŘI ANALÝZE: u obchodu ukončeného na
+// stop lossu jsou oba příznaky degenerované, protože výstup JE cena SL a
+// podle definice by vyšly vždycky true. U takového obchodu proto zůstávají
+// prázdné a filtrovat se podle nich nesmí – jak daleko to proti pozici došlo,
+// říká `maxAdverseTicks`.
+const POST_EXIT_DERIVED_KEYS=['slTicks','maxTicks','maxAdverseTicks','touchedEntry','touchedSl'];
+function postExitFields(t){
+ const tickSize=getTickSizeForInstrument(t?.instrument);
+ const computed=FJPoints.postExitTickFields(t,tickSize);
+ const out={};
+ for(const key of POST_EXIT_DERIVED_KEYS)out[key]=computed[key]==null?undefined:computed[key];
+ return out;
+}
+// Zapíše dopočty na obchod a nevyplněná pole z obchodu odstraní, aby po
+// editaci (třeba smazání ceny SL) nezůstala viset stará hodnota.
+function applyPostExitFields(t){
+ const fields=postExitFields(t);
+ for(const key of POST_EXIT_DERIVED_KEYS){
+  if(fields[key]===undefined)delete t[key];else t[key]=fields[key];
+ }
+ return t;
+}
+// Měkká validace zadaného čísla: nikdy neblokuje uložení, jen varuje.
+function postExitTicksWarning(raw){
+ if(raw===undefined||raw===null||String(raw).trim()==='')return '';
+ const n=Number(raw);
+ if(!Number.isFinite(n))return 'Zadej číslo v ticích.';
+ if(n<0)return 'Zadávej kladně, směr určuje pole.';
+ return '';
 }
 // Popisek pod polem ceny SL: u odvozené hodnoty je potřeba, aby bylo vidět,
 // že ji nezadal uživatel.
@@ -2697,6 +2774,11 @@ function openModal(t=null){
  fillContextSelect('fillStatus','FILL_STATUS','— nevyplněno —',t&&t.fillStatus);
  if($('setupCode'))$('setupCode').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode);
  if($('fillStatus'))$('fillStatus').value=FJTaxonomy.sanitizeSingle('FILL_STATUS',t&&t.fillStatus);
+ // Chování ceny po výstupu: ručně zadaná čísla v ticích. Prázdno se nenahrazuje
+ // nulou – nula by v analýze znamenala „cena se nehnula", ne „nevyplněno".
+ if($('postExitFavorableTicks'))$('postExitFavorableTicks').value=(t&&t.postExitFavorableTicks!=null&&t.postExitFavorableTicks!=='')?t.postExitFavorableTicks:'';
+ if($('postExitAdverseTicks'))$('postExitAdverseTicks').value=(t&&t.postExitAdverseTicks!=null&&t.postExitAdverseTicks!=='')?t.postExitAdverseTicks:'';
+ if($('postExitAdverseFirst'))$('postExitAdverseFirst').value=(t&&t.postExitAdverseFirst)?'ano':'ne';
  renderSingleChipGrid('trend','TREND',t&&t.trend);
  renderChipGrid('entryLevels','ENTRY_LEVEL',t&&t.entryLevels);
  renderChipGrid('srTarget','SR_TARGET',t&&t.srTarget);
@@ -2762,6 +2844,8 @@ function openModal(t=null){
  // událost "input", takže otevření staršího obchodu nemůže tiše přepsat jeho
  // uložený zisk/ztrátu. Odznaky jen ČTOU pole se zisk/ztrátou, nic nedopočítávají.
  updateResultBadge();
+ // Dopočty po výstupu jsou jen ČTENÍ polí – stejně jako odznaky nic nepřepisují.
+ renderPostExitHints();
  document.querySelectorAll('#extraLegsList .leg-row').forEach(updateLegBadge);
  // Až po dopočtu odznaků – ty zapisují do skrytého #result, které snímek
  // kontroly neuložených změn čte. Opačné pořadí by každý otevřený obchod
@@ -2937,6 +3021,71 @@ $('commission')?.addEventListener('input',recomputePnlFromInputs);
 $('contracts')?.addEventListener('input',()=>{applyTemplateCommission();recomputePnlFromInputs();recomputeAllLegRows()});
 // Ruční přepis zisku/ztráty přepíše i odznak výsledku (ten se z něj odvozuje).
 $('pnl')?.addEventListener('input',updateResultBadge);
+// --- Chování ceny po výstupu ve formuláři ---------------------------------
+// Blok se týká obchodu, který se naplnil: u setupu, který se nenaplnil, není
+// z čeho měřit – žádný výstup neexistuje. Nevyplněný stav se bere jako
+// naplněný, protože u ručně zadaného obchodu zůstává prázdný a schovat před
+// ním pole by znamenalo, že se k nim uživatel vůbec nedostane. Skrývá se
+// tedy jen u VÝSLOVNĚ nenaplněného setupu.
+function postExitApplies(fillStatus){
+ return !fillStatus||fillStatus==='FILLED';
+}
+// Rozpracovaný obchod z formuláře, jen v rozsahu, který dopočty potřebují.
+// Cena SL se dopočítává stejně jako při ukládání (u stopnutého obchodu z ceny
+// výstupu), aby náhled ukazoval totéž, co se pak uloží.
+function postExitDraftFromForm(){
+ const draft={
+  instrument:$('instrument')?.value||'',
+  side:$('side')?.value||'',
+  entryPrice:$('entryPrice')?.value,
+  exitPrice:$('exitPrice')?.value,
+  result:$('result')?.value||'',
+  postExitFavorableTicks:$('postExitFavorableTicks')?.value,
+  postExitAdverseTicks:$('postExitAdverseTicks')?.value
+ };
+ const typedSl=$('slPrice')?.value;
+ if(typedSl!==undefined&&String(typedSl).trim()!=='')draft.slPrice=Number(typedSl);
+ else{const derived=deriveStopLossPrice(draft);if(derived!=null)draft.slPrice=derived}
+ return draft;
+}
+function formatTicks(v){
+ return v==null?'—':String(v);
+}
+// Dopočty vedle vstupů. Nic se tu needituje – jen se ukazuje, co se uloží.
+function renderPostExitHints(){
+ const block=$('postExitBlock');
+ const applies=postExitApplies($('fillStatus')?.value);
+ if(block)block.style.display=applies?'':'none';
+ if(!applies)return;
+ const favWarn=postExitTicksWarning($('postExitFavorableTicks')?.value);
+ const advWarn=postExitTicksWarning($('postExitAdverseTicks')?.value);
+ if($('postExitFavorableHint'))$('postExitFavorableHint').textContent=favWarn;
+ if($('postExitAdverseHint'))$('postExitAdverseHint').textContent=advWarn;
+ const hint=$('postExitDerivedHint');
+ if(!hint)return;
+ const draft=postExitDraftFromForm();
+ const tickSize=getTickSizeForInstrument(draft.instrument);
+ if(!tickSize){
+  hint.innerHTML=`Velikost ticku pro „${esc(draft.instrument||'—')}" není známá – doplň ji v Nastavení → Šablony podle instrumentu. Bez ní se dopočty nedají spočítat.`;
+  return;
+ }
+ const d=FJPoints.postExitTickFields(draft,tickSize);
+ const parts=[
+  `SL: ${formatTicks(d.slTicks)} t`,
+  `max ve směru: ${formatTicks(d.maxTicks)} t`,
+  `max proti: ${formatTicks(d.maxAdverseTicks)} t`
+ ];
+ if(d.touchedEntry!=null)parts.push(`zpět na vstup: ${d.touchedEntry?'ano':'ne'}`);
+ if(d.touchedSl!=null)parts.push(`až na SL: ${d.touchedSl?'ano':'ne'}`);
+ let note='';
+ if(d.slTicks==null)note='<br><i>Bez ceny Stop Lossu se riziko v ticích nepočítá – pole zůstane prázdné.</i>';
+ else if(!draft.side)note='<br><i>Bez směru obchodu nejde určit, kam vedlo „ve směru" – doplň Long/Short.</i>';
+ hint.innerHTML=esc(parts.join(' · '))+note;
+}
+['postExitFavorableTicks','postExitAdverseTicks'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
+['fillStatus','postExitAdverseFirst','side'].forEach(id=>$(id)?.addEventListener('change',renderPostExitHints));
+['entryPrice','exitPrice','slPrice','pnl','instrument'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
+$('instrument')?.addEventListener('change',renderPostExitHints);
 
 $('instrument').addEventListener('change',()=>{
  const tpl=findTemplate($('instrument').value);
@@ -3123,6 +3272,28 @@ $('tradeForm').addEventListener('submit',async e=>{
   }
   Object.assign(obj,riskFields(obj));
 
+  // Chování ceny PO VÝSTUPU (v ticích, od výstupní ceny, vždy kladně).
+  // U výslovně nenaplněného setupu (postExitApplies) se neukládá nic – čísla
+  // by v analýze tvrdila, že obchod proběhl, i když žádný výstup nebyl.
+  //
+  // Záporné zadání formulář nezablokuje (měkká validace), ale do dat se ukládá
+  // v absolutní hodnotě – směr nese název pole, ne znaménko.
+  const postExitFav=postExitApplies(obj.fillStatus)?$('postExitFavorableTicks')?.value:'';
+  const postExitAdv=postExitApplies(obj.fillStatus)?$('postExitAdverseTicks')?.value:'';
+  const hasPostExit=[postExitFav,postExitAdv].some(v=>v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v)));
+  if(hasPostExit){
+   if(postExitFav!==undefined&&String(postExitFav).trim()!==''&&Number.isFinite(Number(postExitFav)))obj.postExitFavorableTicks=Math.abs(Number(postExitFav));
+   else delete obj.postExitFavorableTicks;
+   if(postExitAdv!==undefined&&String(postExitAdv).trim()!==''&&Number.isFinite(Number(postExitAdv)))obj.postExitAdverseTicks=Math.abs(Number(postExitAdv));
+   else delete obj.postExitAdverseTicks;
+   obj.postExitAdverseFirst=$('postExitAdverseFirst')?.value==='ano';
+  }else{
+   delete obj.postExitFavorableTicks;delete obj.postExitAdverseTicks;delete obj.postExitAdverseFirst;
+  }
+  // Dopočty (slTicks, maxTicks, maxAdverseTicks, touchedEntry, touchedSl) se
+  // ukládají na obchod, ne jen zobrazují – stojí na nich pozdější analýza.
+  applyPostExitFields(obj);
+
   // Hrubý výsledek drží invariant "pnlRaw = hrubý − komise", na kterém stojí
   // přepočet komisí (recalcUnitCommission). Po ruční editaci se dopočítá znovu,
   // aby u importovaného obchodu nezůstala stará hodnota od konektoru.
@@ -3254,7 +3425,7 @@ function combineTradeObjects(list){
  const totalCommission=legs.reduce((a,l)=>a+(Number(l.commission)||0),0);
  const result=classifyResult(totalPnlRaw);
  const comments=[...new Set(list.map(t=>t.comment).filter(Boolean))];
- return {
+ const merged={
   id:list.find(t=>t._keepId)?.id||first.id||crypto.randomUUID(),
   instrument:first.instrument||'',
   date:lastByExit.date||first.date,
@@ -3299,6 +3470,10 @@ function combineTradeObjects(list){
   externalAccount:list.find(t=>t.externalAccount)?.externalAccount||'',
   journalId:first.journalId
  };
+ // Dopočty k chování ceny po výstupu se po sloučení počítají ZNOVU: vstupní
+ // cena, cena poslední nohy i cena SL jsou teď hodnoty sloučeného obchodu,
+ // takže stará čísla z jednotlivých nohou by ukazovala jinam.
+ return applyPostExitFields(merged);
 }
 let pendingMergeTrades=[];
 function openMergePreview(selected){
@@ -3481,14 +3656,23 @@ function firstTradeIdPerDate(rows){
  for(const date in map)out[date]=map[date].id;
  return out;
 }
+// Sloupce CSV exportu deníku. Hlavička a řádek jsou schválně vedle sebe
+// v jedné funkci každá – když se přidá sloupec jen do jedné z nich, posunou
+// se všechna následující data o jednu buňku a v exportu to není vidět.
+function tradeCsvHeader(){
+ return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','SL (ticky)','Max ve směru (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu','SR proti targetu','SR proti S/L','Order flow','Konfluence','Stav naplnění','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+}
+function tradeCsvRow(t,dn){
+ const p=t.dailyPlan||{};
+ return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.slTicks??'',t.maxTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),(t.srTarget||[]).join('|'),(t.srStopLoss||[]).join('|'),(t.ofConfirm||[]).join('|'),t.confluenceCount??'',t.fillStatus||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+}
 $('exportCsv').onclick=async()=>{
- const h=['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Setup','Trend','Hladina vstupu','SR proti targetu','SR proti S/L','Order flow','Konfluence','Stav naplnění','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=tradeCsvHeader();
  const firstIdByDate=firstTradeIdPerDate(trades);
  const rows=trades.map(t=>{
-  const p=t.dailyPlan||{};
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?getDayNote(t.date):null;
-  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),(t.srTarget||[]).join('|'),(t.srStopLoss||[]).join('|'),(t.ofConfirm||[]).join('|'),t.confluenceCount??'',t.fillStatus||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  return tradeCsvRow(t,dn);
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -3837,19 +4021,27 @@ function generateReportView(allRows=null){
 }
 $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
+// Sloupce CSV exportu Reportů (přes deníky). Stejný důvod pro dvě funkce
+// jako u exportu deníku: hlavička a řádek se nesmí rozejít.
+function reportCsvHeader(){
+ return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','SL (ticky)','Max ve směru (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu','SR proti targetu','SR proti S/L','Order flow','Konfluence','Stav naplnění','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+}
+function reportCsvRow(t,dn){
+ const p=t.dailyPlan||{};
+ return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.slTicks??'',t.maxTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),(t.srTarget||[]).join('|'),(t.srStopLoss||[]).join('|'),(t.ofConfirm||[]).join('|'),t.confluenceCount??'',t.fillStatus||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+}
 $('reportCsv').onclick=async()=>{
- const h=['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Setup','Trend','Hladina vstupu','SR proti targetu','SR proti S/L','Order flow','Konfluence','Stav naplnění','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ const h=reportCsvHeader();
  const dayNotesByJournal={};
  reportRows.forEach(t=>{if(t.date){const cur=dayNotesByJournal[t.journalId+'|'+t.date];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)dayNotesByJournal[t.journalId+'|'+t.date]=t}});
  const allDayNotes=await collectReportDayNotes();
  const rows=reportRows.map(t=>{
-  const p=t.dailyPlan||{};
   const isFirstOfDay=t.date&&dayNotesByJournal[t.journalId+'|'+t.date]===t;
   const dn=isFirstOfDay?(allDayNotes[t.journalId+'|'+t.date]||{}):null;
   // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
   // u pole "pnl" přednostně vrací pnlRaw – ve sloupci Body tak končily PENÍZE,
-  // ne body. displayPoints() je stejná funkce, jakou používá i export deníku.
-  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),(t.srTarget||[]).join('|'),(t.srStopLoss||[]).join('|'),(t.ofConfirm||[]).join('|'),t.confluenceCount??'',t.fillStatus||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+  // ne body. displayPointsTotal() je stejná funkce, jakou používá i export deníku.
+  return reportCsvRow(t,dn);
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;

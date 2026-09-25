@@ -266,7 +266,7 @@ test('sloučení víc cílů respektuje upravený číselník a nezahodí skryt�
     'normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument',
     'getDefaultCommissionForInstrument', 'classifyResult', 'signed', 'tradeTotalPoints',
     'weightedExitFields', 'legFromTrade', 'mergeSamePriceLegs', 'labelLegs',
-    'mergeContextFields', 'combineTradeObjects'
+    'mergeContextFields', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects'
   ], { settings: SETTINGS });
 
   const customKey = FJTaxonomy.makeCustomKey('ENTRY_LEVEL', 'Týdenní open');

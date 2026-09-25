@@ -103,7 +103,7 @@ test('combineTradeObjects: breakeven noha nepřiklopí provizi do plusu', () => 
   const r = loadRenderer(
     ['normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument', 'getDefaultCommissionForInstrument',
       'classifyResult', 'signed', 'tradeTotalPoints', 'weightedExitFields', 'legFromTrade',
-      'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'combineTradeObjects'],
+      'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects'],
     { settings: SETTINGS }
   );
 

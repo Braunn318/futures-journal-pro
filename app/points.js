@@ -169,6 +169,136 @@
     return diff > 0 ? roundPoints(diff) : null;
   }
 
+  // ---------------------------------------------------- chování ceny po výstupu
+  //
+  // Dvě ručně zadávaná čísla (`postExitFavorableTicks`, `postExitAdverseTicks`)
+  // popisují, co cena udělala PO VÝSTUPU – měřeno od výstupní ceny, v ticích,
+  // obě VŽDY KLADNĚ; směr nese název pole. Z nich se dopočítá, jak daleko
+  // pozice došla OD VSTUPU na obě strany, což je vstup pro pozdější analýzu
+  // (SL sweep, mřížka SL × TP).
+  //
+  // Tady je jen matematika – velikost ticku posílá volající, protože ji zná
+  // renderer (šablona instrumentu nebo vestavěná tabulka).
+
+  function finiteOrNull(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Tiky bývají celá čísla, ale dělení desetinnou velikostí ticku umí vyrobit
+  // 11.999999999999998 (RTY, tick 0,1). Zaokrouhlení na 4 desetinná místa to
+  // srovná a přitom nechá průchozí i půltik.
+  function roundTicks(n) {
+    return Math.round((Number(n) || 0) * 10000) / 10000;
+  }
+
+  function ticksOf(priceDiff, tickSize) {
+    const tick = Number(tickSize);
+    if (!Number.isFinite(tick) || tick <= 0) return null;
+    const diff = Number(priceDiff);
+    if (!Number.isFinite(diff)) return null;
+    return roundTicks(diff / tick);
+  }
+
+  function directionOf(side) {
+    if (side === 'long') return 1;
+    if (side === 'short') return -1;
+    return null;
+  }
+
+  // Výstupní cena pro tohle měření je cena POSLEDNÍ nohy, ne vážený průměr:
+  // uživatel měří pokračování ceny od okamžiku, kdy z pozice fakticky vystoupil.
+  function measuredExitPriceOf(trade) {
+    const last = finiteOrNull(trade?.lastLegExitPrice);
+    return last != null ? last : finiteOrNull(trade?.exitPrice);
+  }
+
+  // Znaménkový posun výstupu proti vstupu v ticích: kladně = ve směru obchodu,
+  // záporně = proti (typicky stop loss). Bez směru obchodu se NEHÁDÁ – vrací se
+  // null a dopočty, které na něm stojí, zůstanou prázdné.
+  function exitTicksOf(trade, tickSize) {
+    const dir = directionOf(trade?.side);
+    const entry = finiteOrNull(trade?.entryPrice);
+    const exit = measuredExitPriceOf(trade);
+    if (dir == null || entry == null || exit == null) return null;
+    return ticksOf(dir * (exit - entry), tickSize);
+  }
+
+  // Vzdálenost vstup → Stop Loss v ticích. Bez ceny SL zůstává null a NIKDY se
+  // nedosazuje nula – nula by znamenala „obchod bez rizika", což není totéž co
+  // „nevyplněno".
+  function slTicksOf(trade, tickSize) {
+    const entry = finiteOrNull(trade?.entryPrice);
+    const sl = finiteOrNull(trade?.slPrice);
+    if (entry == null || sl == null) return null;
+    const t = ticksOf(Math.abs(entry - sl), tickSize);
+    return t != null && t > 0 ? t : null;
+  }
+
+  // Dopočítaná pole. Volající je ukládá NA OBCHOD (ne jen zobrazuje), aby se
+  // dala analyzovat bez opakovaného přepočtu a aby přežila sloučení cílů.
+  //
+  //   maxTicks        nejdál VE SMĚRU obchodu, měřeno od vstupu
+  //   maxAdverseTicks nejdál PROTI pozici, měřeno od vstupu
+  //   touchedEntry    protipohyb po výstupu se vrátil až na vstupní cenu
+  //   touchedSl       protipohyb po výstupu došel až na cenu Stop Lossu
+  //
+  // Všechno je null tam, kde chybí vstup. Prázdno je informace („nevím“),
+  // dosazená nula by se od skutečné nuly v analýze nedala odlišit.
+  function postExitTickFields(trade, tickSize) {
+    const out = { slTicks: null, maxTicks: null, maxAdverseTicks: null, touchedEntry: null, touchedSl: null };
+    const tick = Number(tickSize);
+    if (!Number.isFinite(tick) || tick <= 0) return out;
+
+    const exitTicks = exitTicksOf(trade, tickSize);
+    const slTicks = slTicksOf(trade, tickSize);
+    // Zadané hodnoty jsou vždy kladné; záporné zadání je překlep, na který
+    // formulář upozorňuje, a do výpočtu jde v absolutní hodnotě.
+    const favRaw = finiteOrNull(trade?.postExitFavorableTicks);
+    const advRaw = finiteOrNull(trade?.postExitAdverseTicks);
+    const fav = favRaw == null ? null : Math.abs(favRaw);
+    const adv = advRaw == null ? null : Math.abs(advRaw);
+    const mae = finiteOrNull(trade?.maeTicks);
+
+    out.slTicks = slTicks;
+
+    // Nejdál ve směru obchodu = kam došel výstup + kolik cena pokračovala dál.
+    // U stopnutého obchodu je `exitTicks` záporné, takže `postExitFavorable`
+    // tady odpovídá na otázku „o kolik by širší SL vyšel".
+    if (exitTicks != null && fav != null) out.maxTicks = roundTicks(exitTicks + fav);
+
+    if (String(trade?.result) === 'stoploss') {
+      // Stopnutý obchod už proti pozici došel nejméně na SL – to není odhad,
+      // ale fakt. Protipohyb po výstupu se přičítá k němu.
+      if (slTicks != null) out.maxAdverseTicks = roundTicks(slTicks + (adv || 0));
+    } else {
+      // Ziskový / BE obchod: proti pozici se dostal buď během obchodu (MAE
+      // z NT8, pokud je k dispozici), nebo až po výstupu – protipohyb musí
+      // nejdřív ujít cestu zpátky na vstup, teprve co je nad ni, je adverse.
+      const candidates = [];
+      if (mae != null) candidates.push(Math.abs(mae));
+      if (adv != null && exitTicks != null) candidates.push(adv - exitTicks);
+      // Bez MAE je výsledek DOLNÍ ODHAD: co se dělo uvnitř obchodu, data
+      // neříkají, takže se záporná hodnota ořeže na nulu, ne pod ni.
+      if (candidates.length) out.maxAdverseTicks = roundTicks(Math.max(0, ...candidates));
+    }
+
+    // „Došla cena zpátky na vstup / na SL?" dává smysl jen u obchodu, který
+    // vystoupil VE SMĚRU (zisk, BE). U obchodu ukončeného na stop lossu jsou
+    // OBA PŘÍZNAKY DEGENEROVANÉ: výstup JE cena SL, takže by podle definice
+    // vyšly vždycky true, ať se cena po výstupu chovala jakkoli, a jako filtr
+    // v analýze by jen rozdělily vzorek na „všechny stopnuté obchody" a zbytek.
+    // Proto se u stopnutého obchodu NEPOČÍTAJÍ a zůstávají null – u něj se
+    // pracuje s `maxAdverseTicks`, který říká, jak daleko proti pozici to
+    // doopravdy došlo.
+    if (adv != null && exitTicks != null && exitTicks > 0) {
+      out.touchedEntry = adv >= exitTicks;
+      if (slTicks != null) out.touchedSl = adv >= roundTicks(exitTicks + slTicks);
+    }
+    return out;
+  }
+
   function rMultipleOf(pointsPerContract, slPoints) {
     const p = Number(pointsPerContract);
     const sl = Number(slPoints);
@@ -188,6 +318,13 @@
     pointsFieldsForNewTrade,
     exitPriceFields,
     slPointsOf,
-    rMultipleOf
+    rMultipleOf,
+    roundTicks,
+    ticksOf,
+    directionOf,
+    measuredExitPriceOf,
+    exitTicksOf,
+    slTicksOf,
+    postExitTickFields
   };
 }));

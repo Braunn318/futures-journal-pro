@@ -31,7 +31,7 @@ const NAMES = [
   'normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument',
   'getDefaultCommissionForInstrument', 'classifyResult', 'signed', 'tradeTotalPoints',
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
-  'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'combineTradeObjects', 'mapCapturedTrade',
+  'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects', 'mapCapturedTrade',
   'migrateTradePointsFields', 'hasReliablePoints'
 ];
 
