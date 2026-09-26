@@ -373,3 +373,180 @@ test('štítek „neúplný kontext": jen v backtestovém deníku, ne u nenapln�
     assert.ok(!ctx([{ id: 'j1', name: 'B', backtest: true }]).contextPillsHTML(course({ fillStatus: status })).includes('neúplný kontext'), status);
   }
 });
+
+// ------------------------------------------- formulář: dopočet jako read-only
+//
+// MFE u targetu a MAE u stoplossu nejsou naměřené – jsou to aritmetika z výstupní
+// ceny. Formulář je proto neukazuje v editovatelném poli (vypadalo by to jako
+// měření), ale jako šedý text „dopočítáno z výstupní ceny" s odkazem „upravit
+// ručně". V každém obchodě se tak ručně vyplňuje právě jedno z těch dvou čísel.
+
+function courseForm(values, datasets) {
+  const nodes = new Map();
+  const node = id => ({
+    id, value: values[id] ?? '', textContent: '', innerHTML: '', style: {},
+    dataset: { ...(datasets?.[id] || {}) }, focus() {}, select() {}
+  });
+  const document = { getElementById(id) { if (!nodes.has(id)) nodes.set(id, node(id)); return nodes.get(id); } };
+  const r = loadRenderer([
+    '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
+    'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'postExitTicksWarning', 'postExitApplies',
+    'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField',
+    'editCourseManually', 'useDerivedCourse'
+  ], { document, settings: SETTINGS });
+  r.renderPostExitHints();
+  return { r, get: id => document.getElementById(id) };
+}
+const TARGET_FORM = {
+  fillStatus: 'FILLED', instrument: 'MES', side: 'long', result: 'target',
+  entryPrice: '7700', exitPrice: '7706', slPrice: '7697'
+};
+const STOP_FORM = { ...TARGET_FORM, result: 'stoploss', exitPrice: '7697' };
+const shown = n => n.style.display !== 'none';
+
+test('formulář target: MFE read-only dopočet, MAE editovatelné pole', () => {
+  const f = courseForm(TARGET_FORM);
+  assert.ok(!shown(f.get('mfeTicks')), 'pole MFE je skryté');
+  assert.ok(shown(f.get('mfeTicksView')), 'místo něj read-only text');
+  assert.equal(f.get('mfeTicksViewValue').textContent, '24');
+  assert.equal(f.get('mfeTicks').value, 24, 'hodnota zůstává ve skrytém poli pro uložení');
+  assert.equal(f.get('mfeTicks').dataset.derived, '1', 'uloží se s příznakem Derived');
+  assert.ok(shown(f.get('maeTicks')), 'MAE se vyplňuje ručně');
+  assert.ok(!shown(f.get('maeTicksView')));
+});
+
+test('formulář stoploss: MAE read-only dopočet, MFE editovatelné pole', () => {
+  const f = courseForm(STOP_FORM);
+  assert.ok(!shown(f.get('maeTicks')));
+  assert.equal(f.get('maeTicksViewValue').textContent, '12');
+  assert.ok(shown(f.get('mfeTicks')));
+  assert.ok(!shown(f.get('mfeTicksView')));
+});
+
+test('formulář breakeven / ruční: obě pole editovatelná', () => {
+  for (const result of ['breakeven', 'manual', '']) {
+    const f = courseForm({ ...TARGET_FORM, result });
+    assert.ok(shown(f.get('mfeTicks')) && shown(f.get('maeTicks')), result || 'prázdný výsledek');
+    assert.ok(!shown(f.get('mfeTicksView')) && !shown(f.get('maeTicksView')));
+  }
+});
+
+test('„upravit ručně": dopočet se přesune do pole a dál je to ruční hodnota', () => {
+  const f = courseForm(TARGET_FORM);
+  f.r.editCourseManually('mfeTicks');
+  const el = f.get('mfeTicks');
+  assert.ok(shown(el), 'pole je vidět');
+  assert.ok(!shown(f.get('mfeTicksView')));
+  assert.equal(String(el.value), '24', 'výchozí hodnota = dopočet');
+  assert.equal(el.dataset.derived, '', 'bez příznaku Derived');
+  assert.equal(el.dataset.manual, '1');
+
+  // Ručně uzavřený obchod: cena došla dál, než kde byl výstup.
+  el.value = '31';
+  f.r.renderPostExitHints();
+  assert.equal(el.value, '31', 'přepočet ruční hodnotu nepřepíše');
+  assert.match(f.get('mfeTicksRevert').textContent, /24 t/, 'nabídne návrat k dopočtu');
+
+  // Smazání při psaní nepřepne pole zpátky na read-only.
+  el.value = '';
+  f.r.renderPostExitHints();
+  assert.ok(shown(el), 'prázdné ruční pole zůstává polem');
+
+  f.r.useDerivedCourse('mfeTicks');
+  assert.ok(!shown(el), 'návrat k dopočtu');
+  assert.equal(f.get('mfeTicks').dataset.derived, '1');
+});
+
+test('uložená ruční hodnota se otevře jako pole, i když jde dopočítat', () => {
+  const f = courseForm({ ...TARGET_FORM, mfeTicks: '31' }, { mfeTicks: { manual: '1' } });
+  assert.ok(shown(f.get('mfeTicks')));
+  assert.equal(f.get('mfeTicks').value, '31');
+});
+
+// ------------------------------------------------ MFE / MAE z NinjaTraderu
+//
+// NinjaTrader vede u každé vstupní exekuce Execution.MaxPrice / MinPrice (extrém
+// ceny, dokud je pozice otevřená) – ověřeno v NinjaTrader.sqlite i u čistě
+// ručních obchodů bez ATM. Konektor je posílá s výstupem, main.js z nich dělá
+// ticky od průměrné vstupní ceny a deník je ukládá s příznakem Source 'nt8'.
+
+test('excursionTicks: long / short od průměrné vstupní ceny, výstup se započítá', () => {
+  const { excursionTicks } = loadMain(['excursionTicks']);
+  // Reálná exekuce z NinjaTrader.sqlite: MES long 7776 → target 7782, max 7782.5, min 7776.
+  assert.deepEqual(plain(excursionTicks({ tickSize: 0.25, excursionMaxPrice: 7782.5, excursionMinPrice: 7776 }, 'long', 7776, 7782)),
+    { mfeTicks: 26, maeTicks: 0 }, 'MFE 26 t, ne 24 – cena došla o 2 ticky dál než výstup');
+  // Short 7785 → stop 7788.25, max 7788.25, min 7784.5.
+  assert.deepEqual(plain(excursionTicks({ tickSize: 0.25, excursionMaxPrice: 7788.25, excursionMinPrice: 7784.5 }, 'short', 7785, 7788.25)),
+    { mfeTicks: 2, maeTicks: 13 });
+  // NT poslední tick ještě nezapsal: výstupní cena extrém rozšíří.
+  assert.equal(excursionTicks({ tickSize: 0.25, excursionMaxPrice: 7777, excursionMinPrice: 7776 }, 'long', 7776, 7775).maeTicks, 4);
+});
+
+test('excursionTicks: bez extrémů nebo ticku nic – prázdno, ne nula', () => {
+  const { excursionTicks } = loadMain(['excursionTicks']);
+  assert.deepEqual(plain(excursionTicks({ tickSize: 0.25 }, 'long', 7776, 7782)), {}, 'NT pohyb nesledoval (sentinel se neposílá)');
+  assert.deepEqual(plain(excursionTicks({ excursionMaxPrice: 7782.5, excursionMinPrice: 7776 }, 'long', 7776, 7782)), {}, 'bez ticku');
+  assert.deepEqual(plain(excursionTicks({ tickSize: 0.25, excursionMaxPrice: 7782.5, excursionMinPrice: 7776 }, '', 7776, 7782)), {}, 'bez směru');
+});
+
+test('import: MFE/MAE z události dostanou příznak nt8, chybějící se nezakládají', () => {
+  const r = loadRenderer(['courseTicksFromEvent'], {});
+  assert.deepEqual(plain(r.courseTicksFromEvent({ mfeTicks: 26, maeTicks: 0 })),
+    { mfeTicks: 26, mfeTicksSource: 'nt8', maeTicks: 0, maeTicksSource: 'nt8' }, 'naměřená nula je platná hodnota');
+  assert.deepEqual(plain(r.courseTicksFromEvent({})), {});
+});
+
+test('sloučení: ruční > NinjaTrader > dopočet, import ruční hodnotu nepřepíše', () => {
+  const r = renderer();
+  const merged = list => plain(r.mergeContextFields(list));
+  const manual = course({ mfeTicks: 20 });
+  const nt8 = course({ mfeTicks: 30, mfeTicksSource: 'nt8' });
+  const derived = course({ mfeTicks: 40, mfeTicksDerived: true });
+  const a = merged([manual, nt8, derived]);
+  assert.equal(a.mfeTicks, 20, 'ruční hodnota vyhrává, i když je menší');
+  assert.equal(a.mfeTicksSource, undefined);
+  const b = merged([derived, nt8]);
+  assert.equal(b.mfeTicks, 30, 'měření z NT8 má přednost před aritmetikou');
+  assert.equal(b.mfeTicksSource, 'nt8');
+  assert.equal(b.mfeTicksDerived, undefined);
+  const c = merged([nt8, course({ mfeTicks: 35, mfeTicksSource: 'nt8' })]);
+  assert.equal(c.mfeTicks, 35, 'uvnitř jedné vrstvy maximum přes nohy');
+});
+
+test('applyPostExitFields: hodnotu z NinjaTraderu dopočet nepřepíše', () => {
+  const r = renderer();
+  const t = r.applyPostExitFields(course({ mfeTicks: 26, mfeTicksSource: 'nt8' }));
+  assert.equal(t.mfeTicks, 26);
+  assert.equal(t.mfeTicksDerived, undefined);
+  assert.equal(t.mfeTicksSource, 'nt8');
+});
+
+test('formulář: hodnota z NinjaTraderu je editovatelné pole s poznámkou o původu', () => {
+  const f = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { manual: '1', source: 'nt8' } });
+  assert.ok(shown(f.get('mfeTicks')), 'měření se nezobrazuje jako dopočet');
+  assert.equal(f.get('mfeTicksSourceNote').textContent, 'naměřeno v NinjaTraderu');
+  f.r.useDerivedCourse('mfeTicks');
+  assert.equal(f.get('mfeTicks').dataset.source, '', 'návrat k dopočtu původ zahodí');
+});
+
+// Nalezeno při ověření na Market Replay (2026-09-26): importovaný obchod
+// s jediným výstupem neměl exitTicks / maxFavorableTicks / maxAdverseTicks,
+// dopočty dostával až po ručním uložení formuláře. Import je teď počítá hned,
+// s velikostí ticku ze šablon CÍLOVÉHO deníku.
+test('import: dopočty z NT8 hodnot hned, tick ze šablon cílového deníku', () => {
+  const r = renderer();
+  // Reálný obchod z replaye: ES long 7754.25 → stop 7752, NT8 MFE 13 / MAE 9.
+  const es = r.applyPostExitFields({
+    instrument: 'ES', side: 'long', result: 'stoploss', fillStatus: 'FILLED',
+    entryPrice: 7754.25, exitPrice: 7752, mfeTicks: 13, mfeTicksSource: 'nt8', maeTicks: 9, maeTicksSource: 'nt8'
+  }, { templates: [] });
+  assert.equal(es.exitTicks, -9);
+  assert.equal(es.maxFavorableTicks, 13);
+  assert.equal(es.maxAdverseTicks, 9);
+  assert.equal(es.mfeTicksSource, 'nt8');
+
+  const fdxs = { instrument: 'FDXS', side: 'long', result: 'target', fillStatus: 'FILLED', entryPrice: 24000, exitPrice: 24010 };
+  assert.equal(r.applyPostExitFields({ ...fdxs }).exitTicks, undefined, 'globální nastavení tick pro FDXS nezná');
+  assert.equal(r.applyPostExitFields({ ...fdxs }, { templates: [{ instrument: 'FDXS', tickSize: 1 }] }).exitTicks, 10,
+    'šablona cílového deníku ho zná');
+});

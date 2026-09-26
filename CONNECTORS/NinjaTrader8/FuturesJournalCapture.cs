@@ -10,6 +10,9 @@ using NinjaTrader.NinjaScript;
 #endregion
 
 // Futures Journal PRO – NinjaTrader 8 Execution + Position Sync Connector
+// FJ_CONNECTOR_VERSION: 2
+// (Zvyš při každé změně toho, co konektor posílá – aplikace podle toho pozná
+// zastaralou instalaci v NT a jednou nabídne přeinstalaci.)
 // Exekuce se posílají okamžitě. Úplný stav pozic se posílá při každé změně
 // a navíc jednou za minutu jako kontrola proti zůstatkovým/neplatným pozicím.
 
@@ -166,6 +169,11 @@ namespace NinjaTrader.NinjaScript.AddOns
                 string orderName = x.Order != null ? x.Order.Name : x.Name;
                 string orderId = x.Order != null ? x.Order.OrderId : x.OrderId;
                 double pointValue = x.Instrument.MasterInstrument != null ? x.Instrument.MasterInstrument.PointValue : 1.0;
+                double tickSize = x.Instrument.MasterInstrument != null ? x.Instrument.MasterInstrument.TickSize : 0;
+
+                // Průběh ceny (MAE/MFE) posílá jen výstup – vstupní exekuce ho
+                // v tu chvíli ještě nezná.
+                string excursion = x.IsExit ? ExcursionJson(x) : "";
 
                 string json = "{" +
                     "\"source\":\"ninjatrader\"," +
@@ -184,7 +192,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     "\"orderAction\":\"" + Escape(action) + "\"," +
                     "\"orderName\":\"" + Escape(orderName) + "\"," +
                     "\"orderId\":\"" + Escape(orderId) + "\"," +
-                    "\"executionId\":\"" + Escape(x.ExecutionId) + "\"" +
+                    "\"executionId\":\"" + Escape(x.ExecutionId) + "\"," +
+                    "\"tickSize\":" + tickSize.ToString(CultureInfo.InvariantCulture) +
+                    excursion +
                 "}";
 
                 await PostJson(json);
@@ -193,6 +203,67 @@ namespace NinjaTrader.NinjaScript.AddOns
             catch (Exception ex)
             {
                 Print("FuturesJournalCapture error: " + ex.Message);
+            }
+        }
+
+        // Nejvyšší a nejnižší cena, kterou pozice zažila od vstupu do tohoto výstupu.
+        //
+        // NinjaTrader si u KAŽDÉ vstupní exekuce účtu vede Execution.MaxPrice /
+        // MinPrice – extrém ceny od fillu, dokud je pozice otevřená (ověřeno
+        // v NinjaTrader.sqlite, tabulka Executions: vyplněné u ATM i u čistě ručních
+        // obchodů bez strategie). Z těch samých hodnot počítá MAE/MFE okno Trade
+        // Performance. Objekt Trade s vlastnostmi MaeTicks/MfeTicks add-on nemá
+        // (Account žádnou kolekci Trade ani TradesPerformance nevystavuje), proto
+        // se čte přímo z exekucí.
+        //
+        // Pozice = vstupy od poslední exekuce, po které byl účet na instrumentu
+        // plochý (Execution.Position je pozice PO exekuci). Hledá se v
+        // account.Executions, ne ve vlastním seznamu, aby to fungovalo i po
+        // restartu add-onu uprostřed otevřené pozice.
+        //
+        // Hodnoty, které NT nesledoval (obchod proběhl bez dat v NT), mají
+        // sentinel ±double.MaxValue – takové vstupy se přeskočí. Když nezbude
+        // žádný, pole se nepošlou vůbec: prázdno, ne nula.
+        private static string ExcursionJson(Execution exit)
+        {
+            try
+            {
+                Account account = exit.Account;
+                if (account == null) return "";
+                List<Execution> same = new List<Execution>();
+                lock (account.Executions)
+                {
+                    foreach (Execution e in account.Executions)
+                    {
+                        if (e == null || e.Instrument == null || e == exit) continue;
+                        if (e.ExecutionId == exit.ExecutionId && !string.IsNullOrEmpty(e.ExecutionId)) continue;
+                        if (e.Instrument.FullName != exit.Instrument.FullName) continue;
+                        if (e.Time > exit.Time) continue;
+                        same.Add(e);
+                    }
+                }
+                same.Sort((a, b) => a.Time != b.Time ? a.Time.CompareTo(b.Time) : a.Id.CompareTo(b.Id));
+
+                double max = double.MinValue, min = double.MaxValue;
+                bool any = false;
+                for (int i = same.Count - 1; i >= 0; i--)
+                {
+                    Execution e = same[i];
+                    if (e.Position == 0) break;
+                    if (!e.IsEntry) continue;
+                    if (e.MaxPrice <= -1e300 || e.MinPrice >= 1e300 || e.MaxPrice < e.MinPrice) continue;
+                    max = Math.Max(max, e.MaxPrice);
+                    min = Math.Min(min, e.MinPrice);
+                    any = true;
+                }
+                if (!any) return "";
+                return ",\"excursionMaxPrice\":" + max.ToString(CultureInfo.InvariantCulture) +
+                       ",\"excursionMinPrice\":" + min.ToString(CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                NinjaTrader.Code.Output.Process("FuturesJournalCapture excursion error: " + ex.Message, PrintTo.OutputTab1);
+                return "";
             }
         }
 

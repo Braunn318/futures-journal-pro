@@ -223,7 +223,10 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .setup-row .setup-icon{font-size:18px;line-height:1.2}
 .setup-row .setup-body{flex:1;min-width:0}
 .setup-row .setup-actions{display:flex;gap:6px}
-.field input.derived-value{font-style:italic;border-style:dashed}
+.derived-readonly{padding:10px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}
+.derived-readonly b{font-weight:700}
+.derived-edit{font-size:12px;color:var(--blue);margin-left:8px}
+.derived-revert{display:inline-block;margin:4px 0 0 0}
 .field input,.field select,.field textarea{width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px}
 textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.full{grid-column:1/-1}
 .modal{position:fixed;inset:0;background:rgba(var(--shadow-rgb),.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;pointer-events:none}
@@ -1082,8 +1085,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="sub" id="slPriceHint"></div></div>
         <div class="field full" id="postExitBlock">
           <div class="formgrid">
-            <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="mfeTicks" type="number" step="any" min="0" placeholder="např. 20"><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
-            <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="maeTicks" type="number" step="any" min="0" placeholder="např. 6"><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
+            <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="mfeTicks" type="number" step="any" min="0" placeholder="např. 20"><div class="derived-readonly" id="mfeTicksView" style="display:none"><b id="mfeTicksViewValue"></b> t <span class="sub">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('mfeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="mfeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('mfeTicks')"></a><div class="sub" id="mfeTicksSourceNote"></div><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
+            <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="maeTicks" type="number" step="any" min="0" placeholder="např. 6"><div class="derived-readonly" id="maeTicksView" style="display:none"><b id="maeTicksViewValue"></b> t <span class="sub">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('maeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="maeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('maeTicks')"></a><div class="sub" id="maeTicksSourceNote"></div><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
             <div class="field"><label>Sledováno po výstupu <span class="sub">— minut, nepovinné</span></label><input id="observedMinutes" type="number" step="any" min="0" placeholder="např. 30"></div>
             <div class="field"><label>Pokračování po výstupu <span class="sub">— v ticích, ve směru obchodu</span></label><input id="postExitFavorableTicks" type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
             <div class="field"><label>Protipohyb po výstupu <span class="sub">— v ticích, proti směru obchodu</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
@@ -1547,6 +1550,9 @@ async function load(){
  FJTaxonomy.applyConfig(settings.taxonomy);
  fillSettings(); renderAll();
  setTimeout(initAccountOverview,60);
+ // load() běží až po přihlášení, takže okno nepřekryje přihlašovací obrazovku;
+ // při přepnutí deníku se znovu neukáže (hlídá connectorNoticeChecked).
+ setTimeout(()=>maybeShowConnectorNotice(),800);
 }
 function fillSettings(){
  $('startingBalance').value=settings.startingBalance;$('currency').value='USD';$('usdCzkRate').value=settings.usdCzkRate||23;
@@ -2524,11 +2530,17 @@ function mergeContextFields(list){
    // Maximum přes nohy (MFE/MAE). Prázdná noha se nepočítá – jinak by Math.max z prázdna udělal nulu, která by tvrdila „cena nešla ani o tick".
    // Příznak odvození jde s nohou, která maximum dodala – ruční hodnota
    // se sloučením nesmí stát odvozenou ani naopak.
-   const source=list.filter(t=>hasValue(t,field.key)&&Number.isFinite(Number(t[field.key])))
-    .sort((a,b)=>Number(b[field.key])-Number(a[field.key]))[0];
+   // Pořadí zdrojů: ruční > NinjaTrader > dopočet z výstupu. Maximum se bere
+   // jen v nejvyšší zastoupené vrstvě, takže nová noha z importu nikdy
+   // nepřebije hodnotu, kterou uživatel zadal ručně.
+   const filled=list.filter(t=>hasValue(t,field.key)&&Number.isFinite(Number(t[field.key])));
+   const tier=t=>t[field.key+'Derived']===true?2:(t[field.key+'Source']==='nt8'?1:0);
+   const best=Math.min(...filled.map(tier));
+   const source=filled.filter(t=>tier(t)===best).sort((a,b)=>Number(b[field.key])-Number(a[field.key]))[0];
    if(source){
     out[field.key]=Number(source[field.key]);
     if(source[field.key+'Derived']===true)out[field.key+'Derived']=true;
+    if(source[field.key+'Source']==='nt8')out[field.key+'Source']='nt8';
    }
   }else if(field.cardinality==='target'){
    const first=list.map(t=>FJTaxonomy.sanitizeTargetLevel(t?.[field.key])).find(Boolean);
@@ -2637,8 +2649,8 @@ function riskFields(t){
 // prázdné a filtrovat se podle nich nesmí – jak daleko to proti pozici došlo,
 // říká `maxAdverseTicks`.
 const POST_EXIT_DERIVED_KEYS=['slTicks','exitTicks','maxTicks','maxFavorableTicks','maxAdverseTicks','touchedEntry','touchedSl'];
-function postExitFields(t){
- const tickSize=getTickSizeForInstrument(t?.instrument);
+function postExitFields(t,src=settings){
+ const tickSize=getTickSizeForInstrument(t?.instrument,src);
  const computed=FJPoints.postExitTickFields(t,tickSize);
  const out={};
  for(const key of POST_EXIT_DERIVED_KEYS)out[key]=computed[key]==null?undefined:computed[key];
@@ -2646,14 +2658,14 @@ function postExitFields(t){
 }
 // Zapíše dopočty na obchod a nevyplněná pole z obchodu odstraní, aby po
 // editaci (třeba smazání ceny SL) nezůstala viset stará hodnota.
-function applyPostExitFields(t){
+function applyPostExitFields(t,src=settings){
  // MFE/MAE odvozené z výstupu (viz FJPoints.deriveCourseTicks). Ruční hodnota
  // (bez příznaku Derived) má VŽDY přednost a nepřepíše se; odvozená se při
  // přepočtu obnoví, nebo zmizí, když už výstup cíli / SL neodpovídá. Obchod
  // s víc nohami se nechává být – jeho hodnoty vznikly sloučením.
  const legs=FJPoints.legsOf(t);
  if(!(legs&&legs.length>1)&&(!t.fillStatus||t.fillStatus==='FILLED')){
-  const d=FJPoints.deriveCourseTicks(t,getTickSizeForInstrument(t?.instrument));
+  const d=FJPoints.deriveCourseTicks(t,getTickSizeForInstrument(t?.instrument,src));
   for(const key of ['mfeTicks','maeTicks']){
    const has=t[key]!=null&&t[key]!=='';
    if(has&&t[key+'Derived']!==true)continue;
@@ -2661,7 +2673,7 @@ function applyPostExitFields(t){
    else if(has){delete t[key];delete t[key+'Derived']}
   }
  }
- const fields=postExitFields(t);
+ const fields=postExitFields(t,src);
  for(const key of POST_EXIT_DERIVED_KEYS){
   if(fields[key]===undefined)delete t[key];else t[key]=fields[key];
  }
@@ -3094,12 +3106,17 @@ function openModal(t=null){
  for(const id of ['mfeTicks','maeTicks','observedMinutes']){
   if($(id))$(id).value=(t&&t[id]!=null&&t[id]!=='')?t[id]:'';
  }
+ // Uložená ruční hodnota drží pole v ručním režimu – ani po smazání se pak
+ // nepřepne zpátky na dopočet uprostřed psaní. Odvozenou hodnotu ukáže
+ // renderPostExitHints jako read-only text.
  for(const key of ['mfeTicks','maeTicks']){
   const el=$(key); if(!el)continue;
-  const derived=!!(t&&t[key+'Derived']===true&&t[key]!=null&&t[key]!=='');
-  (el.dataset||(el.dataset={})).derived=derived?'1':'';
-  el.classList?.[derived?'add':'remove']?.('derived-value');
-  el.title=derived?'odvozeno z výstupní ceny':'';
+  const has=!!(t&&t[key]!=null&&t[key]!=='');
+  const derived=has&&t[key+'Derived']===true;
+  const ds=el.dataset||(el.dataset={});
+  ds.derived=derived?'1':'';
+  ds.manual=has&&!derived?'1':'';
+  ds.source=has&&!derived&&t[key+'Source']==='nt8'?'nt8':'';
  }
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t&&t['targetLevel'+n]);
@@ -3391,20 +3408,13 @@ function renderPostExitHints(){
  const applies=postExitApplies($('fillStatus')?.value);
  if(block)block.style.display=applies?'':'none';
  if(!applies)return;
- // Předvyplnění odvoditelného MFE/MAE. Ručně zadaná hodnota se nepřepisuje;
- // odvozená (příznak v dataset) se s každou změnou výstupu / SL obnoví.
+ // MFE u targetu / MAE u stoplossu je aritmetika, ne měření – ukazuje se jako
+ // read-only dopočet, ne jako předvyplněné pole. Ručně zadaná hodnota se
+ // nepřepisuje; odvozená se s každou změnou výstupu / SL obnoví.
  {
   const draft0=postExitDraftFromForm();
   const derivedNow=FJPoints.deriveCourseTicks(draft0,getTickSizeForInstrument(draft0.instrument));
-  for(const key of ['mfeTicks','maeTicks']){
-   const el=$(key); if(!el)continue;
-   const ds=el.dataset||(el.dataset={});
-   if(String(el.value).trim()!==''&&ds.derived!=='1')continue;
-   const v=derivedNow[key];
-   el.value=v==null?'':v;ds.derived=v==null?'':'1';
-   el.classList?.[v!=null?'add':'remove']?.('derived-value');
-   el.title=v==null?'':'odvozeno z výstupní ceny';
-  }
+  for(const key of ['mfeTicks','maeTicks'])syncCourseField(key,derivedNow[key]);
  }
  if($('mfeTicksHint'))$('mfeTicksHint').textContent=postExitTicksWarning($('mfeTicks')?.value);
  if($('maeTicksHint'))$('maeTicksHint').textContent=postExitTicksWarning($('maeTicks')?.value);
@@ -3435,9 +3445,51 @@ function renderPostExitHints(){
  else if(!draft.side)note='<br><i>Bez směru obchodu nejde určit, kam vedlo „ve směru" – doplň Long/Short.</i>';
  hint.innerHTML=esc(parts.join(' · '))+note;
 }
-// Uživatelský zásah do MFE/MAE ruší příznak odvození – od té chvíle je hodnota ruční.
+// Jedno pole průběhu (MFE nebo MAE) ve třech stavech:
+//  - ruční (dataset.manual): editovatelné pole; když se hodnota dá dopočítat,
+//    nabídne se pod ním odkaz zpět na dopočet,
+//  - dopočítané: pole se skryje, místo něj read-only text s hodnotou; hodnota
+//    zůstává ve skrytém inputu, ať ji uložení vezme i s příznakem Derived,
+//  - nic k dopočtu: prázdné editovatelné pole.
+// U targetu tak uživatel vyplňuje jen MAE, u stoplossu jen MFE.
+function syncCourseField(key,derivedValue){
+ const el=$(key); if(!el)return;
+ const ds=el.dataset||(el.dataset={});
+ const view=$(key+'View'),revert=$(key+'Revert');
+ const manual=ds.manual==='1'||(String(el.value??'').trim()!==''&&ds.derived!=='1');
+ const showDerived=!manual&&derivedValue!=null;
+ if(manual){ds.manual='1';ds.derived=''}
+ else{el.value=derivedValue==null?'':derivedValue;ds.derived=showDerived?'1':''}
+ el.style.display=showDerived?'none':'';
+ if(view)view.style.display=showDerived?'':'none';
+ if($(key+'ViewValue'))$(key+'ViewValue').textContent=showDerived?String(derivedValue):'';
+ if($(key+'SourceNote'))$(key+'SourceNote').textContent=manual&&ds.source==='nt8'?'naměřeno v NinjaTraderu':'';
+ if(revert){
+  const offer=manual&&derivedValue!=null&&String(el.value??'').trim()!==String(derivedValue);
+  revert.style.display=offer?'':'none';
+  revert.textContent=offer?`použít dopočet z výstupní ceny (${derivedValue} t)`:'';
+ }
+}
+// „upravit ručně": dopočet se přesune do pole jako výchozí hodnota a od té
+// chvíle se chová jako běžná ruční hodnota (u ručně uzavřeného obchodu rovnost
+// MFE = výstup neplatí).
+function editCourseManually(key){
+ const el=$(key); if(!el)return;
+ const ds=el.dataset||(el.dataset={});
+ ds.manual='1';ds.derived='';
+ renderPostExitHints();
+ el.focus?.();el.select?.();
+}
+function useDerivedCourse(key){
+ const el=$(key); if(!el)return;
+ const ds=el.dataset||(el.dataset={});
+ ds.manual='';ds.derived='';ds.source='';el.value='';
+ renderPostExitHints();
+}
+// Uživatelský zásah do MFE/MAE ruší příznak odvození i původ z NinjaTraderu –
+// od té chvíle je hodnota ruční a import ji už nepřepíše.
 ['mfeTicks','maeTicks'].forEach(id=>$(id)?.addEventListener('input',()=>{
- const el=$(id);(el.dataset||(el.dataset={})).derived='';el.classList?.remove('derived-value');el.title='';
+ const ds=$(id).dataset||($(id).dataset={});ds.derived='';ds.manual='1';ds.source='';
 }));
 ['postExitFavorableTicks','postExitAdverseTicks','mfeTicks','maeTicks'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
 ['fillStatus','postExitAdverseFirst','side'].forEach(id=>$(id)?.addEventListener('change',renderPostExitHints));
@@ -3663,6 +3715,7 @@ $('tradeForm').addEventListener('submit',async e=>{
    if(key!=='observedMinutes'){
     const derived=obj[key]!=null&&$(key)?.dataset?.derived==='1'&&!(Array.isArray(obj.legs)&&obj.legs.length>1);
     if(derived)obj[key+'Derived']=true;else delete obj[key+'Derived'];
+    if(obj[key]!=null&&!derived&&$(key)?.dataset?.source==='nt8')obj[key+'Source']='nt8';else delete obj[key+'Source'];
    }
   }
   // Cílové hladiny: typ + cena. Bez ceny se uloží jen typ (R hladiny pak nejde
@@ -4272,9 +4325,19 @@ function showToast(message){
 // problém jako u window.alert(), viz oprava "Uložit heslo"). Používáme proto
 // vlastní okno v rámci aplikace, ne prohlížečový dialog.
 let confirmResolver=null;
-function showConfirm(message){
+// `opts` = volitelné {title, ok, cancel}. Po zavření se popisky vrátí na
+// výchozí, aby další běžné potvrzení nezdědilo cizí text tlačítek.
+const CONFIRM_DEFAULTS={title:'Potvrzení',ok:'Pokračovat',cancel:'Zrušit'};
+function setConfirmLabels(labels){
+ const head=$('confirmModal')?.querySelector?.('.modalhead h2');
+ if(head)head.textContent=labels.title;
+ $('confirmModalOk').textContent=labels.ok;
+ $('confirmModalCancel').textContent=labels.cancel;
+}
+function showConfirm(message,opts){
  return new Promise(resolve=>{
   confirmResolver=resolve;
+  setConfirmLabels({...CONFIRM_DEFAULTS,...(opts||{})});
   $('confirmModalMessage').textContent=message;
   $('confirmModal').classList.add('open');
   setTimeout(()=>$('confirmModalOk').focus(),30);
@@ -4282,6 +4345,7 @@ function showConfirm(message){
 }
 function resolveConfirm(value){
  $('confirmModal').classList.remove('open');
+ setConfirmLabels(CONFIRM_DEFAULTS);
  if(confirmResolver){confirmResolver(value);confirmResolver=null}
 }
 if($('confirmModalCancel'))$('confirmModalCancel').onclick=()=>resolveConfirm(false);
@@ -4661,8 +4725,23 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   commission,
   grossPnl,
   side:e.side||'',
-  positionId:e.positionId||''
+  positionId:e.positionId||'',
+  // MFE/MAE naměřené NinjaTraderem (Execution.MaxPrice/MinPrice vstupů, viz
+  // excursionTicks v main.js). Příznak Source odliší měření od ručního zadání
+  // i od dopočtu z výstupní ceny; bez hodnoty se pole vůbec nezakládá.
+  ...courseTicksFromEvent(e)
  };
+}
+function courseTicksFromEvent(e){
+ const out={};
+ for(const key of ['mfeTicks','maeTicks']){
+  const v=e?.[key];
+  if(v===undefined||v===null||v==='')continue;
+  const n=Number(v);
+  if(!Number.isFinite(n))continue;
+  out[key]=Math.abs(n);out[key+'Source']='nt8';
+ }
+ return out;
 }
 function tradeHasSourceEventId(t,sourceEventId){
  if(!sourceEventId)return false;
@@ -4684,6 +4763,12 @@ async function appendOrMergeCapturedTrade(journalId,event,images=[]){
  // Obchod se sestavuje až tady, protože teprve tady jsou k dispozici nastavení
  // (šablony instrumentů, komise) toho deníku, do kterého se opravdu zapisuje.
  const trade=mapCapturedTrade(event,images,jSettingsEntry?.value||settings);
+ // Dopočty (exitTicks, maxFavorableTicks, maxAdverseTicks…) hned při importu –
+ // jinak by je obchod s jediným výstupem dostal až po ručním uložení formuláře
+ // a MFE/MAE z NinjaTraderu by se do nich nepropsaly. Velikost ticku se bere
+ // z šablon cílového deníku, stejně jako komise. Sloučený obchod je dostane
+ // v combineTradeObjects.
+ applyPostExitFields(trade,jSettingsEntry?.value||settings);
  const autoMerge=jSettingsEntry?.value?.autoMergeLegs!==false;
  if(autoMerge&&trade.positionId){
   const idx=data.trades.findIndex(t=>t.positionId&&t.positionId===trade.positionId);
@@ -4738,11 +4823,37 @@ $('captureTestMultiTarget').onclick=async()=>{
  showToast('Vytvořena testovací pozice se 3 kontrakty uzavřenými přes TP1, Break Even a TP2. Spusť import (nebo počkej na automatický) a zkontroluj Deník – měl by se objevit jeden sloučený obchod se třemi legy.');
 };
 $('captureImport').onclick=()=>importCapturedTrades(false);
-$('captureInstallNinja').onclick=async()=>{
+async function installNinjaConnector(){
  const r=await window.desktopAPI.captureInstallNinjaConnector();
  if(r?.ok)showToast('Hotovo. Konektor byl automaticky vložen do NinjaTraderu. Teď spusť NinjaTrader, otevři NinjaScript Editor a stiskni F5 pro kompilaci.');
  else showToast('Automatická instalace se nepodařila: '+(r?.error||'neznámá chyba'));
-};
+ return r;
+}
+$('captureInstallNinja').onclick=()=>installNinjaConnector();
+// Jednorázové upozornění pro toho, kdo má v NT8 starší konektor (nové verze
+// posílají víc dat, např. MFE/MAE). Ukáže se jen při zastaralé instalaci a jen
+// jednou pro danou verzi konektoru – bez ohledu na to, co uživatel zvolí.
+const CONNECTOR_NOTICE_KEY='FJ_ntConnectorNoticeSeen';
+function shouldShowConnectorNotice(status,seenVersion){
+ return !!(status&&status.installed&&status.outdated&&String(seenVersion??'')!==String(status.currentVersion));
+}
+let connectorNoticeChecked=false;
+async function maybeShowConnectorNotice(){
+ if(connectorNoticeChecked)return;
+ connectorNoticeChecked=true;
+ try{
+  let seen=null;
+  try{seen=localStorage.getItem(CONNECTOR_NOTICE_KEY)}catch(e){}
+  const status=await window.desktopAPI?.captureNinjaConnectorStatus?.();
+  if(!shouldShowConnectorNotice(status,seen))return;
+  // Příznak se ukládá PŘED zobrazením – okno se nesmí ukázat podruhé ani po
+  // zavření aplikace uprostřed dialogu.
+  try{localStorage.setItem(CONNECTOR_NOTICE_KEY,String(status.currentVersion))}catch(e){}
+  const ok=await showConfirm('Pro pokročilé funkce a stabilitu doporučujeme přeinstalovat NT8 konektor. Platí pro stávající uživatele s již nainstalovaným NT8 konektorem.\n\nPo přeinstalaci otevři v NinjaTraderu NinjaScript Editor a stiskni F5.',
+   {title:'NinjaTrader 8 konektor',ok:'Přeinstalovat teď',cancel:'Později'});
+  if(ok)await installNinjaConnector();
+ }catch(e){console.error('connector notice',e)}
+}
 $('capturePrepareTradingView').onclick=async()=>{
  const r=await window.desktopAPI.capturePrepareTradingViewPine();
  if(r?.ok)showToast('Pine Script je zkopírovaný ve schránce a TradingView se otevřel. V Pine Editoru stiskni Ctrl+V a Přidat do grafu.');

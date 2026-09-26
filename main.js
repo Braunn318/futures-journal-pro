@@ -956,6 +956,25 @@ async function openPositionFromExecution(state, key, payload, { delta, price, co
     positionId
   }, 'ninjatrader');
 }
+// MFE / MAE v ticích od průměrné vstupní ceny pozice, z extrémů ceny, které
+// NinjaTrader vede u vstupních exekucí (konektor je posílá s každým výstupem jako
+// excursionMaxPrice / excursionMinPrice). Výstupní cena se do extrémů přidává –
+// cena na ní prokazatelně obchodovala, i kdyby NT poslední tick ještě nezapsal.
+// Bez extrémů nebo bez velikosti ticku se nevrací nic: prázdno, ne nula.
+function excursionTicks(payload, side, avgPrice, exitPrice) {
+  const tick = Number(payload?.tickSize);
+  const hi = Number(payload?.excursionMaxPrice);
+  const lo = Number(payload?.excursionMinPrice);
+  if (!(tick > 0) || !Number.isFinite(hi) || !Number.isFinite(lo) || hi < lo) return {};
+  const entry = Number(avgPrice), exit = Number(exitPrice);
+  if (!Number.isFinite(entry)) return {};
+  const max = Number.isFinite(exit) ? Math.max(hi, exit) : hi;
+  const min = Number.isFinite(exit) ? Math.min(lo, exit) : lo;
+  const toTicks = v => Math.max(0, Math.round((v / tick) * 100) / 100);
+  if (side === 'long') return { mfeTicks: toTicks(max - entry), maeTicks: toTicks(entry - min) };
+  if (side === 'short') return { mfeTicks: toTicks(entry - min), maeTicks: toTicks(max - entry) };
+  return {};
+}
 async function processExecution(payload) {
   const executionId = String(payload.executionId || '');
   const state = readCaptureState();
@@ -1050,7 +1069,8 @@ async function processExecution(payload) {
     strategy: current.strategy || payload.strategy || payload.orderName || '',
     screenshotPaths: [...(current.entryImages || []), ...exitImages],
     sourceExecutionId: executionId,
-    positionId: current.positionId || ''
+    positionId: current.positionId || '',
+    ...excursionTicks(payload, current.side, current.avgPrice, price)
   }, 'ninjatrader');
   derived.push(closed);
 
@@ -1405,21 +1425,87 @@ ipcMain.handle('capture:readScreenshot', async (_event, filePath) => {
 });
 
 
+// ---------------------------------------------------------------- NT8 konektor
+// Verze konektoru je značka v hlavičce .cs souboru (FJ_CONNECTOR_VERSION: N).
+// Konektor nainstalovaný před jejím zavedením ji nemá – ten je verze 1.
+function ninjaConnectorVersion(source) {
+  const m = /FJ_CONNECTOR_VERSION:\s*(\d+)/.exec(String(source || ''));
+  return m ? Number(m[1]) : 1;
+}
+function ninjaConnectorTargetPath(documentsDir) {
+  const customDir = path.join(documentsDir, 'NinjaTrader 8', 'bin', 'Custom');
+  const addOnsDir = path.join(customDir, 'AddOns');
+  return { customDir, addOnsDir, filePath: path.join(addOnsDir, 'FuturesJournalCapture.cs') };
+}
+// Jiné .cs soubory ve složce Custom, které deklarují stejnou třídu (typicky stará
+// ručně importovaná kopie pod jiným jménem). NT kompiluje všechny .cs najednou,
+// takže s nimi by kompilace spadla. Jen čte.
+function findNinjaConnectorDuplicates(customDir, targetFile, fsApi) {
+  const found = [];
+  const same = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+  const walk = dir => {
+    let entries = [];
+    try { entries = fsApi.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.cs$/i.test(entry.name) && !same(full, targetFile)) {
+        try { if (/\bclass\s+FuturesJournalCapture\b/.test(fsApi.readFileSync(full, 'utf8'))) found.push(full); } catch {}
+      }
+    }
+  };
+  walk(customDir);
+  return found;
+}
+// Instalace = přepsání JEDNOHO souboru na JEDNOM místě, nic víc (automatická
+// instalace dřív dělala problémy). Konkrétně:
+//  - nezakládá se složka NinjaTrader 8 – když v Dokumentech není (OneDrive,
+//    jiná instalace NT), nezapíše se nic a uživatel dostane ruční postup,
+//  - založit se smí jen chybějící podsložka AddOns uvnitř existujícího Custom,
+//  - žádná záloha starého souboru: záložní .cs v Custom by NT zkompiloval jako
+//    druhou třídu FuturesJournalCapture,
+//  - s duplicitní třídou jinde v Custom se nezapisuje – kompilace by selhala.
+function installNinjaConnectorFile({ documentsDir, source, fsApi }) {
+  const target = ninjaConnectorTargetPath(documentsDir);
+  if (!fsApi.existsSync(target.customDir)) {
+    return { ok: false, notFound: true, error: 'Složka NinjaTrader 8 nebyla v Dokumentech nalezena, konektor se nikam nezapsal. Použij „Uložit konektor“ a v NinjaTraderu ho importuj přes Tools → Import → NinjaScript Add-On.' };
+  }
+  const duplicates = findNinjaConnectorDuplicates(target.customDir, target.filePath, fsApi);
+  if (duplicates.length) {
+    return { ok: false, duplicates, error: 'Konektor se nezapsal: v NinjaTraderu je jiná kopie téže třídy, se kterou by kompilace selhala. Smaž ji a zkus to znovu: ' + duplicates.join(', ') };
+  }
+  if (!fsApi.existsSync(target.addOnsDir)) fsApi.mkdirSync(target.addOnsDir);
+  fsApi.writeFileSync(target.filePath, source, 'utf8');
+  return { ok: true, path: target.filePath, addOnsDir: target.addOnsDir };
+}
+function ninjaConnectorTemplateSource() {
+  return fs.readFileSync(path.join(connectorsDir(), 'NinjaTrader8', 'FuturesJournalCapture.cs'), 'utf8');
+}
+
 ipcMain.handle('capture:installNinjaConnector', async () => {
   try {
     const settings = readCaptureSettings();
-    const templatePath = path.join(connectorsDir(), 'NinjaTrader8', 'FuturesJournalCapture.cs');
-    let source = fs.readFileSync(templatePath, 'utf8');
-    source = source.replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', settings.apiKey);
-    const targetDir = path.join(app.getPath('documents'), 'NinjaTrader 8', 'bin', 'Custom', 'AddOns');
-    fs.mkdirSync(targetDir, { recursive: true });
-    const targetPath = path.join(targetDir, 'FuturesJournalCapture.cs');
-    fs.writeFileSync(targetPath, source, 'utf8');
-    await shell.openPath(targetDir);
-    return { ok: true, path: targetPath };
+    const source = ninjaConnectorTemplateSource().replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', settings.apiKey);
+    const result = installNinjaConnectorFile({ documentsDir: app.getPath('documents'), source, fsApi: fs });
+    if (result.ok) await shell.openPath(result.addOnsDir);
+    return result;
   } catch (error) {
     logError('Install NinjaTrader connector', error);
     return { ok: false, error: error.message };
+  }
+});
+// Jen čte: je konektor v NT nainstalovaný a je starší než ten, který aplikace
+// nese? Podle toho se jednou nabídne přeinstalace.
+ipcMain.handle('capture:ninjaConnectorStatus', async () => {
+  try {
+    const currentVersion = ninjaConnectorVersion(ninjaConnectorTemplateSource());
+    const target = ninjaConnectorTargetPath(app.getPath('documents'));
+    if (!fs.existsSync(target.filePath)) return { installed: false, currentVersion };
+    const installedVersion = ninjaConnectorVersion(fs.readFileSync(target.filePath, 'utf8'));
+    return { installed: true, installedVersion, currentVersion, outdated: installedVersion < currentVersion };
+  } catch (error) {
+    logError('NinjaTrader connector status', error);
+    return { installed: false };
   }
 });
 

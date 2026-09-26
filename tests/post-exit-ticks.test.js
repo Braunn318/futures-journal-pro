@@ -314,7 +314,7 @@ function postExitForm(values) {
   const r = loadRenderer([
     '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
     'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'postExitTicksWarning', 'postExitApplies',
-    'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints'
+    'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField'
   ], { document: dom.document, settings: SETTINGS });
   r.renderPostExitHints();
   return dom.nodes;

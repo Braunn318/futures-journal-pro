@@ -33,7 +33,7 @@ test('main.js: uzavření pozice na vstupní ceně dá záporný čistý výsled
   const state = { positions: {}, executionIds: [] };
 
   const main = loadMain(
-    ['signedExecutionQuantity', 'positionKey', 'openPositionFromExecution', 'processExecution'],
+    ['signedExecutionQuantity', 'positionKey', 'openPositionFromExecution', 'excursionTicks', 'processExecution'],
     {
       // Stuby okolí: stav pozic v paměti, žádné screenshoty, žádný disk.
       readCaptureState: () => state,
@@ -69,7 +69,7 @@ test('main.js: uzavření pozice na vstupní ceně dá záporný čistý výsled
 test('mapCapturedTrade: breakeven obchod si nechá provizi jako náklad', () => {
   const r = loadRenderer(
     ['normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument', 'getDefaultCommissionForInstrument',
-      'classifyResult', 'signed', 'tradeTotalPoints', 'mapCapturedTrade'],
+      'classifyResult', 'signed', 'tradeTotalPoints', 'courseTicksFromEvent', 'mapCapturedTrade'],
     { settings: SETTINGS, Date }
   );
 

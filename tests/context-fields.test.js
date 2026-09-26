@@ -28,7 +28,7 @@ const NAMES = [
   'getDefaultCommissionForInstrument', 'classifyResult', 'signed', 'tradeTotalPoints',
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
   'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects',
-  'mapCapturedTrade'
+  'courseTicksFromEvent', 'mapCapturedTrade'
 ];
 
 function renderer() {

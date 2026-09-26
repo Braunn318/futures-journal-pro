@@ -13,5 +13,10 @@
   "pnl": 200,
   "result": "target | stoploss",
   "strategy": "Breakout",
-  "comment": "Volitelné"
+  "comment": "Volitelné",
+  "mfeTicks": "Volitelné, trade_closed: nejdál ve směru od průměrné vstupní ceny do výstupu, ticky, kladně",
+  "maeTicks": "Volitelné, trade_closed: nejdál proti směru od průměrné vstupní ceny do výstupu, ticky, kladně",
+  "tickSize": "Volitelné, execution (NinjaTrader): MasterInstrument.TickSize",
+  "excursionMaxPrice": "Volitelné, výstupní execution (NinjaTrader): nejvyšší cena od vstupu pozice (Execution.MaxPrice vstupů)",
+  "excursionMinPrice": "Volitelné, výstupní execution (NinjaTrader): nejnižší cena od vstupu pozice (Execution.MinPrice vstupů)"
 }

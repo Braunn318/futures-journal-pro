@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   storeImage: (dataUrl) => ipcRenderer.invoke('image:store', dataUrl),
   storeCaptureImage: (filePath) => ipcRenderer.invoke('image:storeCapture', filePath),
   captureInstallNinjaConnector: () => ipcRenderer.invoke('capture:installNinjaConnector'),
+  captureNinjaConnectorStatus: () => ipcRenderer.invoke('capture:ninjaConnectorStatus'),
   capturePrepareTradingViewPine: () => ipcRenderer.invoke('capture:prepareTradingViewPine'),
   capturePrepareTradingViewWorker: () => ipcRenderer.invoke('capture:prepareTradingViewWorker'),
   captureExportNinjaConnector: () => ipcRenderer.invoke('capture:exportNinjaConnector'),
