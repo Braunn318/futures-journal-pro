@@ -76,11 +76,15 @@ test('short je zrcadlo longu – směr nese pole, ne znaménko', () => {
   assert.deepEqual(short, long, 'stejně vzdálený short musí vyjít stejně jako long');
 });
 
-test('protipohyb, který se nevrátil na vstup, nedělá zápornou hodnotu', () => {
+test('protipohyb, který se nevrátil na vstup, nedělá zápornou hodnotu ani vymyšlenou nulu', () => {
+  // Bez MAE nevíme, co se dělo uvnitř obchodu. Nula by tvrdila „cena šla proti
+  // pozici nula ticků" – to je jiná informace než „nevím", proto null.
   const d = FJPoints.postExitTickFields(specTrade({ postExitAdverseTicks: 4 }), 0.25);
-  assert.equal(d.maxAdverseTicks, 0, 'cena se po výstupu ani nevrátila na vstup');
+  assert.equal(d.maxAdverseTicks, null, 'cena se po výstupu nevrátila na vstup, ale MAE chybí');
   assert.equal(d.touchedEntry, false);
-  assert.equal(d.touchedSl, false);
+  assert.equal(d.touchedSl, null, 'bez maxAdverseTicks se nedá říct, jestli došla na SL');
+  // S naměřeným MAE je nula skutečná hodnota.
+  assert.equal(FJPoints.postExitTickFields(specTrade({ postExitAdverseTicks: 4, maeTicks: 0 }), 0.25).maxAdverseTicks, 0);
 });
 
 test('MAE z NT8 má přednost, když je větší než protipohyb po výstupu', () => {
@@ -89,7 +93,9 @@ test('MAE z NT8 má přednost, když je větší než protipohyb po výstupu', (
 });
 
 test('bez ceny SL se maxAdverseTicks nepočítá a NIKDY se nedosazuje nula', () => {
-  const d = FJPoints.postExitTickFields(specTrade({ slPrice: undefined, result: 'stoploss' }), 0.25);
+  const d = FJPoints.postExitTickFields(specTrade({
+    slPrice: undefined, result: 'stoploss', postExitAdverseTicks: undefined, postExitFavorableTicks: undefined
+  }), 0.25);
   assert.equal(d.slTicks, null, 'prázdná cena SL znamená prázdné riziko, ne nulové');
   assert.equal(d.maxAdverseTicks, null);
   assert.equal(d.touchedSl, null);
@@ -122,7 +128,7 @@ test('bez směru obchodu se dopočty nehádají', () => {
 
 test('bez velikosti ticku nevznikne žádný dopočet', () => {
   const d = FJPoints.postExitTickFields(specTrade(), null);
-  assert.deepEqual(d, { slTicks: null, maxTicks: null, maxAdverseTicks: null, touchedEntry: null, touchedSl: null });
+  assert.deepEqual(d, { slTicks: null, exitTicks: null, maxTicks: null, maxFavorableTicks: null, maxAdverseTicks: null, touchedEntry: null, touchedSl: null });
 });
 
 test('u sloučeného obchodu se měří od ceny POSLEDNÍ nohy, ne od váženého průměru', () => {

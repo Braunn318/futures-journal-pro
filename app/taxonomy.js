@@ -103,7 +103,26 @@
     SKIPPED: 'setup byl, vědomě vynechán'
   };
 
-  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS };
+  // Typ cílové hladiny: kam obchod mířil (targetLevel1 / targetLevel2). Vlastní
+  // číselník, ne sdílený s hladinou vstupu – „Trail podle 1min M2" nebo „Ruční
+  // výstup bez hladiny" nejsou místa vstupu. Cena hladiny se ukládá vedle typu,
+  // bez ní nejde spočítat, na kolika R hladina ležela.
+  const TARGET_LEVEL = {
+    LIQUIDITY: 'Likvidita',
+    VPOC_DAY: 'VPOC dne',
+    VPOC_30M: 'Netestovaný VPOC 30min svíce',
+    VPOC_1M: 'VPOC 1M svíce',
+    VAH: 'VAH',
+    VAL: 'VAL',
+    VWAP: 'VWAP',
+    LVN: 'LVN',
+    GAP_EDGE: 'Hrana gapu',
+    LTA_LEVEL: 'LTA hladina',
+    TRAIL_M2: 'Trail podle 1min M2',
+    MANUAL_EXIT: 'Ruční výstup bez hladiny'
+  };
+
+  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL };
 
   // Sloučené volby. Klíč vlevo zůstává PLATNÝ (starý obchod ho může mít
   // uložený), ale ve statistikách se počítá pod klíčem vpravo a u nových
@@ -131,7 +150,8 @@
     { name: 'SR_TARGET', label: 'SR proti targetu', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
     { name: 'SR_SL', label: 'SR proti S/L', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
-    { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' }
+    { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' },
+    { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' }
   ];
 
   const GROUP_BY_NAME = Object.fromEntries(GROUPS.map(g => [g.name, g]));
@@ -150,6 +170,16 @@
     { key: 'ofConfirm', cardinality: 'multi', enumName: 'OF_CONFIRM', label: 'Order flow potvrzení' },
     { key: 'fillStatus', cardinality: 'single', enumName: 'FILL_STATUS', label: 'Stav naplnění' },
     { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' },
+    // Cílová hladina: { type: klíč z TARGET_LEVEL, price: číslo }. Bere se vcelku
+    // z prvního obchodu, který ji má – typ a cena patří k sobě.
+    { key: 'targetLevel1', cardinality: 'target', enumName: 'TARGET_LEVEL', label: 'Cílová hladina 1' },
+    { key: 'targetLevel2', cardinality: 'target', enumName: 'TARGET_LEVEL', label: 'Cílová hladina 2' },
+    // Průběh obchodu DO VÝSTUPU, od vstupní ceny, v ticích, vždy kladně.
+    // merge: 'max' – sloučený obchod bere maximum přes nohy: nejdál, kam pozice
+    // jako celek došla, je nejdál z jakékoli její nohy.
+    { key: 'mfeTicks', cardinality: 'number', enumName: null, merge: 'max', label: 'MFE za dobu obchodu (ticky)' },
+    { key: 'maeTicks', cardinality: 'number', enumName: null, merge: 'max', label: 'MAE za dobu obchodu (ticky)' },
+    { key: 'observedMinutes', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Sledováno po výstupu (min)' },
     // Chování ceny PO VÝSTUPU. merge: 'lastExit' znamená, že u sloučeného
     // obchodu se hodnota NEBERE z první nohy jako u ostatních jednohodnotových
     // polí, ale z nohy s nejpozdějším časem výstupu – měří se pokračování ceny
@@ -276,6 +306,18 @@
 
   function sanitizeSingle(group, value, config) {
     return isValidKey(group, value, config) ? value : '';
+  }
+
+  // Cílová hladina { type, price }. Neznámý typ se zahazuje (ne opravuje);
+  // cena je nepovinná, ale bez ní se R hladiny nedá spočítat. Prázdné = null.
+  function sanitizeTargetLevel(value, config) {
+    if (!value || typeof value !== 'object') return null;
+    const type = sanitizeSingle('TARGET_LEVEL', value.type, config);
+    const raw = value.price;
+    const n = (raw === null || raw === undefined || String(raw).trim() === '') ? null : Number(raw);
+    const price = Number.isFinite(n) ? n : null;
+    if (!type && price == null) return null;
+    return { type, price };
   }
 
   // Konfluence: `NONE` je výslovné „žádná hladina", takže se nepočítá.
@@ -407,13 +449,13 @@
 
   return {
     // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
-    SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS,
+    SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL,
     ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, TRADE_CONTEXT_FIELDS,
     // konfigurace
     applyConfig, getConfig, groupConfig,
     // dotazy
     allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey,
-    visibleOptions, sanitizeMulti, sanitizeSingle, confluenceCount,
+    visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, confluenceCount,
     makeCustomKey,
     // přenos mezi deníky a soubor
     sanitizeConfig, exportPayload, configFromImport, describeConfig,

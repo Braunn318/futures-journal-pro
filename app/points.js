@@ -236,65 +236,125 @@
     return t != null && t > 0 ? t : null;
   }
 
+  // Předvyplnění MFE/MAE, které jde ODVODIT ze samotného obchodu (ne odhadnout):
+  //   target   → mfeTicks = exitTicks (výš to nedošlo, tam byl výstup)
+  //   stoploss → maeTicks = |exitTicks| (proti pozici to došlo přesně na SL)
+  //   breakeven / ruční výstup → nic
+  // Platí jen tehdy, když výstup odpovídá zadanému cíli / SL. Obchod zavřený
+  // ručně někde mezi tím se nepředvyplňuje – jde-li to z dat rozlišit (cena
+  // cílové hladiny, resp. cena SL, se liší od skutečné výstupní ceny). Bez
+  // zadané ceny hladiny se rozlišit nedá a výsledek `target` se bere za pravdu.
+  // Obchod s víc nohami se neodvozuje: „výstup" tam není jedna cena.
+  function deriveCourseTicks(trade, tickSize) {
+    const out = {};
+    const legs = legsOf(trade);
+    if (legs && legs.length > 1) return out;
+    const exitTicks = exitTicksOf(trade, tickSize);
+    const exit = measuredExitPriceOf(trade);
+    const tick = Number(tickSize);
+    if (exitTicks == null || exit == null || !(tick > 0)) return out;
+    const same = price => Math.abs(price - exit) < tick / 2;
+    const result = String(trade?.result);
+    if (result === 'target') {
+      const prices = [trade?.targetLevel1?.price, trade?.targetLevel2?.price]
+        .map(finiteOrNull).filter(p => p != null);
+      if (prices.length && !prices.some(same)) return out;
+      if (exitTicks > 0) out.mfeTicks = exitTicks;
+    } else if (result === 'stoploss') {
+      const sl = finiteOrNull(trade?.slPrice);
+      if (sl != null && !same(sl)) return out;
+      if (exitTicks < 0) out.maeTicks = Math.abs(exitTicks);
+    }
+    return out;
+  }
+
+  // Soft validace: SL dál než 40 ticků (10 bodů u ES) je skoro jistě překlep
+  // (živá data: slPrice 7338, slTicks 1607). Nikdy neblokuje uložení.
+  const SL_TICKS_SUSPICIOUS = 40;
+  function slTicksSuspicious(slTicks) {
+    const n = finiteOrNull(slTicks);
+    return n != null && n > SL_TICKS_SUSPICIOUS;
+  }
+
+  // Obchod, který se naplnil, ale chybí mu průběh (MFE nebo MAE), má neúplný
+  // kontext: SL sweep i mřížka SL × TP z něj nedostanou celý obrázek. Nenaplněný
+  // setup se neposuzuje – není z čeho měřit. Prázdný stav se bere jako naplněný
+  // (stejně jako `postExitApplies` ve formuláři).
+  function contextIncomplete(trade) {
+    // Záznam setupu bez exekuce nemá výstup, od kterého by se MFE/MAE měřilo.
+    if (trade?.recordType === 'SETUP_ONLY') return false;
+    const fill = trade?.fillStatus;
+    if (fill && fill !== 'FILLED') return false;
+    return finiteOrNull(trade?.mfeTicks) == null || finiteOrNull(trade?.maeTicks) == null;
+  }
+
   // Dopočítaná pole. Volající je ukládá NA OBCHOD (ne jen zobrazuje), aby se
   // dala analyzovat bez opakovaného přepočtu a aby přežila sloučení cílů.
   //
-  //   maxTicks        nejdál VE SMĚRU obchodu, měřeno od vstupu
-  //   maxAdverseTicks nejdál PROTI pozici, měřeno od vstupu
-  //   touchedEntry    protipohyb po výstupu se vrátil až na vstupní cenu
-  //   touchedSl       protipohyb po výstupu došel až na cenu Stop Lossu
+  // Vstupy (ručně, vždy kladně, v ticích):
+  //   mfeTicks / maeTicks                  nejdál ve směru / proti směru DO VÝSTUPU, od vstupu
+  //   postExitFavorableTicks / ...Adverse  po výstupu, od VÝSTUPNÍ ceny
   //
-  // Všechno je null tam, kde chybí vstup. Prázdno je informace („nevím“),
-  // dosazená nula by se od skutečné nuly v analýze nedala odlišit.
+  // Výstupy:
+  //   exitTicks         výstup − vstup se znaménkem podle směru
+  //   maxFavorableTicks max(mfe, exitTicks + postExitFavorable)
+  //   maxTicks          exitTicks + postExitFavorable (starší pole, ponecháno)
+  //   maxAdverseTicks   max(mae, postExitAdverse − exitTicks); u stopnutého obchodu
+  //                     nejméně slTicks
+  //   touchedEntry      protipohyb po výstupu se vrátil až na vstupní cenu
+  //   touchedSl         maxAdverseTicks >= slTicks (u stopnutého obchodu se
+  //                     nepočítá – viz níž)
+  //
+  // Když některý vstup chybí, počítá se z toho, co je. Když chybí všechny,
+  // výsledek je null – NIKDY nula. Nula znamená „cena nešla ani o tick".
+  // Bez `maeTicks` je záporný výsledek `postExitAdverse − exitTicks` jen
+  // „nevím" (co se dělo uvnitř obchodu, data neříkají), ne naměřená nula –
+  // proto se vrací null místo ořezu na 0. Nula vzniká jen z naměřeného MAE.
   function postExitTickFields(trade, tickSize) {
-    const out = { slTicks: null, maxTicks: null, maxAdverseTicks: null, touchedEntry: null, touchedSl: null };
+    const out = { slTicks: null, exitTicks: null, maxTicks: null, maxFavorableTicks: null, maxAdverseTicks: null, touchedEntry: null, touchedSl: null };
     const tick = Number(tickSize);
     if (!Number.isFinite(tick) || tick <= 0) return out;
 
     const exitTicks = exitTicksOf(trade, tickSize);
     const slTicks = slTicksOf(trade, tickSize);
-    // Zadané hodnoty jsou vždy kladné; záporné zadání je překlep, na který
-    // formulář upozorňuje, a do výpočtu jde v absolutní hodnotě.
-    const favRaw = finiteOrNull(trade?.postExitFavorableTicks);
-    const advRaw = finiteOrNull(trade?.postExitAdverseTicks);
-    const fav = favRaw == null ? null : Math.abs(favRaw);
-    const adv = advRaw == null ? null : Math.abs(advRaw);
-    const mae = finiteOrNull(trade?.maeTicks);
+    const absOrNull = v => { const n = finiteOrNull(v); return n == null ? null : Math.abs(n); };
+    const fav = absOrNull(trade?.postExitFavorableTicks);
+    const adv = absOrNull(trade?.postExitAdverseTicks);
+    const mfe = absOrNull(trade?.mfeTicks);
+    const mae = absOrNull(trade?.maeTicks);
+    const stopped = String(trade?.result) === 'stoploss';
 
     out.slTicks = slTicks;
+    out.exitTicks = exitTicks;
 
-    // Nejdál ve směru obchodu = kam došel výstup + kolik cena pokračovala dál.
-    // U stopnutého obchodu je `exitTicks` záporné, takže `postExitFavorable`
-    // tady odpovídá na otázku „o kolik by širší SL vyšel".
-    if (exitTicks != null && fav != null) out.maxTicks = roundTicks(exitTicks + fav);
+    const favCandidates = [];
+    if (mfe != null) favCandidates.push(mfe);
+    if (exitTicks != null && fav != null) {
+      const after = roundTicks(exitTicks + fav);
+      out.maxTicks = after;
+      favCandidates.push(after);
+    }
+    if (favCandidates.length) out.maxFavorableTicks = roundTicks(Math.max(...favCandidates));
 
-    if (String(trade?.result) === 'stoploss') {
-      // Stopnutý obchod už proti pozici došel nejméně na SL – to není odhad,
-      // ale fakt. Protipohyb po výstupu se přičítá k němu.
-      if (slTicks != null) out.maxAdverseTicks = roundTicks(slTicks + (adv || 0));
-    } else {
-      // Ziskový / BE obchod: proti pozici se dostal buď během obchodu (MAE
-      // z NT8, pokud je k dispozici), nebo až po výstupu – protipohyb musí
-      // nejdřív ujít cestu zpátky na vstup, teprve co je nad ni, je adverse.
-      const candidates = [];
-      if (mae != null) candidates.push(Math.abs(mae));
-      if (adv != null && exitTicks != null) candidates.push(adv - exitTicks);
-      // Bez MAE je výsledek DOLNÍ ODHAD: co se dělo uvnitř obchodu, data
-      // neříkají, takže se záporná hodnota ořeže na nulu, ne pod ni.
-      if (candidates.length) out.maxAdverseTicks = roundTicks(Math.max(0, ...candidates));
+    const advCandidates = [];
+    if (mae != null) advCandidates.push(mae);
+    if (adv != null && exitTicks != null) advCandidates.push(roundTicks(adv - exitTicks));
+    // Stopnutý obchod už proti pozici došel nejméně na SL – to je fakt.
+    if (stopped && slTicks != null) advCandidates.push(slTicks);
+    if (advCandidates.length) {
+      const maxAdv = Math.max(...advCandidates);
+      if (mae != null || maxAdv >= 0) out.maxAdverseTicks = roundTicks(Math.max(0, maxAdv));
     }
 
     // „Došla cena zpátky na vstup / na SL?" dává smysl jen u obchodu, který
     // vystoupil VE SMĚRU (zisk, BE). U obchodu ukončeného na stop lossu jsou
     // OBA PŘÍZNAKY DEGENEROVANÉ: výstup JE cena SL, takže by podle definice
-    // vyšly vždycky true, ať se cena po výstupu chovala jakkoli, a jako filtr
-    // v analýze by jen rozdělily vzorek na „všechny stopnuté obchody" a zbytek.
-    // Proto se u stopnutého obchodu NEPOČÍTAJÍ a zůstávají null – u něj se
-    // pracuje s `maxAdverseTicks`, který říká, jak daleko proti pozici to
-    // doopravdy došlo.
-    if (adv != null && exitTicks != null && exitTicks > 0) {
-      out.touchedEntry = adv >= exitTicks;
-      if (slTicks != null) out.touchedSl = adv >= roundTicks(exitTicks + slTicks);
+    // vyšly vždycky true, a jako filtr v analýze by jen rozdělily vzorek na
+    // „všechny stopnuté obchody" a zbytek. U stopnutého obchodu se proto
+    // NEPOČÍTAJÍ a zůstávají null – pracuje se s `maxAdverseTicks`.
+    if (!stopped) {
+      if (adv != null && exitTicks != null && exitTicks > 0) out.touchedEntry = adv >= exitTicks;
+      if (out.maxAdverseTicks != null && slTicks != null) out.touchedSl = out.maxAdverseTicks >= slTicks;
     }
     return out;
   }
@@ -325,6 +385,10 @@
     measuredExitPriceOf,
     exitTicksOf,
     slTicksOf,
+    SL_TICKS_SUSPICIOUS,
+    slTicksSuspicious,
+    contextIncomplete,
+    deriveCourseTicks,
     postExitTickFields
   };
 }));
