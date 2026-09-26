@@ -1085,8 +1085,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="sub" id="slPriceHint"></div></div>
         <div class="field full" id="postExitBlock">
           <div class="formgrid">
-            <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="mfeTicks" type="number" step="any" min="0" placeholder="např. 20"><div class="derived-readonly" id="mfeTicksView" style="display:none"><b id="mfeTicksViewValue"></b> t <span class="sub">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('mfeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="mfeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('mfeTicks')"></a><div class="sub" id="mfeTicksSourceNote"></div><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
-            <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="maeTicks" type="number" step="any" min="0" placeholder="např. 6"><div class="derived-readonly" id="maeTicksView" style="display:none"><b id="maeTicksViewValue"></b> t <span class="sub">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('maeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="maeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('maeTicks')"></a><div class="sub" id="maeTicksSourceNote"></div><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
+            <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="mfeTicks" type="number" step="any" min="0" placeholder="např. 20"><div class="derived-readonly" id="mfeTicksView" style="display:none"><b id="mfeTicksViewValue"></b> t <span class="sub" id="mfeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('mfeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="mfeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('mfeTicks')"></a><div class="sub" id="mfeTicksSourceNote"></div><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
+            <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="maeTicks" type="number" step="any" min="0" placeholder="např. 6"><div class="derived-readonly" id="maeTicksView" style="display:none"><b id="maeTicksViewValue"></b> t <span class="sub" id="maeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('maeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="maeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('maeTicks')"></a><div class="sub" id="maeTicksSourceNote"></div><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
             <div class="field"><label>Sledováno po výstupu <span class="sub">— minut, nepovinné</span></label><input id="observedMinutes" type="number" step="any" min="0" placeholder="např. 30"></div>
             <div class="field"><label>Pokračování po výstupu <span class="sub">— v ticích, ve směru obchodu</span></label><input id="postExitFavorableTicks" type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
             <div class="field"><label>Protipohyb po výstupu <span class="sub">— v ticích, proti směru obchodu</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
@@ -2530,17 +2530,18 @@ function mergeContextFields(list){
    // Maximum přes nohy (MFE/MAE). Prázdná noha se nepočítá – jinak by Math.max z prázdna udělal nulu, která by tvrdila „cena nešla ani o tick".
    // Příznak odvození jde s nohou, která maximum dodala – ruční hodnota
    // se sloučením nesmí stát odvozenou ani naopak.
-   // Pořadí zdrojů: ruční > NinjaTrader > dopočet z výstupu. Maximum se bere
-   // jen v nejvyšší zastoupené vrstvě, takže nová noha z importu nikdy
-   // nepřebije hodnotu, kterou uživatel zadal ručně.
+   // Pořadí zdrojů: ruční > naměřené konektorem (NinjaTrader i jiný zdroj,
+   // viz courseTicksFromEvent) > dopočet z výstupu. Maximum se bere jen
+   // v nejvyšší zastoupené vrstvě, takže nová noha z importu nikdy nepřebije
+   // hodnotu, kterou uživatel zadal ručně.
    const filled=list.filter(t=>hasValue(t,field.key)&&Number.isFinite(Number(t[field.key])));
-   const tier=t=>t[field.key+'Derived']===true?2:(t[field.key+'Source']==='nt8'?1:0);
+   const tier=t=>t[field.key+'Derived']===true?2:(t[field.key+'Source']?1:0);
    const best=Math.min(...filled.map(tier));
    const source=filled.filter(t=>tier(t)===best).sort((a,b)=>Number(b[field.key])-Number(a[field.key]))[0];
    if(source){
     out[field.key]=Number(source[field.key]);
     if(source[field.key+'Derived']===true)out[field.key+'Derived']=true;
-    if(source[field.key+'Source']==='nt8')out[field.key+'Source']='nt8';
+    if(source[field.key+'Source'])out[field.key+'Source']=source[field.key+'Source'];
    }
   }else if(field.cardinality==='target'){
    const first=list.map(t=>FJTaxonomy.sanitizeTargetLevel(t?.[field.key])).find(Boolean);
@@ -2658,13 +2659,19 @@ function postExitFields(t,src=settings){
 }
 // Zapíše dopočty na obchod a nevyplněná pole z obchodu odstraní, aby po
 // editaci (třeba smazání ceny SL) nezůstala viset stará hodnota.
-function applyPostExitFields(t,src=settings){
+//
+// `deriveCourse:false` vynechá odvození MFE/MAE z výstupu. Používá ho import:
+// výsledek importovaného obchodu je jen znaménko P/L a cenu SL ani cílové
+// hladiny obchod nemá, takže by každá ruční ztrátová uzávěrka dostala „MAE"
+// rovné ztrátě na výstupu a každá zisková „MFE" rovné zisku – potichu, bez
+// toho, aby to kdo viděl. Ve formuláři se odvození ukáže jako read-only dopočet.
+function applyPostExitFields(t,src=settings,{deriveCourse=true}={}){
  // MFE/MAE odvozené z výstupu (viz FJPoints.deriveCourseTicks). Ruční hodnota
  // (bez příznaku Derived) má VŽDY přednost a nepřepíše se; odvozená se při
  // přepočtu obnoví, nebo zmizí, když už výstup cíli / SL neodpovídá. Obchod
  // s víc nohami se nechává být – jeho hodnoty vznikly sloučením.
  const legs=FJPoints.legsOf(t);
- if(!(legs&&legs.length>1)&&(!t.fillStatus||t.fillStatus==='FILLED')){
+ if(deriveCourse&&!(legs&&legs.length>1)&&(!t.fillStatus||t.fillStatus==='FILLED')){
   const d=FJPoints.deriveCourseTicks(t,getTickSizeForInstrument(t?.instrument,src));
   for(const key of ['mfeTicks','maeTicks']){
    const has=t[key]!=null&&t[key]!=='';
@@ -3109,6 +3116,11 @@ function openModal(t=null){
  // Uložená ruční hodnota drží pole v ručním režimu – ani po smazání se pak
  // nepřepne zpátky na dopočet uprostřed psaní. Odvozenou hodnotu ukáže
  // renderPostExitHints jako read-only text.
+ //
+ // U obchodu s víc nohami vznikla odvozená hodnota sloučením nohou
+ // (mergeContextFields) a formulář ji z jedné výstupní ceny přepočítat neumí –
+ // proto se schová do `mergedDerived` a ukazuje se ta uložená.
+ const multiLeg=!!(t&&Array.isArray(t.legs)&&t.legs.length>1);
  for(const key of ['mfeTicks','maeTicks']){
   const el=$(key); if(!el)continue;
   const has=!!(t&&t[key]!=null&&t[key]!=='');
@@ -3116,7 +3128,8 @@ function openModal(t=null){
   const ds=el.dataset||(el.dataset={});
   ds.derived=derived?'1':'';
   ds.manual=has&&!derived?'1':'';
-  ds.source=has&&!derived&&t[key+'Source']==='nt8'?'nt8':'';
+  ds.source=has&&!derived&&t[key+'Source']?String(t[key+'Source']):'';
+  ds.mergedDerived=multiLeg&&derived?String(t[key]):'';
  }
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t&&t['targetLevel'+n]);
@@ -3241,7 +3254,9 @@ function recomputeAllLegRows(){
  document.querySelectorAll('#extraLegsList .leg-row').forEach(recomputeLegRow);
 }
 function wireLegRow(row){
- row.querySelector('.remove-leg').onclick=()=>row.remove();
+ // Počet cílů mění dopočty průběhu (obchod s víc cíli se neodvozuje), takže
+ // přidání i odebrání cíle je musí překreslit – viz postExitDraftFromForm.
+ row.querySelector('.remove-leg').onclick=()=>{row.remove();renderPostExitHints()};
  row.querySelector('.leg-exitPrice').addEventListener('input',()=>recomputeLegRow(row));
  row.querySelector('.leg-points').addEventListener('input',()=>recomputeLegRow(row));
  row.querySelector('.leg-contracts').addEventListener('input',()=>{applyTemplateCommissionToLegRow(row);recomputeLegRow(row)});
@@ -3268,6 +3283,7 @@ function addLegRow(){
  const row=appendBlankLegRow();
  applyTemplateCommissionToLegRow(row);
  recomputeLegRow(row);
+ renderPostExitHints();
 }
 function resetLegRows(){ if($('extraLegsList'))$('extraLegsList').innerHTML=''; legRowSeq=0 }
 function readLegRows(){
@@ -3394,6 +3410,15 @@ function postExitDraftFromForm(){
   targetLevel1:{price:$('targetLevel1Price')?.value},
   targetLevel2:{price:$('targetLevel2Price')?.value}
  };
+ // Další cíle z formuláře jako nohy, stejně jako je sestaví uložení. Bez nich
+ // by dopočty viděly jen první cíl: MFE/MAE by se odvodily z jeho výstupu
+ // (deriveCourseTicks obchod s víc nohami odvozovat odmítá) a cena SL z jeho
+ // výsledku, ne z nohy, která na SL opravdu šla.
+ const legRows=typeof document!=='undefined'&&typeof document.querySelectorAll==='function'?readLegRows():[];
+ if(legRows.length){
+  draft.legs=[{exitPrice:Number(draft.exitPrice)||0,result:draft.result},
+   ...legRows.map(r=>({exitPrice:r.exitPrice,result:classifyResult(r.pnlTyped)}))];
+ }
  const typedSl=$('slPrice')?.value;
  if(typedSl!==undefined&&String(typedSl).trim()!=='')draft.slPrice=Number(typedSl);
  else{const derived=deriveStopLossPrice(draft);if(derived!=null)draft.slPrice=derived}
@@ -3411,10 +3436,17 @@ function renderPostExitHints(){
  // MFE u targetu / MAE u stoplossu je aritmetika, ne měření – ukazuje se jako
  // read-only dopočet, ne jako předvyplněné pole. Ručně zadaná hodnota se
  // nepřepisuje; odvozená se s každou změnou výstupu / SL obnoví.
+ // U obchodu s víc cíli se nic nepřepočítává: ukazuje se hodnota odvozená
+ // při sloučení nohou (viz openModal), pokud nějaká je.
  {
   const draft0=postExitDraftFromForm();
-  const derivedNow=FJPoints.deriveCourseTicks(draft0,getTickSizeForInstrument(draft0.instrument));
-  for(const key of ['mfeTicks','maeTicks'])syncCourseField(key,derivedNow[key]);
+  const multiLeg=(FJPoints.legsOf(draft0)?.length||0)>1;
+  const derivedNow=multiLeg?{}:FJPoints.deriveCourseTicks(draft0,getTickSizeForInstrument(draft0.instrument));
+  for(const key of ['mfeTicks','maeTicks']){
+   if(!multiLeg){syncCourseField(key,derivedNow[key]);continue}
+   const stored=$(key)?.dataset?.mergedDerived;
+   syncCourseField(key,stored!=null&&stored!==''&&Number.isFinite(Number(stored))?Number(stored):null,'ze sloučených cílů');
+  }
  }
  if($('mfeTicksHint'))$('mfeTicksHint').textContent=postExitTicksWarning($('mfeTicks')?.value);
  if($('maeTicksHint'))$('maeTicksHint').textContent=postExitTicksWarning($('maeTicks')?.value);
@@ -3452,7 +3484,14 @@ function renderPostExitHints(){
 //    zůstává ve skrytém inputu, ať ji uložení vezme i s příznakem Derived,
 //  - nic k dopočtu: prázdné editovatelné pole.
 // U targetu tak uživatel vyplňuje jen MAE, u stoplossu jen MFE.
-function syncCourseField(key,derivedValue){
+// `origin` říká, odkud dopočet je (výchozí z výstupní ceny, u obchodu s víc
+// cíli ze sloučených cílů).
+//
+// Hodnota naměřená konektorem (dataset.source) se k návratu na dopočet
+// nenabízí: měření má před aritmetikou přednost a jedním klikem by se
+// vyměnilo za horší číslo. Když ji uživatel přepíše, je z ní ruční hodnota
+// a odkaz se nabídne jako u každé jiné.
+function syncCourseField(key,derivedValue,origin='z výstupní ceny'){
  const el=$(key); if(!el)return;
  const ds=el.dataset||(el.dataset={});
  const view=$(key+'View'),revert=$(key+'Revert');
@@ -3463,11 +3502,12 @@ function syncCourseField(key,derivedValue){
  el.style.display=showDerived?'none':'';
  if(view)view.style.display=showDerived?'':'none';
  if($(key+'ViewValue'))$(key+'ViewValue').textContent=showDerived?String(derivedValue):'';
- if($(key+'SourceNote'))$(key+'SourceNote').textContent=manual&&ds.source==='nt8'?'naměřeno v NinjaTraderu':'';
+ if($(key+'ViewNote'))$(key+'ViewNote').textContent='— dopočítáno '+origin;
+ if($(key+'SourceNote'))$(key+'SourceNote').textContent=manual&&ds.source?(ds.source==='nt8'?'naměřeno v NinjaTraderu':`naměřeno konektorem (${ds.source})`):'';
  if(revert){
-  const offer=manual&&derivedValue!=null&&String(el.value??'').trim()!==String(derivedValue);
+  const offer=manual&&!ds.source&&derivedValue!=null&&String(el.value??'').trim()!==String(derivedValue);
   revert.style.display=offer?'':'none';
-  revert.textContent=offer?`použít dopočet z výstupní ceny (${derivedValue} t)`:'';
+  revert.textContent=offer?`použít dopočet ${origin} (${derivedValue} t)`:'';
  }
 }
 // „upravit ručně": dopočet se přesune do pole jako výchozí hodnota a od té
@@ -3494,6 +3534,9 @@ function useDerivedCourse(key){
 ['postExitFavorableTicks','postExitAdverseTicks','mfeTicks','maeTicks'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
 ['fillStatus','postExitAdverseFirst','side'].forEach(id=>$(id)?.addEventListener('change',renderPostExitHints));
 ['entryPrice','exitPrice','slPrice','pnl','instrument'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
+// Změna ceny nebo zisku některého z dalších cílů (událost probublá z řádku až
+// sem, po jeho vlastním přepočtu) – výsledek nohy určuje odvozenou cenu SL.
+$('extraLegsList')?.addEventListener('input',renderPostExitHints);
 $('instrument')?.addEventListener('change',renderPostExitHints);
 ['targetLevel1Type','targetLevel1Price','targetLevel2Type','targetLevel2Price'].forEach(id=>{
  $(id)?.addEventListener('input',()=>updateLevelsSummary());
@@ -3710,12 +3753,15 @@ $('tradeForm').addEventListener('submit',async e=>{
    const raw=postExitApplies(obj.fillStatus)?$(key)?.value:'';
    if(raw!==undefined&&String(raw).trim()!==''&&Number.isFinite(Number(raw)))obj[key]=Math.abs(Number(raw));
    else delete obj[key];
-   // Příznak odvození přežije jen u hodnoty, kterou uživatel nepřepsal; u obchodu
-   // s víc nohami se neodvozuje (viz applyPostExitFields).
+   // Příznak odvození přežije jen u hodnoty, kterou uživatel nepřepsal. Platí
+   // i u obchodu s víc nohami: tam je to hodnota odvozená sloučením, kterou
+   // formulář jen ukázal (renderPostExitHints ji nepřepočítává) – bez příznaku
+   // by se z dopočtu uložením potichu stala ruční hodnota.
    if(key!=='observedMinutes'){
-    const derived=obj[key]!=null&&$(key)?.dataset?.derived==='1'&&!(Array.isArray(obj.legs)&&obj.legs.length>1);
+    const derived=obj[key]!=null&&$(key)?.dataset?.derived==='1';
     if(derived)obj[key+'Derived']=true;else delete obj[key+'Derived'];
-    if(obj[key]!=null&&!derived&&$(key)?.dataset?.source==='nt8')obj[key+'Source']='nt8';else delete obj[key+'Source'];
+    const source=$(key)?.dataset?.source;
+    if(obj[key]!=null&&!derived&&source)obj[key+'Source']=source;else delete obj[key+'Source'];
    }
   }
   // Cílové hladiny: typ + cena. Bez ceny se uloží jen typ (R hladiny pak nejde
@@ -3848,7 +3894,10 @@ function labelLegs(legs){
  });
  return legs;
 }
-function combineTradeObjects(list){
+// `src` = nastavení deníku, do kterého se sloučený obchod zapisuje (velikost
+// ticku pro dopočty). Import ho předává, protože zapisuje i do jiného než
+// aktivního deníku a běží i před přihlášením, kdy `settings` ještě nejsou.
+function combineTradeObjects(list,src=settings){
  // list = pole běžných obchodů (mohou už samy mít legs, pokud byly dřív sloučené)
  const legs=mergeSamePriceLegs(labelLegs(list.flatMap(t=>Array.isArray(t.legs)&&t.legs.length?t.legs:[legFromTrade(t)])));
  const sorted=[...list].sort((a,b)=>(String(a.date||'')+String(a.entryTime||'')).localeCompare(String(b.date||'')+String(b.entryTime||'')));
@@ -3912,7 +3961,7 @@ function combineTradeObjects(list){
  // Dopočty k chování ceny po výstupu se po sloučení počítají ZNOVU: vstupní
  // cena, cena poslední nohy i cena SL jsou teď hodnoty sloučeného obchodu,
  // takže stará čísla z jednotlivých nohou by ukazovala jinam.
- return applyPostExitFields(merged);
+ return applyPostExitFields(merged,src);
 }
 let pendingMergeTrades=[];
 function openMergePreview(selected){
@@ -4334,19 +4383,32 @@ function setConfirmLabels(labels){
  $('confirmModalOk').textContent=labels.ok;
  $('confirmModalCancel').textContent=labels.cancel;
 }
+// Okno potvrzení je jedno. Druhé potvrzení, které přijde, když první ještě
+// čeká na odpověď (třeba upozornění na konektor těsně po přihlášení), se
+// zařadí do fronty a otevře se až po zavření prvního. Dřív ho přepsalo:
+// text, tlačítka i resolver, takže první `await showConfirm` už nikdy
+// nedoběhl a odpověď patřila jiné otázce.
+const confirmPending=[];
 function showConfirm(message,opts){
  return new Promise(resolve=>{
-  confirmResolver=resolve;
-  setConfirmLabels({...CONFIRM_DEFAULTS,...(opts||{})});
-  $('confirmModalMessage').textContent=message;
-  $('confirmModal').classList.add('open');
-  setTimeout(()=>$('confirmModalOk').focus(),30);
+  confirmPending.push({message,opts,resolve});
+  if(!confirmResolver)openNextConfirm();
  });
+}
+function openNextConfirm(){
+ const next=confirmPending.shift(); if(!next)return;
+ confirmResolver=next.resolve;
+ setConfirmLabels({...CONFIRM_DEFAULTS,...(next.opts||{})});
+ $('confirmModalMessage').textContent=next.message;
+ $('confirmModal').classList.add('open');
+ setTimeout(()=>$('confirmModalOk').focus(),30);
 }
 function resolveConfirm(value){
  $('confirmModal').classList.remove('open');
  setConfirmLabels(CONFIRM_DEFAULTS);
- if(confirmResolver){confirmResolver(value);confirmResolver=null}
+ const resolve=confirmResolver; confirmResolver=null;
+ if(resolve)resolve(value);
+ openNextConfirm();
 }
 if($('confirmModalCancel'))$('confirmModalCancel').onclick=()=>resolveConfirm(false);
 if($('confirmModalOk'))$('confirmModalOk').onclick=()=>resolveConfirm(true);
@@ -4726,20 +4788,26 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   grossPnl,
   side:e.side||'',
   positionId:e.positionId||'',
-  // MFE/MAE naměřené NinjaTraderem (Execution.MaxPrice/MinPrice vstupů, viz
-  // excursionTicks v main.js). Příznak Source odliší měření od ručního zadání
-  // i od dopočtu z výstupní ceny; bez hodnoty se pole vůbec nezakládá.
+  // MFE/MAE naměřené konektorem (u NinjaTraderu Execution.MaxPrice/MinPrice
+  // vstupů, viz excursionTicks v main.js). Příznak Source odliší měření od
+  // ručního zadání i od dopočtu z výstupní ceny; bez hodnoty se pole vůbec
+  // nezakládá.
   ...courseTicksFromEvent(e)
  };
 }
+// Source = kdo hodnotu naměřil: 'nt8' jen u události z NinjaTraderu, jinak
+// název zdroje události (tradingview, external…). Pole mfeTicks/maeTicks jsou
+// v EVENT_SCHEMA obecná pro trade_closed, takže je může poslat kdokoli – a pod
+// „naměřeno v NinjaTraderu" patří jen to, co opravdu přišlo z NT.
 function courseTicksFromEvent(e){
  const out={};
+ const source=e?.source==='ninjatrader'?'nt8':String(e?.source||'external');
  for(const key of ['mfeTicks','maeTicks']){
   const v=e?.[key];
   if(v===undefined||v===null||v==='')continue;
   const n=Number(v);
   if(!Number.isFinite(n))continue;
-  out[key]=Math.abs(n);out[key+'Source']='nt8';
+  out[key]=Math.abs(n);out[key+'Source']=source;
  }
  return out;
 }
@@ -4760,20 +4828,22 @@ async function appendOrMergeCapturedTrade(journalId,event,images=[]){
  // nový cíl u obchodu, který už jednou vznikl sloučením dvou a více legů.
  if(data.trades.some(t=>tradeHasSourceEventId(t,event.id)))return false;
  const jSettingsEntry=(Array.isArray(data.settings)?data.settings:[]).find(s=>s.key==='main');
+ const jSettings=jSettingsEntry?.value||settings;
  // Obchod se sestavuje až tady, protože teprve tady jsou k dispozici nastavení
  // (šablony instrumentů, komise) toho deníku, do kterého se opravdu zapisuje.
- const trade=mapCapturedTrade(event,images,jSettingsEntry?.value||settings);
+ const trade=mapCapturedTrade(event,images,jSettings);
  // Dopočty (exitTicks, maxFavorableTicks, maxAdverseTicks…) hned při importu –
  // jinak by je obchod s jediným výstupem dostal až po ručním uložení formuláře
  // a MFE/MAE z NinjaTraderu by se do nich nepropsaly. Velikost ticku se bere
- // z šablon cílového deníku, stejně jako komise. Sloučený obchod je dostane
- // v combineTradeObjects.
- applyPostExitFields(trade,jSettingsEntry?.value||settings);
+ // z šablon cílového deníku, stejně jako komise – i u sloučeného obchodu
+ // (combineTradeObjects dostává tatáž nastavení). MFE/MAE se tu z výstupu
+ // NEODVOZUJÍ, viz deriveCourse v applyPostExitFields.
+ applyPostExitFields(trade,jSettings,{deriveCourse:false});
  const autoMerge=jSettingsEntry?.value?.autoMergeLegs!==false;
  if(autoMerge&&trade.positionId){
   const idx=data.trades.findIndex(t=>t.positionId&&t.positionId===trade.positionId);
   if(idx>=0){
-   const combined=combineTradeObjects([data.trades[idx],trade]);
+   const combined=combineTradeObjects([data.trades[idx],trade],jSettings);
    combined.id=data.trades[idx].id;
    data.trades[idx]=combined;
    const w=await window.desktopAPI.writeJournal(journalId,data);
@@ -4838,6 +4908,12 @@ function shouldShowConnectorNotice(status,seenVersion){
  return !!(status&&status.installed&&status.outdated&&String(seenVersion??'')!==String(status.currentVersion));
 }
 let connectorNoticeChecked=false;
+function waitForNoOpenModal(){
+ return new Promise(resolve=>{
+  const check=()=>document.querySelector('.modal.open')?setTimeout(check,1500):resolve();
+  check();
+ });
+}
 async function maybeShowConnectorNotice(){
  if(connectorNoticeChecked)return;
  connectorNoticeChecked=true;
@@ -4846,6 +4922,9 @@ async function maybeShowConnectorNotice(){
   try{seen=localStorage.getItem(CONNECTOR_NOTICE_KEY)}catch(e){}
   const status=await window.desktopAPI?.captureNinjaConnectorStatus?.();
   if(!shouldShowConnectorNotice(status,seen))return;
+  // Nevyskočí přes rozdělanou práci (formulář obchodu, jiné potvrzení) –
+  // počká, až žádné okno otevřené není.
+  await waitForNoOpenModal();
   // Příznak se ukládá PŘED zobrazením – okno se nesmí ukázat podruhé ani po
   // zavření aplikace uprostřed dialogu.
   try{localStorage.setItem(CONNECTOR_NOTICE_KEY,String(status.currentVersion))}catch(e){}
@@ -4866,7 +4945,9 @@ $('capturePrepareWorker').onclick=async()=>{
 };
 $('captureExportConnector').onclick=async()=>{
  const r=await window.desktopAPI.captureExportNinjaConnector();
- if(r?.ok)showToast('Konektor byl uložen. V NinjaTraderu ho importuj přes Tools → Import → NinjaScript Add-On.');
+ // Tools → Import → NinjaScript Add-On bere jen .zip archiv exportovaný z NT,
+ // holý .cs soubor jím nahrát nejde – patří rovnou do složky AddOns.
+ if(r?.ok)showToast('Konektor byl uložen. Zkopíruj ho do složky NinjaTrader 8\\bin\\Custom\\AddOns (v Dokumentech, kde má NinjaTrader svá data), pak v NinjaTraderu otevři NinjaScript Editor a stiskni F5.');
  else if(!r?.canceled)showToast('Konektor se nepodařilo uložit: '+(r?.error||'neznámá chyba'));
 };
 $('captureTestCTrader').onclick=async()=>{

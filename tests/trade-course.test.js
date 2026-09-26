@@ -381,19 +381,32 @@ test('štítek „neúplný kontext": jen v backtestovém deníku, ne u nenapln�
 // měření), ale jako šedý text „dopočítáno z výstupní ceny" s odkazem „upravit
 // ručně". V každém obchodě se tak ručně vyplňuje právě jedno z těch dvou čísel.
 
-function courseForm(values, datasets) {
+// `legs` = další cíle ve formuláři (řádky #extraLegsList) jako [{exitPrice, pnl}].
+function courseForm(values, datasets, legs) {
   const nodes = new Map();
   const node = id => ({
     id, value: values[id] ?? '', textContent: '', innerHTML: '', style: {},
     dataset: { ...(datasets?.[id] || {}) }, focus() {}, select() {}
   });
   const document = { getElementById(id) { if (!nodes.has(id)) nodes.set(id, node(id)); return nodes.get(id); } };
-  const r = loadRenderer([
+  const names = [
     '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
     'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'postExitTicksWarning', 'postExitApplies',
     'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField',
     'editCourseManually', 'useDerivedCourse'
-  ], { document, settings: SETTINGS });
+  ];
+  if (legs) {
+    const field = value => ({ value: String(value ?? '') });
+    document.querySelectorAll = sel => (sel === '#extraLegsList .leg-row' ? legs.map(l => ({
+      querySelector: cls => ({
+        '.leg-label': field(''), '.leg-exitTime': field(''), '.leg-exitPrice': field(l.exitPrice),
+        '.leg-result': field(''), '.leg-points': field(''), '.leg-contracts': field(1),
+        '.leg-commission': field(0), '.leg-pnl': field(l.pnl)
+      })[cls]
+    })) : []);
+    names.push('readLegRows', 'classifyResult');
+  }
+  const r = loadRenderer(names, { document, settings: SETTINGS });
   r.renderPostExitHints();
   return { r, get: id => document.getElementById(id) };
 }
@@ -489,11 +502,30 @@ test('excursionTicks: bez extrémů nebo ticku nic – prázdno, ne nula', () =>
   assert.deepEqual(plain(excursionTicks({ tickSize: 0.25, excursionMaxPrice: 7782.5, excursionMinPrice: 7776 }, '', 7776, 7782)), {}, 'bez směru');
 });
 
-test('import: MFE/MAE z události dostanou příznak nt8, chybějící se nezakládají', () => {
+// Pozice ze snímku bez ceny má avgPrice 0 (normalizeSnapshotPosition) – „MFE"
+// by pak byla celá cena instrumentu v ticích, uložená jako měření z NT.
+test('excursionTicks: nesmyslné vstupy nedají nic, ne obří čísla', () => {
+  const { excursionTicks } = loadMain(['excursionTicks']);
+  const ext = { tickSize: 0.25, excursionMaxPrice: 7782.5, excursionMinPrice: 7776 };
+  assert.deepEqual(plain(excursionTicks(ext, 'long', 0, 7782)), {}, 'vstupní cena 0 = neznámá');
+  assert.deepEqual(plain(excursionTicks({ tickSize: 0.25, excursionMaxPrice: 1e300, excursionMinPrice: 7776 }, 'long', 7776, 7782)), {}, 'sentinel NT');
+  assert.deepEqual(plain(excursionTicks({ tickSize: 1, excursionMaxPrice: 1.7e308, excursionMinPrice: -1.7e308 }, 'long', 7776, 7782)), {}, 'přetečení');
+});
+
+test('import: MFE/MAE z NinjaTraderu dostanou příznak nt8, chybějící se nezakládají', () => {
   const r = loadRenderer(['courseTicksFromEvent'], {});
-  assert.deepEqual(plain(r.courseTicksFromEvent({ mfeTicks: 26, maeTicks: 0 })),
+  assert.deepEqual(plain(r.courseTicksFromEvent({ source: 'ninjatrader', mfeTicks: 26, maeTicks: 0 })),
     { mfeTicks: 26, mfeTicksSource: 'nt8', maeTicks: 0, maeTicksSource: 'nt8' }, 'naměřená nula je platná hodnota');
-  assert.deepEqual(plain(r.courseTicksFromEvent({})), {});
+  assert.deepEqual(plain(r.courseTicksFromEvent({ source: 'ninjatrader' })), {});
+});
+
+// EVENT_SCHEMA popisuje mfeTicks/maeTicks obecně pro trade_closed, takže je
+// může poslat i TradingView relay nebo jiný zdroj. „Naměřeno v NinjaTraderu"
+// smí u hodnoty stát jen tehdy, když opravdu přišla z NT.
+test('import: MFE/MAE z jiného zdroje nejsou „z NinjaTraderu"', () => {
+  const r = loadRenderer(['courseTicksFromEvent'], {});
+  assert.deepEqual(plain(r.courseTicksFromEvent({ source: 'tradingview', mfeTicks: 12 })), { mfeTicks: 12, mfeTicksSource: 'tradingview' });
+  assert.equal(r.courseTicksFromEvent({ mfeTicks: 12 }).mfeTicksSource, 'external', 'bez uvedeného zdroje');
 });
 
 test('sloučení: ruční > NinjaTrader > dopočet, import ruční hodnotu nepřepíše', () => {
@@ -511,6 +543,9 @@ test('sloučení: ruční > NinjaTrader > dopočet, import ruční hodnotu nepř
   assert.equal(b.mfeTicksDerived, undefined);
   const c = merged([nt8, course({ mfeTicks: 35, mfeTicksSource: 'nt8' })]);
   assert.equal(c.mfeTicks, 35, 'uvnitř jedné vrstvy maximum přes nohy');
+  const other = merged([derived, course({ mfeTicks: 28, mfeTicksSource: 'tradingview' })]);
+  assert.equal(other.mfeTicks, 28, 'měření jiným konektorem má taky přednost před aritmetikou');
+  assert.equal(other.mfeTicksSource, 'tradingview', 'a původ se nepřepíše na nt8');
 });
 
 test('applyPostExitFields: hodnotu z NinjaTraderu dopočet nepřepíše', () => {
@@ -527,6 +562,114 @@ test('formulář: hodnota z NinjaTraderu je editovatelné pole s poznámkou o p�
   assert.equal(f.get('mfeTicksSourceNote').textContent, 'naměřeno v NinjaTraderu');
   f.r.useDerivedCourse('mfeTicks');
   assert.equal(f.get('mfeTicks').dataset.source, '', 'návrat k dopočtu původ zahodí');
+});
+
+// Měření má před aritmetikou přednost. NT8 MFE 26 t u targetu s výstupem na
+// 24 t by jinak pod sebou mělo odkaz „použít dopočet (24 t)" – skoro u každého
+// obchodu a s jediným kliknutím k horšímu číslu.
+test('formulář: k hodnotě naměřené konektorem se návrat na dopočet nenabízí', () => {
+  const f = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { manual: '1', source: 'nt8' } });
+  assert.ok(!shown(f.get('mfeTicksRevert')), 'bez odkazu zpět na dopočet');
+  assert.equal(f.get('mfeTicksRevert').textContent, '');
+
+  const tv = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { manual: '1', source: 'tradingview' } });
+  assert.equal(tv.get('mfeTicksSourceNote').textContent, 'naměřeno konektorem (tradingview)');
+
+  // Přepsaná hodnota už měření není – odkaz se nabídne jako u každé ruční.
+  const edited = courseForm({ ...TARGET_FORM, mfeTicks: '30' }, { mfeTicks: { manual: '1' } });
+  assert.match(edited.get('mfeTicksRevert').textContent, /24 t/);
+});
+
+// ------------------------------------------- formulář: obchod s víc cíli
+//
+// Formulář má výstupní cenu a výsledek jen PRVNÍHO cíle. Dřív se z nich MFE/MAE
+// přepočítávaly i u obchodu s víc cíli: uložená odvozená hodnota ze sloučení
+// (třeba 22 t z TP2) se nahradila 10 t z TP1 a uložením se z ní stala RUČNÍ
+// hodnota. S BE jako prvním cílem se smazala úplně.
+
+test('formulář s víc cíli: odvozená hodnota ze sloučení se ukáže, nepřepočítá', () => {
+  const tp2 = [{ exitPrice: '7711.5', pnl: '55' }];
+  const f = courseForm({ ...TARGET_FORM, mfeTicks: '46' }, { mfeTicks: { derived: '1', mergedDerived: '46' } }, tp2);
+  assert.ok(!shown(f.get('mfeTicks')), 'read-only jako každý dopočet');
+  assert.equal(f.get('mfeTicksViewValue').textContent, '46', 'ne 24 z prvního cíle');
+  assert.equal(String(f.get('mfeTicks').value), '46', 'do uložení jde uložená hodnota');
+  assert.equal(f.get('mfeTicks').dataset.derived, '1', 'a s příznakem Derived');
+  assert.match(f.get('mfeTicksViewNote').textContent, /ze sloučených cílů/);
+});
+
+test('formulář s víc cíli: BE jako první cíl hodnotu ze sloučení nesmaže', () => {
+  const be = { ...TARGET_FORM, result: 'breakeven', exitPrice: '7700' };
+  const f = courseForm({ ...be, mfeTicks: '46' }, { mfeTicks: { derived: '1', mergedDerived: '46' } }, [{ exitPrice: '7711.5', pnl: '55' }]);
+  assert.equal(String(f.get('mfeTicks').value), '46');
+  assert.equal(f.get('mfeTicks').dataset.derived, '1');
+});
+
+test('formulář s víc cíli: bez hodnoty ze sloučení se z prvního cíle nic neodvozuje', () => {
+  const f = courseForm(TARGET_FORM, {}, [{ exitPrice: '7711.5', pnl: '55' }]);
+  assert.ok(shown(f.get('mfeTicks')) && shown(f.get('maeTicks')), 'obě pole editovatelná');
+  assert.equal(f.get('mfeTicks').value, '', 'žádných 24 t z prvního cíle');
+  assert.equal(f.get('mfeTicks').dataset.derived, '');
+});
+
+// ------------------------------------------------ import do deníku
+//
+// Import zapisuje do deníku podle mapování účtů, ne nutně do aktivního, a běží
+// i před přihlášením. Obchod se proto počítá s nastavením CÍLOVÉHO deníku –
+// i když se sloučí s předchozí nohou (combineTradeObjects).
+
+function importer(journal, activeSettings) {
+  let stored = journal;
+  const window = {
+    desktopAPI: {
+      readJournal: async () => ({ ok: true, data: JSON.parse(JSON.stringify(stored)) }),
+      writeJournal: async (_id, data) => { stored = data; return { ok: true }; }
+    }
+  };
+  const r = loadRenderer([...NAMES, 'courseTicksFromEvent', 'mapCapturedTrade', 'tradeHasSourceEventId', 'appendOrMergeCapturedTrade'],
+    { settings: activeSettings, Date, window });
+  return { r, trades: () => stored.trades };
+}
+const FDXS_JOURNAL = () => ({
+  trades: [],
+  settings: [{ key: 'main', value: { templates: [{ instrument: 'FDXS', pointValue: 1, tickSize: 1 }], breakEvenEnabled: false, autoMergeLegs: true } }]
+});
+function fdxsExit(id, exitPrice, extra) {
+  const pts = exitPrice - 24000;
+  return {
+    id, type: 'trade_closed', source: 'ninjatrader', account: 'A', instrument: 'FDXS', side: 'long',
+    entryTime: '2026-09-26T08:00:00Z', exitTime: '2026-09-26T08:0' + id.slice(-1) + ':00Z',
+    entryPrice: 24000, exitPrice, quantity: 1, contracts: 1, points: Math.abs(pts),
+    grossPnl: pts, commission: 0, pnl: pts, positionId: 'p1', ...extra
+  };
+}
+
+test('import: sloučený obchod dostane dopočty s tickem cílového deníku', async () => {
+  // Aktivní deník (a před přihlášením i prázdné `settings`) FDXS nezná.
+  const imp = importer(FDXS_JOURNAL(), { templates: [] });
+  await imp.r.appendOrMergeCapturedTrade('j2', fdxsExit('e1', 24010));
+  assert.equal(imp.trades()[0].exitTicks, 10, 'jediný výstup');
+  await imp.r.appendOrMergeCapturedTrade('j2', fdxsExit('e2', 24020));
+  assert.equal(imp.trades().length, 1, 'sloučeno do jednoho obchodu');
+  assert.equal(imp.trades()[0].legs.length, 2);
+  assert.equal(imp.trades()[0].exitTicks, 20, 'sloučení dopočty nesmazalo');
+});
+
+// Výsledek importu je jen znaménko P/L a SL ani cílové hladiny import nezná.
+// Odvození by každé ruční ztrátové uzávěrce dalo „MAE" = ztráta na výstupu.
+test('import: MFE/MAE se z výstupu neodvozují, naměřené z NT zůstanou', async () => {
+  const imp = importer(FDXS_JOURNAL(), { templates: [] });
+  await imp.r.appendOrMergeCapturedTrade('j2', { ...fdxsExit('e1', 23997), positionId: 'loss' });
+  await imp.r.appendOrMergeCapturedTrade('j2', { ...fdxsExit('e2', 24010), positionId: 'win' });
+  for (const t of imp.trades()) {
+    assert.equal(t.mfeTicks, undefined, t.positionId);
+    assert.equal(t.maeTicks, undefined, t.positionId);
+    assert.equal(t.maeTicksDerived, undefined);
+  }
+  await imp.r.appendOrMergeCapturedTrade('j2', { ...fdxsExit('e3', 23997, { mfeTicks: 4, maeTicks: 9 }), positionId: 'measured' });
+  const measured = imp.trades().find(t => t.positionId === 'measured');
+  assert.equal(measured.maeTicks, 9);
+  assert.equal(measured.maeTicksSource, 'nt8');
+  assert.equal(measured.maxAdverseTicks, 9, 'dopočty z naměřených hodnot hned při importu');
 });
 
 // Nalezeno při ověření na Market Replay (2026-09-26): importovaný obchod

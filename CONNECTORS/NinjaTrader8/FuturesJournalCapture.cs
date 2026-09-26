@@ -10,7 +10,7 @@ using NinjaTrader.NinjaScript;
 #endregion
 
 // Futures Journal PRO – NinjaTrader 8 Execution + Position Sync Connector
-// FJ_CONNECTOR_VERSION: 2
+// FJ_CONNECTOR_VERSION: 3
 // (Zvyš při každé změně toho, co konektor posílá – aplikace podle toho pozná
 // zastaralou instalaci v NT a jednou nabídne přeinstalaci.)
 // Exekuce se posílají okamžitě. Úplný stav pozic se posílá při každé změně
@@ -170,6 +170,7 @@ namespace NinjaTrader.NinjaScript.AddOns
                 string orderId = x.Order != null ? x.Order.OrderId : x.OrderId;
                 double pointValue = x.Instrument.MasterInstrument != null ? x.Instrument.MasterInstrument.PointValue : 1.0;
                 double tickSize = x.Instrument.MasterInstrument != null ? x.Instrument.MasterInstrument.TickSize : 0;
+                if (!IsUsablePrice(tickSize)) tickSize = 0;
 
                 // Průběh ceny (MAE/MFE) posílá jen výstup – vstupní exekuce ho
                 // v tu chvíli ještě nezná.
@@ -251,12 +252,12 @@ namespace NinjaTrader.NinjaScript.AddOns
                     Execution e = same[i];
                     if (e.Position == 0) break;
                     if (!e.IsEntry) continue;
-                    if (e.MaxPrice <= -1e300 || e.MinPrice >= 1e300 || e.MaxPrice < e.MinPrice) continue;
+                    if (!IsUsablePrice(e.MaxPrice) || !IsUsablePrice(e.MinPrice) || e.MaxPrice < e.MinPrice) continue;
                     max = Math.Max(max, e.MaxPrice);
                     min = Math.Min(min, e.MinPrice);
                     any = true;
                 }
-                if (!any) return "";
+                if (!any || !IsUsablePrice(max) || !IsUsablePrice(min)) return "";
                 return ",\"excursionMaxPrice\":" + max.ToString(CultureInfo.InvariantCulture) +
                        ",\"excursionMinPrice\":" + min.ToString(CultureInfo.InvariantCulture);
             }
@@ -265,6 +266,15 @@ namespace NinjaTrader.NinjaScript.AddOns
                 NinjaTrader.Code.Output.Process("FuturesJournalCapture excursion error: " + ex.Message, PrintTo.OutputTab1);
                 return "";
             }
+        }
+
+        // Cena, kterou jde poslat v JSONu. NaN nebo nekonečno by se zapsaly jako
+        // holé NaN / Infinity, JSON by byl neplatný, aplikace by celou výstupní
+        // exekuci odmítla a obchod by se do deníku nedostal. Sentinel
+        // ±double.MaxValue (NT pohyb nesledoval) se odmítá taky.
+        private static bool IsUsablePrice(double price)
+        {
+            return !double.IsNaN(price) && !double.IsInfinity(price) && Math.Abs(price) < 1e300;
         }
 
         private static async System.Threading.Tasks.Task PostJson(string json)
