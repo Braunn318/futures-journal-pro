@@ -47,6 +47,15 @@ html[data-theme="light"]{
   --btn-danger-text:#ffffff;
   --login-bg-start:#dfe7f7;--login-bg-end:#c6d2ec;--login-card-bg-rgb:255,255,255;
 }
+/* Barevné schéma pro nativní prvky (ikona a okno kalendáře u polí s datem,
+   posuvníky, rozbalovací seznamy). Bez něj kreslí Chromium ikonu kalendáře
+   tmavě i na tmavém poli, takže nebyla vidět a výběr dne z kalendáře
+   „zmizel". data-theme nastavuje i vlastní motiv podle jasu pozadí. */
+:root{color-scheme:dark}
+html[data-theme="light"]{color-scheme:light}
+/* Ikona kalendáře: zřetelně klikací. Datum jde dál i napsat ručně. */
+input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.85;padding:4px;border-radius:6px}
+input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1;background:rgba(var(--tint-rgb),.08)}
 *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,var(--bg-start),var(--bg-end));color:var(--text)}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}

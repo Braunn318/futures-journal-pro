@@ -2,6 +2,9 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.6.8 - 2026-09-27
+- Fixed: picking a day from the calendar looked like it had disappeared from every date field (Přehled účtu, Podíl instrumentů od/do, Deník, Reporty, trade and setup form). The fields are still native date fields, but the page declared no colour scheme, so Chromium drew the calendar icon dark on the dark input and it was practically invisible. The page now sets color-scheme (dark by default, light for the light theme and for light custom themes): the icon is visible, the calendar opens in the theme's colours, and the icon has a pointer cursor and a hover highlight. Typing the date by hand (tt.mm.jjjj) works as before; the calendar opens from the icon or with Alt+Down.
+
 ## 4.6.7 - 2026-09-26
 - Fixed: opening and saving a trade with several targets could silently change its MFE / MAE. The form only has the exit price and result of the FIRST target, and it recomputed MFE / MAE from them: a value derived from the merged legs (e.g. 22 t from TP2) was replaced by 10 t from TP1 and saved as a MANUAL value, and with BE as the first target it was deleted. The form now passes all targets to the calculations (postExitDraftFromForm builds the legs the same way saving does), does not re-derive a multi-target trade, shows the value derived from the merge as read-only "dopočítáno ze sloučených cílů" and saves it with the Derived flag. Adding or removing a target in the form redraws the calculations.
 - Fixed: a merged imported trade was calculated with the tick size of the ACTIVE journal (or with no settings at all before login) instead of the target journal, so merging a leg wiped exitTicks / maxFavorableTicks / maxAdverseTicks that the single-leg import had just computed. combineTradeObjects now takes the target journal's settings.

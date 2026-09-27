@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.6.7",
-  "description": "Futures Journal PRO 4.6.7 – opravy MFE/MAE u sloučených a importovaných obchodů, bezpečnější NT8 konektor a jeho instalace.",
+  "version": "4.6.8",
+  "description": "Futures Journal PRO 4.6.8 – viditelný výběr dne z kalendáře u polí s datem v tmavém motivu.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",
