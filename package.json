@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.6.8",
-  "description": "Futures Journal PRO 4.6.8 – viditelný výběr dne z kalendáře u polí s datem v tmavém motivu.",
+  "version": "4.6.9",
+  "description": "Futures Journal PRO 4.6.9 – Podíl instrumentů počítá jen skutečné obchody (bez setupů bez exekuce) a ukazuje i BE obchody.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

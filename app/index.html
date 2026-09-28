@@ -1866,7 +1866,8 @@ async function collectInstrumentPortfolioRows(){
   try{
    const r=await window.desktopAPI.readJournal(p.id);
    if(!r?.ok)continue;
-   const ts=Array.isArray(r.data?.trades)?r.data.trades:[];
+   // Jen skutečné obchody – setupy bez exekuce (SETUP_ONLY) do podílu instrumentů nepatří.
+   const ts=tradeRecords(r.data?.trades);
    rows.push(...ts.map(t=>({...t,journalId:p.id,journalName:p.name})));
   }catch{}
  }
@@ -1887,12 +1888,13 @@ function groupInstrumentPortfolio(rows){
  const grouped={};
  rows.forEach(t=>{
   const key=(t.instrument||'Nezadáno').trim()||'Nezadáno';
-  if(!grouped[key])grouped[key]={instrument:key,count:0,weight:0,pnl:0,wins:0,losses:0};
+  if(!grouped[key])grouped[key]={instrument:key,count:0,weight:0,pnl:0,wins:0,losses:0,breakevens:0};
   grouped[key].count++;
   grouped[key].pnl+=signed(t);
   grouped[key].weight+=Math.abs(signed(t));
   if(t.result==='target')grouped[key].wins++;
-  if(t.result==='stoploss')grouped[key].losses++;
+  else if(t.result==='stoploss')grouped[key].losses++;
+  else if(t.result==='breakeven')grouped[key].breakevens++;
  });
  let list=Object.values(grouped);
  let totalWeight=list.reduce((a,x)=>a+x.weight,0);
@@ -1923,7 +1925,7 @@ function drawInstrumentPortfolio(){
   const share=(item.weight/totalWeight)*100;
   return `<div class="instrument-portfolio-row">
     <span class="instrument-dot" style="background:${palette[index%palette.length]}"></span>
-    <div><strong>${esc(item.instrument)}</strong><div class="sub">${item.count} obchodů · ${item.wins} ziskových · ${item.losses} ztrátových</div></div>
+    <div><strong>${esc(item.instrument)}</strong><div class="sub">${item.count} obchodů · ${item.wins} ziskových · ${item.losses} ztrátových${item.breakevens?` · ${item.breakevens} BE`:''}</div></div>
     <span class="share">${share.toFixed(1)} %</span>
     <span class="pnl ${item.pnl>=0?'pos':'neg'}">${dualMoney(item.pnl,true)}</span>
   </div>`;

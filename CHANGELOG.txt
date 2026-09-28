@@ -2,6 +2,9 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.6.9 - 2026-09-28
+- Fixed: Přehled účtu → Podíl instrumentů counted setups without execution (SETUP_ONLY – skipped / not filled) as trades, so the trade count did not match wins + losses and an instrument traded only as a skipped setup showed up with 0 % (e.g. ES "1 obchodů"). The tab now uses only real trades, like the rest of the app, and also shows the number of break-even trades, so the count adds up (e.g. "5 obchodů · 2 ziskových · 1 ztrátových · 2 BE").
+
 ## 4.6.8 - 2026-09-27
 - Fixed: picking a day from the calendar looked like it had disappeared from every date field (Přehled účtu, Podíl instrumentů od/do, Deník, Reporty, trade and setup form). The fields are still native date fields, but the page declared no colour scheme, so Chromium drew the calendar icon dark on the dark input and it was practically invisible. The page now sets color-scheme (dark by default, light for the light theme and for light custom themes): the icon is visible, the calendar opens in the theme's colours, and the icon has a pointer cursor and a hover highlight. Typing the date by hand (tt.mm.jjjj) works as before; the calendar opens from the icon or with Alt+Down.
 
