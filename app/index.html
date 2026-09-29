@@ -232,6 +232,14 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .setup-row .setup-icon{font-size:18px;line-height:1.2}
 .setup-row .setup-body{flex:1;min-width:0}
 .setup-row .setup-actions{display:flex;gap:6px}
+/* Obchod „naživo bych nevzal“: tónovaný jako setup bez vstupu, ale oranžově. */
+.card.trade.skip-live{background:linear-gradient(0deg,rgba(var(--orange-rgb,246,166,35),.07),rgba(var(--orange-rgb,246,166,35),.07)),var(--panel);border:1px dashed rgba(var(--orange-rgb,246,166,35),.55)}
+.pill.skip-live-pill{font-size:10px;padding:1px 6px;background:rgba(var(--orange-rgb,246,166,35),.16);color:var(--orange,#f6a623);border:1px solid rgba(var(--orange-rgb,246,166,35),.4)}
+.skip-live-toggle{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.skip-live-toggle input{width:auto}
+.sr-rows{display:flex;flex-direction:column;gap:6px}
+.sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr auto;gap:6px;align-items:center}
+.sr-row .sr-warn{grid-column:1/-1;font-size:12px}
 .derived-readonly{padding:10px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}
 .derived-readonly b{font-weight:700}
 .derived-edit{font-size:12px;color:var(--blue);margin-left:8px}
@@ -467,6 +475,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Deník / karta</label><select id="accountJournal"><option value="">Všechny deníky</option></select></div>
           <div class="field"><label>Instrument</label><select id="accountInstrument"><option value="">Všechny instrumenty</option></select></div>
           <div class="field"><label>&nbsp;</label><button class="btn primary" id="applyAccountFilters">Zobrazit</button></div>
+          <div class="field"><label>&nbsp;</label><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveOverview"> včetně obchodů, které bych naživo nevzal</label></div>
         </div>
       </div>
 
@@ -489,6 +498,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="topInstruments" class="bar-list"></div>
           <div class="panel-subtitle">Setupy a fill rate</div>
           <div id="setupStatsBox" class="stat-list"></div>
+          <div class="panel-subtitle">Naživo bych nevzal <span class="sub">— evidováno zvlášť</span></div>
+          <div id="skipLiveStatsBox" class="stat-list"></div>
         </div>
         <div class="card">
           <h3>Rozložení zisků a ztrát</h3>
@@ -568,6 +579,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <input id="search" placeholder="Hledat instrument nebo komentář">
         <select id="filterResult"><option value="">Všechny výsledky</option><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
+        <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
+        <label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label>
         <input type="date" id="filterDate">
         <input type="date" id="newDayDate" title="Datum dne k přidání">
         <button class="btn" id="addEmptyDay" title="Přidá denní blok (komentář/náhled/poznámky/screenshoty) i bez obchodu">+ Přidat den</button>
@@ -592,6 +605,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <label>Deník / karta</label>
             <select id="calendarJournal"><option value="">Aktivní deník</option><option value="all">Všechny deníky</option></select>
           </div>
+          <label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveCalendar"> včetně obchodů, které bych naživo nevzal</label>
         </div>
         <div class="sub" id="calendarRiskNote" style="margin:-4px 0 10px"></div>
         <div class="calendar" id="calendarGrid"></div>
@@ -615,6 +629,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn primary" id="generateReport">Vytvořit report</button>
           <button class="btn" id="reportCsv">Export CSV</button>
           <button class="btn" id="reportPrint">Tisk / PDF</button>
+          <label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveReports"> včetně obchodů, které bych naživo nevzal</label>
         </div>
       </div>
       <div class="grid stats" style="margin-top:16px">
@@ -1110,8 +1125,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <details class="field full chip-collapse" id="levelsBlock">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Hladiny <span class="sub" id="levelsSummary"></span></summary>
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
-          <div class="field full"><label>SR proti targetu <span class="sub">— hladiny, které stojí v cestě k cíli; lze vybrat víc</span></label><div id="srTarget" class="chip-grid"></div></div>
-          <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem; lze vybrat víc</span></label><div id="srStopLoss" class="chip-grid"></div></div>
+          <div class="field full"><label>SR proti targetu <span class="sub">— hladiny v cestě k cíli (ve směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srTarget" class="sr-rows"></div><button type="button" class="btn" style="margin-top:6px" onclick="appendLevelRow('srTarget')">＋ Přidat hladinu</button></div>
+          <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem (proti směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><button type="button" class="btn" style="margin-top:6px" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
           <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
           <div class="field"><label>Cena cílové hladiny 1</label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"></div>
@@ -1127,6 +1142,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         </div>
         <div class="field"><label>Strategie</label><input id="strategy" placeholder="Volitelné"></div>
         <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+        <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
+        <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
         
         <div class="field full"><label>Setup / scénář <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanSetup" placeholder="Volitelné"></textarea></div>
         <div class="field full"><label>Psychologický checklist <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanPsychology" placeholder="Volitelné"></textarea></div>
@@ -1403,6 +1420,67 @@ function dualMoneyText(n,withSign=false){const v=Number(n)||0,sign=withSign&&v>0
 let setupRecords=[];
 function isSetupRecord(t){return t?.recordType==='SETUP_ONLY'}
 function tradeRecords(rows){return Array.isArray(rows)?rows.filter(t=>!isSetupRecord(t)):[]}
+// Obchod „naživo bych nevzal“ (wouldSkipLive): v backtestu vzatý jen kvůli
+// měření. Ve VÝCHOZÍM STAVU nesmí do equity, P/L, win rate, expectancy ani
+// žádné jiné statistiky výkonu – to hlídá performanceRecords(), kterou volá
+// každá výkonová agregace sama. Do fill rate ale patří (computeSetupStats
+// dostává tradeRecords): naplnění limitky je mechanika vstupu, ne rozhodnutí.
+// Přepínač „včetně obchodů, které bych naživo nevzal“ je jeden pro celou
+// aplikaci a pamatuje se (localStorage).
+const INCLUDE_SKIP_LIVE_KEY='FJ_includeSkipLive';
+function isSkipLive(t){return t?.wouldSkipLive===true}
+function readIncludeSkipLive(){try{return localStorage.getItem(INCLUDE_SKIP_LIVE_KEY)==='1'}catch{return false}}
+let includeSkipLive=readIncludeSkipLive();
+function performanceRecords(rows,include=includeSkipLive){return tradeRecords(rows).filter(t=>include||!isSkipLive(t))}
+// Skupina „naživo bych nevzal“ evidovaná zvlášť – aby šlo poznat, jestli
+// vynechávání takových setupů výkon strategie nesnižuje. Počítá se vždy,
+// nezávisle na přepínači.
+function computeSkipLiveStats(rows){
+ const all=tradeRecords(rows);
+ const group=all.filter(isSkipLive);
+ const stats=computeOverallStats(group,true);
+ const byReason={};
+ for(const t of group){
+  const key=t.wouldSkipReason||'';
+  const r=byReason[key]||(byReason[key]={key,count:0,wins:0,losses:0,pnl:0});
+  r.count++;r.pnl+=signed(t);
+  if(t.result==='target')r.wins++;else if(t.result==='stoploss')r.losses++;
+ }
+ return {
+  count:group.length,pnl:stats.gainSum+stats.lossSum,winRate:stats.winRate,expectancy:stats.expectancy,
+  expectancyWithout:computeOverallStats(all,false).expectancy,
+  expectancyWith:computeOverallStats(all,true).expectancy,
+  byReason:Object.values(byReason).sort((a,b)=>b.count-a.count)
+ };
+}
+function renderSkipLiveStats(stats){
+ const el=$('skipLiveStatsBox'); if(!el)return;
+ if(!stats.count){el.innerHTML='<div class="sub">Žádný obchod označený „naživo bych nevzal“.</div>';return}
+ const row=(label,val,cls='')=>`<div class="stat-row"><span>${label}</span><b class="${cls}">${val}</b></div>`;
+ const lines=[
+  row('Obchodů',stats.count),
+  row('P/L',(stats.pnl>=0?'+':'')+money(stats.pnl),stats.pnl>=0?'pos':'neg'),
+  row('Win rate',(stats.winRate*100).toFixed(1)+' %'),
+  row('Expectancy',money(stats.expectancy),stats.expectancy>=0?'pos':'neg'),
+  row('Expectancy bez nich / s nimi',`${money(stats.expectancyWithout)} / ${money(stats.expectancyWith)}`)
+ ];
+ const reasons=stats.byReason.map(r=>row(esc(r.key?FJTaxonomy.labelOf('SKIP_REASON',r.key):'Bez důvodu'),`${r.count}× · ${r.wins}/${r.losses} · ${(r.pnl>=0?'+':'')+money(r.pnl)}`,r.pnl>=0?'pos':'neg'));
+ el.innerHTML=lines.join('')+(reasons.length?'<div class="sub" style="margin-top:6px">Podle důvodu (počet · zisk/ztráta · P/L)</div>'+reasons.join(''):'');
+}
+// Jediné místo, které přepínač mění: srovná všechny jeho checkboxy a
+// překreslí to, co z výkonových čísel stojí.
+function setIncludeSkipLive(value){
+ includeSkipLive=value===true;
+ try{localStorage.setItem(INCLUDE_SKIP_LIVE_KEY,includeSkipLive?'1':'0')}catch{}
+ document.querySelectorAll('.include-skip-live').forEach(cb=>{cb.checked=includeSkipLive});
+}
+async function onIncludeSkipLiveChange(value){
+ setIncludeSkipLive(value);
+ renderAll();
+ if(typeof applyAccountOverview==='function'&&overviewAllTrades.length)applyAccountOverview();
+ if(typeof drawInstrumentPortfolio==='function')drawInstrumentPortfolio();
+ if(typeof reportRows!=='undefined'&&reportRows)generateReportView();
+}
 function setRecords(all){
  const rows=Array.isArray(all)?all:[];
  trades=tradeRecords(rows);
@@ -1542,6 +1620,43 @@ async function runTickFieldsMigration(){
    }
   }
   journal.tickFieldsVersion=TICK_FIELDS_VERSION;
+ });
+ return {changed:patches.size};
+}
+// Převod SR hladin (4.7.0): srTarget / srStopLoss byly pole klíčů, teď jsou to
+// řádky { level, price, ticksFromEntry }. Starý klíč se stane řádkem bez ceny
+// a vzdálenosti – nic se nedopočítává. Idempotentní: když není co převádět,
+// nic se nezapisuje; jinak záloha PŘED zápisem. Čtení jde stejně vždy přes
+// sanitizeLevelRows, takže deník, který se ještě nepřevedl, funguje taky.
+//
+// Migrace mění JEN TVAR, nic nevaliduje ani nezahazuje: běží před load(),
+// tedy dřív, než se použijí uživatelské číselníky, a vlastní klíč (CUSTOM_…)
+// by validace proti výchozímu číselníku tiše smazala.
+function srLevelsMigrationPatch(t){
+ if(!t||t.recordType==='SETUP_ONLY')return null;
+ const patch={};
+ for(const key of ['srTarget','srStopLoss']){
+  if(!FJTaxonomy.hasLegacyLevelRows(t[key]))continue;
+  const seen=new Set();
+  patch[key]=t[key].map(item=>typeof item==='string'?{level:item,price:null,ticksFromEntry:null}:item)
+   .filter(r=>{if(!r||typeof r!=='object')return false;if(r.price!=null||r.ticksFromEntry!=null)return true;if(seen.has(r.level))return false;seen.add(r.level);return true});
+ }
+ return Object.keys(patch).length?patch:null;
+}
+async function runSrLevelsMigration(){
+ const data=await ensureActiveJournalData();
+ const patches=new Map();
+ for(const t of (Array.isArray(data.trades)?data.trades:[])){const p=srLevelsMigrationPatch(t);if(p)patches.set(t.id,p)}
+ if(!patches.size)return {changed:0};
+ const backup=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-prevodem-sr-hladin');
+ if(!backup||backup.ok!==true)throw new Error(backup?.error||'Zálohu deníku před migrací nelze vytvořit.');
+ await commitJournal(journal=>{
+  for(const t of (Array.isArray(journal.trades)?journal.trades:[])){
+   // Patch se počítá znovu nad tím, co je v deníku teď – mezi čtením a
+   // zápisem mohl přijít import.
+   const p=srLevelsMigrationPatch(t);
+   if(p)Object.assign(t,p);
+  }
  });
  return {changed:patches.size};
 }
@@ -1877,14 +1992,17 @@ function instrumentPortfolioFilteredRows(){
  const journal=$('instrumentPortfolioJournal')?.value||'';
  const from=$('instrumentPortfolioFrom')?.value||'';
  const to=$('instrumentPortfolioTo')?.value||'';
- return instrumentPortfolioRows.filter(t=>{
+ // Obchody „naživo bych nevzal“ se sbírají všechny a vylučují až tady, aby
+ // přepínač fungoval bez nového načítání deníků.
+ return performanceRecords(instrumentPortfolioRows).filter(t=>{
   if(journal&&t.journalId!==journal)return false;
   if(from&&t.date&&t.date<from)return false;
   if(to&&t.date&&t.date>to)return false;
   return true;
  });
 }
-function groupInstrumentPortfolio(rows){
+function groupInstrumentPortfolio(rows,include=includeSkipLive){
+ rows=performanceRecords(rows,include);
  const grouped={};
  rows.forEach(t=>{
   const key=(t.instrument||'Nezadáno').trim()||'Nezadáno';
@@ -1940,8 +2058,8 @@ async function initInstrumentPortfolioSection(){
  select.value=current;
  drawInstrumentPortfolio();
 }
-function computeDrawdownByDate(rows=trades){
- rows=tradeRecords(rows);
+function computeDrawdownByDate(rows=trades,include=includeSkipLive){
+ rows=performanceRecords(rows,include);
  const daily={};rows.forEach(t=>{if(t.date)daily[t.date]=(daily[t.date]||0)+signed(t)});
  const dates=Object.keys(daily).sort();
  let equity=Number(settings.startingBalance)||0, peak=equity;
@@ -1953,8 +2071,8 @@ function computeDrawdownByDate(rows=trades){
  });
  return map;
 }
-function evaluateDayRisk(date, drawdownByDate, rows=trades){
- rows=tradeRecords(rows);
+function evaluateDayRisk(date, drawdownByDate, rows=trades, include=includeSkipLive){
+ rows=performanceRecords(rows,include);
  const r=settings.risk||{};
  const dayTrades=rows.filter(t=>t.date===date);
  const violations=[],achievements=[];
@@ -1971,8 +2089,8 @@ function evaluateDayRisk(date, drawdownByDate, rows=trades){
  if(r.profitTargetPerDay && dailyPnl>=r.profitTargetPerDay) achievements.push(`Splněn profit target ${dualMoneyText(r.profitTargetPerDay)}`);
  return {violations,achievements};
 }
-function computeOverallStats(rows){
- rows=tradeRecords(rows);
+function computeOverallStats(rows,include=includeSkipLive){
+ rows=performanceRecords(rows,include);
  const wins=rows.filter(t=>t.result==='target'), losses=rows.filter(t=>t.result==='stoploss'), breakevens=rows.filter(t=>t.result==='breakeven');
  const gainSum=wins.reduce((a,t)=>a+signed(t),0), lossSum=losses.reduce((a,t)=>a+signed(t),0);
  const winrateDenom=wins.length+losses.length;
@@ -2063,8 +2181,11 @@ function renderGauges(stats){
  if($('gaugeProfitRateLabel'))$('gaugeProfitRateLabel').textContent=(profitRate*100).toFixed(1)+'%';
 }
 function renderDashboard(rows=trades,setups=setupRecords){
- const safeRows=tradeRecords(rows);
- renderSetupStats(computeSetupStats([...safeRows,...(Array.isArray(setups)?setups.filter(isSetupRecord):[])]));
+ // Fill rate bere i obchody „naživo bych nevzal“ (mechanika vstupu), výkon ne.
+ const allTrades=tradeRecords(rows);
+ const safeRows=performanceRecords(rows);
+ renderSkipLiveStats(computeSkipLiveStats(allTrades));
+ renderSetupStats(computeSetupStats([...allTrades,...(Array.isArray(setups)?setups.filter(isSetupRecord):[])]));
  const stats=computeOverallStats(safeRows);
  const total=stats.gainSum+stats.lossSum, balance=Number(settings.startingBalance)+total;
  renderKpiStrip(total,balance,stats);
@@ -2496,6 +2617,91 @@ function readChipGrid(id,enumName){
  const el=$(id); if(!el)return [];
  return FJTaxonomy.sanitizeMulti(enumName,[...el.querySelectorAll('.chip.on')].map(c=>c.dataset.key));
 }
+// ---- SR hladiny: řádky { level, price, ticksFromEntry } ----
+// Zadání ceny dopočítá vzdálenost od vstupu a naopak. Vzdálenost je vždy
+// kladná, stranu nese pole (srTarget ve směru obchodu, srStopLoss proti) a
+// směr obchodu. Když chybí velikost ticku nebo cena vstupu (u ceny z ticků
+// i směr), přepočet je VYPNUTÝ a obě pole se ukládají, jak je uživatel zadal –
+// nic se nedosazuje odhadem.
+//
+// Řádek si v dataset.anchor pamatuje, co uživatel zadal naposled; změna
+// vstupu, směru nebo instrumentu přepočítá tu druhou hodnotu. Otevření
+// obchodu nepřepočítává nic (stejně jako u P/L).
+const SR_ENUMS={srTarget:'SR_TARGET',srStopLoss:'SR_SL'};
+function srFormContext(){
+ return {entry:$('entryPrice')?.value,side:$('side')?.value||'',tick:getTickSizeForInstrument($('instrument')?.value)};
+}
+function formatLevelRow(enumName,r){
+ return FJTaxonomy.labelOf(enumName,r.level)+(r.price!=null?' @ '+r.price:'')+(r.ticksFromEntry!=null?' · '+r.ticksFromEntry+' t':'');
+}
+function recomputeLevelRow(field,el){
+ const {entry,side,tick}=srFormContext();
+ const price=el.querySelector('.sr-price'),ticks=el.querySelector('.sr-ticks'),warn=el.querySelector('.sr-warn');
+ const blank=v=>String(v??'').trim()==='';
+ if(FJPoints.srLinkEnabled(entry,tick)){
+  if(el.dataset.anchor==='price'){
+   const v=FJPoints.srTicksFromPrice(price.value,entry,tick);
+   ticks.value=blank(price.value)||v==null?'':v;
+  }else if(el.dataset.anchor==='ticks'&&FJPoints.directionOf(side)!=null){
+   const v=FJPoints.srPriceFromTicks(field,side,ticks.value,entry,tick);
+   price.value=blank(ticks.value)||v==null?'':v;
+  }
+ }
+ if(warn){
+  const msgs=[];
+  if(FJPoints.srWrongSide(field,side,price.value,entry))msgs.push(field==='srTarget'?'Cena leží proti směru obchodu – SR proti targetu bývá ve směru.':'Cena leží ve směru obchodu – SR proti S/L bývá mezi vstupem a Stop Lossem.');
+  if(!blank(ticks.value)&&Number(ticks.value)<0)msgs.push('Vzdálenost zadávej kladně, stranu určuje pole.');
+  warn.textContent=msgs.join(' ');
+ }
+}
+function recomputeAllLevelRows(){
+ for(const field of Object.keys(SR_ENUMS))document.querySelectorAll('#'+field+' .sr-row').forEach(el=>recomputeLevelRow(field,el));
+ renderSrLinkNote();
+ updateLevelsSummary();
+}
+function renderSrLinkNote(){
+ const note=$('srLinkNote'); if(!note)return;
+ const {entry,side,tick}=srFormContext();
+ if(!(Number(tick)>0))note.textContent='Přepočet cena ↔ ticky je vypnutý: instrument nemá velikost ticku (doplň ji v šabloně instrumentu). Cena i ticky se uloží, jak je zadáš.';
+ else if(String(entry??'').trim()===''||!Number.isFinite(Number(entry)))note.textContent='Přepočet cena ↔ ticky je vypnutý: chybí cena vstupu. Cena i ticky se uloží, jak je zadáš.';
+ else if(FJPoints.directionOf(side)==null)note.textContent='Bez směru obchodu se z ticků cena nedopočítá (nejde určit stranu). Z ceny se ticky dopočítají.';
+ else note.textContent='';
+}
+window.appendLevelRow=(field,row={})=>{
+ const host=$(field),enumName=SR_ENUMS[field]; if(!host||!enumName)return null;
+ const el=document.createElement('div');
+ el.className='sr-row';
+ const options=FJTaxonomy.visibleOptions(enumName,row.level?[row.level]:[]);
+ el.innerHTML=`<select class="sr-level" aria-label="Typ hladiny"><option value="">— hladina —</option>${options.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('')}</select>`
+  +'<input class="sr-price" type="number" step="any" placeholder="cena" aria-label="Cena hladiny">'
+  +'<input class="sr-ticks" type="number" step="any" min="0" placeholder="ticky od vstupu" aria-label="Vzdálenost od vstupu v ticích">'
+  +'<button type="button" class="icon sr-remove" title="Odebrat hladinu">✕</button><div class="sub post-exit-warn sr-warn"></div>';
+ el.querySelector('.sr-level').value=row.level||'';
+ el.querySelector('.sr-price').value=row.price!=null?row.price:'';
+ el.querySelector('.sr-ticks').value=row.ticksFromEntry!=null?row.ticksFromEntry:'';
+ el.dataset.anchor=row.price!=null?'price':(row.ticksFromEntry!=null?'ticks':'');
+ el.querySelector('.sr-level').addEventListener('change',()=>updateLevelsSummary());
+ el.querySelector('.sr-price').addEventListener('input',()=>{el.dataset.anchor='price';recomputeLevelRow(field,el);updateLevelsSummary()});
+ el.querySelector('.sr-ticks').addEventListener('input',()=>{el.dataset.anchor='ticks';recomputeLevelRow(field,el);updateLevelsSummary()});
+ el.querySelector('.sr-remove').addEventListener('click',()=>{el.remove();updateLevelsSummary()});
+ host.appendChild(el);
+ return el;
+};
+function renderLevelRows(field,rows){
+ const host=$(field); if(!host)return;
+ host.innerHTML='';
+ for(const r of FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],rows))appendLevelRow(field,r);
+ renderSrLinkNote();
+}
+function readLevelRows(field){
+ const host=$(field); if(!host)return [];
+ const rows=[...host.querySelectorAll('.sr-row')].map(el=>({
+  level:el.querySelector('.sr-level')?.value||'',
+  price:el.querySelector('.sr-price')?.value,
+  ticksFromEntry:el.querySelector('.sr-ticks')?.value
+ }));
+ return FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],rows);
+}
 // Počet hladin v konfluenci se NEEDITUJE ručně – dopočítává se z vybraných
 // hladin, aby nemohl uletět od skutečnosti.
 function updateConfluenceHint(){
@@ -2511,6 +2717,12 @@ function updateLevelsSummary(){
  const out=$('levelsSummary'); if(!out)return;
  const parts=[];
  for(const [id,enumName,label] of LEVEL_FIELDS){
+  // SR pole jsou řádky s cenou / vzdáleností, ostatní dlaždice.
+  if(SR_ENUMS[id]){
+   const rows=readLevelRows(id);
+   if(rows.length)parts.push(label+': '+rows.map(r=>formatLevelRow(enumName,r)).join(', '));
+   continue;
+  }
   const keys=readChipGrid(id,enumName);
   if(keys.length)parts.push(label+': '+keys.map(k=>FJTaxonomy.labelOf(enumName,k)).join(' + '));
  }
@@ -2533,7 +2745,12 @@ function mergeContextFields(list){
  const lastExitKeys=FJTaxonomy.TRADE_CONTEXT_FIELDS.filter(f=>f.merge==='lastExit').map(f=>f.key);
  const lastExitSource=byExitDesc.find(t=>lastExitKeys.some(k=>hasValue(t,k)))||null;
  for(const field of FJTaxonomy.TRADE_CONTEXT_FIELDS){
-  if(field.cardinality==='multi'){
+  if(field.cardinality==='levelRows'){
+   // SR hladiny: sjednocení ŘÁDKŮ všech nohou. Identické řádky se sloučí,
+   // hodnoty se nepřepočítávají (sanitizeLevelRows).
+   const rows=FJTaxonomy.sanitizeLevelRows(field.enumName,list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]));
+   if(rows.length)out[field.key]=rows;
+  }else if(field.cardinality==='multi'){
    const union=list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]);
    const clean=FJTaxonomy.sanitizeMulti(field.enumName,union);
    if(clean.length)out[field.key]=clean;
@@ -2596,10 +2813,10 @@ function levelPillsHTML(t){
  const parts=[];
  const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
  if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + '))}</span>`);
- const srT=FJTaxonomy.sanitizeMulti('SR_TARGET',t.srTarget);
- if(srT.length)parts.push(`<span class="pill context-pill" title="SR proti targetu">SR→TG: ${esc(srT.map(k=>FJTaxonomy.labelOf('SR_TARGET',k)).join(', '))}</span>`);
- const srS=FJTaxonomy.sanitizeMulti('SR_SL',t.srStopLoss);
- if(srS.length)parts.push(`<span class="pill context-pill" title="SR proti S/L">SR→SL: ${esc(srS.map(k=>FJTaxonomy.labelOf('SR_SL',k)).join(', '))}</span>`);
+ const srT=FJTaxonomy.sanitizeLevelRows('SR_TARGET',t.srTarget);
+ if(srT.length)parts.push(`<span class="pill context-pill" title="SR proti targetu (cena · vzdálenost od vstupu v ticích)">SR→TG: ${esc(srT.map(r=>formatLevelRow('SR_TARGET',r)).join(', '))}</span>`);
+ const srS=FJTaxonomy.sanitizeLevelRows('SR_SL',t.srStopLoss);
+ if(srS.length)parts.push(`<span class="pill context-pill" title="SR proti S/L (cena · vzdálenost od vstupu v ticích)">SR→SL: ${esc(srS.map(r=>formatLevelRow('SR_SL',r)).join(', '))}</span>`);
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
   if(!target)continue;
@@ -2751,7 +2968,11 @@ function tradeHTML(t){
  const ctxPills=contextPillsHTML(t);
  const levelsBlock=tradeLevelsBlockHTML(t);
  const importedBadge=isImported?`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Automaticky naimportováno z konektoru">⚡ Auto import</span>`:'';
- return `<div class="card trade">
+ // „Naživo bych nevzal“: štítek nese popisek DŮVODU, ne obecné „nevzal bych“ –
+ // karta je navíc tónovaná, ať se obchod v seznamu nesplete se živým.
+ const skipLive=t.wouldSkipLive===true;
+ const skipBadge=skipLive?`<span class="pill skip-live-pill" title="Naživo bych nevzal – vzato jen kvůli měření. Ve výchozím stavu mimo P/L a statistiky výkonu.">${esc(t.wouldSkipReason?FJTaxonomy.labelOf('SKIP_REASON',t.wouldSkipReason):'naživo bych nevzal')}</span>`:'';
+ return `<div class="card trade${skipLive?' skip-live':''}">
  <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
  <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů${totalPointsDisplay} · ${dualMoney(pnlVal,true)}</div>
@@ -2761,7 +2982,7 @@ function tradeHTML(t){
  </div>
  ${(ctxPills||levelsBlock)?`<div>${ctxPills?`<div class="trade-legs" style="margin-top:6px">${ctxPills}</div>`:''}${levelsBlock}</div>`:''}
  <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Strategie: ${esc(t.strategy||'—')}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
- <div>${t.comment?`<div class="comment">${esc(t.comment)}</div>`:''}${importedBadge?`<div class="sub" style="margin-top:2px">${importedBadge}</div>`:''}
+ <div>${t.comment?`<div class="comment">${esc(t.comment)}</div>`:''}${(importedBadge||skipBadge)?`<div class="sub" style="margin-top:2px">${[skipBadge,importedBadge].filter(Boolean).join(' ')}</div>`:''}
  ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
  ${t.dailyPlan.instrument?`<div><b>Instrument:</b> ${esc(t.dailyPlan.instrument)}</div>`:''}
  ${t.dailyPlan.maxTrades?`<div><b>Max. obchodů:</b> ${esc(t.dailyPlan.maxTrades)}</div>`:''}
@@ -2785,7 +3006,8 @@ window.rememberTradeLevels=(id,open)=>{if(open)openTradeLevels.add(id);else open
 const extraEmptyDays=new Set();
 const DOW_LABELS=['Ne','Po','Út','St','Čt','Pá','So'];
 function czPluralObchod(n){if(n===1)return 'obchod';if(n>=2&&n<=4)return 'obchody';return 'obchodů'}
-function dayKpis(dayTrades){
+function dayKpis(dayTrades,include=includeSkipLive){
+ dayTrades=performanceRecords(dayTrades,include);
  const pnl=dayTrades.reduce((a,t)=>a+signed(t),0);
  const wins=dayTrades.filter(t=>t.result==='target').length, losses=dayTrades.filter(t=>t.result==='stoploss').length;
  const denom=wins+losses;
@@ -2826,6 +3048,7 @@ function setupRowHTML(s){
 function dayGroupHTML(date,dayTrades,daySetups=[]){
  const note=getDayNote(date);
  const kpi=dayKpis(dayTrades);
+ const skipCount=dayTrades.filter(isSkipLive).length;
  const open=openDayNotes.has(date);
  const d=new Date(date+'T00:00:00');
  const weekday=isNaN(d)?'':DOW_LABELS[d.getDay()];
@@ -2840,7 +3063,7 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
+ <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
  <div class="spacer"></div>
  ${levelsBtn}
  <span class="stat ${kpi.pnl>=0?'pos':'neg'}">${kpi.pnl>=0?'+':''}${money(kpi.pnl)}</span>
@@ -2920,9 +3143,12 @@ async function handleDayShotInputChange(e){
  if(el)el.innerHTML=dayThumbsHTML(date);else renderTrades();
 }
 function renderTrades(){
- const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'';
+ const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'',sk=$('filterSkipLive')?.value||'';
  const sideOk=t=>!s||(s==='none'?(t.side!=='long'&&t.side!=='short'):t.side===s);
- const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
+ // Filtr skupiny „naživo bych nevzal“: jen ona / bez ní. Výchozí „vše“ ukazuje
+ // obchody vždy – P/L dne se z nich počítá podle přepínače (dayKpis).
+ const skipOk=t=>!sk||(sk==='only'?isSkipLive(t):!isSkipLive(t));
+ const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&skipOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
  const groups=[];
  for(const t of list){
   const last=groups[groups.length-1];
@@ -2931,7 +3157,7 @@ function renderTrades(){
  // Setupy bez exekuce se v seznamu ukazují, ale do skupin počítaných čísel
  // (P/L dne, počet obchodů, win rate) nevstupují – jdou zvlášť v `setups`.
  // Filtr výsledku je vylučuje: setup žádný výsledek nemá.
- if(!r){
+ if(!r&&sk!=='only'){
   for(const s of setupRecords){
    if(q&&!(String(s.instrument||'')+' '+String(s.note||'')+' '+String(s.reason||'')).toLowerCase().includes(q))continue;
    if(!sideOk(s)||(d&&s.date!==d))continue;
@@ -2943,7 +3169,7 @@ function renderTrades(){
  }
  // Prázdné dny (jen s poznámkou) se přidávají jen když se nefiltruje – jinak by
  // se objevovaly i u filtru, kterému žádný jejich obchod neodpovídá.
- if(!q&&!r&&!s){
+ if(!q&&!r&&!s&&!sk){
   const tradeDates=new Set(groups.map(g=>g.date));
   const extraDates=new Set([...Object.keys(db?.data?.dayNotes||{}),...extraEmptyDays]);
   extraDates.forEach(date=>{
@@ -2965,9 +3191,9 @@ async function loadCalendarAllTrades(){
 }
 function getCalendarRows(){
  const scope=$('calendarJournal')?.value||'';
- if(!scope)return tradeRecords(trades); // Aktivní deník – přesně dosavadní chování
- if(scope==='all')return tradeRecords(calendarAllTrades);
- return tradeRecords(calendarAllTrades).filter(t=>t.journalId===scope);
+ if(!scope)return performanceRecords(trades); // Aktivní deník – přesně dosavadní chování
+ if(scope==='all')return performanceRecords(calendarAllTrades);
+ return performanceRecords(calendarAllTrades).filter(t=>t.journalId===scope);
 }
 async function initCalendarSection(){
  if($('calendarJournal')&&$('calendarJournal').options.length<=2){
@@ -2988,7 +3214,7 @@ function renderCalendar(){
  const names=['Po','Út','St','Čt','Pá','So','Ne'];let html=names.map(n=>`<div class="dow">${n}</div>`).join('')+'<div class="dow week">Týden</div>';
  const first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate();
  const scope=$('calendarJournal')?.value||'';
- const rows=tradeRecords(getCalendarRows());
+ const rows=performanceRecords(getCalendarRows());
  const showRisk=!scope; // řízení rizika je nastavené vždy jen pro jeden konkrétní deník
  const riskNote=$('calendarRiskNote');
  if(riskNote)riskNote.textContent=showRisk?'':'Řízení rizika (⚠️/🎯) se zobrazuje jen pro aktivní deník – při zobrazení více deníků najednou by hodnoty z různých nastavení nebyly srovnatelné.';
@@ -3026,6 +3252,7 @@ function goToJournalForDate(date){
  if($('filterDate'))$('filterDate').value=date;
  if($('filterResult'))$('filterResult').value='';
  if($('filterSide'))$('filterSide').value='';
+ if($('filterSkipLive'))$('filterSkipLive').value='';
  if($('search'))$('search').value='';
  renderTrades();
 }
@@ -3114,6 +3341,10 @@ function openModal(t=null){
  // statistiky i export.
  fillContextSelect('setupCode','SETUP','— nevyplněno —',t&&t.setupCode);
  fillContextSelect('fillStatus','FILL_STATUS','— nevyplněno —',t&&t.fillStatus);
+ fillContextSelect('wouldSkipReason','SKIP_REASON','— nevyplněno —',t&&t.wouldSkipReason);
+ if($('wouldSkipLive'))$('wouldSkipLive').value=isSkipLive(t)?'ano':'ne';
+ if($('wouldSkipReason'))$('wouldSkipReason').value=FJTaxonomy.sanitizeSingle('SKIP_REASON',t&&t.wouldSkipReason);
+ syncWouldSkipField();
  if($('setupCode'))$('setupCode').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode);
  if($('fillStatus'))$('fillStatus').value=FJTaxonomy.sanitizeSingle('FILL_STATUS',t&&t.fillStatus);
  // Chování ceny po výstupu: ručně zadaná čísla v ticích. Prázdno se nenahrazuje
@@ -3150,8 +3381,8 @@ function openModal(t=null){
  }
  renderSingleChipGrid('trend','TREND',t&&t.trend);
  renderChipGrid('entryLevels','ENTRY_LEVEL',t&&t.entryLevels);
- renderChipGrid('srTarget','SR_TARGET',t&&t.srTarget);
- renderChipGrid('srStopLoss','SR_SL',t&&t.srStopLoss);
+ renderLevelRows('srTarget',t&&t.srTarget);
+ renderLevelRows('srStopLoss',t&&t.srStopLoss);
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
  updateConfluenceHint();
  // Sbalené při každém otevření – rozbalený stav by si <details> pamatoval
@@ -3531,6 +3762,11 @@ function editCourseManually(key){
  renderPostExitHints();
  el.focus?.();el.select?.();
 }
+// Důvod „naživo bych nevzal“ se ukazuje jen tehdy, když příznak platí.
+function syncWouldSkipField(){
+ const f=$('wouldSkipReasonField'); if(!f)return;
+ f.style.display=$('wouldSkipLive')?.value==='ano'?'':'none';
+}
 function useDerivedCourse(key){
  const el=$(key); if(!el)return;
  const ds=el.dataset||(el.dataset={});
@@ -3549,6 +3785,11 @@ function useDerivedCourse(key){
 // sem, po jeho vlastním přepočtu) – výsledek nohy určuje odvozenou cenu SL.
 $('extraLegsList')?.addEventListener('input',renderPostExitHints);
 $('instrument')?.addEventListener('change',renderPostExitHints);
+// SR řádky: změna vstupu, směru nebo instrumentu přepočítá druhou hodnotu
+// u řádků, kde ji uživatel nezadal sám.
+['entryPrice','instrument'].forEach(id=>$(id)?.addEventListener('input',recomputeAllLevelRows));
+['side','instrument'].forEach(id=>$(id)?.addEventListener('change',recomputeAllLevelRows));
+$('wouldSkipLive')?.addEventListener('change',syncWouldSkipField);
 ['targetLevel1Type','targetLevel1Price','targetLevel2Type','targetLevel2Price'].forEach(id=>{
  $(id)?.addEventListener('input',()=>updateLevelsSummary());
  $(id)?.addEventListener('change',()=>updateLevelsSummary());
@@ -3717,10 +3958,17 @@ $('tradeForm').addEventListener('submit',async e=>{
   // nepovinná a nesmí blokovat uložení obchodu.
   obj.setupCode=FJTaxonomy.sanitizeSingle('SETUP',$('setupCode')?.value);
   obj.fillStatus=FJTaxonomy.sanitizeSingle('FILL_STATUS',$('fillStatus')?.value);
+  // „Naživo bych nevzal“ je samostatná otázka, NE planFollowed. Bez příznaku
+  // se důvod nedrží – visel by u obchodu, který se do výkonu počítá.
+  if($('wouldSkipLive')?.value==='ano'){
+   obj.wouldSkipLive=true;
+   const reason=FJTaxonomy.sanitizeSingle('SKIP_REASON',$('wouldSkipReason')?.value);
+   if(reason)obj.wouldSkipReason=reason;else delete obj.wouldSkipReason;
+  }else{delete obj.wouldSkipLive;delete obj.wouldSkipReason}
   obj.trend=readSingleChipGrid('trend','TREND');
   obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
-  obj.srTarget=readChipGrid('srTarget','SR_TARGET');
-  obj.srStopLoss=readChipGrid('srStopLoss','SR_SL');
+  obj.srTarget=readLevelRows('srTarget');
+  obj.srStopLoss=readLevelRows('srStopLoss');
   obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
   obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
 
@@ -3953,6 +4201,8 @@ function combineTradeObjects(list,src=settings){
   commission:Math.round(totalCommission*100)/100,
   strategy:first.strategy||list.find(t=>t.strategy)?.strategy||'',
   planFollowed:list.every(t=>t.planFollowed==='ano')?'ano':'ne',
+  // „Naživo bych nevzal“ patří k rozhodnutí o celé pozici: stačí jedna noha.
+  ...(list.some(t=>t.wouldSkipLive===true)?{wouldSkipLive:true,...(list.find(t=>t.wouldSkipLive===true&&t.wouldSkipReason)?{wouldSkipReason:list.find(t=>t.wouldSkipLive===true&&t.wouldSkipReason).wouldSkipReason}:{})}:{}),
   // Komentář je pole uživatele – appka do něj nic nedopisuje. Sloučení
   // spojí to, co si napsal u jednotlivých cílů, a když nic nenapsal,
   // zůstane prázdné. Dřív se sem doplňovala věta „Sloučeno z N cílů…",
@@ -4113,7 +4363,8 @@ $('closeModal').onclick=async()=>{
 // Záměrně BEZ zavírání kliknutím mimo okno – u rozdělaného formuláře (Nový/
 // Upravit obchod) by omylem kliknutí mimo mohlo smazat rozepsanou práci.
 // Zavírá se jen křížkem (#closeModal) nahoře.
-['search','filterResult','filterSide','filterDate'].forEach(id=>$(id)?.addEventListener('input',renderTrades));
+['search','filterResult','filterSide','filterSkipLive','filterDate'].forEach(id=>$(id)?.addEventListener('input',renderTrades));
+document.querySelectorAll('.include-skip-live').forEach(cb=>{cb.checked=includeSkipLive;cb.addEventListener('change',()=>onIncludeSkipLiveChange(cb.checked))});
 $('addEmptyDay').onclick=()=>{
  const date=$('newDayDate').value||new Date().toISOString().slice(0,10);
  extraEmptyDays.add(date);
@@ -4223,20 +4474,43 @@ function firstTradeIdPerDate(rows){
 // Sloupce CSV exportu deníku. Hlavička a řádek jsou schválně vedle sebe
 // v jedné funkci každá – když se přidá sloupec jen do jedné z nich, posunou
 // se všechna následující data o jednu buňku a v exportu to není vidět.
-function tradeCsvHeader(){
- return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu','SR proti targetu','SR proti S/L','Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+// SR hladiny jsou v CSV jako bloky sloupců „SR→TG n hladina / cena / ticky",
+// jeden blok na řádek hladiny. Počet bloků = nejvíc řádků v exportovaných
+// obchodech (aspoň 1); spočítá ho srCsvCounts a dostane ho hlavička i řádek,
+// aby se nerozešly. Typ se neověřuje proti číselníku aktivní karty – export
+// Reportů bere obchody z víc deníků a každý má vlastní číselník.
+function srCsvCounts(rows){
+ const max=field=>Math.max(1,...(Array.isArray(rows)?rows:[]).map(t=>FJTaxonomy.sanitizeLevelRows(null,t?.[field]).length));
+ return {tg:max('srTarget'),sl:max('srStopLoss')};
 }
-function tradeCsvRow(t,dn){
+function srCsvHeader(counts){
+ const out=[];
+ for(const [k,label] of [['tg','SR→TG'],['sl','SR→SL']])for(let i=1;i<=counts[k];i++)out.push(`${label} ${i} hladina`,`${label} ${i} cena`,`${label} ${i} ticky`);
+ return out;
+}
+function srCsvCells(t,counts){
+ const out=[];
+ for(const [k,field] of [['tg','srTarget'],['sl','srStopLoss']]){
+  const rows=FJTaxonomy.sanitizeLevelRows(null,t?.[field]);
+  for(let i=0;i<counts[k];i++){const r=rows[i];out.push(r?r.level:'',r?.price??'',r?.ticksFromEntry??'')}
+ }
+ return out;
+}
+function tradeCsvHeader(counts={tg:1,sl:1}){
+ return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+}
+function tradeCsvRow(t,dn,counts={tg:1,sl:1}){
  const p=t.dailyPlan||{};
- return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),(t.srTarget||[]).join('|'),(t.srStopLoss||[]).join('|'),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('exportCsv').onclick=async()=>{
- const h=tradeCsvHeader();
+ const counts=srCsvCounts(trades);
+ const h=tradeCsvHeader(counts);
  const firstIdByDate=firstTradeIdPerDate(trades);
  const rows=trades.map(t=>{
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?getDayNote(t.date):null;
-  return tradeCsvRow(t,dn);
+  return tradeCsvRow(t,dn,counts);
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -4592,7 +4866,7 @@ function generateReportView(allRows=null){
  const run=async()=>{
   const all=allRows||await collectReportRows();
   const f=$('reportFrom').value,to=$('reportTo').value,j=$('reportJournal').value,i=$('reportInstrument').value;
-  reportRows=tradeRecords(all).filter(t=>(!f||t.date>=f)&&(!to||t.date<=to)&&(!j||t.journalId===j)&&(!i||t.instrument===i));
+  reportRows=performanceRecords(all).filter(t=>(!f||t.date>=f)&&(!to||t.date<=to)&&(!j||t.journalId===j)&&(!i||t.instrument===i));
   const wins=reportRows.filter(t=>t.result==='target'),losses=reportRows.filter(t=>t.result==='stoploss');
   const pnl=reportRows.reduce((a,t)=>a+reportSigned(t),0),gw=wins.reduce((a,t)=>a+Number(t.pnl||0),0),gl=losses.reduce((a,t)=>a+Number(t.pnl||0),0);
   $('reportCount').textContent=reportRows.length;
@@ -4612,15 +4886,16 @@ $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
 // Sloupce CSV exportu Reportů (přes deníky). Stejný důvod pro dvě funkce
 // jako u exportu deníku: hlavička a řádek se nesmí rozejít.
-function reportCsvHeader(){
- return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu','SR proti targetu','SR proti S/L','Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+function reportCsvHeader(counts={tg:1,sl:1}){
+ return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
-function reportCsvRow(t,dn){
+function reportCsvRow(t,dn,counts={tg:1,sl:1}){
  const p=t.dailyPlan||{};
- return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),(t.srTarget||[]).join('|'),(t.srStopLoss||[]).join('|'),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('reportCsv').onclick=async()=>{
- const h=reportCsvHeader();
+ const counts=srCsvCounts(reportRows);
+ const h=reportCsvHeader(counts);
  const dayNotesByJournal={};
  reportRows.forEach(t=>{if(t.date){const cur=dayNotesByJournal[t.journalId+'|'+t.date];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)dayNotesByJournal[t.journalId+'|'+t.date]=t}});
  const allDayNotes=await collectReportDayNotes();
@@ -4630,7 +4905,7 @@ $('reportCsv').onclick=async()=>{
   // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
   // u pole "pnl" přednostně vrací pnlRaw – ve sloupci Body tak končily PENÍZE,
   // ne body. displayPointsTotal() je stejná funkce, jakou používá i export deníku.
-  return reportCsvRow(t,dn);
+  return reportCsvRow(t,dn,counts);
  });
  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
@@ -5066,7 +5341,7 @@ function syncAccountDateFields(){
 function filteredOverviewTrades(){
  const mode=$('accountRangeMode').value,day=$('accountDay').value,from=$('accountFrom').value,to=$('accountTo').value;
  const journal=$('accountJournal').value,instrument=$('accountInstrument').value;
- return tradeRecords(filteredOverviewRecords());
+ return performanceRecords(filteredOverviewRecords());
 }
 // Všechny záznamy přehledu včetně setupů bez exekuce – jen pro četnost setupů
 // a fill rate. Agregace P/L berou výhradně filteredOverviewTrades.
@@ -5083,8 +5358,12 @@ function filteredOverviewRecords(){
  });
 }
 function applyAccountOverview(){
- const rows=filteredOverviewTrades();
- renderDashboard(rows,filteredOverviewRecords().filter(isSetupRecord));
+ // renderDashboard dostává VŠECHNY obchody: výkon si z nich vybere sám
+ // (performanceRecords), fill rate a blok „naživo bych nevzal“ potřebují i ty
+ // vyloučené. Seznam pod tím ukazuje všechny, vyloučené jsou barevně odlišené.
+ const all=filteredOverviewRecords();
+ const rows=tradeRecords(all);
+ renderDashboard(rows,all.filter(isSetupRecord));
  $('accountOverviewTrades').innerHTML=rows.length?rows.slice().sort((a,b)=>(b.date+(b.entryTime||'')).localeCompare(a.date+(a.entryTime||''))).map(tradeHTML).join(''):'<div class="sub">Pro vybraný filtr nejsou žádné obchody.</div>';
 }
 $('accountRangeMode').onchange=syncAccountDateFields;
@@ -5121,6 +5400,10 @@ async function startJournalApplication(){
    const r=await runTickFieldsMigration();
    if(r&&r.changed)showToast(`Přepočítáno ${r.changed} obchodů (tikové průběhy). Nulové maxAdverseTicks bez MAE jsou teď prázdné. Záloha deníku je v safety-backups.`);
   }catch(e){showToast('Migrace tikových polí se nepodařila: '+e.message)}
+  try{
+   const r=await runSrLevelsMigration();
+   if(r&&r.changed)showToast(`SR hladiny u ${r.changed} obchodů převedeny na řádky (cena a vzdálenost zatím prázdné). Záloha deníku je v safety-backups.`);
+  }catch(e){showToast('Převod SR hladin se nepodařil: '+e.message)}
   await load();
  }
  catch(e){journalAppStarted=false;showToast('Databázi se nepodařilo otevřít: '+e.message)}

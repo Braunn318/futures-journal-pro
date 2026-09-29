@@ -32,7 +32,7 @@ const NAMES = [
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
   'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'combineTradeObjects',
   'sideMeta', 'reportSigned', 'postExitApplies',
-  'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
+  'srCsvHeader', 'srCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
 ];
 
 function renderer(settings = SETTINGS) {

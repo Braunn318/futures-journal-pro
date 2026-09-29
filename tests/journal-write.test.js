@@ -162,3 +162,41 @@ test('getAll vrací kopii, takže úpravy mimo uložení nikam neprosáknou', as
   assert.equal(j.data().trades.length, 1);
   assert.equal(j.data().trades[0].instrument, 'MES');
 });
+
+// Main proces čte deník přes whitelist top-level klíčů (readJournal). Co
+// v něm chybí, se při čtení zahodí a nejbližší zápis to smaže z disku. Takhle
+// se ztrácela `tickFieldsVersion`: runTickFieldsMigration ji zapsala, při
+// dalším startu ji readJournal neviděl, a migrace tak běžela – a celý deník
+// přepisovala – při každém startu.
+test('tickFieldsVersion přežije čtení a zápis deníku v main procesu', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-journal-'));
+  try {
+    const main = require('./helpers/extract').loadMain(
+      ['safeJournalId', 'journalPath', 'readJournal', 'writeJournalFile'],
+      {
+        fs, path,
+        dataRoot: () => root,
+        defaultJournalData: () => ({ trades: [], settings: [] }),
+        // Obrázky tu nejsou, přesun screenshotů se nemá co dělat.
+        deflateJournalImages: () => 0,
+        backupJournalFile: () => { throw new Error('záloha se tu dělat nemá'); },
+        logInfo: () => {}
+      }
+    );
+
+    main.writeJournalFile('j1', { ...withOneTrade(), schemaVersion: 1, tickFieldsVersion: 1 });
+    const first = main.readJournal('j1');
+    assert.equal(first.tickFieldsVersion, 1, 'čtení značku migrace nezahodí');
+
+    main.writeJournalFile('j1', first);
+    const onDisk = JSON.parse(fs.readFileSync(main.journalPath('j1'), 'utf8'));
+    assert.equal(onDisk.tickFieldsVersion, 1, 'zápis přečteného deníku ji na disku nechá');
+    assert.equal(main.readJournal('j1').tickFieldsVersion, 1);
+    assert.equal(main.readJournal('j1').schemaVersion, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

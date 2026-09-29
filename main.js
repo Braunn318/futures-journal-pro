@@ -315,7 +315,11 @@ function readJournal(id) {
     // POZOR: tenhle seznam je whitelist. Cokoli, co v něm není, se při čtení
     // tiše zahodí a následný zápis to smaže – u `dayNotes` to už jednou
     // reálně nastalo. Každý nový top-level klíč sem musí být doplněn.
-    schemaVersion: Number(parsed.schemaVersion) || 0
+    schemaVersion: Number(parsed.schemaVersion) || 0,
+    // Značka migrace tiků / MFE / MAE (runTickFieldsMigration v rendereru).
+    // Dokud tu chyběla, zahodila se při každém čtení a migrace se spouštěla
+    // (a celý deník zapisovala) při každém startu.
+    tickFieldsVersion: Number(parsed.tickFieldsVersion) || 0
   };
   // Jednorázový přesun starých base64 obrázků do souborů. Proběhne při prvním
   // otevření deníku po aktualizaci a pak už nikdy (podruhé nenajde co

@@ -381,3 +381,21 @@ test('popis konfigurace řekne, co se přenáší', () => {
   assert.match(lines[0], /vlastní pořadí/);
   assert.deepEqual(FJTaxonomy.describeConfig({}), [], 'výchozí číselník nemá co přenášet');
 });
+
+test('důvod „naživo bych nevzal“ je editovatelný číselník jako ostatní', () => {
+  assert.deepEqual(Object.keys(FJTaxonomy.SKIP_REASON),
+    ['LIQUIDITY_SWEPT', 'SR_IN_WAY', 'CONTEXT', 'TOO_LATE', 'LOW_CONVICTION', 'RISK_RULE', 'OTHER']);
+  assert.equal(FJTaxonomy.labelOf('SKIP_REASON', 'SR_IN_WAY'), 'SR zóna / hladina v cestě');
+  assert.ok(FJTaxonomy.GROUP_BY_NAME.SKIP_REASON, 'skupina je v editoru číselníků');
+
+  const cfg = FJTaxonomy.sanitizeConfig({
+    SKIP_REASON: { labels: { CONTEXT: 'Kontext proti mně' }, hidden: ['OTHER'], custom: { CUSTOM_NEWS: 'Zprávy' } }
+  });
+  FJTaxonomy.applyConfig(cfg);
+  assert.equal(FJTaxonomy.labelOf('SKIP_REASON', 'CONTEXT'), 'Kontext proti mně', 'přejmenování mění jen popisek');
+  assert.ok(FJTaxonomy.isHidden('SKIP_REASON', 'OTHER'));
+  assert.equal(FJTaxonomy.sanitizeSingle('SKIP_REASON', 'OTHER'), 'OTHER', 'skrytý důvod zůstává platný u starých obchodů');
+  assert.equal(FJTaxonomy.sanitizeSingle('SKIP_REASON', 'CUSTOM_NEWS'), 'CUSTOM_NEWS', 'vlastní položka');
+  assert.ok(!FJTaxonomy.visibleOptions('SKIP_REASON').some(o => o.key === 'OTHER'), 'skrytý se novým obchodům nenabízí');
+  assert.match(FJTaxonomy.describeConfig(cfg)[0], /^Důvod „naživo bych nevzal“: /);
+});

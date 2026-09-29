@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.6.9",
-  "description": "Futures Journal PRO 4.6.9 – Podíl instrumentů počítá jen skutečné obchody (bez setupů bez exekuce) a ukazuje i BE obchody.",
+  "version": "4.7.0",
+  "description": "Futures Journal PRO 4.7.0 – příznak „naživo bych nevzal“ (mimo výkon, evidovaný zvlášť) a SR hladiny s cenou / vzdáleností od vstupu.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

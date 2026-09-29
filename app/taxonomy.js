@@ -122,7 +122,22 @@
     MANUAL_EXIT: 'Ruční výstup bez hladiny'
   };
 
-  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL };
+  // Proč by obchod naživo NEVZAL (wouldSkipLive). V backtestu se setup dá vzít
+  // i tak – replay nic nestojí a výsledek je informace –, ale do výkonu
+  // strategie takový obchod ve výchozím stavu nepatří. NENÍ to planFollowed:
+  // ten říká „vzal jsem to a neměl podle pravidel“, tohle „vzal jsem to jen
+  // kvůli měření".
+  const SKIP_REASON = {
+    LIQUIDITY_SWEPT: 'Velký výběr likvidity proti směru',
+    SR_IN_WAY: 'SR zóna / hladina v cestě',
+    CONTEXT: 'Kontext neseděl',
+    TOO_LATE: 'Pozdě, cena už odjela',
+    LOW_CONVICTION: 'Slabý signál, nedůvěra',
+    RISK_RULE: 'Riziko / denní limit',
+    OTHER: 'Jiný důvod'
+  };
+
+  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON };
 
   // Sloučené volby. Klíč vlevo zůstává PLATNÝ (starý obchod ho může mít
   // uložený), ale ve statistikách se počítá pod klíčem vpravo a u nových
@@ -151,7 +166,8 @@
     { name: 'SR_SL', label: 'SR proti S/L', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
     { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' },
-    { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' }
+    { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' },
+    { name: 'SKIP_REASON', label: 'Důvod „naživo bych nevzal“', cardinality: 'single' }
   ];
 
   const GROUP_BY_NAME = Object.fromEntries(GROUPS.map(g => [g.name, g]));
@@ -165,8 +181,11 @@
     { key: 'setupCode', cardinality: 'single', enumName: 'SETUP', label: 'Setup' },
     { key: 'trend', cardinality: 'single', enumName: 'TREND', label: 'Trend' },
     { key: 'entryLevels', cardinality: 'multi', enumName: 'ENTRY_LEVEL', label: 'Hladina vstupu' },
-    { key: 'srTarget', cardinality: 'multi', enumName: 'SR_TARGET', label: 'SR proti targetu' },
-    { key: 'srStopLoss', cardinality: 'multi', enumName: 'SR_SL', label: 'SR proti S/L' },
+    // SR hladiny jsou ŘÁDKY { level, price, ticksFromEntry } – jedna hladina
+    // jeden řádek, stejný typ může být víckrát (dvě VAH na různých cenách).
+    // Sloučený obchod bere sjednocení řádků (sanitizeLevelRows).
+    { key: 'srTarget', cardinality: 'levelRows', enumName: 'SR_TARGET', label: 'SR proti targetu' },
+    { key: 'srStopLoss', cardinality: 'levelRows', enumName: 'SR_SL', label: 'SR proti S/L' },
     { key: 'ofConfirm', cardinality: 'multi', enumName: 'OF_CONFIRM', label: 'Order flow potvrzení' },
     { key: 'fillStatus', cardinality: 'single', enumName: 'FILL_STATUS', label: 'Stav naplnění' },
     { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' },
@@ -320,6 +339,51 @@
     return { type, price };
   }
 
+  // SR hladiny: seznam řádků { level, price, ticksFromEntry }.
+  //   level          klíč číselníku (SR_TARGET / SR_SL)
+  //   price          cena hladiny, nebo null
+  //   ticksFromEntry vzdálenost od vstupu v ticích, VŽDY KLADNĚ, nebo null –
+  //                  stranu nese název pole a směr obchodu, ne znaménko
+  // Přijímá i starý tvar (pole klíčů z doby multi-selectu) – takový řádek
+  // nemá cenu ani vzdálenost. Neznámý typ se zahazuje (ne opravuje), stejně
+  // jako u multi-selectu. Identické řádky se sloučí; holý řádek (bez ceny
+  // i vzdálenosti) se zahodí, když stejná hladina existuje i s údajem – nese
+  // tutéž informaci, jen chudší. Řádky stejného typu s jinou cenou zůstávají.
+  function numOrNull(raw) {
+    if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // `group` null = typ se proti číselníku NEOVĚŘUJE, jen se srovná tvar – pro
+  // export dat z víc deníků, kde má každý vlastní číselník.
+  function sanitizeLevelRows(group, value, config) {
+    const list = Array.isArray(value) ? value : [];
+    const known = group ? new Set(allKeys(group, config)) : null;
+    const valid = { has: key => key !== '' && (known ? known.has(key) : true) };
+    const rows = [];
+    const seen = new Set();
+    for (const item of list) {
+      const raw = (item && typeof item === 'object') ? item : { level: item };
+      const level = typeof raw.level === 'string' && valid.has(raw.level) ? raw.level : '';
+      if (!level) continue;
+      const price = numOrNull(raw.price);
+      const ticks = numOrNull(raw.ticksFromEntry);
+      const row = { level, price, ticksFromEntry: ticks == null ? null : Math.abs(ticks) };
+      const sig = row.level + '|' + row.price + '|' + row.ticksFromEntry;
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      rows.push(row);
+    }
+    const detailed = new Set(rows.filter(r => r.price != null || r.ticksFromEntry != null).map(r => r.level));
+    return rows.filter(r => r.price != null || r.ticksFromEntry != null || !detailed.has(r.level));
+  }
+
+  // Starý tvar (pole klíčů) – pro migraci: je co převádět?
+  function hasLegacyLevelRows(value) {
+    return Array.isArray(value) && value.some(item => typeof item === 'string');
+  }
+
   // Konfluence: `NONE` je výslovné „žádná hladina", takže se nepočítá.
   function confluenceCount(entryLevels, config) {
     return sanitizeMulti('ENTRY_LEVEL', entryLevels, config).filter(k => k !== 'NONE').length;
@@ -449,13 +513,13 @@
 
   return {
     // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
-    SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL,
+    SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
     ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, TRADE_CONTEXT_FIELDS,
     // konfigurace
     applyConfig, getConfig, groupConfig,
     // dotazy
     allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey,
-    visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, confluenceCount,
+    visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     makeCustomKey,
     // přenos mezi deníky a soubor
     sanitizeConfig, exportPayload, configFromImport, describeConfig,

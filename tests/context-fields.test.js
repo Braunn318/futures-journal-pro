@@ -145,8 +145,9 @@ test('popis polí drží kardinalitu, na které stojí pravidla slučování', (
   assert.equal(byKey.setupCode.cardinality, 'single');
   assert.equal(byKey.trend.cardinality, 'single');
   assert.equal(byKey.entryLevels.cardinality, 'multi');
-  assert.equal(byKey.srTarget.cardinality, 'multi');
-  assert.equal(byKey.srStopLoss.cardinality, 'multi');
+  // SR kolonky jsou od 4.7.0 řádky { level, price, ticksFromEntry }.
+  assert.equal(byKey.srTarget.cardinality, 'levelRows');
+  assert.equal(byKey.srStopLoss.cardinality, 'levelRows');
   assert.equal(byKey.ofConfirm.cardinality, 'multi');
   assert.equal(byKey.fillStatus.cardinality, 'single');
   assert.equal(byKey.slPrice.cardinality, 'number');
@@ -186,6 +187,11 @@ test('nové kontextové kolonky přežijí sloučení víc cílů', () => {
   const merged = r.combineTradeObjects([tp1, tp2]);
 
   assert.equal(merged.trend, 'LONG', 'single-select bere první neprázdný');
-  assert.deepEqual([...merged.srTarget], ['LIQUIDITY', 'VAH'], 'multi-select se sjednocuje');
-  assert.deepEqual([...merged.srStopLoss], ['VWAP']);
+  // Starý tvar (klíče) se při sloučení převede na řádky a sjednotí.
+  const plainRows = rows => JSON.parse(JSON.stringify(rows));
+  assert.deepEqual(plainRows(merged.srTarget), [
+    { level: 'VAH', price: null, ticksFromEntry: null },
+    { level: 'LIQUIDITY', price: null, ticksFromEntry: null }
+  ], 'SR řádky se sjednocují');
+  assert.deepEqual(plainRows(merged.srStopLoss), [{ level: 'VWAP', price: null, ticksFromEntry: null }]);
 });

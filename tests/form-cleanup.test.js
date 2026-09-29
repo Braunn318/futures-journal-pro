@@ -98,14 +98,25 @@ test('hladiny jsou ve formuláři v jedné sbalitelné položce', () => {
 });
 
 // Mřížka dlaždic pro `readChipGrid`: uzel s vybranými klíči.
+// SR kolonky jsou od 4.7.0 řádky (typ + cena + ticky) pro `readLevelRows`;
+// v zadání testu stačí klíč, nebo celý řádek.
 function chipDom(selection) {
   const node = keys => ({
     querySelectorAll: () => keys.map(key => ({ dataset: { key } }))
   });
+  const srNode = rows => ({
+    querySelectorAll: () => rows.map(r => (typeof r === 'string' ? { level: r } : r)).map(r => ({
+      querySelector: sel => ({
+        '.sr-level': { value: r.level },
+        '.sr-price': { value: r.price ?? '' },
+        '.sr-ticks': { value: r.ticksFromEntry ?? '' }
+      })[sel]
+    }))
+  });
   const nodes = {
     entryLevels: node(selection.entryLevels || []),
-    srTarget: node(selection.srTarget || []),
-    srStopLoss: node(selection.srStopLoss || []),
+    srTarget: srNode(selection.srTarget || []),
+    srStopLoss: srNode(selection.srStopLoss || []),
     ofConfirm: node(selection.ofConfirm || []),
     levelsSummary: { id: 'levelsSummary', textContent: '' }
   };
@@ -117,7 +128,7 @@ function chipDom(selection) {
 
 function summaryOf(selection) {
   const dom = chipDom(selection);
-  const r = loadRenderer(['$', 'readChipGrid', 'LEVEL_FIELDS', 'updateLevelsSummary'],
+  const r = loadRenderer(['$', 'readChipGrid', 'SR_ENUMS', 'readLevelRows', 'formatLevelRow', 'LEVEL_FIELDS', 'updateLevelsSummary'],
     { document: dom.document, FJTaxonomy });
   r.updateLevelsSummary();
   return dom.nodes.levelsSummary.textContent;
@@ -130,6 +141,15 @@ test('sbalená položka ukazuje, co je vybrané – sbalení nic neschová', () 
   assert.match(summary, /Vstup: VAH \+ VWAP/);
   assert.match(summary, /SR→TG: VAL/);
   assert.doesNotMatch(summary, /SR→SL/, 'nevyplněná kolonka se v hlavičce nepřipomíná');
+});
+
+test('shrnutí u SR hladiny ukáže cenu i vzdálenost od vstupu', () => {
+  const summary = summaryOf({
+    srTarget: [{ level: 'VAH', price: 7712.5, ticksFromEntry: 10 }],
+    srStopLoss: [{ level: 'VWAP', ticksFromEntry: 6 }]
+  });
+  assert.match(summary, /SR→TG: VAH @ 7712\.5 · 10 t/);
+  assert.match(summary, /SR→SL: VWAP · 6 t/);
 });
 
 test('sbalená položka u prázdného obchodu řekne, že je prázdná', () => {
@@ -154,7 +174,7 @@ test('shrnutí počítá i s order flow, které je ve stejné položce', () => {
 // rozklikávací položku.
 
 function pills() {
-  return loadRenderer(['esc', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML'],
+  return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML'],
     { FJTaxonomy });
 }
 
@@ -187,6 +207,15 @@ test('sbalená část nese všechny čtyři skupiny a svůj počet', () => {
   assert.match(html, /SR→TG: VPOC 1M/);
   assert.match(html, /SR→SL: VWAP/);
   assert.match(html, /OF: Uzavření vůči VPOC v pořádku/);
+});
+
+test('karta ukáže u SR hladiny cenu i vzdálenost; starý tvar (klíče) funguje dál', () => {
+  const { html } = pills().levelPillsHTML(contextTrade({
+    srTarget: [{ level: 'VAH', price: 7712.5, ticksFromEntry: 10 }, { level: 'VWAP', price: null, ticksFromEntry: 6 }],
+    srStopLoss: ['VWAP']
+  }));
+  assert.match(html, /SR→TG: VAH @ 7712\.5 · 10 t, VWAP · 6 t/);
+  assert.match(html, /SR→SL: VWAP</);
 });
 
 test('obchod bez hladin sbalitelnou položku nedostane', () => {

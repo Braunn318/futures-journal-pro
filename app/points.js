@@ -359,6 +359,54 @@
     return out;
   }
 
+  // ------------------------------------------------------ SR hladiny: cena ↔ ticky
+  //
+  // Řádek SR hladiny nese cenu i vzdálenost od vstupu; zadání jedné dopočítá
+  // druhou. Vzdálenost je VŽDY KLADNÁ, stranu nese pole a směr obchodu:
+  //   srTarget   → ve směru obchodu (long nad vstupem, short pod)
+  //   srStopLoss → proti směru obchodu (long pod vstupem, short nad)
+  // Když chybí velikost ticku nebo vstupní cena (a u ceny z ticků i směr),
+  // vrací se null a přepočet se vypne – NIKDY se nedosazuje odhad. Chybějící
+  // hodnota bodu u instrumentu už jednou vynulovala reálné P/L.
+
+  const SR_FIELD_SIDE = { srTarget: 1, srStopLoss: -1 };
+
+  function srLinkEnabled(entryPrice, tickSize) {
+    const tick = Number(tickSize);
+    return finiteOrNull(entryPrice) != null && Number.isFinite(tick) && tick > 0;
+  }
+
+  function srTicksFromPrice(price, entryPrice, tickSize) {
+    const p = finiteOrNull(price);
+    const e = finiteOrNull(entryPrice);
+    if (p == null || e == null) return null;
+    return ticksOf(Math.abs(p - e), tickSize);
+  }
+
+  // Cena se srovná na 6 desetinných míst – 7700.25 + 3 × 0,25 jinak umí
+  // vyrobit 7701.000000000001.
+  function srPriceFromTicks(field, side, ticks, entryPrice, tickSize) {
+    const dir = directionOf(side);
+    const fieldSide = SR_FIELD_SIDE[field];
+    const t = finiteOrNull(ticks);
+    const e = finiteOrNull(entryPrice);
+    const tick = Number(tickSize);
+    if (dir == null || !fieldSide || t == null || e == null || !Number.isFinite(tick) || tick <= 0) return null;
+    return Math.round((e + dir * fieldSide * Math.abs(t) * tick) * 1e6) / 1e6;
+  }
+
+  // Měkké varování: cena hladiny leží na opačné straně vstupu, než pole
+  // určuje (SR proti targetu pod vstupem longu…). Neblokuje – jen upozorní,
+  // že vzdálenost je kladná a stranu z ní nejde vyčíst.
+  function srWrongSide(field, side, price, entryPrice) {
+    const dir = directionOf(side);
+    const fieldSide = SR_FIELD_SIDE[field];
+    const p = finiteOrNull(price);
+    const e = finiteOrNull(entryPrice);
+    if (dir == null || !fieldSide || p == null || e == null || p === e) return false;
+    return Math.sign(p - e) !== dir * fieldSide;
+  }
+
   function rMultipleOf(pointsPerContract, slPoints) {
     const p = Number(pointsPerContract);
     const sl = Number(slPoints);
@@ -389,6 +437,10 @@
     slTicksSuspicious,
     contextIncomplete,
     deriveCourseTicks,
-    postExitTickFields
+    postExitTickFields,
+    srLinkEnabled,
+    srTicksFromPrice,
+    srPriceFromTicks,
+    srWrongSide
   };
 }));
