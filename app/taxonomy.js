@@ -186,6 +186,12 @@
     // Sloučený obchod bere sjednocení řádků (sanitizeLevelRows).
     { key: 'srTarget', cardinality: 'levelRows', enumName: 'SR_TARGET', label: 'SR proti targetu' },
     { key: 'srStopLoss', cardinality: 'levelRows', enumName: 'SR_SL', label: 'SR proti S/L' },
+    // „Žádná hladina v cestě" – odlišuje „nic tam nebylo" od „nevyplněno".
+    // Ukládá se jen true a jen u obchodu bez řádků. `noneFor` říká, ke
+    // kterému poli patří: sloučený obchod ho má, jen když ho mají všechny
+    // nohy a sjednocené řádky jsou prázdné.
+    { key: 'srTargetNone', cardinality: 'bool', enumName: null, noneFor: 'srTarget', label: 'SR proti targetu: žádná' },
+    { key: 'srStopLossNone', cardinality: 'bool', enumName: null, noneFor: 'srStopLoss', label: 'SR proti S/L: žádná' },
     { key: 'ofConfirm', cardinality: 'multi', enumName: 'OF_CONFIRM', label: 'Order flow potvrzení' },
     { key: 'fillStatus', cardinality: 'single', enumName: 'FILL_STATUS', label: 'Stav naplnění' },
     { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' },
@@ -196,15 +202,15 @@
     // Průběh obchodu DO VÝSTUPU, od vstupní ceny, v ticích, vždy kladně.
     // merge: 'max' – sloučený obchod bere maximum přes nohy: nejdál, kam pozice
     // jako celek došla, je nejdál z jakékoli její nohy.
-    { key: 'mfeTicks', cardinality: 'number', enumName: null, merge: 'max', label: 'MFE za dobu obchodu (ticky)' },
-    { key: 'maeTicks', cardinality: 'number', enumName: null, merge: 'max', label: 'MAE za dobu obchodu (ticky)' },
+    { key: 'mfeTicks', cardinality: 'number', enumName: null, merge: 'max', label: 'MFE' },
+    { key: 'maeTicks', cardinality: 'number', enumName: null, merge: 'max', label: 'MAE' },
     { key: 'observedMinutes', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Sledováno po výstupu (min)' },
     // Chování ceny PO VÝSTUPU. merge: 'lastExit' znamená, že u sloučeného
     // obchodu se hodnota NEBERE z první nohy jako u ostatních jednohodnotových
     // polí, ale z nohy s nejpozdějším časem výstupu – měří se pokračování ceny
     // po tom, co pozice fakticky skončila, ne po částečném výstupu uprostřed.
-    { key: 'postExitFavorableTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Pokračování po výstupu (ticky)' },
-    { key: 'postExitAdverseTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Protipohyb po výstupu (ticky)' },
+    { key: 'postExitFavorableTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Ticky po výstupu – ve směru zisku' },
+    { key: 'postExitAdverseTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Ticky po výstupu – proti' },
     { key: 'postExitAdverseFirst', cardinality: 'bool', enumName: null, merge: 'lastExit', label: 'Protipohyb přišel dřív' }
   ];
 
@@ -389,6 +395,42 @@
     return sanitizeMulti('ENTRY_LEVEL', entryLevels, config).filter(k => k !== 'NONE').length;
   }
 
+  // Klíče kontextových polí, která obchod nemá vyplněná (štítek „Neúplné").
+  // Pořadí je pořadí formuláře. Nekontroluje se, co je nepovinné nebo má
+  // hodnotu vždy: doba sledování, cílová hladina 2, „protipohyb přišel dřív".
+  //  - SR pole jsou vyplněná řádky NEBO příznakem „žádná hladina v cestě",
+  //  - cílová hladina 1 potřebuje typ i cenu (bez ceny nejde R hladiny),
+  //  - čísla (cena SL, MFE/MAE, po výstupu): vyplněná je i nula a i hodnota
+  //    odvozená z výstupu; chybí jen prázdné,
+  //  - u výslovně nenaplněného setupu (NO_FILL, MISSED…) se pole, která
+  //    popisují průběh a výstup, nekontrolují – nebylo co měřit.
+  function missingContextKeys(trade, config) {
+    if (!trade || typeof trade !== 'object' || trade.recordType === 'SETUP_ONLY') return [];
+    const missing = [];
+    const filledNumber = v => v !== undefined && v !== null && String(v).trim() !== '' && Number.isFinite(Number(v));
+    if (!sanitizeSingle('SETUP', trade.setupCode, config)) missing.push('setupCode');
+    if (!sanitizeSingle('FILL_STATUS', trade.fillStatus, config)) missing.push('fillStatus');
+    if (!sanitizeSingle('TREND', trade.trend, config)) missing.push('trend');
+    if (!sanitizeMulti('ENTRY_LEVEL', trade.entryLevels, config).length) missing.push('entryLevels');
+    if (!sanitizeLevelRows('SR_TARGET', trade.srTarget, config).length && trade.srTargetNone !== true) missing.push('srTarget');
+    if (!sanitizeLevelRows('SR_SL', trade.srStopLoss, config).length && trade.srStopLossNone !== true) missing.push('srStopLoss');
+    if (!sanitizeMulti('OF_CONFIRM', trade.ofConfirm, config).length) missing.push('ofConfirm');
+    const target = sanitizeTargetLevel(trade.targetLevel1, config);
+    if (!target || !target.type || target.price == null) missing.push('targetLevel1');
+    const fill = trade.fillStatus;
+    if (!fill || fill === 'FILLED') {
+      for (const key of ['slPrice', 'mfeTicks', 'maeTicks', 'postExitFavorableTicks', 'postExitAdverseTicks']) {
+        if (!filledNumber(trade[key])) missing.push(key);
+      }
+    }
+    return missing;
+  }
+
+  // Popisek kontextového pole podle klíče (TRADE_CONTEXT_FIELDS).
+  function contextFieldLabel(key) {
+    return TRADE_CONTEXT_FIELDS.find(f => f.key === key)?.label || key;
+  }
+
   // Klíč pro vlastní volbu. Odvozuje se z popisku, aby byl čitelný i v CSV,
   // ale po vytvoření se už NIKDY nemění – přejmenování volby mění jen popisek.
   function makeCustomKey(group, label, config) {
@@ -520,6 +562,7 @@
     // dotazy
     allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey,
     visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
+    missingContextKeys, contextFieldLabel,
     makeCustomKey,
     // přenos mezi deníky a soubor
     sanitizeConfig, exportPayload, configFromImport, describeConfig,

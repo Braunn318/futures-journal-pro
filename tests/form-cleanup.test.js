@@ -85,16 +85,31 @@ test('formulář obchodu nemá plánovací pole, ale má setup, psychologii a ko
   assert.match(HTML, /\.\.\.existingPlan/, 'zrušená pole se přebírají z původního obchodu');
 });
 
-test('hladiny jsou ve formuláři v jedné sbalitelné položce', () => {
-  const block = HTML.slice(HTML.indexOf('<details class="field full chip-collapse" id="levelsBlock">'));
-  const end = block.indexOf('</details>');
-  assert.ok(end > 0, 'sbalitelná položka „Hladiny" ve formuláři chybí');
-  const inside = block.slice(0, end);
-  for (const id of ['entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm']) {
-    assert.ok(inside.includes('id="' + id + '"'), id + ' patří dovnitř položky Hladiny');
+// Od 4.7.1 je formulář rozdělený do sbalitelných karet (SL / TP, Pohyb ceny,
+// Setup, Komentáře); základ obchodu zůstává vždy vidět.
+const sectionOf = card => {
+  const start = HTML.indexOf(`<details class="trade-section" data-card="${card}">`);
+  assert.ok(start > 0, `karta ${card} ve formuláři chybí`);
+  return HTML.slice(start, HTML.indexOf('</details>', start));
+};
+
+test('formulář: pole jsou ve správných kartách', () => {
+  const expected = {
+    sltp: ['slPrice', 'targetLevel1Price', 'targetLevel2Price'],
+    course: ['mfeTicks', 'maeTicks', 'observedMinutes', 'postExitFavorableTicks', 'postExitAdverseTicks', 'postExitAdverseFirst'],
+    setup: ['setupCode', 'fillStatus', 'trend', 'entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm', 'targetLevel1Type', 'targetLevel2Type', 'planFollowed', 'wouldSkipLive'],
+    comments: ['tradePlanSetup', 'tradePlanPsychology', 'tradePlanNote', 'comment', 'screenshots']
+  };
+  for (const [card, ids] of Object.entries(expected)) {
+    const inside = sectionOf(card);
+    for (const id of ids) assert.ok(inside.includes(`id="${id}"`), `${id} patří do karty ${card}`);
   }
-  // Trend zůstává mimo – jsou to tři dlaždice, sbalovat je nemá co ušetřit.
-  assert.ok(!inside.includes('id="trend"'));
+  // Základ (ceny, zisk, další cíle) se nesbaluje.
+  const firstCard = HTML.indexOf('<details class="trade-section"');
+  for (const id of ['entryPrice', 'exitPrice', 'pnl', 'contracts', 'extraLegsList']) {
+    assert.ok(HTML.indexOf(`id="${id}"`) < firstCard, `${id} je v základu nad kartami`);
+  }
+  assert.ok(!HTML.includes('id="strategy"'), 'pole Strategie z formuláře zmizelo');
 });
 
 // Mřížka dlaždic pro `readChipGrid`: uzel s vybranými klíči.
@@ -128,7 +143,7 @@ function chipDom(selection) {
 
 function summaryOf(selection) {
   const dom = chipDom(selection);
-  const r = loadRenderer(['$', 'readChipGrid', 'SR_ENUMS', 'readLevelRows', 'formatLevelRow', 'LEVEL_FIELDS', 'updateLevelsSummary'],
+  const r = loadRenderer(['$', 'readChipGrid', 'SR_ENUMS', 'readLevelRows', 'formatLevelRow', 'LEVEL_FIELDS', 'syncSrNoneControls', 'readSrNone', 'updateLevelsSummary'],
     { document: dom.document, FJTaxonomy });
   r.updateLevelsSummary();
   return dom.nodes.levelsSummary.textContent;
@@ -174,8 +189,9 @@ test('shrnutí počítá i s order flow, které je ve stejné položce', () => {
 // rozklikávací položku.
 
 function pills() {
-  return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML'],
-    { FJTaxonomy });
+  return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML',
+    'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'srRefDistanceText'],
+    { FJTaxonomy, settings: { templates: [] } });
 }
 
 function contextTrade(overrides) {

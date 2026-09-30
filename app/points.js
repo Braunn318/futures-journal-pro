@@ -414,6 +414,24 @@
     return round2(p / sl);
   }
 
+  // Plánované R: vzdálenost vstup → nejvzdálenější target děleno rizikem
+  // (vstup → SL). U víc cílů se bere target nejdál ve směru obchodu – to je
+  // plán celé pozice. Target na špatné straně vstupu (překlep) nebo chybějící
+  // směr / SL nedají nic, ne záporné nebo vymyšlené číslo.
+  function plannedRMultipleOf(trade, targetPrices) {
+    const dir = directionOf(trade?.side);
+    const entry = finiteOrNull(trade?.entryPrice);
+    const sl = finiteOrNull(trade?.slPrice);
+    if (dir == null || entry == null || sl == null) return null;
+    const risk = Math.abs(entry - sl);
+    if (!risk) return null;
+    const reward = (Array.isArray(targetPrices) ? targetPrices : [])
+      .map(finiteOrNull).filter(p => p != null)
+      .map(p => dir * (p - entry)).filter(d => d > 0);
+    if (!reward.length) return null;
+    return round2(Math.max(...reward) / risk);
+  }
+
   return {
     POINTS_CONVENTION,
     MONEY_TOLERANCE,
@@ -427,6 +445,7 @@
     exitPriceFields,
     slPointsOf,
     rMultipleOf,
+    plannedRMultipleOf,
     roundTicks,
     ticksOf,
     directionOf,

@@ -49,7 +49,7 @@ function stubDocument() {
 // ostatní vykreslování je zastoupené prázdnými funkcemi.
 function tradeForm() {
   const dom = stubDocument();
-  const r = loadRenderer(['$', 'openModal'], {
+  const r = loadRenderer(['$', 'openModal', 'SR_ENUMS'], {
     document: dom.document,
     window: {},
     FJTaxonomy,
@@ -66,6 +66,7 @@ function tradeForm() {
     isSkipLive: t => t?.wouldSkipLive === true,
     updateConfluenceHint() {},
     updateLevelsSummary() {},
+    applyTradeSectionsOpenState() {},
     appendBlankLegRow() { return dom.document.getElementById('legRow'); },
     showPreviews() {},
     updateResultBadge() {},

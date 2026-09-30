@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.7.0",
-  "description": "Futures Journal PRO 4.7.0 – příznak „naživo bych nevzal“ (mimo výkon, evidovaný zvlášť) a SR hladiny s cenou / vzdáleností od vstupu.",
+  "version": "4.7.1",
+  "description": "Futures Journal PRO 4.7.1 – dopočet ceny SL u obchodu na stop lossu, štítek „Neúplné“ u obchodů bez kontextu a rozbalovací karty v Nastavení.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

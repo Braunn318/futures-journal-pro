@@ -309,13 +309,18 @@ function formStub(values) {
   };
 }
 
+// Hlavičky karet, řádek s R a vzdálenosti SR jsou jen zobrazení – testují se
+// zvlášť (tests/incomplete-trade.test.js), tady by jen táhly půlku formuláře.
+const DISPLAY_STUBS = { renderRiskInfo() {}, renderSrDistances() {}, renderTradeSections() {} };
+
 function postExitForm(values) {
   const dom = formStub(values);
   const r = loadRenderer([
     '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
     'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'postExitTicksWarning', 'postExitApplies',
-    'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField'
-  ], { document: dom.document, settings: SETTINGS });
+    'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField',
+    'deriveTargetPrices', 'renderCourseHints', 'sourceLabel'
+  ], { document: dom.document, settings: SETTINGS, ...DISPLAY_STUBS });
   r.renderPostExitHints();
   return dom.nodes;
 }

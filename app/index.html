@@ -228,6 +228,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .day-flag{position:absolute;top:6px;right:8px;font-size:14px}
 .limitbox{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
 .post-exit-warn{color:var(--yellow)}
+.pill.incomplete-pill{background:rgba(var(--orange-rgb),.12);color:var(--orange);border:1px dashed rgba(var(--orange-rgb),.6);font-size:11px;padding:1px 7px;cursor:help}
 .setup-row{background:rgba(120,140,255,.10);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
 .setup-row .setup-icon{font-size:18px;line-height:1.2}
 .setup-row .setup-body{flex:1;min-width:0}
@@ -240,6 +241,11 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .sr-rows{display:flex;flex-direction:column;gap:6px}
 .sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr auto;gap:6px;align-items:center}
 .sr-row .sr-warn{grid-column:1/-1;font-size:12px}
+.sr-actions{display:flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap}
+.sr-actions .btn:disabled{opacity:.4;cursor:default}
+.field .sr-none{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0;cursor:pointer}
+.field .sr-none input{width:auto;padding:0}
+.field .sr-none.is-disabled{opacity:.5;cursor:default}
 .derived-readonly{padding:10px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}
 .derived-readonly b{font-weight:700}
 .derived-edit{font-size:12px;color:var(--blue);margin-left:8px}
@@ -256,6 +262,31 @@ textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-c
 .alert{padding:11px 13px;border-radius:10px;margin-bottom:14px;display:none}.alert.show{display:block}.alert.red{background:rgba(var(--red-rgb),.15);color:var(--red)}.alert.green{background:rgba(var(--green-rgb),.15);color:var(--green)}
 .table-scroll{overflow:auto}table{width:100%;border-collapse:collapse;min-width:900px}th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+#settings .settings-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+.settings-card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;user-select:none}
+.settings-card>summary::-webkit-details-marker{display:none}
+.settings-card>summary h3{margin:0}
+.settings-card>summary .chev{width:16px;height:16px;flex:none;color:var(--muted);transition:transform .18s ease}
+.settings-card[open]>summary .chev{transform:rotate(90deg)}
+.settings-card[open]>summary{margin-bottom:14px}
+.settings-card>summary:hover h3{color:var(--blue)}
+.trade-section{border:1px solid var(--line);border-radius:12px;margin-top:12px;padding:0 14px;background:rgba(var(--tint-rgb),.02)}
+.trade-section>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;padding:12px 0;user-select:none;min-width:0}
+.trade-section>summary::-webkit-details-marker{display:none}
+.trade-section>summary .chev{width:16px;height:16px;flex:none;color:var(--muted);transition:transform .18s ease}
+.trade-section[open]>summary .chev{transform:rotate(90deg)}
+.trade-section-title{font-weight:800;font-size:14px;flex:none}
+.trade-section>summary:hover .trade-section-title{color:var(--blue)}
+.trade-section-summary{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trade-section-missing{flex:none;font-size:11px;padding:1px 8px;border-radius:999px;color:var(--orange);background:rgba(var(--orange-rgb),.12);border:1px dashed rgba(var(--orange-rgb),.6);cursor:help}
+.trade-section-missing:empty{display:none}
+.trade-section>.formgrid{padding-bottom:14px}
+.dir-icon{width:14px;height:14px;vertical-align:-2px;margin-right:4px}
+.dir-icon.up{color:var(--green)}.dir-icon.down{color:var(--red)}
+.sr-row .sr-dist{grid-column:1/-1;font-size:12px}
+.sr-row .sr-dist:empty{display:none}
+.settings-check{display:flex;align-items:center;gap:8px;cursor:pointer}
+.settings-check input{width:auto}
 
 .status-toast{position:fixed;right:22px;bottom:22px;z-index:50;padding:12px 16px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);box-shadow:0 10px 30px rgba(var(--shadow-rgb),.35);display:none;max-width:420px;white-space:pre-line;line-height:1.4;cursor:pointer}.status-toast.show{display:block}
 @media(max-width:1000px){#integrations>.grid{grid-template-columns:1fr!important}.journal-switcher{min-width:220px;margin:0 12px}.stats{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}.trade{grid-template-columns:1fr}.app{grid-template-columns:1fr}.sidebar{height:auto;position:static;display:flex;align-items:center;justify-content:space-between;padding:14px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.brand{margin:0}.main{padding:16px}.kpi-strip{grid-template-columns:repeat(2,1fr)}.overview-row,.performance-row{grid-template-columns:1fr}}
@@ -776,8 +807,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
       <div class="subsection active" id="settingsGeneral">
       <div class="settings-grid">
-        <div class="card">
-          <h3>Vzhled (téma)</h3>
+        <details class="card settings-card" data-card="theme">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Vzhled (téma)</h3></summary>
           <p class="sub">Platí pro celou aplikaci na tomto počítači, nezávisle na deníku. Uloží se jen v tomto zařízení.</p>
           <div class="field" style="margin-top:10px">
             <label>Motiv</label>
@@ -821,27 +852,33 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <button class="btn" id="resetThemeDefaults" style="margin-top:14px">Obnovit výchozí tmavé barvy</button>
           </div>
           <button class="btn primary" id="saveTheme" style="margin-top:14px">Uložit vzhled</button>
-        </div>
-        <div class="card">
-          <h3>Zabezpečení aplikace</h3>
+        </details>
+        <details class="card settings-card" data-card="incomplete">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Označování neúplných obchodů</h3></summary>
+          <label class="settings-check"><input type="checkbox" id="markIncompleteTrades" checked> Označit obchody s nevyplněným kontextem štítkem „⚠ Neúplné“</label>
+          <p class="sub" style="margin-top:8px">Kontroluje se: setup, stav naplnění, trend, hladina vstupu, SR proti targetu a proti S/L (hladina, nebo „žádná hladina v cestě“), order flow potvrzení, cílová hladina 1 (typ i cena), cena Stop Lossu, MFE, MAE, pokračování a protipohyb po výstupu. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují. Co přesně chybí, ukáže štítek po najetí myší.</p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
+        <details class="card settings-card" data-card="security">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Zabezpečení aplikace</h3></summary>
           <p class="sub">Při prvním spuštění si nastavíš vlastní heslo.</p>
           <button class="btn" id="changePassword">Změnit heslo</button>
           <button class="btn" id="lockApp" style="margin-left:8px">🔒 Zamknout aplikaci</button>
-        </div>
-        <div class="card">
-          <h3>Účet</h3>
+        </details>
+        <details class="card settings-card" data-card="account">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Účet</h3></summary>
           <div class="field"><label>Počáteční stav účtu</label><input type="number" id="startingBalance" step="0.01"></div>
           <div class="field" style="margin-top:12px"><label>Hlavní měna</label><input id="currency" value="USD" disabled></div>
           <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
           <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
-        </div>
+        </details>
       </div>
       </div>
 
       <div class="subsection" id="settingsRisk">
       <div class="settings-grid">
-        <div class="card">
-          <h3>Řízení rizika (per deník)</h3>
+        <details class="card settings-card" data-card="risk">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Řízení rizika (per deník)</h3></summary>
           <p class="sub">Volitelné denní/celkové limity pro tento konkrétní deník. Prázdné pole = pravidlo je vypnuté. Porušení nebo splnění cíle se poznačí u příslušného dne v Kalendáři.</p>
           <div class="field" style="margin-top:10px"><label>Max. denní drawdown (v měně účtu)</label><input type="number" id="riskMaxDailyDrawdown" min="0" step="0.01" placeholder="např. 1000"></div>
           <div class="field" style="margin-top:12px"><label>Max. celkový drawdown účtu (v měně účtu)</label><input type="number" id="riskMaxTotalDrawdown" min="0" step="0.01" placeholder="např. 5000"><div class="sub">Propad od nejvyššího dosaženého stavu účtu (peak) k aktuálnímu stavu.</div></div>
@@ -850,29 +887,28 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" style="margin-top:12px"><label>Limit profit obchodů / den</label><input type="number" id="riskMaxProfitTradesPerDay" min="0" step="1" placeholder="např. 4"></div>
           <div class="field" style="margin-top:12px"><label>Profit target / den (v měně účtu)</label><input type="number" id="riskProfitTargetPerDay" min="0" step="0.01" placeholder="např. 800"><div class="sub">Nejde o porušení pravidla – den se v kalendáři zvýrazní zeleně jako splněný cíl.</div></div>
           <button class="btn primary" id="saveRiskSettings" style="margin-top:14px">Uložit řízení rizika</button>
-        </div>
-        <div class="card">
-          <h3>Break Even a slučování obchodů</h3>
+        </details>
+        <details class="card settings-card" data-card="breakEven">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Break Even a slučování obchodů</h3></summary>
           <p class="sub">Obchod s výsledkem blízko nuly se označí jako Break Even místo ztráty. Obchody stejné pozice (např. TP1/TP2/BE z NinjaTraderu) lze slučovat automaticky.</p>
           <div class="field" style="margin-top:10px"><label>Rozpoznávat Break Even</label><select id="breakEvenEnabled"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <div class="field" style="margin-top:12px"><label>Práh Break Even (v měně účtu, ±)</label><input type="number" id="breakEvenThreshold" min="0" step="0.01" value="0"><div class="sub">Obchod s čistým ziskem/ztrátou v tomto rozmezí kolem nuly se zobrazí jako Break Even.</div></div>
           <div class="field" style="margin-top:12px"><label>Automaticky slučovat cíle stejné pozice (TP1/TP2/BE) při importu</label><select id="autoMergeLegs"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <button class="btn primary" id="saveBreakEvenSettings" style="margin-top:14px">Uložit nastavení</button>
-        </div>
+        </details>
       </div>
       </div>
 
       <div class="subsection" id="settingsTemplates">
       <div class="settings-grid">
-        <div class="card">
-          <h3>Šablony podle instrumentu</h3>
-          <p class="sub">Pro daný instrument lze předvyplnit strategii, dodržení plánu, komentář, hodnotu bodu, velikost ticku a výchozí komisi — při ručním přidání i při automatickém importu.</p>
-          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto;margin-top:12px;font-weight:700;color:var(--muted);font-size:12px">
-            <div>Instrument</div><div>Strategie</div><div>Plán</div><div>Bod ($)</div><div>Tick</div><div>Komise ($/ks)</div><div>Komentář</div><div></div>
+        <details class="card settings-card" data-card="templates">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Šablony podle instrumentu</h3></summary>
+          <p class="sub">Pro daný instrument lze předvyplnit dodržení plánu, komentář, hodnotu bodu, velikost ticku a výchozí komisi — při ručním přidání i při automatickém importu.</p>
+          <div class="template-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto;margin-top:12px;font-weight:700;color:var(--muted);font-size:12px">
+            <div>Instrument</div><div>Plán</div><div>Bod ($)</div><div>Tick</div><div>Komise ($/ks)</div><div>Komentář</div><div></div>
           </div>
-          <div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
+          <div class="template-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
             <input id="tplNewInstrument" placeholder="např. MES">
-            <input id="tplNewStrategy" placeholder="Strategie">
             <select id="tplNewPlan"><option value="">—</option><option value="ano">Ano</option><option value="ne">Ne</option></select>
             <input id="tplNewPointValue" type="number" step="any" min="0" placeholder="5,00">
             <input id="tplNewTickSize" type="number" step="any" min="0" placeholder="0,25" title="Velikost ticku – nejmenší pohyb ceny. Potřebná pro dopočty chování ceny po výstupu.">
@@ -902,14 +938,14 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <button class="btn danger" id="backfillSideBtn" style="margin-top:10px">Doplnit směr v aktivním deníku</button>
             <div class="sub" id="backfillSideReport" style="margin-top:10px"></div>
           </div>
-        </div>
+        </details>
       </div>
       </div>
 
       <div class="subsection" id="settingsTaxonomy">
       <div class="settings-grid">
-        <div class="card">
-          <h3>Číselníky kontextu obchodu</h3>
+        <details class="card settings-card" data-card="taxonomy">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Číselníky kontextu obchodu</h3></summary>
           <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volba se nemaže, jen skrývá: skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových.</p>
           <div id="taxonomyGroups"></div>
           <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
@@ -926,29 +962,29 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             </div>
             <div class="sub" id="taxonomyTransferNote" style="margin-top:8px"></div>
           </div>
-        </div>
+        </details>
       </div>
       </div>
 
       <div class="subsection" id="settingsBackup">
       <div class="settings-grid">
-        <div class="card">
-          <h3>Export pro AI analýzu / Claude Cowork</h3>
+        <details class="card settings-card" data-card="aiExport">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Export pro AI analýzu / Claude Cowork</h3></summary>
           <p class="sub">Vedle běžných dat udržuje appka automaticky ještě jednu "odlehčenou" kopii každého deníku – úplně stejná obchodní data (výsledek, body, komentář, denní plán, setup/scénář, psychologický checklist…), ale BEZ screenshotů. Ty totiž dělají soubor objemný; bez nich je i deník s velkým počtem obchodů v řádu stovek kB. Tahle kopie se aktualizuje sama při každém uložení obchodu.</p>
           <div id="aiExportInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji umístění…</div>
           <button class="btn primary" id="regenerateAiExports" style="margin-top:10px">🔄 Aktualizovat teď (pro všechny deníky)</button>
           <div class="sub" style="margin-top:8px">Nasměruj Claude Cowork (nebo jiný nástroj) přímo na tuhle složku, ať vidí aktuální obchody napříč deníky bez nutnosti cokoliv ručně exportovat. Soubor "index.json" v této složce říká, který soubor patří kterému deníku podle názvu.</div>
-        </div>
-        <div class="card">
-          <h3>Umístění dat (deníky, obchody, screenshoty)</h3>
+        </details>
+        <details class="card settings-card" data-card="dataLocation">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Umístění dat (deníky, obchody, screenshoty)</h3></summary>
           <p class="sub">Ve výchozím stavu se data ukládají na systémovém disku (C:), stejně jako u většiny Windows aplikací. Pokud chceš mít data na jiném disku (např. kvůli místu na SSD vyhrazenému jen pro OS), lze umístění změnit – appka existující deníky i screenshoty přesune celé, nic se neztratí.</p>
           <div id="dataLocationInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji aktuální umístění…</div>
           <button class="btn primary" id="changeDataLocation" style="margin-top:10px">📁 Změnit umístění dat…</button>
           <button class="btn" id="resetDataLocation" style="margin-top:10px;margin-left:8px">Vrátit na výchozí umístění</button>
           <div class="sub" style="margin-top:8px">Po změně se appka restartuje, ať se nové umístění projeví všude bezpečně.</div>
-        </div>
-        <div class="card">
-          <h3>Záloha a obnova</h3>
+        </details>
+        <details class="card settings-card" data-card="backup">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Záloha a obnova</h3></summary>
           <p class="sub">Data se ukládají lokálně v tomto prohlížeči.</p>
           <button class="btn primary" id="updateBackup">💾 Aktualizovat zálohu na SSD</button>
           <button class="btn" id="restoreBackup" style="display:block;margin-top:10px">♻️ Obnovit ze zálohy</button>
@@ -960,7 +996,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn danger" id="clearAll" style="display:block;margin-top:18px">Smazat data aktuálního deníku</button>
           <button class="btn danger" id="factoryReset" style="display:block;margin-top:10px">⚠️ Kompletní reset aplikace</button>
           <div class="sub" style="margin-top:8px">Smaže všechny deníky, obchody, nastavení i uloženou cestu k záloze.</div>
-        </div>
+        </details>
       </div>
       </div>
     </section>
@@ -973,7 +1009,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   <div class="modalbox" style="max-width:520px">
     <div class="modalhead"><h2 id="journalNameModalTitle">Nový deník</h2><button class="icon" id="closeJournalNameModal">✕</button></div>
     <div class="field"><label id="journalNameLabel">Název deníku</label><input id="journalNameInput" maxlength="60" placeholder="Např. NQ, ES nebo GC"></div>
-    <div class="field"><label style="display:flex;gap:8px;align-items:center;text-transform:none"><input type="checkbox" id="journalBacktest" style="width:auto"> Backtestový deník <span class="sub">— jen tady se ukazuje štítek „neúplný kontext“</span></label></div>
+    <div class="field"><label style="display:flex;gap:8px;align-items:center;text-transform:none"><input type="checkbox" id="journalBacktest" style="width:auto"> Backtestový deník <span class="sub">— jen označení deníku; štítek „Neúplné“ se zapíná v Nastavení → Obecné pro všechny deníky</span></label></div>
     <div id="journalNameError" class="alert red"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="btn" id="cancelJournalName">Zrušit</button>
@@ -1106,33 +1142,6 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field"><label>Zisk / ztráta v měně účtu (čistý, po komisi)</label><input id="pnl" type="number" step="any"></div>
         <div class="field"><label>Komise (v měně účtu)</label><input id="commission" type="number" step="any" min="0" value="0"></div>
         <div class="field"><label>Počet kontraktů</label><input id="contracts" type="number" step="1" value="1"></div>
-        <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="sub" id="slPriceHint"></div></div>
-        <div class="field full" id="postExitBlock">
-          <div class="formgrid">
-            <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="mfeTicks" type="number" step="any" min="0" placeholder="např. 20"><div class="derived-readonly" id="mfeTicksView" style="display:none"><b id="mfeTicksViewValue"></b> t <span class="sub" id="mfeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('mfeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="mfeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('mfeTicks')"></a><div class="sub" id="mfeTicksSourceNote"></div><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
-            <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="maeTicks" type="number" step="any" min="0" placeholder="např. 6"><div class="derived-readonly" id="maeTicksView" style="display:none"><b id="maeTicksViewValue"></b> t <span class="sub" id="maeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('maeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="maeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('maeTicks')"></a><div class="sub" id="maeTicksSourceNote"></div><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
-            <div class="field"><label>Sledováno po výstupu <span class="sub">— minut, nepovinné</span></label><input id="observedMinutes" type="number" step="any" min="0" placeholder="např. 30"></div>
-            <div class="field"><label>Pokračování po výstupu <span class="sub">— v ticích, ve směru obchodu</span></label><input id="postExitFavorableTicks" type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
-            <div class="field"><label>Protipohyb po výstupu <span class="sub">— v ticích, proti směru obchodu</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
-            <div class="field full sub" id="postExitRuleHint">Vše v ticích, vždy kladně. MFE/MAE měř za dobu trvání obchodu (od vstupní ceny), pokračování/protipohyb po výstupu (od výstupní ceny). Vyplň, co jsi sledoval — prázdné pole je v pořádku, nula znamená „cena nešla ani o tick", což je jiná informace.<br>U obchodu ukončeného na Stop Lossu čti „pokračování" jako <i>o kolik by širší SL vyšel</i>.</div>
-            <div class="field"><label>Protipohyb přišel dřív než pokračování</label><select id="postExitAdverseFirst"><option value="ne">Ne</option><option value="ano">Ano</option></select></div>
-            <div class="field" id="postExitDerivedField"><label>Dopočítá se <span class="sub">— needitovatelné</span></label><div class="sub" id="postExitDerivedHint">—</div></div>
-          </div>
-        </div>
-        <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
-        <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
-        <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
-        <details class="field full chip-collapse" id="levelsBlock">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Hladiny <span class="sub" id="levelsSummary"></span></summary>
-          <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
-          <div class="field full"><label>SR proti targetu <span class="sub">— hladiny v cestě k cíli (ve směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srTarget" class="sr-rows"></div><button type="button" class="btn" style="margin-top:6px" onclick="appendLevelRow('srTarget')">＋ Přidat hladinu</button></div>
-          <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem (proti směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><button type="button" class="btn" style="margin-top:6px" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
-          <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
-          <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
-          <div class="field"><label>Cena cílové hladiny 1</label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"></div>
-          <div class="field"><label>Cílová hladina 2 <span class="sub">— typ</span></label><select id="targetLevel2Type"></select></div>
-          <div class="field"><label>Cena cílové hladiny 2</label><input id="targetLevel2Price" type="number" step="any" placeholder="např. 7720"></div>
-        </details>
         <div class="field full" id="pnlCalcHint" style="margin-top:-6px"></div>
         <div class="field" id="extraLegsField" style="grid-column:1/-1">
           <label>Více cílů u téhož obchodu (TP2, Break Even…) <span class="sub">— nepovinné</span></label>
@@ -1140,17 +1149,61 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="extraLegsList" style="margin-top:8px"></div>
           <button type="button" class="btn" id="addLegBtn" style="margin-top:8px">＋ Přidat další cíl</button>
         </div>
-        <div class="field"><label>Strategie</label><input id="strategy" placeholder="Volitelné"></div>
-        <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
-        <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
-        <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
-        
-        <div class="field full"><label>Setup / scénář <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanSetup" placeholder="Volitelné"></textarea></div>
-        <div class="field full"><label>Psychologický checklist <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanPsychology" placeholder="Volitelné"></textarea></div>
-        <div class="field full"><label>Komentář k setupu <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanNote" placeholder="Volitelné"></textarea></div>
-        <div class="field full"><label>Komentář <span class="optional-badge" title="Tohle je pole, které uvidíš u obchodu v přehledu Deníku.">Viditelné</span></label><textarea id="comment" placeholder="Volitelné"></textarea></div>
-        <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tohle okno otevřené.</div><div class="image-preview" id="imagePreview"></div></div>
       </div>
+      <details class="trade-section" data-card="sltp">
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">SL / TP</span><span class="sub trade-section-summary" id="sltpSummary"></span><span class="trade-section-missing" id="sltpMissing"></span></summary>
+        <div class="formgrid">
+          <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="derived-readonly" id="slPriceView" style="display:none"><b id="slPriceViewValue"></b> <span class="sub" id="slPriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('slPrice')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="slPriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('slPrice')"></a><div class="sub" id="slPriceHint"></div></div>
+          <div class="field" id="targetLevel1PriceField"><label>Cena targetu <span class="sub">— pro výpočet R</span></label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"><div class="derived-readonly" id="targetLevel1PriceView" style="display:none"><b id="targetLevel1PriceViewValue"></b> <span class="sub" id="targetLevel1PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel1Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel1PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel1Price')"></a></div>
+          <div class="field" id="targetLevel2PriceField"><label>Cena targetu 2 <span class="sub">— druhý cíl</span></label><input id="targetLevel2Price" type="number" step="any" placeholder="např. 7720"><div class="derived-readonly" id="targetLevel2PriceView" style="display:none"><b id="targetLevel2PriceViewValue"></b> <span class="sub" id="targetLevel2PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel2Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel2PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel2Price')"></a></div>
+          <div class="field full sub" id="riskInfo"></div>
+        </div>
+      </details>
+      <details class="trade-section" data-card="course">
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Pohyb ceny</span><span class="sub trade-section-summary" id="courseSummary"></span><span class="trade-section-missing" id="courseMissing"></span></summary>
+        <div class="formgrid">
+          <div class="field full" id="postExitBlock">
+          <div class="formgrid">
+          <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="mfeTicks" type="number" step="any" min="0" placeholder="např. 20"><div class="derived-readonly" id="mfeTicksView" style="display:none"><b id="mfeTicksViewValue"></b> t <span class="sub" id="mfeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('mfeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="mfeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('mfeTicks')"></a><div class="sub" id="mfeTicksSourceNote"></div><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
+          <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="maeTicks" type="number" step="any" min="0" placeholder="např. 6"><div class="derived-readonly" id="maeTicksView" style="display:none"><b id="maeTicksViewValue"></b> t <span class="sub" id="maeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('maeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="maeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('maeTicks')"></a><div class="sub" id="maeTicksSourceNote"></div><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
+          <div class="field"><label><svg class="dir-icon up" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Ticky po výstupu — ve směru zisku <span class="sub">— od výstupní ceny</span></label><input id="postExitFavorableTicks" type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
+          <div class="field"><label><svg class="dir-icon down" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Ticky po výstupu — proti <span class="sub">— od výstupní ceny</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
+          <div class="field"><label>Protipohyb přišel dřív? <span class="sub">— než pohyb ve směru zisku</span></label><select id="postExitAdverseFirst"><option value="ne">Ne</option><option value="ano">Ano</option></select></div>
+          <div class="field"><label>Sledováno po výstupu <span class="sub">— minut, nepovinné</span></label><input id="observedMinutes" type="number" step="any" min="0" placeholder="např. 30"></div>
+          <div class="field full sub" id="postExitRuleHint">Vše v ticích, vždy kladně. MFE/MAE měř za dobu trvání obchodu (od vstupní ceny), ticky po výstupu od výstupní ceny. Vyplň, co jsi sledoval — prázdné pole je v pořádku, nula znamená „cena nešla ani o tick", což je jiná informace.<br>U obchodu ukončeného na Stop Lossu čti „ve směru zisku" jako <i>o kolik by širší SL vyšel</i>.</div>
+          <div class="field" id="postExitDerivedField"><label>Dopočítá se <span class="sub">— needitovatelné</span></label><div class="sub" id="postExitDerivedHint">—</div></div>
+          </div>
+          </div>
+          <div class="field full sub" id="postExitNotApplies" style="display:none">U výslovně nenaplněného setupu se pohyb ceny nevyplňuje – nebylo co měřit.</div>
+        </div>
+      </details>
+      <details class="trade-section" data-card="setup">
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Setup</span><span class="sub trade-section-summary"><span id="setupSummary"></span> <span id="levelsSummary"></span></span><span class="trade-section-missing" id="setupMissing"></span></summary>
+        <div class="formgrid">
+          <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
+          <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
+          <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
+          <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
+          <div class="field full"><label>SR proti targetu <span class="sub">— hladiny v cestě k cíli (ve směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srTarget" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srTargetAdd" onclick="appendLevelRow('srTarget')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srTargetNone"> žádná hladina v cestě</label></div></div>
+          <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem (proti směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srStopLossAdd" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srStopLossNone"> žádná hladina v cestě</label></div><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
+          <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
+          <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
+          <div class="field"><label>Cílová hladina 2 <span class="sub">— typ</span></label><select id="targetLevel2Type"></select></div>
+          <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+          <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
+          <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
+        </div>
+      </details>
+      <details class="trade-section" data-card="comments">
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Komentáře</span><span class="sub trade-section-summary" id="commentsSummary"></span><span class="trade-section-missing" id="commentsMissing"></span></summary>
+        <div class="formgrid">
+          <div class="field full"><label>Setup / scénář <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanSetup" placeholder="Volitelné"></textarea></div>
+          <div class="field full"><label>Psychologický checklist <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanPsychology" placeholder="Volitelné"></textarea></div>
+          <div class="field full"><label>Komentář k setupu <span class="optional-badge">nepovinné</span></label><textarea id="tradePlanNote" placeholder="Volitelné"></textarea></div>
+          <div class="field full"><label>Komentář <span class="optional-badge" title="Tohle je pole, které uvidíš u obchodu v přehledu Deníku.">Viditelné</span></label><textarea id="comment" placeholder="Volitelné"></textarea></div>
+          <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tohle okno otevřené.</div><div class="image-preview" id="imagePreview"></div></div>
+        </div>
+      </details>
       <div id="formAlert" class="alert red"></div>
       <button class="btn primary" type="submit" style="margin-top:16px">Uložit obchod</button>
     </form>
@@ -1227,7 +1280,7 @@ async function storeScreenshot(dataUrl){
 }
 let tradeFormBaseline='';
 function tradeFormSnapshot(){
- const vals=[...$('tradeForm').querySelectorAll('input,select,textarea')].map(el=>el.type==='file'?'':el.value);
+ const vals=[...$('tradeForm').querySelectorAll('input,select,textarea')].map(el=>el.type==='file'?'':(el.type==='checkbox'?el.checked:el.value));
  return JSON.stringify(vals)+'|'+JSON.stringify(editImages);
 }
 
@@ -1466,6 +1519,18 @@ function renderSkipLiveStats(stats){
  ];
  const reasons=stats.byReason.map(r=>row(esc(r.key?FJTaxonomy.labelOf('SKIP_REASON',r.key):'Bez důvodu'),`${r.count}× · ${r.wins}/${r.losses} · ${(r.pnl>=0?'+':'')+money(r.pnl)}`,r.pnl>=0?'pos':'neg'));
  el.innerHTML=lines.join('')+(reasons.length?'<div class="sub" style="margin-top:6px">Podle důvodu (počet · zisk/ztráta · P/L)</div>'+reasons.join(''):'');
+}
+// Štítek „Neúplné" na kartách obchodů (Nastavení → Obecné). Stejně jako
+// přepínač výše platí pro celou aplikaci, ne pro jeden deník, a pamatuje se.
+// Výchozí je zapnuto – vypnuto je jen výslovně uložené '0'.
+const MARK_INCOMPLETE_KEY='FJ_markIncompleteTrades';
+function readMarkIncompleteTrades(){try{return localStorage.getItem(MARK_INCOMPLETE_KEY)!=='0'}catch{return true}}
+let markIncompleteTrades=readMarkIncompleteTrades();
+function setMarkIncompleteTrades(value){
+ markIncompleteTrades=value===true;
+ try{localStorage.setItem(MARK_INCOMPLETE_KEY,markIncompleteTrades?'1':'0')}catch{}
+ if($('markIncompleteTrades'))$('markIncompleteTrades').checked=markIncompleteTrades;
+ renderAll();
 }
 // Jediné místo, které přepínač mění: srovná všechny jeho checkboxy a
 // překreslí to, co z výkonových čísel stojí.
@@ -1759,9 +1824,8 @@ function renderTemplateList(){
  if(dl)dl.innerHTML=list.map(t=>`<option value="${esc(t.instrument)}">`).join('');
  const box=$('templateList');
  if(!box)return;
- box.innerHTML=list.length?list.map(t=>`<div class="template-row" style="grid-template-columns:1fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
+ box.innerHTML=list.length?list.map(t=>`<div class="template-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
   <div><b>${esc(t.instrument)}</b></div>
-  <div>${esc(t.strategy||'—')}</div>
   <div>${t.planFollowed==='ano'?'Dodržen':t.planFollowed==='ne'?'Nedodržen':'—'}</div>
   <div>${t.pointValue?('$'+Number(t.pointValue).toFixed(2)):'—'}</div>
   <div>${t.tickSize?String(t.tickSize):'—'}</div>
@@ -1779,9 +1843,9 @@ $('addTemplate').onclick=async()=>{
  const pv=$('tplNewPointValue').value;
  const cm=$('tplNewCommission').value;
  const ts=$('tplNewTickSize').value;
- const tpl={id:crypto.randomUUID(),instrument,strategy:$('tplNewStrategy').value.trim(),planFollowed:$('tplNewPlan').value,comment:$('tplNewComment').value.trim(),pointValue:pv===''?null:Math.abs(Number(pv))||null,tickSize:ts===''?null:Math.abs(Number(ts))||null,defaultCommission:cm===''?null:Math.abs(Number(cm))||0};
+ const tpl={id:crypto.randomUUID(),instrument,planFollowed:$('tplNewPlan').value,comment:$('tplNewComment').value.trim(),pointValue:pv===''?null:Math.abs(Number(pv))||null,tickSize:ts===''?null:Math.abs(Number(ts))||null,defaultCommission:cm===''?null:Math.abs(Number(cm))||0};
  await persistSettings({templates:[...(settings.templates||[]),tpl]});
- $('tplNewInstrument').value='';$('tplNewStrategy').value='';$('tplNewPlan').value='';$('tplNewComment').value='';$('tplNewPointValue').value='';$('tplNewTickSize').value='';$('tplNewCommission').value='';
+ $('tplNewInstrument').value='';$('tplNewPlan').value='';$('tplNewComment').value='';$('tplNewPointValue').value='';$('tplNewTickSize').value='';$('tplNewCommission').value='';
  showToast('Šablona byla přidána.');
 };
 if($('saveConnectorCommissionSetting'))$('saveConnectorCommissionSetting').onclick=async()=>{
@@ -2675,7 +2739,7 @@ window.appendLevelRow=(field,row={})=>{
  el.innerHTML=`<select class="sr-level" aria-label="Typ hladiny"><option value="">— hladina —</option>${options.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('')}</select>`
   +'<input class="sr-price" type="number" step="any" placeholder="cena" aria-label="Cena hladiny">'
   +'<input class="sr-ticks" type="number" step="any" min="0" placeholder="ticky od vstupu" aria-label="Vzdálenost od vstupu v ticích">'
-  +'<button type="button" class="icon sr-remove" title="Odebrat hladinu">✕</button><div class="sub post-exit-warn sr-warn"></div>';
+  +'<button type="button" class="icon sr-remove" title="Odebrat hladinu">✕</button><div class="sub sr-dist"></div><div class="sub post-exit-warn sr-warn"></div>';
  el.querySelector('.sr-level').value=row.level||'';
  el.querySelector('.sr-price').value=row.price!=null?row.price:'';
  el.querySelector('.sr-ticks').value=row.ticksFromEntry!=null?row.ticksFromEntry:'';
@@ -2685,8 +2749,32 @@ window.appendLevelRow=(field,row={})=>{
  el.querySelector('.sr-ticks').addEventListener('input',()=>{el.dataset.anchor='ticks';recomputeLevelRow(field,el);updateLevelsSummary()});
  el.querySelector('.sr-remove').addEventListener('click',()=>{el.remove();updateLevelsSummary()});
  host.appendChild(el);
+ syncSrNoneControls();
  return el;
 };
+// „Žádná hladina v cestě" odlišuje „nic tam nebylo" od „nevyplněno" (štítek
+// Neúplné). Se zadanými řádky si odporuje, proto:
+//  - dokud jsou řádky, zaškrtnout nejde (a případné zaškrtnutí se zruší),
+//  - zaškrtnuté pole zneaktivní „Přidat hladinu".
+// Řádky se nikdy nemažou kvůli zaškrtnutí – vyplněná data se neztratí.
+function syncSrNoneControls(){
+ for(const field of Object.keys(SR_ENUMS)){
+  const box=$(field+'None'); if(!box)continue;
+  const hasRows=!!$(field)?.querySelector?.('.sr-row');
+  if(hasRows)box.checked=false;
+  box.disabled=hasRows;
+  const label=box.closest?.('.sr-none');
+  if(label){
+   label.classList.toggle('is-disabled',hasRows);
+   label.title=hasRows?'Nejdřív odeber zadané hladiny.':'Zaškrtni, když mezi vstupem a cílem / Stop Lossem žádná hladina nebyla.';
+  }
+  const add=$(field+'Add');
+  if(add)add.disabled=box.checked;
+ }
+}
+function readSrNone(field){
+ return $(field+'None')?.checked===true&&readLevelRows(field).length===0;
+}
 function renderLevelRows(field,rows){
  const host=$(field); if(!host)return;
  host.innerHTML='';
@@ -2714,6 +2802,7 @@ function updateConfluenceHint(){
 // jestli tam něco je, bez rozkliknutí.
 const LEVEL_FIELDS=[['entryLevels','ENTRY_LEVEL','Vstup'],['srTarget','SR_TARGET','SR→TG'],['srStopLoss','SR_SL','SR→SL'],['ofConfirm','OF_CONFIRM','OF']];
 function updateLevelsSummary(){
+ syncSrNoneControls();
  const out=$('levelsSummary'); if(!out)return;
  const parts=[];
  for(const [id,enumName,label] of LEVEL_FIELDS){
@@ -2721,6 +2810,7 @@ function updateLevelsSummary(){
   if(SR_ENUMS[id]){
    const rows=readLevelRows(id);
    if(rows.length)parts.push(label+': '+rows.map(r=>formatLevelRow(enumName,r)).join(', '));
+   else if(readSrNone(id))parts.push(label+': žádná');
    continue;
   }
   const keys=readChipGrid(id,enumName);
@@ -2750,6 +2840,10 @@ function mergeContextFields(list){
    // hodnoty se nepřepočítávají (sanitizeLevelRows).
    const rows=FJTaxonomy.sanitizeLevelRows(field.enumName,list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]));
    if(rows.length)out[field.key]=rows;
+  }else if(field.noneFor){
+   // „Žádná hladina" platí za celou pozici, jen když ji tvrdí všechny nohy
+   // a žádná noha hladinu nezadala (řádky jsou v TRADE_CONTEXT_FIELDS dřív).
+   if(list.length&&list.every(t=>t?.[field.key]===true)&&!out[field.noneFor])out[field.key]=true;
   }else if(field.cardinality==='multi'){
    const union=list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]);
    const clean=FJTaxonomy.sanitizeMulti(field.enumName,union);
@@ -2772,7 +2866,14 @@ function mergeContextFields(list){
     if(source[field.key+'Source'])out[field.key+'Source']=source[field.key+'Source'];
    }
   }else if(field.cardinality==='target'){
-   const first=list.map(t=>FJTaxonomy.sanitizeTargetLevel(t?.[field.key])).find(Boolean);
+   // Cena odvozená z výstupu nohy (targetLevelNPriceDerived) popisuje jen tu
+   // nohu – u sloučené pozice by target 1 nesl cenu libovolné nohy. Přebírá
+   // se jen typ; cenu formulář dopočítá z nohou znovu (deriveTargetPrices).
+   const first=list.map(t=>{
+    const tl=FJTaxonomy.sanitizeTargetLevel(t?.[field.key]);
+    if(tl&&t[field.key+'PriceDerived']===true)return tl.type?{type:tl.type,price:null}:null;
+    return tl;
+   }).find(Boolean);
    if(first)out[field.key]=first;
   }else if(field.merge==='lastExit'){
    // Skupina se bere z JEDNÉ nohy vcelku – jinak by se stalo, že čísla jsou
@@ -2797,15 +2898,25 @@ function mergeContextFields(list){
 function contextPillsHTML(t){
  const parts=[];
  // Měkké validace: jen upozornění, nikdy neblokují uložení ani nic nemažou.
- // Jen v deníku označeném jako backtestový: v živém deníku by staré obchody
- // dostaly štítek, který nikdy nezmizí (MFE/MAE se u nich zpětně nezjistí).
- const inBacktest=typeof journalProfiles!=='undefined'&&journalProfiles.find(j=>j.id===activeJournalId)?.backtest===true;
- if(inBacktest&&FJPoints.contextIncomplete(t))parts.push('<span class="pill context-pill post-exit-warn" title="Chybí MFE nebo MAE – obchod se do analýzy průběhu nedostane celý">neúplný kontext</span>');
+ // Chybějící kontext (dřív štítek „neúplný kontext" jen pro MFE/MAE
+ // v backtestovém deníku) hlásí štítek „Neúplné" v titulku karty
+ // (incompleteBadgeHTML) – zapíná se v Nastavení → Obecné.
  if(FJPoints.slTicksSuspicious(t.slTicks))parts.push(`<span class="pill context-pill post-exit-warn" title="SL nepravděpodobně daleko, překlep?">SL ${esc(t.slTicks)} t?</span>`);
  if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
  if(t.trend)parts.push(`<span class="pill context-pill" title="Trend">${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
  if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
  return parts.join(' ');
+}
+// Štítek „Neúplné · N" v titulku karty: obchod nemá vyplněný kontext
+// (FJTaxonomy.missingContextKeys). Co chybí, říká tooltip – karta zůstane
+// kompaktní. Vypíná se v Nastavení → Obecné (markIncompleteTrades, jeden
+// přepínač pro celou aplikaci, výchozí zapnuto).
+function incompleteBadgeHTML(t){
+ if(typeof markIncompleteTrades!=='undefined'&&markIncompleteTrades===false)return '';
+ const missing=FJTaxonomy.missingContextKeys(t);
+ if(!missing.length)return '';
+ const labels=missing.map(k=>FJTaxonomy.contextFieldLabel(k));
+ return `<span class="pill incomplete-pill" title="Chybí: ${esc(labels.join(', '))}">⚠ Neúplné · ${missing.length}</span>`;
 }
 // Hladiny a order flow – to, co se na kartě sbaluje. Vrací i počet pilulek,
 // protože hlavička sbalené položky říká, kolik jich je pod ní schovaných.
@@ -2814,9 +2925,18 @@ function levelPillsHTML(t){
  const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
  if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + '))}</span>`);
  const srT=FJTaxonomy.sanitizeLevelRows('SR_TARGET',t.srTarget);
- if(srT.length)parts.push(`<span class="pill context-pill" title="SR proti targetu (cena · vzdálenost od vstupu v ticích)">SR→TG: ${esc(srT.map(r=>formatLevelRow('SR_TARGET',r)).join(', '))}</span>`);
+ // Vzdálenost od SL / před targetem se k řádku připíše jen pro zobrazení
+ // (z uložené ceny SL a ceny targetu 1), uložená je jen ta od vstupu.
+ const tick=getTickSizeForInstrument(t.instrument);
+ const withDist=(field,enumName,r)=>{
+  const dist=srRefDistanceText(field,r.price,field==='srStopLoss'?t.slPrice:t.targetLevel1?.price,tick);
+  return formatLevelRow(enumName,r)+(dist?' · '+dist:'');
+ };
+ if(srT.length)parts.push(`<span class="pill context-pill" title="SR proti targetu (cena · vzdálenost od vstupu v ticích · před targetem)">SR→TG: ${esc(srT.map(r=>withDist('srTarget','SR_TARGET',r)).join(', '))}</span>`);
+ else if(t.srTargetNone===true)parts.push('<span class="pill context-pill" title="SR proti targetu: žádná hladina v cestě">SR→TG: žádná</span>');
  const srS=FJTaxonomy.sanitizeLevelRows('SR_SL',t.srStopLoss);
- if(srS.length)parts.push(`<span class="pill context-pill" title="SR proti S/L (cena · vzdálenost od vstupu v ticích)">SR→SL: ${esc(srS.map(r=>formatLevelRow('SR_SL',r)).join(', '))}</span>`);
+ if(srS.length)parts.push(`<span class="pill context-pill" title="SR proti S/L (cena · vzdálenost od vstupu v ticích · od SL)">SR→SL: ${esc(srS.map(r=>withDist('srStopLoss','SR_SL',r)).join(', '))}</span>`);
+ else if(t.srStopLossNone===true)parts.push('<span class="pill context-pill" title="SR proti S/L: žádná hladina v cestě">SR→SL: žádná</span>');
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
   if(!target)continue;
@@ -2857,11 +2977,30 @@ function deriveStopLossPrice(t){
  const p=Number(t.exitPrice);
  return Number.isFinite(p)&&p?p:null;
 }
+// Odvození cen targetů – protějšek deriveStopLossPrice. Ceny ziskových nohou
+// v pořadí nohou (TP1, TP2), BEZ DUPLICIT: dva cíle zavřené na stejné ceně
+// (NinjaTrader je umí nahlásit jako dvě exekuce) jsou jeden target, ne target
+// 1 a 2 se stejnou cenou. BE a SL nohy target nejsou. Bez nohou: obchod na
+// targetu → výstupní cena.
+function deriveTargetPrices(t){
+ const legs=FJPoints.legsOf(t);
+ const raw=legs?legs.filter(l=>l.result==='target').map(l=>Number(l.exitPrice))
+  :(t.result==='target'?[Number(t.exitPrice)]:[]);
+ const out=[];
+ for(const p of raw){
+  if(!Number.isFinite(p)||!p)continue;
+  if(!out.some(q=>Math.abs(q-p)<1e-6))out.push(p);
+ }
+ return out;
+}
 // Riziková pole (spec §3.3c). R se počítá VŽDY z bodů na kontrakt, nikdy
 // z celkových – jinak by u dvoukontraktové pozice vyšlo dvojnásobné.
+// Plánované R = nejvzdálenější target ÷ riziko (FJPoints.plannedRMultipleOf).
 function riskFields(t){
  const slPoints=FJPoints.slPointsOf(t.entryPrice,t.slPrice);
- const out={slPoints,rMultiple:FJPoints.rMultipleOf(t.pointsPerContract,slPoints)};
+ const targets=[t.targetLevel1?.price,t.targetLevel2?.price];
+ const out={slPoints,rMultiple:FJPoints.rMultipleOf(t.pointsPerContract,slPoints),
+  plannedRMultiple:FJPoints.plannedRMultipleOf(t,targets)};
  return out;
 }
 // Dopočítaná tiková pole k chování ceny po výstupu. Ukládají se NA OBCHOD
@@ -2922,12 +3061,11 @@ function postExitTicksWarning(raw){
  if(n<0)return 'Zadávej kladně, směr určuje pole.';
  return '';
 }
-// Popisek pod polem ceny SL: u odvozené hodnoty je potřeba, aby bylo vidět,
-// že ji nezadal uživatel.
+// Popisek pod polem ceny SL: R uloženého obchodu. Že je cena odvozená, říká
+// read-only dopočet (#slPriceView), ne tenhle popisek.
 function renderSlPriceHint(t){
  const hint=$('slPriceHint'); if(!hint)return;
- if(t&&t.slDerived&&t.slPrice!=null)hint.innerHTML=`<i>Odvozeno z výstupní ceny (${t.slPrice}). Přepsáním se příznak zruší.</i>`;
- else if(t&&t.rMultiple!=null)hint.textContent=`R = ${t.rMultiple} (${t.slPoints} b riziko)`;
+ if(t&&t.rMultiple!=null)hint.textContent=`R = ${t.rMultiple} (${t.slPoints} b riziko)`;
  else hint.textContent='';
 }
 // Vážená výstupní cena a cena poslední nohy (spec §3.2). Když nohu nejde
@@ -2966,6 +3104,7 @@ function tradeHTML(t){
  // čtyřsloupcová mřížka a obchod bez kontextu má buněk jen tři, jak to bylo
  // vždycky – prázdná buňka by mu posunula zbytek karty o sloupec.
  const ctxPills=contextPillsHTML(t);
+ const incompleteBadge=incompleteBadgeHTML(t);
  const levelsBlock=tradeLevelsBlockHTML(t);
  const importedBadge=isImported?`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Automaticky naimportováno z konektoru">⚡ Auto import</span>`:'';
  // „Naživo bych nevzal“: štítek nese popisek DŮVODU, ne obecné „nevzal bych“ –
@@ -2973,15 +3112,15 @@ function tradeHTML(t){
  const skipLive=t.wouldSkipLive===true;
  const skipBadge=skipLive?`<span class="pill skip-live-pill" title="Naživo bych nevzal – vzato jen kvůli měření. Ve výchozím stavu mimo P/L a statistiky výkonu.">${esc(t.wouldSkipReason?FJTaxonomy.labelOf('SKIP_REASON',t.wouldSkipReason):'naživo bych nevzal')}</span>`:'';
  return `<div class="card trade${skipLive?' skip-live':''}">
- <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
+ <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${incompleteBadge?' '+incompleteBadge:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
  <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů${totalPointsDisplay} · ${dualMoney(pnlVal,true)}</div>
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
- ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}</div>`:''}
+ ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}${t.plannedRMultiple!=null?` · <span title="Plánované R: nejvzdálenější target ÷ riziko">plán R <b>${Number(t.plannedRMultiple).toFixed(2)}</b></span>`:''}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
  </div>
  ${(ctxPills||levelsBlock)?`<div>${ctxPills?`<div class="trade-legs" style="margin-top:6px">${ctxPills}</div>`:''}${levelsBlock}</div>`:''}
- <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Strategie: ${esc(t.strategy||'—')}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
+ <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
  <div>${t.comment?`<div class="comment">${esc(t.comment)}</div>`:''}${(importedBadge||skipBadge)?`<div class="sub" style="margin-top:2px">${[skipBadge,importedBadge].filter(Boolean).join(' ')}</div>`:''}
  ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
  ${t.dailyPlan.instrument?`<div><b>Instrument:</b> ${esc(t.dailyPlan.instrument)}</div>`:''}
@@ -3335,7 +3474,17 @@ function openModal(t=null){
  resetLegRows();
  if($('templateHint'))$('templateHint').textContent='';
  if($('pnlCalcHint'))$('pnlCalcHint').innerHTML='';
- if($('slPrice'))$('slPrice').value=(t&&t.slPrice!=null&&t.slPrice!=='')?t.slPrice:'';
+ if($('slPrice')){
+  const el=$('slPrice');
+  el.value=(t&&t.slPrice!=null&&t.slPrice!=='')?t.slPrice:'';
+  // Odvozená cena SL se ukáže jako read-only dopočet (renderPostExitHints),
+  // ruční zůstane v poli – stejně jako MFE/MAE níže.
+  const has=el.value!=='';
+  const derived=has&&t.slDerived===true;
+  const ds=el.dataset||(el.dataset={});
+  ds.derived=derived?'1':'';
+  ds.manual=has&&!derived?'1':'';
+ }
  renderSlPriceHint(t||null);
  // Číselníky se plní z taxonomy.js, ne z HTML – jeden zdroj pravdy pro UI,
  // statistiky i export.
@@ -3369,25 +3518,36 @@ function openModal(t=null){
   const derived=has&&t[key+'Derived']===true;
   const ds=el.dataset||(el.dataset={});
   ds.derived=derived?'1':'';
-  ds.manual=has&&!derived?'1':'';
   ds.source=has&&!derived&&t[key+'Source']?String(t[key+'Source']):'';
+  // Naměřená hodnota (konektor) není ruční – syncCourseField ji ukáže zamčenou.
+  ds.manual=has&&!derived&&!ds.source?'1':'';
   ds.mergedDerived=multiLeg&&derived?String(t[key]):'';
  }
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t&&t['targetLevel'+n]);
   fillContextSelect('targetLevel'+n+'Type','TARGET_LEVEL','— nevyplněno —',target&&target.type);
   if($('targetLevel'+n+'Type'))$('targetLevel'+n+'Type').value=target?target.type:'';
-  if($('targetLevel'+n+'Price'))$('targetLevel'+n+'Price').value=(target&&target.price!=null)?target.price:'';
+  const el=$('targetLevel'+n+'Price');
+  if(el){
+   el.value=(target&&target.price!=null)?target.price:'';
+   // Cena targetu se chová jako cena SL: odvozená = read-only dopočet.
+   const has=el.value!=='';
+   const derived=has&&t['targetLevel'+n+'PriceDerived']===true;
+   const ds=el.dataset||(el.dataset={});
+   ds.derived=derived?'1':'';
+   ds.manual=has&&!derived?'1':'';
+  }
  }
  renderSingleChipGrid('trend','TREND',t&&t.trend);
  renderChipGrid('entryLevels','ENTRY_LEVEL',t&&t.entryLevels);
  renderLevelRows('srTarget',t&&t.srTarget);
  renderLevelRows('srStopLoss',t&&t.srStopLoss);
+ // Zaškrtnutí až po řádcích: syncSrNoneControls ho u obchodu s řádky zruší.
+ for(const field of Object.keys(SR_ENUMS))if($(field+'None'))$(field+'None').checked=!!(t&&t[field+'None']===true);
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
  updateConfluenceHint();
- // Sbalené při každém otevření – rozbalený stav by si <details> pamatoval
- // z minulého obchodu a smysl sbalení (kratší formulář) by se ztratil.
- if($('levelsBlock'))$('levelsBlock').open=false;
+ // Karty formuláře se otevřou tak, jak je uživatel naposledy nechal.
+ applyTradeSectionsOpenState();
  updateLevelsSummary();
  if($('extraLegsField'))$('extraLegsField').style.display='';
  if(t){
@@ -3412,7 +3572,7 @@ function openModal(t=null){
    $('pnl').value=(t.pnlRaw!==undefined&&t.pnlRaw!==null?t.pnlRaw:t.pnl)??'';
    $('commission').value=t.commission??0;
   }
-  ['strategy','planFollowed','comment'].forEach(k=>$(k).value=t[k]??'');
+  ['planFollowed','comment'].forEach(k=>$(k).value=t[k]??'');
   if(legs){
    legs.slice(1).forEach(l=>{
     const row=appendBlankLegRow();
@@ -3540,7 +3700,7 @@ function readLegRows(){
   pnlTyped:row.querySelector('.leg-pnl').value===''?0:Number(row.querySelector('.leg-pnl').value)||0
  }));
 }
-if($('addLegBtn'))$('addLegBtn').onclick=()=>addLegRow();
+if($('addLegBtn'))$('addLegBtn').onclick=()=>{addLegRow();renderPostExitHints()};
 function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div><img src="${src}" style="cursor:pointer" title="Otevřít obrázek ve výchozím prohlížeči obrázků" onclick="openImageFromForm('${src}')"><button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
 window.removeImg=i=>{editImages.splice(i,1);showPreviews()}
 window.editTrade=id=>{
@@ -3648,9 +3808,7 @@ function postExitDraftFromForm(){
   postExitFavorableTicks:$('postExitFavorableTicks')?.value,
   postExitAdverseTicks:$('postExitAdverseTicks')?.value,
   mfeTicks:$('mfeTicks')?.value,
-  maeTicks:$('maeTicks')?.value,
-  targetLevel1:{price:$('targetLevel1Price')?.value},
-  targetLevel2:{price:$('targetLevel2Price')?.value}
+  maeTicks:$('maeTicks')?.value
  };
  // Další cíle z formuláře jako nohy, stejně jako je sestaví uložení. Bez nich
  // by dopočty viděly jen první cíl: MFE/MAE by se odvodily z jeho výstupu
@@ -3661,7 +3819,16 @@ function postExitDraftFromForm(){
   draft.legs=[{exitPrice:Number(draft.exitPrice)||0,result:draft.result},
    ...legRows.map(r=>({exitPrice:r.exitPrice,result:classifyResult(r.pnlTyped)}))];
  }
- const typedSl=$('slPrice')?.value;
+ // Ceny targetů stejně jako cena SL: pole v režimu dopočtu se nebere, ale
+ // počítá se čerstvě z výstupu / nohou.
+ const derivedTargets=deriveTargetPrices(draft);
+ for(const n of [1,2]){
+  const el=$('targetLevel'+n+'Price');
+  draft['targetLevel'+n]={price:el?.dataset?.derived==='1'?(derivedTargets[n-1]??''):el?.value};
+ }
+ // Hodnota v poli je ruční jen tehdy, když není odvozená – skryté pole
+ // s dopočtem by jinak po změně výsledku drželo starou cenu.
+ const typedSl=$('slPrice')?.dataset?.derived==='1'?'':$('slPrice')?.value;
  if(typedSl!==undefined&&String(typedSl).trim()!=='')draft.slPrice=Number(typedSl);
  else{const derived=deriveStopLossPrice(draft);if(derived!=null)draft.slPrice=derived}
  return draft;
@@ -3670,10 +3837,34 @@ function formatTicks(v){
  return v==null?'—':String(v);
 }
 // Dopočty vedle vstupů. Nic se tu needituje – jen se ukazuje, co se uloží.
+// Jediný vstup pro všechny dopočty formuláře – volá ho každá změna, která
+// může dopočty posunout.
 function renderPostExitHints(){
+ // Cena SL u obchodu ukončeného na SL je výstupní cena (u víc cílů cena nohy,
+ // která šla na SL), cena targetu u obchodu na targetu také (TP1 → target 1,
+ // TP2 → target 2) – read-only dopočet jako MFE/MAE. Karta SL / TP nezávisí
+ // na Stavu naplnění, proto se obnovuje dřív než Pohyb ceny.
+ const draft=postExitDraftFromForm();
+ syncCourseField('slPrice',deriveStopLossPrice(draft),'z výstupní ceny','');
+ const targets=deriveTargetPrices(draft);
+ for(const n of [1,2])syncCourseField('targetLevel'+n+'Price',targets[n-1]??null,'z výstupní ceny','');
+ // Target 2 jen tam, kde dává smysl: obchod má další cíl, nebo už cenu.
+ const t2=$('targetLevel2PriceField');
+ if(t2){
+  const hasLegs=typeof document!=='undefined'&&typeof document.querySelector==='function'&&!!document.querySelector('#extraLegsList .leg-row');
+  t2.style.display=(targets.length>1||hasLegs||String($('targetLevel2Price')?.value??'').trim()!=='')?'':'none';
+ }
+ renderCourseHints();
+ renderRiskInfo();
+ renderSrDistances();
+ renderTradeSections();
+}
+// Pohyb ceny (MFE, MAE, ticky po výstupu) a jejich dopočty.
+function renderCourseHints(){
  const block=$('postExitBlock');
  const applies=postExitApplies($('fillStatus')?.value);
  if(block)block.style.display=applies?'':'none';
+ if($('postExitNotApplies'))$('postExitNotApplies').style.display=applies?'none':'';
  if(!applies)return;
  // MFE u targetu / MAE u stoplossu je aritmetika, ne měření – ukazuje se jako
  // read-only dopočet, ne jako předvyplněné pole. Ručně zadaná hodnota se
@@ -3719,6 +3910,125 @@ function renderPostExitHints(){
  else if(!draft.side)note='<br><i>Bez směru obchodu nejde určit, kam vedlo „ve směru" – doplň Long/Short.</i>';
  hint.innerHTML=esc(parts.join(' · '))+note;
 }
+// Řádek pod cenami v kartě SL / TP: riziko a plánované R (nejvzdálenější
+// target ÷ riziko). Skutečné R obchodu se počítá při uložení (riskFields).
+function renderRiskInfo(){
+ const out=$('riskInfo'); if(!out)return;
+ const d=postExitDraftFromForm();
+ const slPoints=FJPoints.slPointsOf(d.entryPrice,d.slPrice);
+ const planned=FJPoints.plannedRMultipleOf(d,[d.targetLevel1?.price,d.targetLevel2?.price]);
+ if(slPoints==null){out.textContent='Bez ceny Stop Lossu se R nepočítá.';return}
+ out.textContent=`Riziko ${slPoints} b na kontrakt`+(planned!=null?` · plánované R ${planned}`:' · plánované R: doplň cenu targetu');
+}
+// Vzdálenost SR hladiny od SL (SR proti S/L) a před targetem (SR proti
+// targetu) v ticích – jen zobrazení. Uložená vzdálenost zůstává od vstupu
+// (ticksFromEntry), na ní stojí analýza v Backtest Labu.
+function srRefDistanceText(field,price,ref,tick){
+ const n=FJPoints.srTicksFromPrice(price,ref,tick);
+ if(n==null)return '';
+ return field==='srStopLoss'?`${n} t od SL`:`${n} t před targetem`;
+}
+function renderSrDistances(){
+ if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
+ // Poznámka o přepočtu cena ↔ ticky: openModal vykresluje SR řádky dřív, než
+ // vyplní instrument a vstup, takže by po otevření obchodu tvrdila, že tick
+ // chybí. Obnovuje se proto s každým dopočtem.
+ renderSrLinkNote();
+ const d=postExitDraftFromForm();
+ const tick=getTickSizeForInstrument(d.instrument);
+ const refs={srStopLoss:d.slPrice,srTarget:d.targetLevel1?.price};
+ for(const field of Object.keys(SR_ENUMS)){
+  document.querySelectorAll('#'+field+' .sr-row').forEach(el=>{
+   const box=el.querySelector('.sr-dist'); if(!box)return;
+   box.textContent=srRefDistanceText(field,el.querySelector('.sr-price')?.value,refs[field],tick);
+  });
+ }
+}
+// ---- Karty formuláře obchodu (SL / TP, Pohyb ceny, Setup, Komentáře) ----
+// Rozbalení se pamatuje (localStorage, jen pohodlí v tomhle zařízení);
+// poprvé jsou rozbalené SL / TP a Pohyb ceny.
+const TRADE_SECTIONS_KEY='FJ_tradeFormOpenCards';
+const TRADE_SECTIONS_DEFAULT=['sltp','course'];
+function readTradeSectionsOpen(){
+ try{const raw=localStorage.getItem(TRADE_SECTIONS_KEY);if(raw==null)return TRADE_SECTIONS_DEFAULT;const v=JSON.parse(raw);return Array.isArray(v)?v:TRADE_SECTIONS_DEFAULT}catch{return TRADE_SECTIONS_DEFAULT}
+}
+function applyTradeSectionsOpenState(){
+ if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
+ const open=new Set(readTradeSectionsOpen());
+ document.querySelectorAll('#tradeForm details.trade-section').forEach(card=>{card.open=open.has(card.dataset.card)});
+}
+// Kontext obchodu tak, jak je zrovna ve formuláři – pro „chybí N" v hlavičkách
+// karet. Stejná kontrola jako štítek „Neúplné" (FJTaxonomy.missingContextKeys).
+function formContextDraft(){
+ const d=postExitDraftFromForm();
+ const srNone=field=>typeof readSrNone==='function'&&readSrNone(field);
+ return {...d,
+  setupCode:$('setupCode')?.value||'',fillStatus:$('fillStatus')?.value||'',
+  trend:readSingleChipGrid('trend','TREND'),entryLevels:readChipGrid('entryLevels','ENTRY_LEVEL'),
+  srTarget:readLevelRows('srTarget'),srStopLoss:readLevelRows('srStopLoss'),
+  srTargetNone:srNone('srTarget'),srStopLossNone:srNone('srStopLoss'),
+  ofConfirm:readChipGrid('ofConfirm','OF_CONFIRM'),
+  targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price}
+ };
+}
+// Do které karty patří chybějící pole. Cílová hladina 1 se dělí: typ je
+// v Setupu, cena v SL / TP.
+const TRADE_SECTION_OF={slPrice:'sltp',mfeTicks:'course',maeTicks:'course',postExitFavorableTicks:'course',postExitAdverseTicks:'course',
+ setupCode:'setup',fillStatus:'setup',trend:'setup',entryLevels:'setup',srTarget:'setup',srStopLoss:'setup',ofConfirm:'setup'};
+function missingBySection(d){
+ const out={sltp:[],course:[],setup:[],comments:[]};
+ for(const key of FJTaxonomy.missingContextKeys(d)){
+  if(key==='targetLevel1'){
+   const tl=d.targetLevel1||{};
+   if(!tl.type)out.setup.push(FJTaxonomy.contextFieldLabel(key)+' (typ)');
+   if(String(tl.price??'').trim()===''||!Number.isFinite(Number(tl.price)))out.sltp.push('Cena targetu');
+   continue;
+  }
+  (out[TRADE_SECTION_OF[key]]||out.setup).push(FJTaxonomy.contextFieldLabel(key));
+ }
+ return out;
+}
+function renderTradeSections(){
+ if(!$('sltpSummary'))return;
+ const d=formContextDraft();
+ const val=v=>String(v??'').trim();
+ const sltp=[];
+ if(val(d.slPrice))sltp.push('SL '+d.slPrice);
+ if(val(d.targetLevel1?.price))sltp.push('TP '+d.targetLevel1.price);
+ if(val(d.targetLevel2?.price))sltp.push('TP2 '+d.targetLevel2.price);
+ const planned=FJPoints.plannedRMultipleOf(d,[d.targetLevel1?.price,d.targetLevel2?.price]);
+ if(planned!=null)sltp.push('plán R '+planned);
+ $('sltpSummary').textContent=sltp.length?'— '+sltp.join(' · '):'';
+ const course=[];
+ if(!postExitApplies(d.fillStatus))course.push('nenaplněný setup');
+ else{
+  if(val(d.mfeTicks))course.push('MFE '+d.mfeTicks);
+  if(val(d.maeTicks))course.push('MAE '+d.maeTicks);
+  if(val(d.postExitFavorableTicks))course.push('↑ '+d.postExitFavorableTicks);
+  if(val(d.postExitAdverseTicks))course.push('↓ '+d.postExitAdverseTicks);
+ }
+ if($('courseSummary'))$('courseSummary').textContent=course.length?'— '+course.join(' · '):'';
+ const setup=[];
+ if(d.setupCode)setup.push(FJTaxonomy.labelOf('SETUP',d.setupCode));
+ if(d.fillStatus&&d.fillStatus!=='FILLED')setup.push(FJTaxonomy.labelOf('FILL_STATUS',d.fillStatus));
+ if(d.trend)setup.push('trend '+FJTaxonomy.labelOf('TREND',d.trend));
+ if($('setupSummary'))$('setupSummary').textContent=setup.length?'— '+setup.join(' · '):'';
+ const texts=['tradePlanSetup','tradePlanPsychology','tradePlanNote','comment'].filter(id=>val($(id)?.value)).length;
+ const shots=typeof editImages!=='undefined'&&Array.isArray(editImages)?editImages.length:0;
+ const comments=[];
+ if(texts)comments.push(texts+(texts===1?' text':texts<5?' texty':' textů'));
+ if(shots)comments.push(shots+(shots===1?' screenshot':shots<5?' screenshoty':' screenshotů'));
+ if($('commentsSummary'))$('commentsSummary').textContent=comments.length?'— '+comments.join(' · '):'';
+ // „chybí N" se řídí stejným přepínačem jako štítek na kartě obchodu.
+ const show=!(typeof markIncompleteTrades!=='undefined'&&markIncompleteTrades===false);
+ const missing=missingBySection(d);
+ for(const card of Object.keys(missing)){
+  const el=$(card+'Missing'); if(!el)continue;
+  const list=show?missing[card]:[];
+  el.textContent=list.length?'chybí '+list.length:'';
+  el.title=list.length?'Chybí: '+list.join(', '):'';
+ }
+}
 // Jedno pole průběhu (MFE nebo MAE) ve třech stavech:
 //  - ruční (dataset.manual): editovatelné pole; když se hodnota dá dopočítat,
 //    nabídne se pod ním odkaz zpět na dopočet,
@@ -3729,27 +4039,39 @@ function renderPostExitHints(){
 // `origin` říká, odkud dopočet je (výchozí z výstupní ceny, u obchodu s víc
 // cíli ze sloučených cílů).
 //
-// Hodnota naměřená konektorem (dataset.source) se k návratu na dopočet
-// nenabízí: měření má před aritmetikou přednost a jedním klikem by se
-// vyměnilo za horší číslo. Když ji uživatel přepíše, je z ní ruční hodnota
-// a odkaz se nabídne jako u každé jiné.
-function syncCourseField(key,derivedValue,origin='z výstupní ceny'){
+// Hodnota naměřená konektorem (dataset.source, bez ručního zásahu) je čtvrtý
+// stav: ukáže se ZAMČENÁ stejně jako dopočet („18 t — importováno
+// z NinjaTraderu" + „upravit ručně"), protože to není ruční zadání. Měření má
+// přednost před aritmetikou, takže ho dopočet nepřepíše a návrat na dopočet
+// se u něj nenabízí. Po „upravit ručně" je pole editovatelné; až ho uživatel
+// přepíše, je z něj ruční hodnota a odkaz se nabídne jako u každé jiné.
+//
+// Stejně se chová i cena Stop Lossu a cena targetu (dopočet z výstupní ceny)
+// – jen bez jednotky „t", proto `unit`.
+function sourceLabel(source){
+ return source==='nt8'?'importováno z NinjaTraderu':`naměřeno konektorem (${source})`;
+}
+function syncCourseField(key,derivedValue,origin='z výstupní ceny',unit=' t'){
  const el=$(key); if(!el)return;
  const ds=el.dataset||(el.dataset={});
  const view=$(key+'View'),revert=$(key+'Revert');
- const manual=ds.manual==='1'||(String(el.value??'').trim()!==''&&ds.derived!=='1');
- const showDerived=!manual&&derivedValue!=null;
+ const value=String(el.value??'').trim();
+ const measured=!!ds.source&&ds.manual!=='1'&&value!=='';
+ const manual=!measured&&(ds.manual==='1'||(value!==''&&ds.derived!=='1'));
+ const showDerived=!measured&&!manual&&derivedValue!=null;
  if(manual){ds.manual='1';ds.derived=''}
+ else if(measured)ds.derived='';
  else{el.value=derivedValue==null?'':derivedValue;ds.derived=showDerived?'1':''}
- el.style.display=showDerived?'none':'';
- if(view)view.style.display=showDerived?'':'none';
- if($(key+'ViewValue'))$(key+'ViewValue').textContent=showDerived?String(derivedValue):'';
- if($(key+'ViewNote'))$(key+'ViewNote').textContent='— dopočítáno '+origin;
- if($(key+'SourceNote'))$(key+'SourceNote').textContent=manual&&ds.source?(ds.source==='nt8'?'naměřeno v NinjaTraderu':`naměřeno konektorem (${ds.source})`):'';
+ const locked=measured||showDerived;
+ el.style.display=locked?'none':'';
+ if(view)view.style.display=locked?'':'none';
+ if($(key+'ViewValue'))$(key+'ViewValue').textContent=measured?value:(showDerived?String(derivedValue):'');
+ if($(key+'ViewNote'))$(key+'ViewNote').textContent=measured?'— '+sourceLabel(ds.source):'— dopočítáno '+origin;
+ if($(key+'SourceNote'))$(key+'SourceNote').textContent=manual&&ds.source?sourceLabel(ds.source):'';
  if(revert){
   const offer=manual&&!ds.source&&derivedValue!=null&&String(el.value??'').trim()!==String(derivedValue);
   revert.style.display=offer?'':'none';
-  revert.textContent=offer?`použít dopočet ${origin} (${derivedValue} t)`:'';
+  revert.textContent=offer?`použít dopočet ${origin} (${derivedValue}${unit})`:'';
  }
 }
 // „upravit ručně": dopočet se přesune do pole jako výchozí hodnota a od té
@@ -3778,9 +4100,32 @@ function useDerivedCourse(key){
 ['mfeTicks','maeTicks'].forEach(id=>$(id)?.addEventListener('input',()=>{
  const ds=$(id).dataset||($(id).dataset={});ds.derived='';ds.manual='1';ds.source='';
 }));
+// Stejně u ceny SL a cen targetů: co uživatel napíše, je ruční hodnota
+// (slDerived / targetLevelNPriceDerived = false).
+['slPrice','targetLevel1Price','targetLevel2Price'].forEach(id=>$(id)?.addEventListener('input',()=>{
+ const ds=$(id).dataset||($(id).dataset={});ds.derived='';ds.manual='1';
+}));
+['targetLevel1Price','targetLevel2Price'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
+// Hlavičky karet (shrnutí, „chybí N") a vzdálenosti SR od SL / targetu
+// sledují každou změnu ve formuláři – i klik na dlaždici, který „input"
+// nevyvolá. Jednou za snímek, ať psaní nezdržuje.
+let tradeSectionsFrame=0;
+const scheduleTradeSections=()=>{
+ if(tradeSectionsFrame)return;
+ tradeSectionsFrame=requestAnimationFrame(()=>{tradeSectionsFrame=0;renderSrDistances();renderTradeSections()});
+};
+['input','change','click'].forEach(ev=>$('tradeForm')?.addEventListener(ev,scheduleTradeSections));
+document.querySelectorAll('#tradeForm details.trade-section').forEach(card=>card.addEventListener('toggle',()=>{
+ const open=[...document.querySelectorAll('#tradeForm details.trade-section')].filter(c=>c.open).map(c=>c.dataset.card);
+ try{localStorage.setItem(TRADE_SECTIONS_KEY,JSON.stringify(open))}catch{}
+}));
 ['postExitFavorableTicks','postExitAdverseTicks','mfeTicks','maeTicks'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
 ['fillStatus','postExitAdverseFirst','side'].forEach(id=>$(id)?.addEventListener('change',renderPostExitHints));
 ['entryPrice','exitPrice','slPrice','pnl','instrument'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
+// Body, komise a kontrakty mění dopočtený zisk, a tím i výsledek (target / SL),
+// na kterém závisí odvozená cena SL. Listenery přepočtu zisku jsou
+// registrované dřív, takže se tu čte už nový výsledek.
+['points','commission','contracts'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
 // Změna ceny nebo zisku některého z dalších cílů (událost probublá z řádku až
 // sem, po jeho vlastním přepočtu) – výsledek nohy určuje odvozenou cenu SL.
 $('extraLegsList')?.addEventListener('input',renderPostExitHints);
@@ -3794,14 +4139,14 @@ $('wouldSkipLive')?.addEventListener('change',syncWouldSkipField);
  $(id)?.addEventListener('input',()=>updateLevelsSummary());
  $(id)?.addEventListener('change',()=>updateLevelsSummary());
 });
+['srTargetNone','srStopLossNone'].forEach(id=>$(id)?.addEventListener('change',()=>updateLevelsSummary()));
 
 $('instrument').addEventListener('change',()=>{
  const tpl=findTemplate($('instrument').value);
  const hint=$('templateHint');
  if(!tpl){if(hint)hint.textContent='';applyTemplateCommission();recomputePnlFromInputs();recomputeAllLegRows();return}
- if(hint)hint.textContent=`Šablona nalezena: ${tpl.strategy||'—'}${tpl.comment?' · '+tpl.comment:''}${tpl.pointValue?` · hodnota bodu $${Number(tpl.pointValue).toFixed(2)}`:''}${tpl.defaultCommission!=null?` · komise $${Number(tpl.defaultCommission).toFixed(2)}/ks`:''}`;
+ if(hint)hint.textContent=`Šablona nalezena${tpl.comment?': '+tpl.comment:''}${tpl.pointValue?` · hodnota bodu $${Number(tpl.pointValue).toFixed(2)}`:''}${tpl.defaultCommission!=null?` · komise $${Number(tpl.defaultCommission).toFixed(2)}/ks`:''}`;
  if(!$('tradeId').value){
-  if(!$('strategy').value)$('strategy').value=tpl.strategy||'';
   if(tpl.planFollowed)$('planFollowed').value=tpl.planFollowed;
   if(!$('comment').value)$('comment').value=tpl.comment||'';
  }
@@ -3882,7 +4227,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   delete obj.legs;
 
   // "result" se tu ZÁMĚRNĚ nečte – je odvozený z čisté částky (classifyResult níž).
-  ['instrument','date','entryTime','entryPrice','exitTime','exitPrice','points','pnl','contracts','strategy','planFollowed','comment']
+  ['instrument','date','entryTime','entryPrice','exitTime','exitPrice','points','pnl','contracts','planFollowed','comment']
    .forEach(k=>obj[k]=$(k)?.value??'');
   obj.commission=Math.abs(Number($('commission')?.value))||0;
   obj.side=($('side').value==='long'||$('side').value==='short')?$('side').value:'';
@@ -3969,14 +4314,19 @@ $('tradeForm').addEventListener('submit',async e=>{
   obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
   obj.srTarget=readLevelRows('srTarget');
   obj.srStopLoss=readLevelRows('srStopLoss');
+  // „Žádná hladina v cestě" – ukládá se jen true a jen bez řádků.
+  for(const field of Object.keys(SR_ENUMS)){
+   if(readSrNone(field))obj[field+'None']=true;else delete obj[field+'None'];
+  }
   obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
   obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
 
   // Cena Stop Lossu: ruční zadání má vždy přednost. Když je prázdná a obchod
   // skončil na SL, odvodí se z ceny nohy, která na SL šla (NE z váženého
   // průměru) – spec §3.3b. Příznak `slDerived` se resetuje, jakmile hodnotu
-  // přepíše uživatel.
-  const typedSl=$('slPrice')?.value;
+  // přepíše uživatel. Pole v režimu dopočtu (dataset.derived) se za ruční
+  // nepovažuje – jinak by se odvozená cena druhým uložením stala ruční.
+  const typedSl=$('slPrice')?.dataset?.derived==='1'?'':$('slPrice')?.value;
   if(typedSl!==undefined&&String(typedSl).trim()!==''){
    obj.slPrice=Number(typedSl);
    obj.slDerived=false;
@@ -3985,7 +4335,6 @@ $('tradeForm').addEventListener('submit',async e=>{
    if(derived!=null){obj.slPrice=derived;obj.slDerived=true}
    else{delete obj.slPrice;delete obj.slDerived}
   }
-  Object.assign(obj,riskFields(obj));
 
   // Chování ceny PO VÝSTUPU (v ticích, od výstupní ceny, vždy kladně).
   // U výslovně nenaplněného setupu (postExitApplies) se neukládá nic – čísla
@@ -4025,10 +4374,19 @@ $('tradeForm').addEventListener('submit',async e=>{
   }
   // Cílové hladiny: typ + cena. Bez ceny se uloží jen typ (R hladiny pak nejde
   // spočítat, ale informace o typu se neztratí).
+  // Cena targetu se chová jako cena SL: ruční má přednost, pole v režimu
+  // dopočtu se bere čerstvě z nohou (deriveTargetPrices) s příznakem
+  // targetLevel{n}PriceDerived – sanitizeTargetLevel nese jen { type, price }.
+  const derivedTargets=deriveTargetPrices(obj);
   for(const n of [1,2]){
-   const target=FJTaxonomy.sanitizeTargetLevel({type:$('targetLevel'+n+'Type')?.value,price:$('targetLevel'+n+'Price')?.value});
+   const el=$('targetLevel'+n+'Price');
+   const isDerived=el?.dataset?.derived==='1';
+   const price=isDerived?(derivedTargets[n-1]??''):el?.value;
+   const target=FJTaxonomy.sanitizeTargetLevel({type:$('targetLevel'+n+'Type')?.value,price});
    if(target)obj['targetLevel'+n]=target;else delete obj['targetLevel'+n];
+   if(isDerived&&target&&target.price!=null)obj['targetLevel'+n+'PriceDerived']=true;else delete obj['targetLevel'+n+'PriceDerived'];
   }
+  Object.assign(obj,riskFields(obj));
   // Dopočty (slTicks, exitTicks, maxTicks, maxFavorableTicks, maxAdverseTicks, touchedEntry, touchedSl) se
   // ukládají na obchod, ne jen zobrazují – stojí na nich pozdější analýza.
   applyPostExitFields(obj);
@@ -4290,6 +4648,27 @@ document.querySelectorAll('.subtab-bar').forEach(bar=>{
   if(btn.dataset.oninit && typeof window[btn.dataset.oninit]==='function')setTimeout(window[btn.dataset.oninit],60);
  });
 });
+// Karty v Nastavení jsou pod sebou a sbalitelné. Které jsou rozbalené, se
+// pamatuje (jen pohodlí v tomhle zařízení); výchozí je vše sbalené.
+const SETTINGS_OPEN_KEY='FJ_settingsOpenCards';
+function readOpenSettingsCards(){try{const v=JSON.parse(localStorage.getItem(SETTINGS_OPEN_KEY)||'[]');return Array.isArray(v)?v:[]}catch{return []}}
+(function initSettingsCards(){
+ const open=new Set(readOpenSettingsCards());
+ document.querySelectorAll('#settings details.settings-card').forEach(card=>{
+  card.open=open.has(card.dataset.card);
+  card.addEventListener('toggle',()=>{
+   if(card.open)open.add(card.dataset.card);else open.delete(card.dataset.card);
+   try{localStorage.setItem(SETTINGS_OPEN_KEY,JSON.stringify([...open]))}catch{}
+  });
+ });
+})();
+if($('markIncompleteTrades')){
+ $('markIncompleteTrades').checked=markIncompleteTrades;
+ $('markIncompleteTrades').addEventListener('change',e=>{
+  setMarkIncompleteTrades(e.target.checked);
+  showToast(markIncompleteTrades?'Neúplné obchody se označují.':'Označování neúplných obchodů je vypnuté.');
+ });
+}
 $('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
 $('addTradeBtn').onclick=()=>openModal();
 // ---- Setup bez exekuce (recordType SETUP_ONLY) ----
@@ -4497,11 +4876,11 @@ function srCsvCells(t,counts){
  return out;
 }
 function tradeCsvHeader(counts={tg:1,sl:1}){
- return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
 function tradeCsvRow(t,dn,counts={tg:1,sl:1}){
  const p=t.dailyPlan||{};
- return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('exportCsv').onclick=async()=>{
  const counts=srCsvCounts(trades);
@@ -4887,11 +5266,11 @@ $('reportPrint').onclick=()=>window.print();
 // Sloupce CSV exportu Reportů (přes deníky). Stejný důvod pro dvě funkce
 // jako u exportu deníku: hlavička a řádek se nesmí rozejít.
 function reportCsvHeader(counts={tg:1,sl:1}){
- return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
 function reportCsvRow(t,dn,counts={tg:1,sl:1}){
  const p=t.dailyPlan||{};
- return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('reportCsv').onclick=async()=>{
  const counts=srCsvCounts(reportRows);

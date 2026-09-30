@@ -364,13 +364,17 @@ test('sloučení: příznak odvození jde s nohou, která dodala maximum', () =>
   assert.equal(both.mfeTicksDerived, true);
 });
 
-test('štítek „neúplný kontext": jen v backtestovém deníku, ne u nenaplněných', () => {
-  const ctx = journal => loadRenderer(['esc', 'contextPillsHTML'], { journalProfiles: journal, activeJournalId: 'j1' });
+test('chybějící MFE/MAE hlásí štítek „Neúplné", ne druhý štítek v kontextu', () => {
+  // Dřív: „neúplný kontext" jen v backtestovém deníku. Od 4.7.1 ho nahrazuje
+  // obecný štítek „Neúplné" (incompleteBadgeHTML), který MFE/MAE kontroluje
+  // taky – dva štítky pro totéž by se na kartě jen opakovaly.
+  const r = loadRenderer(['esc', 'contextPillsHTML', 'incompleteBadgeHTML'],
+    { journalProfiles: [{ id: 'j1', name: 'B', backtest: true }], activeJournalId: 'j1' });
   const trade = course();
-  assert.match(ctx([{ id: 'j1', name: 'B', backtest: true }]).contextPillsHTML(trade), /neúplný kontext/);
-  assert.ok(!ctx([{ id: 'j1', name: 'Živý' }]).contextPillsHTML(trade).includes('neúplný kontext'), 'živý deník štítek nemá');
+  assert.ok(!r.contextPillsHTML(trade).includes('neúplný kontext'));
+  assert.match(r.incompleteBadgeHTML(trade), /title="Chybí:[^"]*MFE, MAE/);
   for (const status of ['NO_FILL', 'MISSED', 'SKIPPED']) {
-    assert.ok(!ctx([{ id: 'j1', name: 'B', backtest: true }]).contextPillsHTML(course({ fillStatus: status })).includes('neúplný kontext'), status);
+    assert.doesNotMatch(r.incompleteBadgeHTML(course({ fillStatus: status })), /MFE/, status);
   }
 });
 
@@ -393,7 +397,7 @@ function courseForm(values, datasets, legs) {
     '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
     'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'postExitTicksWarning', 'postExitApplies',
     'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField',
-    'editCourseManually', 'useDerivedCourse'
+    'editCourseManually', 'useDerivedCourse', 'deriveTargetPrices', 'renderCourseHints', 'sourceLabel'
   ];
   if (legs) {
     const field = value => ({ value: String(value ?? '') });
@@ -406,7 +410,10 @@ function courseForm(values, datasets, legs) {
     })) : []);
     names.push('readLegRows', 'classifyResult');
   }
-  const r = loadRenderer(names, { document, settings: SETTINGS });
+  // Hlavičky karet, řádek s R a vzdálenosti SR jsou jen zobrazení (testy
+  // v incomplete-trade.test.js).
+  const r = loadRenderer(names, { document, settings: SETTINGS,
+    renderRiskInfo() {}, renderSrDistances() {}, renderTradeSections() {} });
   r.renderPostExitHints();
   return { r, get: id => document.getElementById(id) };
 }
@@ -474,6 +481,82 @@ test('uložená ruční hodnota se otevře jako pole, i když jde dopočítat', 
   const f = courseForm({ ...TARGET_FORM, mfeTicks: '31' }, { mfeTicks: { manual: '1' } });
   assert.ok(shown(f.get('mfeTicks')));
   assert.equal(f.get('mfeTicks').value, '31');
+});
+
+// ------------------------------------------------ cena Stop Lossu jako dopočet
+//
+// U obchodu ukončeného na SL je cena SL výstupní cena – aritmetika, ne vstup.
+// Formulář ji proto ukáže read-only („dopočítáno z výstupní ceny") s odkazem
+// „upravit ručně", stejně jako MFE/MAE. Dřív se dopočítala až při uložení
+// a ve formuláři pole zůstalo prázdné.
+
+const STOP_NO_SL = { ...STOP_FORM, slPrice: '' };
+
+test('formulář stoploss bez ceny SL: cena SL read-only dopočet z výstupu', () => {
+  const f = courseForm(STOP_NO_SL);
+  assert.ok(!shown(f.get('slPrice')), 'pole SL je skryté');
+  assert.ok(shown(f.get('slPriceView')));
+  assert.equal(f.get('slPriceViewValue').textContent, '7697');
+  assert.equal(f.get('slPrice').dataset.derived, '1', 'uloží se s příznakem slDerived');
+  assert.equal(f.r.postExitDraftFromForm().slPrice, 7697);
+});
+
+test('formulář target / BE: cena SL zůstává prázdné editovatelné pole', () => {
+  for (const result of ['target', 'breakeven', '']) {
+    const f = courseForm({ ...TARGET_FORM, slPrice: '', result });
+    assert.ok(shown(f.get('slPrice')), result || 'prázdný výsledek');
+    assert.ok(!shown(f.get('slPriceView')));
+    assert.equal(f.get('slPrice').value, '');
+  }
+});
+
+test('cena SL: dopočet se ukáže i u výslovně nenaplněného setupu skrytého bloku', () => {
+  // Pole SL leží mimo postExitBlock – nesmí záviset na Stavu naplnění.
+  const f = courseForm({ ...STOP_NO_SL, fillStatus: '' });
+  assert.equal(f.get('slPriceViewValue').textContent, '7697');
+});
+
+test('cena SL: „upravit ručně" → ruční hodnota, nabídne návrat k dopočtu', () => {
+  const f = courseForm(STOP_NO_SL);
+  f.r.editCourseManually('slPrice');
+  const el = f.get('slPrice');
+  assert.ok(shown(el));
+  assert.equal(String(el.value), '7697', 'výchozí hodnota = dopočet');
+  assert.equal(el.dataset.derived, '');
+  el.value = '7696.5';
+  f.r.renderPostExitHints();
+  assert.equal(el.value, '7696.5', 'přepočet ruční hodnotu nepřepíše');
+  assert.equal(f.get('slPriceRevert').textContent, 'použít dopočet z výstupní ceny (7697)', 'bez jednotky „t"');
+  assert.equal(f.r.postExitDraftFromForm().slPrice, 7696.5);
+  f.r.useDerivedCourse('slPrice');
+  assert.ok(!shown(el));
+  assert.equal(el.dataset.derived, '1');
+});
+
+test('cena SL: změna výsledku ze SL na target odvozenou cenu zahodí', () => {
+  const f = courseForm(STOP_NO_SL);
+  f.get('result').value = 'target';
+  f.get('exitPrice').value = '7706';
+  f.r.renderPostExitHints();
+  assert.ok(shown(f.get('slPrice')));
+  assert.equal(f.get('slPrice').value, '', 'stará odvozená cena nezůstane v poli');
+  assert.equal(f.r.postExitDraftFromForm().slPrice, undefined);
+});
+
+test('cena SL: uložená odvozená cena se otevře jako dopočet, ruční jako pole', () => {
+  const derived = courseForm({ ...STOP_FORM }, { slPrice: { derived: '1' } });
+  assert.ok(!shown(derived.get('slPrice')), 'odvozená zůstane odvozená – druhé uložení z ní neudělá ruční');
+  assert.equal(derived.get('slPrice').dataset.derived, '1');
+  const manual = courseForm({ ...STOP_FORM, slPrice: '7696' }, { slPrice: { manual: '1' } });
+  assert.ok(shown(manual.get('slPrice')));
+  assert.equal(manual.get('slPrice').value, '7696');
+  assert.match(manual.get('slPriceRevert').textContent, /7697\)$/);
+});
+
+test('cena SL s víc cíli: bere se cena nohy, která šla na SL', () => {
+  const f = courseForm({ ...TARGET_FORM, slPrice: '', result: 'target', exitPrice: '7706' }, null,
+    [{ exitPrice: 7697, pnl: -20 }]);
+  assert.equal(f.get('slPriceViewValue').textContent, '7697');
 });
 
 // ------------------------------------------------ MFE / MAE z NinjaTraderu
@@ -556,24 +639,38 @@ test('applyPostExitFields: hodnotu z NinjaTraderu dopočet nepřepíše', () => 
   assert.equal(t.mfeTicksSource, 'nt8');
 });
 
-test('formulář: hodnota z NinjaTraderu je editovatelné pole s poznámkou o původu', () => {
-  const f = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { manual: '1', source: 'nt8' } });
-  assert.ok(shown(f.get('mfeTicks')), 'měření se nezobrazuje jako dopočet');
-  assert.equal(f.get('mfeTicksSourceNote').textContent, 'naměřeno v NinjaTraderu');
+// Od 4.7.1 je hodnota naměřená konektorem ZAMČENÁ jako dopočet: není to ruční
+// zadání, tak se nesmí tvářit jako vstup (zásada uživatele). Měření má přitom
+// přednost před aritmetikou – dopočet z výstupu (24 t) ho nepřepíše.
+test('formulář: hodnota z NinjaTraderu je zamčená s poznámkou o původu', () => {
+  const f = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { source: 'nt8' } });
+  assert.ok(!shown(f.get('mfeTicks')), 'měření není editovatelné pole');
+  assert.ok(shown(f.get('mfeTicksView')));
+  assert.equal(f.get('mfeTicksViewValue').textContent, '26', 'ukazuje naměřenou hodnotu, ne dopočet 24');
+  assert.equal(f.get('mfeTicksViewNote').textContent, '— importováno z NinjaTraderu');
+  assert.equal(f.get('mfeTicks').value, '26', 'uloží se naměřená hodnota');
+  assert.equal(f.get('mfeTicks').dataset.derived, '', 'bez příznaku Derived');
+
+  // „upravit ručně" → pole s naměřenou hodnotou; původ zůstává, dokud se nepřepíše.
+  f.r.editCourseManually('mfeTicks');
+  assert.ok(shown(f.get('mfeTicks')));
+  assert.equal(f.get('mfeTicks').value, '26');
+  assert.equal(f.get('mfeTicksSourceNote').textContent, 'importováno z NinjaTraderu');
   f.r.useDerivedCourse('mfeTicks');
   assert.equal(f.get('mfeTicks').dataset.source, '', 'návrat k dopočtu původ zahodí');
 });
 
-// Měření má před aritmetikou přednost. NT8 MFE 26 t u targetu s výstupem na
-// 24 t by jinak pod sebou mělo odkaz „použít dopočet (24 t)" – skoro u každého
-// obchodu a s jediným kliknutím k horšímu číslu.
+// NT8 MFE 26 t u targetu s výstupem na 24 t by jinak mělo odkaz „použít
+// dopočet (24 t)" – skoro u každého obchodu a s jediným kliknutím k horšímu číslu.
 test('formulář: k hodnotě naměřené konektorem se návrat na dopočet nenabízí', () => {
-  const f = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { manual: '1', source: 'nt8' } });
+  const f = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { source: 'nt8' } });
   assert.ok(!shown(f.get('mfeTicksRevert')), 'bez odkazu zpět na dopočet');
   assert.equal(f.get('mfeTicksRevert').textContent, '');
+  f.r.editCourseManually('mfeTicks');
+  assert.ok(!shown(f.get('mfeTicksRevert')), 'ani po „upravit ručně", dokud je to měření');
 
-  const tv = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { manual: '1', source: 'tradingview' } });
-  assert.equal(tv.get('mfeTicksSourceNote').textContent, 'naměřeno konektorem (tradingview)');
+  const tv = courseForm({ ...TARGET_FORM, mfeTicks: '26' }, { mfeTicks: { source: 'tradingview' } });
+  assert.equal(tv.get('mfeTicksViewNote').textContent, '— naměřeno konektorem (tradingview)');
 
   // Přepsaná hodnota už měření není – odkaz se nabídne jako u každé ruční.
   const edited = courseForm({ ...TARGET_FORM, mfeTicks: '30' }, { mfeTicks: { manual: '1' } });
