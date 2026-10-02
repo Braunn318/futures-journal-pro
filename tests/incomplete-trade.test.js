@@ -74,7 +74,10 @@ test('neznámý klíč číselníku se nepočítá jako vyplněný', () => {
 
 // ------------------------------------------------------------ štítek na kartě
 
-const badge = mark => loadRenderer(['esc', 'incompleteBadgeHTML'], mark === undefined ? {} : { markIncompleteTrades: mark });
+// Od 4.7.2 místo jednoho přepínače nastavení karet (Nastavení → Přizpůsobení):
+// true = výchozí (vše s upozorněním), false = upozornění vypnuté u všech karet.
+const allCards = warn => Object.fromEntries(FJTaxonomy.TRADE_CARDS.map(c => [c.key, { show: true, warn }]));
+const badge = mark => loadRenderer(['esc', 'incompleteBadgeHTML'], mark === undefined ? {} : { tradeCardConfig: allCards(mark) });
 
 test('štítek: počet a tooltip s popisky chybějících polí', () => {
   const html = badge(true).incompleteBadgeHTML(complete({ trend: '', srStopLoss: [] }));

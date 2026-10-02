@@ -801,6 +801,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     <section id="settings" class="section">
       <div class="subtab-bar">
         <button class="active" data-subtab="settingsGeneral">Obecné</button>
+        <button data-subtab="settingsCustomize">Přizpůsobení</button>
         <button data-subtab="settingsRisk">Riziko</button>
         <button data-subtab="settingsTemplates">Šablony</button>
         <button data-subtab="settingsTaxonomy">Číselníky</button>
@@ -808,6 +809,34 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       </div>
 
       <div class="subsection active" id="settingsGeneral">
+      <div class="settings-grid">
+        <details class="card settings-card" data-card="journals">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Deníky</h3></summary>
+          <div class="panel-subtitle" style="margin-top:0">Přehled účtu po spuštění ukáže</div>
+          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="active"> Poslední aktivní deník</label>
+          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="all"> Všechny deníky</label>
+          <p class="sub" style="margin-top:6px">Filtr „Deník / karta“ v Přehledu účtu jde pak kdykoli přepnout ručně. Uloží se hned.</p>
+          <div class="panel-subtitle">Skrytí a smazání</div>
+          <p class="sub">Skrytý deník se nikde nezobrazuje ani nezapočítává (výběr deníku, Přehled účtu, Kalendář, Reporty, přesun obchodu). Jeho data zůstávají, jdou do záloh i do AI exportu a deník jde kdykoli znovu zobrazit. Když skryješ aktivní deník, aplikace přepne na naposledy použitý viditelný. Poslední viditelný deník skrýt nejde.</p>
+          <div id="journalVisibilityList" style="margin-top:10px"></div>
+        </details>
+        <details class="card settings-card" data-card="security">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Zabezpečení aplikace</h3></summary>
+          <p class="sub">Při prvním spuštění si nastavíš vlastní heslo.</p>
+          <button class="btn" id="changePassword">Změnit heslo</button>
+          <button class="btn" id="lockApp" style="margin-left:8px">🔒 Zamknout aplikaci</button>
+        </details>
+        <details class="card settings-card" data-card="account">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Účet</h3></summary>
+          <div class="field"><label>Počáteční stav účtu</label><input type="number" id="startingBalance" step="0.01"></div>
+          <div class="field" style="margin-top:12px"><label>Hlavní měna</label><input id="currency" value="USD" disabled></div>
+          <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
+          <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
+        </details>
+      </div>
+      </div>
+
+      <div class="subsection" id="settingsCustomize">
       <div class="settings-grid">
         <details class="card settings-card" data-card="theme">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Vzhled (téma)</h3></summary>
@@ -855,34 +884,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           </div>
           <button class="btn primary" id="saveTheme" style="margin-top:14px">Uložit vzhled</button>
         </details>
-        <details class="card settings-card" data-card="incomplete">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Označování neúplných obchodů</h3></summary>
-          <label class="settings-check"><input type="checkbox" id="markIncompleteTrades" checked> Označit obchody s nevyplněným kontextem štítkem „⚠ Neúplné“</label>
-          <p class="sub" style="margin-top:8px">Kontroluje se: setup, stav naplnění, trend, hladina vstupu, SR proti targetu a proti S/L (hladina, nebo „žádná hladina v cestě“), order flow potvrzení, cílová hladina 1 (typ i cena), cena Stop Lossu, MFE, MAE, pokračování a protipohyb po výstupu. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují. Co přesně chybí, ukáže štítek po najetí myší.</p>
+        <details class="card settings-card" data-card="tradeCards">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Karty obchodu</h3></summary>
+          <p class="sub">Které karty se ukazují ve formuláři obchodu a u obchodu v Deníku, a u kterých upozorňovat na nevyplněná pole (štítek „⚠ Neúplné“ na kartě obchodu a „chybí N“ v hlavičce karty). Skrytá karta jen zmizí – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí karty se zase ukážou.</p>
+          <div id="tradeCardSettings" style="margin-top:10px"></div>
+          <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend; <b>Hladiny</b> – hladina vstupu, SR proti targetu a proti S/L (hladina, nebo „žádná hladina v cestě“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
-        </details>
-        <details class="card settings-card" data-card="journals">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Deníky</h3></summary>
-          <div class="panel-subtitle" style="margin-top:0">Přehled účtu po spuštění ukáže</div>
-          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="active"> Poslední aktivní deník</label>
-          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="all"> Všechny deníky</label>
-          <p class="sub" style="margin-top:6px">Filtr „Deník / karta“ v Přehledu účtu jde pak kdykoli přepnout ručně. Uloží se hned.</p>
-          <div class="panel-subtitle">Skrytí a smazání</div>
-          <p class="sub">Skrytý deník se nikde nezobrazuje ani nezapočítává (výběr deníku, Přehled účtu, Kalendář, Reporty, přesun obchodu). Jeho data zůstávají, jdou do záloh i do AI exportu a deník jde kdykoli znovu zobrazit. Když skryješ aktivní deník, aplikace přepne na naposledy použitý viditelný. Poslední viditelný deník skrýt nejde.</p>
-          <div id="journalVisibilityList" style="margin-top:10px"></div>
-        </details>
-        <details class="card settings-card" data-card="security">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Zabezpečení aplikace</h3></summary>
-          <p class="sub">Při prvním spuštění si nastavíš vlastní heslo.</p>
-          <button class="btn" id="changePassword">Změnit heslo</button>
-          <button class="btn" id="lockApp" style="margin-left:8px">🔒 Zamknout aplikaci</button>
-        </details>
-        <details class="card settings-card" data-card="account">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Účet</h3></summary>
-          <div class="field"><label>Počáteční stav účtu</label><input type="number" id="startingBalance" step="0.01"></div>
-          <div class="field" style="margin-top:12px"><label>Hlavní měna</label><input id="currency" value="USD" disabled></div>
-          <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
-          <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
         </details>
       </div>
       </div>
@@ -1190,20 +1197,25 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         </div>
       </details>
       <details class="trade-section" data-card="setup">
-        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Setup</span><span class="sub trade-section-summary"><span id="setupSummary"></span> <span id="levelsSummary"></span></span><span class="trade-section-missing" id="setupMissing"></span></summary>
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Setup</span><span class="sub trade-section-summary" id="setupSummary"></span><span class="trade-section-missing" id="setupMissing"></span></summary>
         <div class="formgrid">
           <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
           <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
           <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
+          <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+          <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
+          <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
+        </div>
+      </details>
+      <details class="trade-section" data-card="levels">
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Hladiny</span><span class="sub trade-section-summary" id="levelsSummary"></span><span class="trade-section-missing" id="levelsMissing"></span></summary>
+        <div class="formgrid">
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
           <div class="field full"><label>SR proti targetu <span class="sub">— hladiny v cestě k cíli (ve směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srTarget" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srTargetAdd" onclick="appendLevelRow('srTarget')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srTargetNone"> žádná hladina v cestě</label></div></div>
           <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem (proti směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srStopLossAdd" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srStopLossNone"> žádná hladina v cestě</label></div><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
           <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
           <div class="field"><label>Cílová hladina 2 <span class="sub">— typ</span></label><select id="targetLevel2Type"></select></div>
-          <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
-          <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
-          <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
         </div>
       </details>
       <details class="trade-section" data-card="comments">
@@ -1539,17 +1551,43 @@ function renderSkipLiveStats(stats){
  const reasons=stats.byReason.map(r=>row(esc(r.key?FJTaxonomy.labelOf('SKIP_REASON',r.key):'Bez důvodu'),`${r.count}× · ${r.wins}/${r.losses} · ${(r.pnl>=0?'+':'')+money(r.pnl)}`,r.pnl>=0?'pos':'neg'));
  el.innerHTML=lines.join('')+(reasons.length?'<div class="sub" style="margin-top:6px">Podle důvodu (počet · zisk/ztráta · P/L)</div>'+reasons.join(''):'');
 }
-// Štítek „Neúplné" na kartách obchodů (Nastavení → Obecné). Stejně jako
-// přepínač výše platí pro celou aplikaci, ne pro jeden deník, a pamatuje se.
-// Výchozí je zapnuto – vypnuto je jen výslovně uložené '0'.
+// Karty formuláře obchodu (Nastavení → Přizpůsobení): každá jde skrýt a každá
+// má vlastní „Upozorňovat na nevyplněné" (štítek „Neúplné" na kartě obchodu
+// a „chybí N" v hlavičce karty). Platí pro celou aplikaci a pamatuje se.
+// Výchozí je vše zobrazené i s upozorněním.
+//
+// Nahrazuje jeden globální přepínač FJ_markIncompleteTrades (do 4.7.1). Kdo
+// ho měl vypnutý, dostane při prvním čtení všechna upozornění vypnutá – jeho
+// volba se tak nezmění; potom už se starý klíč nečte.
+const TRADE_CARDS_KEY='FJ_tradeCards';
 const MARK_INCOMPLETE_KEY='FJ_markIncompleteTrades';
-function readMarkIncompleteTrades(){try{return localStorage.getItem(MARK_INCOMPLETE_KEY)!=='0'}catch{return true}}
-let markIncompleteTrades=readMarkIncompleteTrades();
-function setMarkIncompleteTrades(value){
- markIncompleteTrades=value===true;
- try{localStorage.setItem(MARK_INCOMPLETE_KEY,markIncompleteTrades?'1':'0')}catch{}
- if($('markIncompleteTrades'))$('markIncompleteTrades').checked=markIncompleteTrades;
+function readTradeCardConfig(){
+ try{
+  const raw=localStorage.getItem(TRADE_CARDS_KEY);
+  if(raw!=null)return FJTaxonomy.normalizeCardConfig(JSON.parse(raw));
+  const legacyOff=localStorage.getItem(MARK_INCOMPLETE_KEY)==='0';
+  const cfg=FJTaxonomy.normalizeCardConfig({});
+  if(legacyOff)for(const k of Object.keys(cfg))cfg[k].warn=false;
+  localStorage.setItem(TRADE_CARDS_KEY,JSON.stringify(cfg));
+  return cfg;
+ }catch{return FJTaxonomy.normalizeCardConfig({})}
+}
+let tradeCardConfig=readTradeCardConfig();
+function setTradeCardConfig(next){
+ tradeCardConfig=FJTaxonomy.normalizeCardConfig(next);
+ try{localStorage.setItem(TRADE_CARDS_KEY,JSON.stringify(tradeCardConfig))}catch{}
+ applyTradeCardVisibility();
+ renderTradeCardSettings();
  renderAll();
+}
+function tradeCardShown(key){return typeof tradeCardConfig==='undefined'||FJTaxonomy.cardShown(tradeCardConfig,key)}
+// Skrytá karta jen zmizí z formuláře – její pole dál drží načtené hodnoty,
+// takže uložení obchodu data skryté karty nesmaže.
+function applyTradeCardVisibility(){
+ if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
+ document.querySelectorAll('#tradeForm details.trade-section[data-card]').forEach(card=>{
+  card.style.display=tradeCardShown(card.dataset.card)?'':'none';
+ });
 }
 // Co ukáže Přehled účtu po startu (Nastavení → Deníky): jen poslední aktivní
 // deník (výchozí), nebo všechny viditelné. Platí pro celou aplikaci.
@@ -2930,6 +2968,8 @@ function contextPillsHTML(t){
  // v backtestovém deníku) hlásí štítek „Neúplné" v titulku karty
  // (incompleteBadgeHTML) – zapíná se v Nastavení → Obecné.
  if(FJPoints.slTicksSuspicious(t.slTicks))parts.push(`<span class="pill context-pill post-exit-warn" title="SL nepravděpodobně daleko, překlep?">SL ${esc(t.slTicks)} t?</span>`);
+ // Skrytá karta Setup (Nastavení → Přizpůsobení) schová i své pilulky.
+ if(typeof tradeCardShown==='function'&&!tradeCardShown('setup'))return parts.join(' ');
  if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
  if(t.trend)parts.push(`<span class="pill context-pill" title="Trend">${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
  if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
@@ -2937,14 +2977,12 @@ function contextPillsHTML(t){
 }
 // Štítek „Neúplné · N" v titulku karty: obchod nemá vyplněný kontext
 // (FJTaxonomy.missingContextKeys). Co chybí, říká tooltip – karta zůstane
-// kompaktní. Vypíná se v Nastavení → Obecné (markIncompleteTrades, jeden
-// přepínač pro celou aplikaci, výchozí zapnuto).
+// kompaktní. Počítají se jen karty, které jsou zobrazené a mají zapnuté
+// „Upozorňovat na nevyplněné" (Nastavení → Přizpůsobení, tradeCardConfig).
 function incompleteBadgeHTML(t){
- if(typeof markIncompleteTrades!=='undefined'&&markIncompleteTrades===false)return '';
- const missing=FJTaxonomy.missingContextKeys(t);
- if(!missing.length)return '';
- const labels=missing.map(k=>FJTaxonomy.contextFieldLabel(k));
- return `<span class="pill incomplete-pill" title="Chybí: ${esc(labels.join(', '))}">⚠ Neúplné · ${missing.length}</span>`;
+ const labels=FJTaxonomy.missingForCards(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig);
+ if(!labels.length)return '';
+ return `<span class="pill incomplete-pill" title="Chybí: ${esc(labels.join(', '))}">⚠ Neúplné · ${labels.length}</span>`;
 }
 // Hladiny a order flow – to, co se na kartě sbaluje. Vrací i počet pilulek,
 // protože hlavička sbalené položky říká, kolik jich je pod ní schovaných.
@@ -2982,6 +3020,7 @@ function levelPillsHTML(t){
 // překresluje celý z řetězce (renderTrades), takže atribut `open` na živém
 // prvku by se při každém uložení obchodu nebo změně filtru ztratil.
 function tradeLevelsBlockHTML(t){
+ if(typeof tradeCardShown==='function'&&!tradeCardShown('levels'))return '';
  const {html,count}=levelPillsHTML(t);
  if(!count)return '';
  const open=openTradeLevels.has(t.id)?' open':'';
@@ -3112,6 +3151,8 @@ function tradeTotalPoints(t){
 }
 function tradeHTML(t){
  const m=resultMeta(t.result);
+ // Obsah skryté karty formuláře (Nastavení → Přizpůsobení) se neukazuje ani tady.
+ const shown=key=>typeof tradeCardShown!=='function'||tradeCardShown(key);
  const pnlVal=signed(t,'pnl');
  const sign=t.result==='breakeven'?'±':m.sign;
  // Hlavní číslo jsou CELKOVÉ body pozice (spec §2.1 KOREKCE). Body na
@@ -3144,12 +3185,12 @@ function tradeHTML(t){
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
  <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů${totalPointsDisplay} · ${dualMoney(pnlVal,true)}</div>
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
- ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}${t.plannedRMultiple!=null?` · <span title="Plánované R: nejvzdálenější target ÷ riziko">plán R <b>${Number(t.plannedRMultiple).toFixed(2)}</b></span>`:''}</div>`:''}
+ ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}${t.plannedRMultiple!=null&&shown('sltp')?` · <span title="Plánované R: nejvzdálenější target ÷ riziko">plán R <b>${Number(t.plannedRMultiple).toFixed(2)}</b></span>`:''}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
  </div>
  ${(ctxPills||levelsBlock)?`<div>${ctxPills?`<div class="trade-legs" style="margin-top:6px">${ctxPills}</div>`:''}${levelsBlock}</div>`:''}
- <div><div class="meta">Kontrakty: ${t.contracts}</div><div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div></div>
- <div>${t.comment?`<div class="comment">${esc(t.comment)}</div>`:''}${(importedBadge||skipBadge)?`<div class="sub" style="margin-top:2px">${[skipBadge,importedBadge].filter(Boolean).join(' ')}</div>`:''}
+ <div><div class="meta">Kontrakty: ${t.contracts}</div>${shown('setup')?`<div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div>`:''}</div>
+ <div>${t.comment&&shown('comments')?`<div class="comment">${esc(t.comment)}</div>`:''}${(importedBadge||skipBadge)?`<div class="sub" style="margin-top:2px">${[skipBadge,importedBadge].filter(Boolean).join(' ')}</div>`:''}
  ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
  ${t.dailyPlan.instrument?`<div><b>Instrument:</b> ${esc(t.dailyPlan.instrument)}</div>`:''}
  ${t.dailyPlan.maxTrades?`<div><b>Max. obchodů:</b> ${esc(t.dailyPlan.maxTrades)}</div>`:''}
@@ -3602,6 +3643,7 @@ function openModal(t=null){
  updateConfluenceHint();
  // Karty formuláře se otevřou tak, jak je uživatel naposledy nechal.
  applyTradeSectionsOpenState();
+ if(typeof applyTradeCardVisibility==='function')applyTradeCardVisibility();
  updateLevelsSummary();
  if($('extraLegsField'))$('extraLegsField').style.display='';
  if(t){
@@ -3998,7 +4040,7 @@ function renderSrDistances(){
   });
  }
 }
-// ---- Karty formuláře obchodu (SL / TP, Pohyb ceny, Setup, Komentáře) ----
+// ---- Karty formuláře obchodu (SL / TP, Pohyb ceny, Setup, Hladiny, Komentáře) ----
 // Rozbalení se pamatuje (localStorage, jen pohodlí v tomhle zařízení);
 // poprvé jsou rozbalené SL / TP a Pohyb ceny.
 const TRADE_SECTIONS_KEY='FJ_tradeFormOpenCards';
@@ -4024,23 +4066,6 @@ function formContextDraft(){
   ofConfirm:readChipGrid('ofConfirm','OF_CONFIRM'),
   targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price}
  };
-}
-// Do které karty patří chybějící pole. Cílová hladina 1 se dělí: typ je
-// v Setupu, cena v SL / TP.
-const TRADE_SECTION_OF={slPrice:'sltp',mfeTicks:'course',maeTicks:'course',postExitFavorableTicks:'course',postExitAdverseTicks:'course',
- setupCode:'setup',fillStatus:'setup',trend:'setup',entryLevels:'setup',srTarget:'setup',srStopLoss:'setup',ofConfirm:'setup'};
-function missingBySection(d){
- const out={sltp:[],course:[],setup:[],comments:[]};
- for(const key of FJTaxonomy.missingContextKeys(d)){
-  if(key==='targetLevel1'){
-   const tl=d.targetLevel1||{};
-   if(!tl.type)out.setup.push(FJTaxonomy.contextFieldLabel(key)+' (typ)');
-   if(String(tl.price??'').trim()===''||!Number.isFinite(Number(tl.price)))out.sltp.push('Cena targetu');
-   continue;
-  }
-  (out[TRADE_SECTION_OF[key]]||out.setup).push(FJTaxonomy.contextFieldLabel(key));
- }
- return out;
 }
 function renderTradeSections(){
  if(!$('sltpSummary'))return;
@@ -4073,12 +4098,14 @@ function renderTradeSections(){
  if(texts)comments.push(texts+(texts===1?' text':texts<5?' texty':' textů'));
  if(shots)comments.push(shots+(shots===1?' screenshot':shots<5?' screenshoty':' screenshotů'));
  if($('commentsSummary'))$('commentsSummary').textContent=comments.length?'— '+comments.join(' · '):'';
- // „chybí N" se řídí stejným přepínačem jako štítek na kartě obchodu.
- const show=!(typeof markIncompleteTrades!=='undefined'&&markIncompleteTrades===false);
- const missing=missingBySection(d);
+ // „chybí N" se řídí stejným nastavením karty jako štítek na kartě obchodu
+ // (Upozorňovat na nevyplněné, Nastavení → Přizpůsobení). Kam pole patří,
+ // rozhoduje FJTaxonomy.missingContextByCard.
+ const cfg=typeof tradeCardConfig==='undefined'?{}:tradeCardConfig;
+ const missing=FJTaxonomy.missingContextByCard(d);
  for(const card of Object.keys(missing)){
   const el=$(card+'Missing'); if(!el)continue;
-  const list=show?missing[card]:[];
+  const list=FJTaxonomy.cardWarns(cfg,card)?missing[card]:[];
   el.textContent=list.length?'chybí '+list.length:'';
   el.title=list.length?'Chybí: '+list.join(', '):'';
  }
@@ -4716,13 +4743,36 @@ function readOpenSettingsCards(){try{const v=JSON.parse(localStorage.getItem(SET
   });
  });
 })();
-if($('markIncompleteTrades')){
- $('markIncompleteTrades').checked=markIncompleteTrades;
- $('markIncompleteTrades').addEventListener('change',e=>{
-  setMarkIncompleteTrades(e.target.checked);
-  showToast(markIncompleteTrades?'Neúplné obchody se označují.':'Označování neúplných obchodů je vypnuté.');
+// Nastavení → Přizpůsobení → Karty obchodu: u každé karty „Zobrazit"
+// a „Upozorňovat na nevyplněné". Upozornění skryté karty nejde zapnout –
+// skrytá karta se nekontroluje.
+function renderTradeCardSettings(){
+ const box=$('tradeCardSettings');if(!box)return;
+ const cfg=tradeCardConfig;
+ box.innerHTML=FJTaxonomy.TRADE_CARDS.map(card=>{
+  const c=cfg[card.key];
+  const warn=card.checks===false
+   ?'<span class="sub">— nic se nekontroluje</span>'
+   :`<label class="settings-check" style="margin:0${c.show?'':';opacity:.45'}"><input type="checkbox" class="trade-card-warn" data-card="${esc(card.key)}"${c.warn?' checked':''}${c.show?'':' disabled'}> Upozorňovat na nevyplněné</label>`;
+  return `<div class="mapping-row trade-card-row" style="grid-template-columns:minmax(120px,1fr) auto minmax(220px,1.4fr)">
+   <div><b>${esc(card.label)}</b></div>
+   <label class="settings-check" style="margin:0"><input type="checkbox" class="trade-card-show" data-card="${esc(card.key)}"${c.show?' checked':''}> Zobrazit</label>
+   <div>${warn}</div>
+  </div>`;
+ }).join('');
+ box.querySelectorAll('.trade-card-show').forEach(el=>el.onchange=()=>{
+  const card=FJTaxonomy.TRADE_CARDS.find(x=>x.key===el.dataset.card);
+  setTradeCardConfig({...tradeCardConfig,[el.dataset.card]:{...tradeCardConfig[el.dataset.card],show:el.checked}});
+  showToast(`Karta „${card?.label||el.dataset.card}“ je ${el.checked?'zobrazená':'skrytá'}.`);
+ });
+ box.querySelectorAll('.trade-card-warn').forEach(el=>el.onchange=()=>{
+  const card=FJTaxonomy.TRADE_CARDS.find(x=>x.key===el.dataset.card);
+  setTradeCardConfig({...tradeCardConfig,[el.dataset.card]:{...tradeCardConfig[el.dataset.card],warn:el.checked}});
+  showToast(`${card?.label||el.dataset.card}: upozornění na nevyplněné ${el.checked?'zapnuto':'vypnuto'}.`);
  });
 }
+renderTradeCardSettings();
+applyTradeCardVisibility();
 $('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
 $('addTradeBtn').onclick=()=>openModal();
 // ---- Setup bez exekuce (recordType SETUP_ONLY) ----

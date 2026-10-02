@@ -431,6 +431,67 @@
     return TRADE_CONTEXT_FIELDS.find(f => f.key === key)?.label || key;
   }
 
+  // ------------------------------------------------- karty formuláře obchodu
+  // Karty formuláře (Nastavení → Přizpůsobení): každou jde skrýt a u každé
+  // zvlášť vypnout upozornění na nevyplněná pole. `checks: false` = karta nemá
+  // žádné kontrolované pole (komentáře jsou vždy nepovinné).
+  const TRADE_CARDS = [
+    { key: 'sltp', label: 'SL / TP' },
+    { key: 'course', label: 'Pohyb ceny' },
+    { key: 'setup', label: 'Setup' },
+    { key: 'levels', label: 'Hladiny' },
+    { key: 'comments', label: 'Komentáře', checks: false }
+  ];
+  // Do které karty patří kontrolované pole. Cílová hladina 1 se dělí: typ
+  // je v Hladinách, cena v SL / TP (bez ceny nejde plánované R).
+  const CARD_OF_FIELD = {
+    slPrice: 'sltp',
+    mfeTicks: 'course', maeTicks: 'course', postExitFavorableTicks: 'course', postExitAdverseTicks: 'course',
+    setupCode: 'setup', fillStatus: 'setup', trend: 'setup',
+    entryLevels: 'levels', srTarget: 'levels', srStopLoss: 'levels', ofConfirm: 'levels'
+  };
+
+  // Chybějící pole rozdělená po kartách, jako popisky. Rozhoduje
+  // missingContextKeys – tady se jen třídí, nic se nekontroluje znovu.
+  function missingContextByCard(trade, config) {
+    const out = {};
+    for (const card of TRADE_CARDS) out[card.key] = [];
+    for (const key of missingContextKeys(trade, config)) {
+      if (key === 'targetLevel1') {
+        const tl = (trade && trade.targetLevel1) || {};
+        if (!sanitizeSingle('TARGET_LEVEL', tl.type, config)) out.levels.push(contextFieldLabel(key) + ' (typ)');
+        if (numOrNull(tl.price) == null) out.sltp.push('Cena targetu');
+        continue;
+      }
+      out[CARD_OF_FIELD[key] || 'setup'].push(contextFieldLabel(key));
+    }
+    return out;
+  }
+
+  // Nastavení karet: { sltp: { show, warn }, … }. Chybějící karta nebo
+  // hodnota = zapnuto (výchozí stav je vše zobrazené i s upozorněním).
+  function normalizeCardConfig(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = {};
+    for (const card of TRADE_CARDS) {
+      const c = src[card.key] && typeof src[card.key] === 'object' ? src[card.key] : {};
+      out[card.key] = { show: c.show !== false, warn: c.warn !== false };
+    }
+    return out;
+  }
+  function cardShown(cardConfig, key) { return normalizeCardConfig(cardConfig)[key]?.show !== false; }
+  function cardWarns(cardConfig, key) {
+    const c = normalizeCardConfig(cardConfig)[key];
+    return !!c && c.show && c.warn;
+  }
+
+  // Chybějící pole jen z karet, které jsou zobrazené a mají zapnuté upozornění
+  // (štítek „Neúplné" na kartě obchodu).
+  function missingForCards(trade, cardConfig, config) {
+    const byCard = missingContextByCard(trade, config);
+    return TRADE_CARDS.filter(card => cardWarns(cardConfig, card.key)).flatMap(card => byCard[card.key]);
+  }
+
   // Klíč pro vlastní volbu. Odvozuje se z popisku, aby byl čitelný i v CSV,
   // ale po vytvoření se už NIKDY nemění – přejmenování volby mění jen popisek.
   function makeCustomKey(group, label, config) {
@@ -563,6 +624,7 @@
     allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey,
     visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     missingContextKeys, contextFieldLabel,
+    TRADE_CARDS, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingForCards,
     makeCustomKey,
     // přenos mezi deníky a soubor
     sanitizeConfig, exportPayload, configFromImport, describeConfig,

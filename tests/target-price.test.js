@@ -13,6 +13,7 @@ const assert = require('node:assert/strict');
 
 const { loadRenderer } = require('./helpers/extract');
 const FJPoints = require('../app/points.js');
+const FJTaxonomy = require('../app/taxonomy.js');
 
 const SETTINGS = {
   templates: [{ instrument: 'MES', pointValue: 5, defaultCommission: 1.9 }],
@@ -219,15 +220,16 @@ test('SR: vzdálenost od SL a před targetem v ticích', () => {
 // --------------------------------------------- hlavičky karet: co kde chybí
 
 test('chybějící pole se rozdělí do karet; cílová hladina 1 podle toho, co chybí', () => {
-  const r = loadRenderer(['missingBySection', 'TRADE_SECTION_OF']);
+  // Od 4.7.2 rozhoduje FJTaxonomy.missingContextByCard (typ cíle je v Hladinách).
+  const r = { missingBySection: d => FJTaxonomy.missingContextByCard(d) };
   const base = {
     setupCode: 'M2_OF', fillStatus: 'FILLED', trend: 'SHORT', entryLevels: ['VPOC_DAY'],
     srTargetNone: true, srStopLossNone: true, ofConfirm: ['ABS_ASK'],
     slPrice: 7746, mfeTicks: 18, maeTicks: 2, postExitFavorableTicks: 1, postExitAdverseTicks: 30
   };
   eq(r.missingBySection({ ...base, targetLevel1: { type: 'VPOC_1M', price: '' } }),
-    { sltp: ['Cena targetu'], course: [], setup: [], comments: [] });
-  eq(r.missingBySection({ ...base, targetLevel1: { type: '', price: 7737.75 } }).setup,
+    { sltp: ['Cena targetu'], course: [], setup: [], levels: [], comments: [] });
+  eq(r.missingBySection({ ...base, targetLevel1: { type: '', price: 7737.75 } }).levels,
     ['Cílová hladina 1 (typ)']);
   const m = r.missingBySection({ ...base, slPrice: '', maeTicks: '', trend: '', targetLevel1: { type: 'VPOC_1M', price: 7737.75 } });
   eq(m.sltp, ['Cena Stop Lossu']);

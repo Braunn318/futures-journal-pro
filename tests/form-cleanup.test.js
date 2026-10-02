@@ -97,7 +97,9 @@ test('formulář: pole jsou ve správných kartách', () => {
   const expected = {
     sltp: ['slPrice', 'targetLevel1Price', 'targetLevel2Price'],
     course: ['mfeTicks', 'maeTicks', 'observedMinutes', 'postExitFavorableTicks', 'postExitAdverseTicks', 'postExitAdverseFirst'],
-    setup: ['setupCode', 'fillStatus', 'trend', 'entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm', 'targetLevel1Type', 'targetLevel2Type', 'planFollowed', 'wouldSkipLive'],
+    setup: ['setupCode', 'fillStatus', 'trend', 'planFollowed', 'wouldSkipLive'],
+    // Od 4.7.2 samostatná karta Hladiny (jde skrýt a hlídat zvlášť).
+    levels: ['entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm', 'targetLevel1Type', 'targetLevel2Type', 'levelsSummary'],
     comments: ['tradePlanSetup', 'tradePlanPsychology', 'tradePlanNote', 'comment', 'screenshots']
   };
   for (const [card, ids] of Object.entries(expected)) {
