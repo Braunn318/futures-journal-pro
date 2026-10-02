@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.7.1",
-  "description": "Futures Journal PRO 4.7.1 – cena SL a targetu dopočtená z výstupu, plánované R, formulář obchodu v rozbalovacích kartách, zamčené MFE/MAE z NinjaTraderu, štítek „Neúplné“, příznak „naživo bych nevzal“ a SR hladiny s cenou / vzdáleností.",
+  "version": "4.7.2",
+  "description": "Futures Journal PRO 4.7.2 – skrývání a úplné mazání deníků, výchozí deník v Přehledu účtu, cena SL a targetu dopočtená z výstupu, plánované R, formulář obchodu v rozbalovacích kartách, zamčené MFE/MAE z NinjaTraderu, štítek „Neúplné“, příznak „naživo bych nevzal“ a SR hladiny s cenou / vzdáleností.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

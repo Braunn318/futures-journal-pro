@@ -147,7 +147,7 @@ test('computeSkipLiveStats: srovnání expectancy bez nich / s nimi', () => {
 test('kalendář: den s obchodem „naživo bych nevzal" má P/L jen z živých obchodů', () => {
   function run(rows, include) {
     const dom = domStub();
-    const r = load(['computeDrawdownByDate', 'evaluateDayRisk', 'getCalendarRows', 'renderCalendar'], {
+    const r = load(['computeDrawdownByDate', 'evaluateDayRisk', 'getCalendarRows', 'renderCalendar', 'renderCalendarMonthSummary', 'computeOverallStats'], {
       trades: rows, calendarAllTrades: null, calendarDate: new Date(2026, 8, 1),
       $: dom.$, dualMoney: v => String(v), dualMoneyText: v => String(v), money: v => String(v),
       esc: v => String(v), Intl

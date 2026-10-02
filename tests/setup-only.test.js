@@ -164,7 +164,7 @@ test('renderTrades: setupy nejdou do počítaných čísel dne, jen se ukazují 
 test('renderCalendar: den se setupem nemá P/L ani počet obchodů', () => {
   function run(rows) {
     const dom = domStub();
-    const r = loadRenderer([...BASE_NAMES, 'computeDrawdownByDate', 'evaluateDayRisk', 'getCalendarRows', 'renderCalendar'], {
+    const r = loadRenderer([...BASE_NAMES, 'computeDrawdownByDate', 'evaluateDayRisk', 'getCalendarRows', 'renderCalendar', 'renderCalendarMonthSummary', 'computeOverallStats'], {
       settings: SETTINGS, trades: rows, calendarAllTrades: null, calendarDate: new Date(2026, 8, 1),
       $: dom.$, dualMoney: v => String(v), dualMoneyText: v => String(v), money: v => String(v),
       esc: v => String(v), Intl

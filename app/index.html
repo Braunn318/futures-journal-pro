@@ -221,7 +221,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .calendar{display:grid;grid-template-columns:repeat(7,1fr) 0.9fr;gap:8px}.dow{text-align:center;color:var(--muted);font-size:12px;padding:6px}
 .dow.week{color:var(--blue);font-weight:700}
 .day{min-height:105px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px;position:relative}
-.day.empty{opacity:.25}.day .num{font-weight:800}.day .pnl{font-size:12px;margin-top:7px}.day .count{font-size:11px;color:var(--muted);margin-top:4px}
+.day.empty{opacity:.25}.day.out-month{opacity:.5}.day.out-month .num{color:var(--muted)}.day .num{font-weight:800}.day .pnl{font-size:12px;margin-top:7px}.day .count{font-size:11px;color:var(--muted);margin-top:4px}
 .day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
 .day.week-summary{background:var(--panel2);border-color:rgba(var(--blue-rgb),.4)}
 .day.week-summary .num{color:var(--blue);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
@@ -639,6 +639,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveCalendar"> včetně obchodů, které bych naživo nevzal</label>
         </div>
         <div class="sub" id="calendarRiskNote" style="margin:-4px 0 10px"></div>
+        <div id="calendarMonthSummary"></div>
         <div class="calendar" id="calendarGrid"></div>
       </div>
       <div class="card" style="margin-top:16px">
@@ -789,6 +790,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         </div>
         <p class="sub" style="margin-top:-4px">Účet se v seznamu objeví sám, jakmile z něj přijde první obchod. Přidej ho ručně, pokud ho chceš přiřadit dřív – jinak by první backtest obchod spadl do právě otevřené karty.</p>
         <div id="captureMappingRows"></div>
+        <p class="sub" style="margin-top:10px"><b>Skrýt</b> jen schová účet z tohoto seznamu. Posílání obchodů tím <b>nevypneš</b>: obchody z účtu dál chodí do přiřazeného deníku, a bez přiřazení do právě aktivního. Totéž platí pro účet přiřazený ke skrytému deníku – obchody chodí dál do něj.</p>
         <button class="btn" id="captureSaveMappings" style="margin-top:12px">Uložit přiřazení</button>
         <div id="captureHiddenAccountsBox" style="margin-top:16px"></div>
       </div>
@@ -858,6 +860,16 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <label class="settings-check"><input type="checkbox" id="markIncompleteTrades" checked> Označit obchody s nevyplněným kontextem štítkem „⚠ Neúplné“</label>
           <p class="sub" style="margin-top:8px">Kontroluje se: setup, stav naplnění, trend, hladina vstupu, SR proti targetu a proti S/L (hladina, nebo „žádná hladina v cestě“), order flow potvrzení, cílová hladina 1 (typ i cena), cena Stop Lossu, MFE, MAE, pokračování a protipohyb po výstupu. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují. Co přesně chybí, ukáže štítek po najetí myší.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
+        <details class="card settings-card" data-card="journals">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Deníky</h3></summary>
+          <div class="panel-subtitle" style="margin-top:0">Přehled účtu po spuštění ukáže</div>
+          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="active"> Poslední aktivní deník</label>
+          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="all"> Všechny deníky</label>
+          <p class="sub" style="margin-top:6px">Filtr „Deník / karta“ v Přehledu účtu jde pak kdykoli přepnout ručně. Uloží se hned.</p>
+          <div class="panel-subtitle">Skrytí a smazání</div>
+          <p class="sub">Skrytý deník se nikde nezobrazuje ani nezapočítává (výběr deníku, Přehled účtu, Kalendář, Reporty, přesun obchodu). Jeho data zůstávají, jdou do záloh i do AI exportu a deník jde kdykoli znovu zobrazit. Když skryješ aktivní deník, aplikace přepne na naposledy použitý viditelný. Poslední viditelný deník skrýt nejde.</p>
+          <div id="journalVisibilityList" style="margin-top:10px"></div>
         </details>
         <details class="card settings-card" data-card="security">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Zabezpečení aplikace</h3></summary>
@@ -1055,7 +1067,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <div class="modal" id="promptModal">
   <div class="modalbox" style="max-width:440px">
     <div class="modalhead"><h2 id="promptModalTitle">Potvrzení</h2></div>
-    <p id="promptModalMessage"></p>
+    <p id="promptModalMessage" style="white-space:pre-line"></p>
     <input type="text" id="promptModalInput" style="width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px">
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
       <button class="btn" id="promptModalCancel">Zrušit</button>
@@ -1212,17 +1224,24 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
 <script src="taxonomy.js"></script>
 <script src="points.js"></script>
+<script src="journals.js"></script>
 <script>
 const DB_VERSION=1;
 const JOURNAL_LIST_KEY='FuturesJournal_profiles';
 const ACTIVE_JOURNAL_KEY='FuturesJournal_active';
+// Naposledy použitý deník před přepnutím – náhrada, když se aktivní deník skryje.
+const PREVIOUS_JOURNAL_KEY='FJ_previousJournalId';
 let journalProfiles=JSON.parse(localStorage.getItem(JOURNAL_LIST_KEY)||'[]');
 // Přednastavený „Hlavní deník“ se v aplikaci nepoužívá. Zobrazují se pouze deníky vytvořené uživatelem.
 journalProfiles=journalProfiles.filter(j=>!(j?.id==='default'||String(j?.name||'').trim().toLowerCase()==='hlavní deník'));
+// Všechny deníky skryté (třeba po obnovení zálohy) = není kam přepnout. První
+// se proto znovu zobrazí, jinak by aplikace běžela bez aktivního deníku.
+if(journalProfiles.length&&!FJJournals.visibleJournals(journalProfiles).length)delete journalProfiles[0].hidden;
 localStorage.setItem(JOURNAL_LIST_KEY,JSON.stringify(journalProfiles));
-let activeJournalId=localStorage.getItem(ACTIVE_JOURNAL_KEY)||journalProfiles[0]?.id||'';
-if(!journalProfiles.some(j=>j.id===activeJournalId)) activeJournalId=journalProfiles[0]?.id||'';
+// Skrytý deník nesmí zůstat aktivní: náhradou je naposledy použitý viditelný, jinak první viditelný.
+let activeJournalId=FJJournals.resolveActiveJournal(journalProfiles,localStorage.getItem(ACTIVE_JOURNAL_KEY),localStorage.getItem(PREVIOUS_JOURNAL_KEY));
 if(activeJournalId)localStorage.setItem(ACTIVE_JOURNAL_KEY,activeJournalId);else localStorage.removeItem(ACTIVE_JOURNAL_KEY);
+function visibleJournalProfiles(){return FJJournals.visibleJournals(journalProfiles)}
 
 async function removeLegacyDefaultJournal(){
  // Odstraní pouze technický soubor starého přednastaveného profilu. Uživatelské deníky ani jejich data nemaže.
@@ -1531,6 +1550,15 @@ function setMarkIncompleteTrades(value){
  try{localStorage.setItem(MARK_INCOMPLETE_KEY,markIncompleteTrades?'1':'0')}catch{}
  if($('markIncompleteTrades'))$('markIncompleteTrades').checked=markIncompleteTrades;
  renderAll();
+}
+// Co ukáže Přehled účtu po startu (Nastavení → Deníky): jen poslední aktivní
+// deník (výchozí), nebo všechny viditelné. Platí pro celou aplikaci.
+const OVERVIEW_START_KEY='FJ_overviewStartJournal';
+function readOverviewStartMode(){try{return localStorage.getItem(OVERVIEW_START_KEY)===FJJournals.OVERVIEW_START.ALL?FJJournals.OVERVIEW_START.ALL:FJJournals.OVERVIEW_START.ACTIVE}catch{return FJJournals.OVERVIEW_START.ACTIVE}}
+let overviewStartMode=readOverviewStartMode();
+function setOverviewStartMode(value){
+ overviewStartMode=value===FJJournals.OVERVIEW_START.ALL?FJJournals.OVERVIEW_START.ALL:FJJournals.OVERVIEW_START.ACTIVE;
+ try{localStorage.setItem(OVERVIEW_START_KEY,overviewStartMode)}catch{}
 }
 // Jediné místo, které přepínač mění: srovná všechny jeho checkboxy a
 // překreslí to, co z výkonových čísel stojí.
@@ -2041,7 +2069,7 @@ let instrumentPortfolioRows=[];
 
 async function collectInstrumentPortfolioRows(){
  const rows=[];
- for(const p of journalProfiles){
+ for(const p of visibleJournalProfiles()){
   try{
    const r=await window.desktopAPI.readJournal(p.id);
    if(!r?.ok)continue;
@@ -2118,7 +2146,7 @@ async function initInstrumentPortfolioSection(){
  instrumentPortfolioRows=await collectInstrumentPortfolioRows();
  const select=$('instrumentPortfolioJournal');
  const current=select.value;
- select.innerHTML='<option value="">Všechny deníky</option>'+journalProfiles.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ select.innerHTML='<option value="">Všechny deníky</option>'+visibleJournalProfiles().map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
  select.value=current;
  drawInstrumentPortfolio();
 }
@@ -2441,7 +2469,7 @@ function taxonomyGroupPatch(cfg,group){
 // číselník sám do sebe nemá smysl.
 function renderTaxonomyTransfer(){
  const select=$('taxonomyCopyTarget'); if(!select)return;
- const targets=journalProfiles.filter(j=>j.id!==activeJournalId);
+ const targets=visibleJournalProfiles().filter(j=>j.id!==activeJournalId);
  select.innerHTML=targets.length
   ?targets.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('')
   :'<option value="">Žádná další karta deníku</option>';
@@ -3325,7 +3353,7 @@ let calendarAllTrades=null;
 async function loadCalendarAllTrades(){
  if(calendarAllTrades)return calendarAllTrades;
  calendarAllTrades=[];
- for(const p of journalProfiles)calendarAllTrades.push(...await readTradesForOverview(p));
+ for(const p of visibleJournalProfiles())calendarAllTrades.push(...await readTradesForOverview(p));
  return calendarAllTrades;
 }
 function getCalendarRows(){
@@ -3336,7 +3364,7 @@ function getCalendarRows(){
 }
 async function initCalendarSection(){
  if($('calendarJournal')&&$('calendarJournal').options.length<=2){
-  $('calendarJournal').innerHTML='<option value="">Aktivní deník</option><option value="all">Všechny deníky</option>'+journalProfiles.filter(p=>p.id!==activeJournalId).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  $('calendarJournal').innerHTML='<option value="">Aktivní deník</option><option value="all">Všechny deníky</option>'+visibleJournalProfiles().filter(p=>p.id!==activeJournalId).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
  }
  const scope=$('calendarJournal')?.value||'';
  if(scope)await loadCalendarAllTrades();
@@ -3352,6 +3380,7 @@ function renderCalendar(){
  $('monthLabel').textContent=new Intl.DateTimeFormat('cs-CZ',{month:'long',year:'numeric'}).format(calendarDate);
  const names=['Po','Út','St','Čt','Pá','So','Ne'];let html=names.map(n=>`<div class="dow">${n}</div>`).join('')+'<div class="dow week">Týden</div>';
  const first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate();
+ const last=(new Date(y,m,days).getDay()+6)%7;
  const scope=$('calendarJournal')?.value||'';
  const rows=performanceRecords(getCalendarRows());
  const showRisk=!scope; // řízení rizika je nastavené vždy jen pro jeden konkrétní deník
@@ -3363,22 +3392,47 @@ function renderCalendar(){
   html+=`<div class="day week-summary"><div class="num">Týden</div><div class="pnl ${weekPnl>=0?'pos':'neg'}">${dualMoney(weekPnl,true)}</div><div class="count">${weekCount} obchodů</div></div>`;
   weekPnl=0;weekCount=0;
  };
- for(let i=0;i<first;i++){html+='<div class="day empty"></div>';cellsInRow++;if(cellsInRow===7){flushWeek();cellsInRow=0}}
- for(let day=1;day<=days;day++){
-  const date=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,ts=rows.filter(t=>t.date===date),p=ts.reduce((a,t)=>a+signed(t),0);
+ // Mřížka jde vždy po celých týdnech (Po–Ne), i přes hranici měsíce. Dny
+ // předchozího/dalšího měsíce se ukazují ztlumeně, ale s daty – jinak by
+ // součet „Týden“ v prvním a posledním řádku vynechal část týdne.
+ const cellsTotal=first+days+(6-last);
+ for(let i=0;i<cellsTotal;i++){
+  const d=new Date(y,m,1-first+i),inMonth=d.getMonth()===m;
+  const date=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,ts=rows.filter(t=>t.date===date),p=ts.reduce((a,t)=>a+signed(t),0);
   const {violations,achievements}=showRisk?evaluateDayRisk(date, drawdownByDate, rows):{violations:[],achievements:[]};
   const flagCls=violations.length?'risk':(achievements.length?'goal':'');
   const title=[...violations,...achievements].join(' | ');
-  html+=`<div class="day ${ts.length?'has':''} ${flagCls}" ${ts.length?`onclick="showDay('${date}')"`:''} ${title?`title="${esc(title)}"`:''}><div class="num">${day}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}</div>`;
+  html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" ${ts.length?`onclick="showDay('${date}')"`:''} ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}</div>`;
   weekPnl+=p;weekCount+=ts.length;
   cellsInRow++;
   if(cellsInRow===7){flushWeek();cellsInRow=0}
  }
- if(cellsInRow>0){
-  for(;cellsInRow<7;cellsInRow++)html+='<div class="day empty"></div>';
-  flushWeek();
- }
  $('calendarGrid').innerHTML=html;
+ renderCalendarMonthSummary(rows,y,m);
+}
+// Výsledek zobrazeného kalendářního měsíce – jen jeho dny, bez dnů sousedních
+// měsíců, které mřížka ukazuje kvůli celým týdnům. Bere stejné řádky jako
+// mřížka, takže platí filtr deníku i přepínač „naživo bych nevzal“.
+function renderCalendarMonthSummary(rows,y,m){
+ const box=$('calendarMonthSummary');if(!box)return;
+ const prefix=`${y}-${String(m+1).padStart(2,'0')}-`;
+ const monthRows=rows.filter(t=>String(t.date||'').startsWith(prefix));
+ const stats=computeOverallStats(monthRows);
+ const pnl=stats.gainSum+stats.lossSum;
+ const byDay={};
+ monthRows.forEach(t=>{byDay[t.date]=(byDay[t.date]||0)+signed(t)});
+ const dayPnls=Object.values(byDay);
+ const greenDays=dayPnls.filter(v=>v>0).length,redDays=dayPnls.filter(v=>v<0).length;
+ const pf=stats.profitFactor===Infinity?'∞':stats.profitFactor.toFixed(2);
+ const label=new Intl.DateTimeFormat('cs-CZ',{month:'long',year:'numeric'}).format(new Date(y,m,1));
+ box.innerHTML=`<div class="panel-subtitle" style="margin-top:0">Výsledek měsíce – ${esc(label)}</div>
+  <div class="kpi-strip">
+   <div class="kpi-item"><div class="kpi-label">P/L měsíce</div><div class="kpi-value ${pnl>0?'pos':pnl<0?'neg':''}">${dualMoney(pnl,true)}</div></div>
+   <div class="kpi-item"><div class="kpi-label">Obchody</div><div class="kpi-value">${stats.totalTrades}</div></div>
+   <div class="kpi-item"><div class="kpi-label">Win rate</div><div class="kpi-value">${Math.round(stats.winRate*100)} %</div></div>
+   <div class="kpi-item"><div class="kpi-label">Profit factor</div><div class="kpi-value">${pf}</div></div>
+   <div class="kpi-item"><div class="kpi-label">Obchodní dny</div><div class="kpi-value">${dayPnls.length} <span class="sub" style="font-size:13px"><span class="pos">${greenDays} ↑</span> / <span class="neg">${redDays} ↓</span></span></div></div>
+  </div>`;
 }
 function goToJournalForDate(date){
  const scope=$('calendarJournal')?.value||'';
@@ -4418,7 +4472,7 @@ window.openMoveTrade=async(id,sourceJournalId)=>{
  const sourceResult=await window.desktopAPI.readJournal(sourceJournalId);
  const trade=(sourceResult?.data?.trades||[]).find(t=>t.id===id);
  if(!trade){showToast('Obchod se nepodařilo najít.');return}
- const targets=journalProfiles.filter(j=>j.id!==sourceJournalId);
+ const targets=visibleJournalProfiles().filter(j=>j.id!==sourceJournalId);
  if(!targets.length){showToast('Nejdříve vytvoř další deník, do kterého lze obchod přesunout.');return}
  pendingMoveTrade={id,sourceJournalId};
  $('moveTradeInfo').textContent=`${trade.instrument||'Bez instrumentu'} · ${trade.date||'bez data'} · z deníku „${source?.name||'Neznámý deník'}“`;
@@ -4970,15 +5024,17 @@ function renderJournalSelector(){
  select.disabled=false;
  $('renameJournalBtn').disabled=false;
  $('deleteJournalBtn').disabled=false;
- select.innerHTML=journalProfiles.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ select.innerHTML=visibleJournalProfiles().map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
  select.value=activeJournalId;
 }
 async function switchJournal(id){
  if(id===activeJournalId)return;
  if(db)db.close();
+ rememberPreviousJournal();
  activeJournalId=id;saveJournalProfiles();
  safeReload();
 }
+function rememberPreviousJournal(){try{if(activeJournalId)localStorage.setItem(PREVIOUS_JOURNAL_KEY,activeJournalId)}catch{}}
 $('journalSelect').onchange=e=>switchJournal(e.target.value);
 let journalNameMode='new';
 function openJournalNameModal(mode){
@@ -5000,7 +5056,7 @@ async function saveJournalNameFromModal(){
  if(journalNameMode==='new'){
   if(journalProfiles.some(j=>j.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
   const id='journal_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-  journalProfiles.push({id,name:clean,backtest:$('journalBacktest').checked});activeJournalId=id;saveJournalProfiles();closeJournalNameModal();safeReload();
+  journalProfiles.push({id,name:clean,backtest:$('journalBacktest').checked});rememberPreviousJournal();activeJournalId=id;saveJournalProfiles();closeJournalNameModal();safeReload();
  }else{
   const j=journalProfiles.find(x=>x.id===activeJournalId);if(!j)return;
   if(journalProfiles.some(x=>x.id!==j.id&&x.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
@@ -5014,16 +5070,92 @@ $('cancelJournalName').onclick=closeJournalNameModal;
 $('saveJournalName').onclick=saveJournalNameFromModal;
 $('journalNameInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveJournalNameFromModal()}if(e.key==='Escape')closeJournalNameModal()});
 $('journalNameModal').addEventListener('click',e=>{if(e.target===$('journalNameModal'))closeJournalNameModal()});
-$('deleteJournalBtn').addEventListener('click',async()=>{
+$('deleteJournalBtn').addEventListener('click',()=>deleteJournalById(activeJournalId));
+// Úplné smazání deníku: soubor deníku, jeho AI export a screenshoty, na které
+// neodkazuje žádný jiný deník (main.js, storage:deleteJournal). Nevratné, proto
+// se potvrzuje opsáním názvu – jedno kliknutí na „Pokračovat" nestačí.
+async function deleteJournalById(id){
+ const j=journalProfiles.find(x=>x.id===id);if(!j)return;
  if(journalProfiles.length<=1){showToast('Poslední deník nelze smazat.');return}
- const j=journalProfiles.find(x=>x.id===activeJournalId);if(!j)return;
- if(!(await showConfirm(`Opravdu smazat deník „${j.name}“ včetně všech jeho dat?`)))return;
- if(db)db.close();
- const deleted=await window.desktopAPI.deleteJournal(activeJournalId);
+ if(!FJJournals.isHidden(j)&&visibleJournalProfiles().length<=1){showToast('Poslední viditelný deník nelze smazat. Nejdřív zobraz jiný deník.');return}
+ const typed=await showPromptText(`Deník „${j.name}“ se nevratně smaže včetně všech obchodů, denních poznámek a screenshotů, které nepoužívá jiný deník. Bezpečnostní kopie ve složce safety-backups zůstanou.\n\nPro potvrzení napiš přesný název deníku.`,'Smazat deník');
+ if(typed==null)return;
+ if(typed.trim()!==j.name){showToast('Název nesouhlasí – deník se nesmazal.');return}
+ const wasActive=id===activeJournalId;
+ if(wasActive&&db)db.close();
+ const deleted=await window.desktopAPI.deleteJournal(id);
  if(!deleted?.ok){showToast('Deník se nepodařilo smazat: '+(deleted?.error||'Neznámá chyba'));return}
- journalProfiles=journalProfiles.filter(x=>x.id!==activeJournalId);activeJournalId=journalProfiles[0].id;saveJournalProfiles();safeReload();
+ // Účet přiřazený ke smazanému deníku by při dalším importu soubor deníku
+ // znovu založil (writeJournal). Přiřazení se proto ruší.
+ try{
+  const status=await window.desktopAPI.captureStatus?.();
+  const mappings={...(status?.accountMappings||{})};
+  const orphaned=Object.keys(mappings).filter(a=>mappings[a]===id);
+  if(orphaned.length){orphaned.forEach(a=>delete mappings[a]);await window.desktopAPI.captureSetMappings(mappings)}
+ }catch(e){console.warn('Přiřazení účtů ke smazanému deníku se nepodařilo zrušit:',e)}
+ journalProfiles=journalProfiles.filter(x=>x.id!==id);
+ if(wasActive){
+  activeJournalId=FJJournals.resolveActiveJournal(journalProfiles,'',localStorage.getItem(PREVIOUS_JOURNAL_KEY));
+  saveJournalProfiles();safeReload();return;
+ }
+ saveJournalProfiles();journalsChanged();
+ showToast(`Deník „${j.name}“ byl smazán.`);
+}
+// Skrytí / zobrazení deníku. Skrytý aktivní deník se nejdřív nahradí jiným
+// viditelným (naposledy použitým, jinak prvním) a aplikace se načte znovu.
+async function setJournalHidden(id,hidden){
+ const j=journalProfiles.find(x=>x.id===id);if(!j)return;
+ if(!hidden){delete j.hidden;saveJournalProfiles();journalsChanged();showToast(`Deník „${j.name}“ je znovu vidět.`);return}
+ if(!FJJournals.canHide(journalProfiles,id)){showToast('Poslední viditelný deník nelze skrýt.');return}
+ if(id===activeJournalId){
+  const next=FJJournals.resolveActiveJournal(journalProfiles.map(p=>p.id===id?{...p,hidden:true}:p),'',localStorage.getItem(PREVIOUS_JOURNAL_KEY));
+  const nextName=journalProfiles.find(p=>p.id===next)?.name||'jiný deník';
+  if(!(await showConfirm(`Deník „${j.name}“ je právě aktivní. Po skrytí se přepnu na „${nextName}“. Pokračovat?`,{title:'Skrýt deník',ok:'Skrýt a přepnout'})))return;
+  j.hidden=true;
+  if(db)db.close();
+  activeJournalId=next;saveJournalProfiles();safeReload();return;
+ }
+ j.hidden=true;saveJournalProfiles();journalsChanged();
+ showToast(`Deník „${j.name}“ je skrytý.`);
+}
+// Po změně seznamu deníků bez reloadu: překreslí výběry a souhrny, které deníky sčítají.
+function journalsChanged(){
+ renderJournalSelector();renderJournalVisibilityList();renderTaxonomyTransfer();
+ calendarAllTrades=null;
+ initReports();
+ initAccountOverview().catch(e=>console.warn(e));
+ if(captureSnapshot)renderCaptureMappings(captureSnapshot.accounts||[],captureSnapshot.accountMappings||{},captureSnapshot.hiddenAccounts||[]);
+ renderAll();
+}
+function renderJournalVisibilityList(){
+ const box=$('journalVisibilityList');if(!box)return;
+ box.innerHTML=journalProfiles.map(j=>{
+  const hidden=FJJournals.isHidden(j);
+  const tags=[j.id===activeJournalId?'aktivní':'',hidden?'skrytý':''].filter(Boolean).join(' · ');
+  return `<div class="mapping-row journal-visibility-row" style="grid-template-columns:1fr auto">
+   <div><b${hidden?' style="opacity:.6"':''}>${esc(j.name)}</b>${tags?` <span class="sub" style="font-size:11px">${tags}</span>`:''}</div>
+   <div style="display:flex;gap:6px;justify-content:flex-end">
+    <button type="button" class="btn journal-toggle-hidden" data-id="${esc(j.id)}" style="padding:5px 9px;font-size:12px">${hidden?'Zobrazit':'Skrýt'}</button>
+    <button type="button" class="btn danger journal-delete" data-id="${esc(j.id)}" style="padding:5px 9px;font-size:12px">Smazat</button>
+   </div>
+  </div>`;
+ }).join('')||'<p class="sub">Zatím žádný deník.</p>';
+ box.querySelectorAll('.journal-toggle-hidden').forEach(btn=>btn.onclick=()=>{
+  const j=journalProfiles.find(x=>x.id===btn.dataset.id);
+  setJournalHidden(btn.dataset.id,!FJJournals.isHidden(j));
+ });
+ box.querySelectorAll('.journal-delete').forEach(btn=>btn.onclick=()=>deleteJournalById(btn.dataset.id));
+}
+document.querySelectorAll('input[name="overviewStartJournal"]').forEach(r=>{
+ r.checked=r.value===overviewStartMode;
+ r.addEventListener('change',()=>{
+  if(!r.checked)return;
+  setOverviewStartMode(r.value);
+  showToast(overviewStartMode===FJJournals.OVERVIEW_START.ALL?'Přehled účtu bude po spuštění ukazovat všechny deníky.':'Přehled účtu bude po spuštění ukazovat poslední aktivní deník.');
+ });
 });
 renderJournalSelector();
+renderJournalVisibilityList();
 
 
 function showToast(message){
@@ -5197,7 +5329,7 @@ async function readJournalDayNotes(profile){
 }
 async function collectReportDayNotes(){
  const map={};
- for(const p of journalProfiles){
+ for(const p of visibleJournalProfiles()){
   const notes=await readJournalDayNotes(p);
   for(const date in notes)map[p.id+'|'+date]=notes[date];
  }
@@ -5206,7 +5338,7 @@ async function collectReportDayNotes(){
 
 async function collectReportRows(){
  const all=[];
- for(const p of journalProfiles)all.push(...await readJournalTrades(p));
+ for(const p of visibleJournalProfiles())all.push(...await readJournalTrades(p));
  return all;
 }
 function reportSigned(t){return signed(t,'pnl')}
@@ -5237,7 +5369,7 @@ function drawReportChart(rows){
 async function initReports(){
  const all=await collectReportRows();
  const instruments=[...new Set(all.map(t=>t.instrument).filter(Boolean))].sort();
- $('reportJournal').innerHTML='<option value="">Všechny deníky</option>'+journalProfiles.map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ $('reportJournal').innerHTML='<option value="">Všechny deníky</option>'+visibleJournalProfiles().map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
  $('reportInstrument').innerHTML='<option value="">Všechny instrumenty</option>'+instruments.map(i=>`<option>${esc(i)}</option>`).join('');
  generateReportView(all);
 }
@@ -5350,9 +5482,9 @@ function renderCaptureMappings(accounts,mappings,hiddenAccounts=[]){
   <div><b>${esc(account)}</b></div>
   <select class="capture-mapping" data-account="${esc(account)}">
    <option value="">Aktivní karta při importu</option>
-   ${journalProfiles.map(j=>`<option value="${esc(j.id)}" ${mappings[account]===j.id?'selected':''}>${esc(j.name)}</option>`).join('')}
+   ${journalProfiles.filter(j=>!FJJournals.isHidden(j)||mappings[account]===j.id).map(j=>`<option value="${esc(j.id)}" ${mappings[account]===j.id?'selected':''}>${esc(j.name)}${FJJournals.isHidden(j)?' (skrytý)':''}</option>`).join('')}
   </select>
-  <button class="btn capture-hide-account" data-account="${esc(account)}" title="Skrýt účet ze seznamu" style="padding:5px 9px;font-size:12px;min-width:auto">Skrýt</button>
+  <button class="btn capture-hide-account" data-account="${esc(account)}" title="Jen schová účet z tohoto seznamu – import obchodů z něj nezastaví" style="padding:5px 9px;font-size:12px;min-width:auto">Skrýt</button>
  </div>`).join(''):'<p class="sub">V seznamu nejsou žádné zobrazené účty.</p>';
  const box=$('captureHiddenAccountsBox');
  box.innerHTML=hiddenAccounts.length?`<details><summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">SKRYTÉ ÚČTY (${hiddenAccounts.length})</summary><div style="margin-top:10px">${hiddenAccounts.map(account=>`<div class="mapping-row"><div><b>${esc(account)}</b></div><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn capture-restore-account" data-account="${esc(account)}" style="padding:5px 9px;font-size:12px">Přidat zpět</button><button class="btn danger capture-delete-account" data-account="${esc(account)}" style="padding:5px 9px;font-size:12px">Odstranit</button></div></div>`).join('')}</div></details>`:'';
@@ -5702,12 +5834,17 @@ function refreshAccountInstrumentOptions(preferredValue=''){
  $('accountInstrument').innerHTML='<option value="">Všechny instrumenty</option>'+instruments.map(i=>`<option value="${esc(i)}">${esc(i)}</option>`).join('');
  $('accountInstrument').value=instruments.includes(preferredValue)?preferredValue:'';
 }
+let accountOverviewInitialized=false;
+function defaultOverviewJournal(){return FJJournals.overviewStartJournal(overviewStartMode,activeJournalId,journalProfiles)}
 async function initAccountOverview(){
  overviewAllTrades=[];
- for(const p of journalProfiles)overviewAllTrades.push(...await readTradesForOverview(p));
- const oldJ=$('accountJournal').value,oldI=$('accountInstrument').value;
- $('accountJournal').innerHTML='<option value="">Všechny deníky</option>'+journalProfiles.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
- $('accountJournal').value=journalProfiles.some(p=>p.id===oldJ)?oldJ:'';
+ for(const p of visibleJournalProfiles())overviewAllTrades.push(...await readTradesForOverview(p));
+ // Při prvním otevření se filtr nastaví podle Nastavení → Deníky (poslední
+ // aktivní deník / všechny). Potom se drží, co si uživatel vybral.
+ const oldJ=accountOverviewInitialized?$('accountJournal').value:defaultOverviewJournal(),oldI=$('accountInstrument').value;
+ accountOverviewInitialized=true;
+ $('accountJournal').innerHTML='<option value="">Všechny deníky</option>'+visibleJournalProfiles().map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+ $('accountJournal').value=visibleJournalProfiles().some(p=>p.id===oldJ)?oldJ:'';
  refreshAccountInstrumentOptions(oldI);
  syncAccountDateFields();
  applyAccountOverview();
@@ -5750,8 +5887,8 @@ $('accountJournal').onchange=()=>{refreshAccountInstrumentOptions();applyAccount
 $('accountInstrument').onchange=applyAccountOverview;
 $('applyAccountFilters').onclick=applyAccountOverview;
 $('clearAccountFilters').onclick=()=>{
- $('accountRangeMode').value='all';$('accountDay').value='';$('accountFrom').value='';$('accountTo').value='';$('accountJournal').value='';$('accountInstrument').value='';
- syncAccountDateFields();applyAccountOverview();
+ $('accountRangeMode').value='all';$('accountDay').value='';$('accountFrom').value='';$('accountTo').value='';$('accountJournal').value=defaultOverviewJournal();$('accountInstrument').value='';
+ refreshAccountInstrumentOptions();syncAccountDateFields();applyAccountOverview();
 };
 syncAccountDateFields();
 

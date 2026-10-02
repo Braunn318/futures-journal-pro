@@ -576,8 +576,52 @@ ipcMain.handle('storage:write', async (_event, journalId, data) => {
   try { writeJournal(journalId, data || defaultJournalData()); return { ok: true }; }
   catch (error) { logError('Storage write', error); return { ok: false, error: error.message }; }
 });
+// Jména obrázků, na které deník (soubor v journal-data) odkazuje.
+function journalImageNames(file) {
+  const names = new Set();
+  mapImageStrings(JSON.parse(fs.readFileSync(file, 'utf8')), value => {
+    const name = imageRefName(value);
+    if (name) names.add(name);
+    return null;
+  });
+  return names;
+}
+// Úplné smazání deníku: soubor deníku, jeho odlehčený AI export a screenshoty,
+// které nepoužívá žádný jiný deník. Screenshoty jsou společné (jméno = otisk
+// obsahu), takže stejný obrázek může patřit i jinému deníku – ten se nechá.
+// Když se některý zbývající deník nedá přečíst, nesmaže se ŽÁDNÝ obrázek:
+// nevíme, co používá, a ztracený screenshot už nikdo nevrátí.
+// Bezpečnostní kopie v safety-backups se nemažou.
+function deleteJournalCompletely(journalId) {
+  const file = journalPath(journalId);
+  let own = new Set();
+  if (fs.existsSync(file)) {
+    try { own = journalImageNames(file); }
+    catch (error) { logError('deleteJournal: čtení obrázků deníku', error); }
+  }
+  fs.rmSync(file, { force: true });
+  fs.rmSync(aiExportPath(journalId), { force: true });
+  let removedImages = 0;
+  if (own.size && fs.existsSync(dataRoot())) {
+    const used = new Set();
+    for (const entry of fs.readdirSync(dataRoot())) {
+      if (!entry.endsWith('.json')) continue;
+      try { for (const name of journalImageNames(path.join(dataRoot(), entry))) used.add(name); }
+      catch (error) {
+        logError(`deleteJournal: deník ${entry} nejde přečíst, obrázky se nemažou`, error);
+        return { ok: true, removedImages: 0, keptImages: own.size };
+      }
+    }
+    for (const name of own) {
+      if (used.has(name)) continue;
+      fs.rmSync(path.join(imagesRoot(), name), { force: true });
+      removedImages++;
+    }
+  }
+  return { ok: true, removedImages, keptImages: own.size - removedImages };
+}
 ipcMain.handle('storage:deleteJournal', async (_event, journalId) => {
-  try { fs.rmSync(journalPath(journalId), { force: true }); return { ok: true }; }
+  try { return deleteJournalCompletely(journalId); }
   catch (error) { logError('Storage delete journal', error); return { ok: false, error: error.message }; }
 });
 ipcMain.handle('storage:reset', async () => {

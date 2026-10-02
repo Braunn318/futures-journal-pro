@@ -52,7 +52,7 @@ function renderEditor(taxonomy) {
   const dom = makeDom(['taxonomyGroups', 'taxonomyCopyTarget', 'taxonomyCopyBtn', 'taxonomyTransferNote']);
   FJTaxonomy.applyConfig(taxonomy || {});
   const r = loadRenderer(
-    ['$', 'esc', 'wireTaxonomyEditor', 'renderTaxonomyEditor', 'renderTaxonomyTransfer'],
+    ['$', 'esc', 'wireTaxonomyEditor', 'renderTaxonomyEditor', 'renderTaxonomyTransfer', 'visibleJournalProfiles'],
     {
       document: dom.document,
       settings: { ...SETTINGS, taxonomy: taxonomy || {} },
@@ -136,7 +136,7 @@ test('přenos číselníků: nabídne ostatní karty a popíše, co se přenáš
 test('přenos číselníků: bez další karty se kopie nenabízí', () => {
   const dom = makeDom(['taxonomyGroups', 'taxonomyCopyTarget', 'taxonomyCopyBtn', 'taxonomyTransferNote']);
   FJTaxonomy.applyConfig({});
-  const r = loadRenderer(['$', 'esc', 'renderTaxonomyTransfer'], {
+  const r = loadRenderer(['$', 'esc', 'renderTaxonomyTransfer', 'visibleJournalProfiles'], {
     document: dom.document,
     settings: { ...SETTINGS },
     journalProfiles: [{ id: 'j1', name: 'Phidias 1' }],

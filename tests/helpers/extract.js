@@ -16,6 +16,7 @@ const vm = require('vm');
 const nodeCrypto = require('crypto');
 const FJPoints = require('../../app/points.js');
 const FJTaxonomy = require('../../app/taxonomy.js');
+const FJJournals = require('../../app/journals.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -156,6 +157,7 @@ function loadFromSource(source, names, globals = {}) {
     // <script src>), takže ho kontext musí mít taky.
     FJPoints,
     FJTaxonomy,
+    FJJournals,
     ...globals
   });
   vm.runInContext(code, context, { filename: 'extracted-from-source.js' });
