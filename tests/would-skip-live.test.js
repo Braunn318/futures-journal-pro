@@ -55,12 +55,15 @@ function domStub(values = {}) {
 }
 
 const BASE = ['isSetupRecord', 'tradeRecords', 'signed', 'INCLUDE_SKIP_LIVE_KEY', 'isSkipLive',
-  'readIncludeSkipLive', 'includeSkipLive', 'performanceRecords'];
+  'readIncludeSkipLive', 'includeSkipLive', 'INCLUDE_NO_FILL_KEY', 'INCLUDE_SKIPPED_KEY', 'hypotheticalGroup', 'readIncludeFlag', 'includeNoFill', 'includeSkipped', 'currentInclude', 'performanceRecords'];
 
 // Načte funkce a nastaví globální přepínač (let v kontextu vm).
 function load(names, globals, include = false) {
   const r = loadRenderer([...BASE, ...names], { settings: SETTINGS, ...globals });
-  require('vm').runInContext('includeSkipLive=' + (include ? 'true' : 'false'), r.__context);
+  // k3 je zároveň NO_FILL – „přepínač zapnutý“ tu proto znamená všechny
+  // přepínače skupin mimo výkon (no fill a vynechané mají vlastní testy).
+  const v = include ? 'true' : 'false';
+  require('vm').runInContext(`includeSkipLive=${v};includeNoFill=${v};includeSkipped=${v}`, r.__context);
   return r;
 }
 
@@ -102,7 +105,7 @@ test('renderDashboard: výkon bez nich, fill rate s nimi, skupina evidovaná zvl
   function run(rows, include) {
     const seen = {};
     const r = load(['computeOverallStats', 'computeDrawdownByDate', 'evaluateDayRisk',
-      'computeSetupStats', 'computeSkipLiveStats', 'renderDashboard'], {
+      'computeSetupStats', 'PERFORMANCE_GROUPS', 'computeGroupStats', 'computeSkipLiveStats', 'renderDashboard'], {
       trades: rows, setupRecords: [], $: domStub().$,
       renderKpiStrip: (total, balance, stats) => { seen.kpi = plain({ total, balance, stats }); },
       renderOverallStatsList() {}, renderTopInstruments: list => { seen.top = plain(list); },
@@ -110,6 +113,7 @@ test('renderDashboard: výkon bez nich, fill rate s nimi, skupina evidovaná zvl
       renderGauges() {}, drawHistogram() {}, drawEquityRows: list => { seen.equity = plain(list); }, drawWeeklyCurve() {},
       renderSetupStats: stats => { seen.setup = plain(stats); },
       renderSkipLiveStats: stats => { seen.skip = plain(stats); },
+      renderGroupStats() {},
       dualMoneyText: v => String(v)
     }, include);
     r.renderDashboard(rows, []);
@@ -134,14 +138,19 @@ test('renderDashboard: výkon bez nich, fill rate s nimi, skupina evidovaná zvl
 });
 
 test('computeSkipLiveStats: srovnání expectancy bez nich / s nimi', () => {
-  const r = load(['computeOverallStats', 'computeSkipLiveStats'], {});
+  const r = load(['computeOverallStats', 'PERFORMANCE_GROUPS', 'computeGroupStats', 'computeSkipLiveStats'], {});
   const s = plain(r.computeSkipLiveStats(MIXED));
   const liveNet = LIVE.reduce((a, t) => a + t.pnlRaw, 0);
   const allNet = MIXED.reduce((a, t) => a + t.pnlRaw, 0);
   assert.equal(s.expectancyWithout, liveNet / LIVE.length);
-  assert.equal(s.expectancyWith, allNet / MIXED.length);
+  // „S nimi“ přepíná jen tuhle skupinu: k3 je zároveň NO_FILL a zůstává mimo,
+  // dokud je vypnutý přepínač no fill.
+  const withSkip = [...LIVE, SKIPPED[0], SKIPPED[1]];
+  assert.equal(s.expectancyWith, withSkip.reduce((a, t) => a + t.pnlRaw, 0) / withSkip.length);
   assert.equal(s.winRate, 1 / 3);
   assert.equal(plain(r.computeSkipLiveStats(LIVE)).count, 0);
+  const all = load(['computeOverallStats', 'PERFORMANCE_GROUPS', 'computeGroupStats', 'computeSkipLiveStats'], {}, true);
+  assert.equal(plain(all.computeSkipLiveStats(MIXED)).expectancyWith, allNet / MIXED.length, 's no fill zapnutým i k3');
 });
 
 test('kalendář: den s obchodem „naživo bych nevzal" má P/L jen z živých obchodů', () => {
@@ -209,7 +218,7 @@ test('sloučení: příznak i důvod se neztratí a planFollowed zůstává samo
     'normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument', 'getDefaultCommissionForInstrument',
     'classifyResult', 'signed', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields',
     'legFromTrade', 'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'getTickSizeForInstrument',
-    'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects'
+    'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'postExitApplies', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects'
   ], { settings: SETTINGS, Date });
   const base = { instrument: 'MES', date: '2026-09-12', entryTime: '16:00', entryPrice: 7700, side: 'long', contracts: 1, commission: 0, positionId: 'p' };
   const tp1 = { ...base, id: 'a', exitTime: '16:05', exitPrice: 7703, result: 'target', points: 3, pnl: 15, pnlRaw: 15, planFollowed: 'ano' };

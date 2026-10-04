@@ -67,7 +67,7 @@ function domStub(values = {}) {
   };
 }
 
-const BASE_NAMES = ['isSetupRecord', 'tradeRecords', 'signed', 'INCLUDE_SKIP_LIVE_KEY', 'isSkipLive', 'readIncludeSkipLive', 'includeSkipLive', 'performanceRecords'];
+const BASE_NAMES = ['isSetupRecord', 'tradeRecords', 'signed', 'INCLUDE_SKIP_LIVE_KEY', 'isSkipLive', 'readIncludeSkipLive', 'includeSkipLive', 'INCLUDE_NO_FILL_KEY', 'INCLUDE_SKIPPED_KEY', 'hypotheticalGroup', 'readIncludeFlag', 'includeNoFill', 'includeSkipped', 'currentInclude', 'performanceRecords'];
 
 // ------------------------------------------------------------ 1. drawdown
 
@@ -106,7 +106,7 @@ test('renderDashboard: equity, KPI i statistiky vycházejí jen z obchodů', () 
     const dom = domStub();
     const seen = { kpi: null, list: null, drawn: null, setupStats: null };
     const r = loadRenderer([...BASE_NAMES, 'computeOverallStats', 'computeDrawdownByDate', 'evaluateDayRisk',
-      'computeSetupStats', 'computeSkipLiveStats', 'renderDashboard'], {
+      'computeSetupStats', 'PERFORMANCE_GROUPS', 'computeGroupStats', 'computeSkipLiveStats', 'renderDashboard'], {
       settings: SETTINGS, trades: rows, setupRecords: setups, $: dom.$,
       renderKpiStrip: (total, balance, stats) => { seen.kpi = plain({ total, balance, stats }); },
       renderOverallStatsList: stats => { seen.list = plain(stats); },
@@ -115,6 +115,7 @@ test('renderDashboard: equity, KPI i statistiky vycházejí jen z obchodů', () 
       renderGauges() {}, drawHistogram() {}, drawEquityRows() {}, drawWeeklyCurve() {},
       renderSetupStats: stats => { seen.setupStats = plain(stats); },
       renderSkipLiveStats() {},
+      renderGroupStats() {},
       dualMoneyText: v => String(v)
     });
     r.renderDashboard(rows, setups);

@@ -28,7 +28,7 @@ const NAMES = [
   'getDefaultCommissionForInstrument', 'classifyResult', 'signed', 'tradeTotalPoints',
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
   'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES',
-  'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects',
+  'postExitFields', 'applyPostExitFields', 'postExitApplies', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects',
   'sideMeta', 'reportSigned', 'srCsvCounts', 'srCsvHeader', 'srCsvCells',
   'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'srLevelsMigrationPatch'
 ];

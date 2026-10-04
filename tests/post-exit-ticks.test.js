@@ -27,7 +27,7 @@ const SETTINGS = {
 const NAMES = [
   'normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument',
   'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'POST_EXIT_DERIVED_KEYS',
-  'postExitFields', 'applyPostExitFields', 'postExitTicksWarning',
+  'postExitFields', 'applyPostExitFields', 'postExitApplies', 'postExitTicksWarning',
   'getDefaultCommissionForInstrument', 'classifyResult', 'signed', 'tradeTotalPoints',
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
   'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'combineTradeObjects',

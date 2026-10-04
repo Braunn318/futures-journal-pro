@@ -1,6 +1,6 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.7.2",
+  "version": "4.7.3",
   "description": "Futures Journal PRO 4.7.2 – skrývání a úplné mazání deníků, výchozí deník v Přehledu účtu, kalendář po celých týdnech s výsledkem měsíce a Nastavení → Přizpůsobení: karty obchodu (vč. nové karty Hladiny) a upozornění na nevyplněné po kartách.",
   "main": "main.js",
   "author": "Jája S",

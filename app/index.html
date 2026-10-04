@@ -238,6 +238,16 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .pill.skip-live-pill{font-size:10px;padding:1px 6px;background:rgba(var(--orange-rgb,246,166,35),.16);color:var(--orange,#f6a623);border:1px solid rgba(var(--orange-rgb,246,166,35),.4)}
 .skip-live-toggle{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
 .skip-live-toggle input{width:auto}
+.include-toggles{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+.account-filter-grid .include-field{grid-column:1/-1}
+.include-toggles label.skip-live-toggle{display:inline-flex;margin:0;white-space:nowrap}
+.include-toggles label.skip-live-toggle input[type=checkbox]{width:auto;flex:0 0 auto;margin:0}
+/* Hypotetický obchod (nenaplněný / vynechaný setup vyplněný jako obchod):
+   tónovaný jako setup bez vstupu – modře no fill, šedě vědomě vynechaný. */
+.card.trade.hypo-nofill{background:linear-gradient(0deg,rgba(120,140,255,.09),rgba(120,140,255,.09)),var(--panel);border:1px dashed rgba(120,140,255,.6)}
+.card.trade.hypo-skipped{background:linear-gradient(0deg,rgba(150,160,180,.09),rgba(150,160,180,.09)),var(--panel);border:1px dashed rgba(150,160,180,.6)}
+.pill.hypo-pill{font-size:10px;padding:1px 6px;background:rgba(120,140,255,.16);color:#9fb0ff;border:1px solid rgba(120,140,255,.4)}
+.day-header .stat-excluded{font-size:12px;font-weight:600;color:var(--muted);margin-right:8px;opacity:.85}
 .sr-rows{display:flex;flex-direction:column;gap:6px}
 .sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr auto;gap:6px;align-items:center}
 .sr-row .sr-warn{grid-column:1/-1;font-size:12px}
@@ -506,7 +516,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Deník / karta</label><select id="accountJournal"><option value="">Všechny deníky</option></select></div>
           <div class="field"><label>Instrument</label><select id="accountInstrument"><option value="">Všechny instrumenty</option></select></div>
           <div class="field"><label>&nbsp;</label><button class="btn primary" id="applyAccountFilters">Zobrazit</button></div>
-          <div class="field"><label>&nbsp;</label><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveOverview"> včetně obchodů, které bych naživo nevzal</label></div>
+          <div class="field include-field"><span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveOverview"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillOverview"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedOverview"> včetně vědomě vynechaných</label></span></div>
         </div>
       </div>
 
@@ -531,6 +541,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="setupStatsBox" class="stat-list"></div>
           <div class="panel-subtitle">Naživo bych nevzal <span class="sub">— evidováno zvlášť</span></div>
           <div id="skipLiveStatsBox" class="stat-list"></div>
+          <div class="panel-subtitle">No fill – hypoteticky <span class="sub">— nenaplněno / nestihnuto, evidováno zvlášť</span></div>
+          <div id="noFillStatsBox" class="stat-list"></div>
+          <div class="panel-subtitle">Vědomě vynechané – hypoteticky <span class="sub">— evidováno zvlášť</span></div>
+          <div id="skippedStatsBox" class="stat-list"></div>
         </div>
         <div class="card">
           <h3>Rozložení zisků a ztrát</h3>
@@ -611,7 +625,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <select id="filterResult"><option value="">Všechny výsledky</option><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
-        <label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label>
+        <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
+        <span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span>
         <input type="date" id="filterDate">
         <input type="date" id="newDayDate" title="Datum dne k přidání">
         <button class="btn" id="addEmptyDay" title="Přidá denní blok (komentář/náhled/poznámky/screenshoty) i bez obchodu">+ Přidat den</button>
@@ -636,7 +651,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <label>Deník / karta</label>
             <select id="calendarJournal"><option value="">Aktivní deník</option><option value="all">Všechny deníky</option></select>
           </div>
-          <label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveCalendar"> včetně obchodů, které bych naživo nevzal</label>
+          <span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveCalendar"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillCalendar"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedCalendar"> včetně vědomě vynechaných</label></span>
         </div>
         <div class="sub" id="calendarRiskNote" style="margin:-4px 0 10px"></div>
         <div id="calendarMonthSummary"></div>
@@ -661,7 +676,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn primary" id="generateReport">Vytvořit report</button>
           <button class="btn" id="reportCsv">Export CSV</button>
           <button class="btn" id="reportPrint">Tisk / PDF</button>
-          <label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-skip-live" id="includeSkipLiveReports"> včetně obchodů, které bych naživo nevzal</label>
+          <span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveReports"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillReports"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedReports"> včetně vědomě vynechaných</label></span>
         </div>
       </div>
       <div class="grid stats" style="margin-top:16px">
@@ -1115,7 +1130,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <div class="modal" id="setupModal">
   <div class="modalbox">
     <div class="modalhead"><h2 id="setupModalTitle">Setup bez vstupu</h2><button class="icon" id="closeSetupModal">✕</button></div>
-    <div class="sub" style="margin-bottom:12px">Setup, který byl, ale nedošlo k exekuci. Nevstupuje do P/L, equity ani risk managementu – jen do četnosti setupů a fill rate.</div>
+    <div class="sub" style="margin-bottom:12px">Setup, který byl, ale nedošlo k exekuci. Nevstupuje do P/L, equity ani risk managementu – jen do četnosti setupů a fill rate. Když chceš vědět, co by to udělalo, použij „Vyplnit jako celý obchod“.</div>
     <input type="hidden" id="sfId">
     <div class="formgrid">
       <div class="field"><label>Datum</label><input id="sfDate" type="date"></div>
@@ -1138,6 +1153,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="btn" id="cancelSetup" type="button">Zrušit</button>
+      <button class="btn" id="convertSetup" type="button" title="Uloží setup a otevře plný formulář obchodu – doplníš hypotetický výstup a výsledek (co by to udělalo). Ve výchozím stavu mimo P/L a statistiky výkonu.">Vyplnit jako celý obchod</button>
       <button class="btn primary" id="saveSetup" type="button">Uložit</button>
     </div>
   </div>
@@ -1193,14 +1209,14 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" id="postExitDerivedField"><label>Dopočítá se <span class="sub">— needitovatelné</span></label><div class="sub" id="postExitDerivedHint">—</div></div>
           </div>
           </div>
-          <div class="field full sub" id="postExitNotApplies" style="display:none">U výslovně nenaplněného setupu se pohyb ceny nevyplňuje – nebylo co měřit.</div>
+          <div class="field full sub" id="postExitNotApplies" style="display:none">U nenaplněného / vynechaného setupu se pohyb ceny vyplňuje, až když doplníš hypotetickou cenu výstupu – do té doby nebylo co měřit.</div>
         </div>
       </details>
       <details class="trade-section" data-card="setup">
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Setup</span><span class="sub trade-section-summary" id="setupSummary"></span><span class="trade-section-missing" id="setupMissing"></span></summary>
         <div class="formgrid">
           <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
-          <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select></div>
+          <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
           <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
@@ -1515,31 +1531,68 @@ const INCLUDE_SKIP_LIVE_KEY='FJ_includeSkipLive';
 function isSkipLive(t){return t?.wouldSkipLive===true}
 function readIncludeSkipLive(){try{return localStorage.getItem(INCLUDE_SKIP_LIVE_KEY)==='1'}catch{return false}}
 let includeSkipLive=readIncludeSkipLive();
-function performanceRecords(rows,include=includeSkipLive){return tradeRecords(rows).filter(t=>include||!isSkipLive(t))}
-// Skupina „naživo bych nevzal“ evidovaná zvlášť – aby šlo poznat, jestli
-// vynechávání takových setupů výkon strategie nesnižuje. Počítá se vždy,
-// nezávisle na přepínači.
-function computeSkipLiveStats(rows){
+// Hypotetický obchod: nenaplněný (NO_FILL, MISSED) nebo vědomě vynechaný
+// (SKIPPED) setup vyplněný jako celý obchod – „co by to udělalo“. Výkonové
+// agregace ho ve výchozím stavu vynechávají stejně jako „naživo bych nevzal“;
+// každá skupina má vlastní pamatovaný přepínač. Prázdný stav = naplněno.
+// MISSED („nestihl jsem“) patří k no fill – není to vědomé rozhodnutí.
+const INCLUDE_NO_FILL_KEY='FJ_includeNoFill';
+const INCLUDE_SKIPPED_KEY='FJ_includeSkipped';
+function hypotheticalGroup(t){
+ const st=t?.fillStatus;
+ if(st==='NO_FILL'||st==='MISSED')return 'noFill';
+ if(st==='SKIPPED')return 'skipped';
+ return null;
+}
+function readIncludeFlag(key){try{return localStorage.getItem(key)==='1'}catch{return false}}
+let includeNoFill=readIncludeFlag(INCLUDE_NO_FILL_KEY);
+let includeSkipped=readIncludeFlag(INCLUDE_SKIPPED_KEY);
+function currentInclude(){return {skipLive:includeSkipLive,noFill:includeNoFill,skipped:includeSkipped}}
+// `include`: objekt {skipLive, noFill, skipped}, nebo boolean – true = všechny
+// skupiny, false = žádná.
+function performanceRecords(rows,include=currentInclude()){
+ const inc=typeof include==='object'&&include?include:{skipLive:!!include,noFill:!!include,skipped:!!include};
+ return tradeRecords(rows).filter(t=>{
+  if(isSkipLive(t)&&!inc.skipLive)return false;
+  const g=hypotheticalGroup(t);
+  return !g||inc[g]===true;
+ });
+}
+// Skupiny mimo výkon – „naživo bych nevzal“, no fill a vědomě vynechané –
+// evidované zvlášť, aby šlo poznat, jestli jejich vynechávání výkon strategie
+// nesnižuje. Počítá se vždy, nezávisle na přepínačích. Srovnání expectancy
+// „bez nich / s nimi“ přepíná jen danou skupinu, ostatní přepínače platí.
+const PERFORMANCE_GROUPS={
+ skipLive:{test:isSkipLive,reasonOf:t=>t.wouldSkipReason||'',reasonLabel:k=>k?FJTaxonomy.labelOf('SKIP_REASON',k):'Bez důvodu',reasonTitle:'Podle důvodu',empty:'Žádný obchod označený „naživo bych nevzal“.'},
+ noFill:{test:t=>hypotheticalGroup(t)==='noFill',reasonOf:t=>t.fillStatus||'',reasonLabel:k=>FJTaxonomy.labelOf('FILL_STATUS',k),reasonTitle:'Podle stavu',empty:'Žádný nenaplněný setup vyplněný jako obchod.'},
+ skipped:{test:t=>hypotheticalGroup(t)==='skipped',reasonOf:t=>t.setupCode||'',reasonLabel:k=>k?FJTaxonomy.labelOf('SETUP',k):'Bez setupu',reasonTitle:'Podle setupu',empty:'Žádný vědomě vynechaný setup vyplněný jako obchod.'}
+};
+function computeGroupStats(rows,key){
+ const def=PERFORMANCE_GROUPS[key];
  const all=tradeRecords(rows);
- const group=all.filter(isSkipLive);
+ const group=all.filter(def.test);
  const stats=computeOverallStats(group,true);
  const byReason={};
  for(const t of group){
-  const key=t.wouldSkipReason||'';
-  const r=byReason[key]||(byReason[key]={key,count:0,wins:0,losses:0,pnl:0});
+  const k=def.reasonOf(t);
+  const r=byReason[k]||(byReason[k]={key:k,count:0,wins:0,losses:0,pnl:0});
   r.count++;r.pnl+=signed(t);
   if(t.result==='target')r.wins++;else if(t.result==='stoploss')r.losses++;
  }
+ const base=currentInclude();
  return {
   count:group.length,pnl:stats.gainSum+stats.lossSum,winRate:stats.winRate,expectancy:stats.expectancy,
-  expectancyWithout:computeOverallStats(all,false).expectancy,
-  expectancyWith:computeOverallStats(all,true).expectancy,
+  expectancyWithout:computeOverallStats(all,{...base,[key]:false}).expectancy,
+  expectancyWith:computeOverallStats(all,{...base,[key]:true}).expectancy,
   byReason:Object.values(byReason).sort((a,b)=>b.count-a.count)
  };
 }
-function renderSkipLiveStats(stats){
- const el=$('skipLiveStatsBox'); if(!el)return;
- if(!stats.count){el.innerHTML='<div class="sub">Žádný obchod označený „naživo bych nevzal“.</div>';return}
+function computeSkipLiveStats(rows){return computeGroupStats(rows,'skipLive')}
+function renderSkipLiveStats(stats){renderGroupStats('skipLiveStatsBox','skipLive',stats)}
+function renderGroupStats(boxId,key,stats){
+ const el=$(boxId); if(!el)return;
+ const def=PERFORMANCE_GROUPS[key];
+ if(!stats.count){el.innerHTML=`<div class="sub">${def.empty}</div>`;return}
  const row=(label,val,cls='')=>`<div class="stat-row"><span>${label}</span><b class="${cls}">${val}</b></div>`;
  const lines=[
   row('Obchodů',stats.count),
@@ -1548,8 +1601,8 @@ function renderSkipLiveStats(stats){
   row('Expectancy',money(stats.expectancy),stats.expectancy>=0?'pos':'neg'),
   row('Expectancy bez nich / s nimi',`${money(stats.expectancyWithout)} / ${money(stats.expectancyWith)}`)
  ];
- const reasons=stats.byReason.map(r=>row(esc(r.key?FJTaxonomy.labelOf('SKIP_REASON',r.key):'Bez důvodu'),`${r.count}× · ${r.wins}/${r.losses} · ${(r.pnl>=0?'+':'')+money(r.pnl)}`,r.pnl>=0?'pos':'neg'));
- el.innerHTML=lines.join('')+(reasons.length?'<div class="sub" style="margin-top:6px">Podle důvodu (počet · zisk/ztráta · P/L)</div>'+reasons.join(''):'');
+ const reasons=stats.byReason.map(r=>row(esc(def.reasonLabel(r.key)),`${r.count}× · ${r.wins}/${r.losses} · ${(r.pnl>=0?'+':'')+money(r.pnl)}`,r.pnl>=0?'pos':'neg'));
+ el.innerHTML=lines.join('')+(reasons.length?`<div class="sub" style="margin-top:6px">${def.reasonTitle} (počet · zisk/ztráta · P/L)</div>`+reasons.join(''):'');
 }
 // Karty formuláře obchodu (Nastavení → Přizpůsobení): každá jde skrýt a každá
 // má vlastní „Upozorňovat na nevyplněné" (štítek „Neúplné" na kartě obchodu
@@ -1598,15 +1651,22 @@ function setOverviewStartMode(value){
  overviewStartMode=value===FJJournals.OVERVIEW_START.ALL?FJJournals.OVERVIEW_START.ALL:FJJournals.OVERVIEW_START.ACTIVE;
  try{localStorage.setItem(OVERVIEW_START_KEY,overviewStartMode)}catch{}
 }
-// Jediné místo, které přepínač mění: srovná všechny jeho checkboxy a
-// překreslí to, co z výkonových čísel stojí.
-function setIncludeSkipLive(value){
- includeSkipLive=value===true;
- try{localStorage.setItem(INCLUDE_SKIP_LIVE_KEY,includeSkipLive?'1':'0')}catch{}
- document.querySelectorAll('.include-skip-live').forEach(cb=>{cb.checked=includeSkipLive});
+// Jediné místo, které přepínače mění: srovná všechny checkboxy téže skupiny
+// (data-include) a uloží volbu.
+const INCLUDE_STORAGE_KEYS={skipLive:INCLUDE_SKIP_LIVE_KEY,noFill:INCLUDE_NO_FILL_KEY,skipped:INCLUDE_SKIPPED_KEY};
+function setInclude(key,value){
+ const on=value===true;
+ if(key==='skipLive')includeSkipLive=on;
+ else if(key==='noFill')includeNoFill=on;
+ else if(key==='skipped')includeSkipped=on;
+ else return;
+ try{localStorage.setItem(INCLUDE_STORAGE_KEYS[key],on?'1':'0')}catch{}
+ document.querySelectorAll(`.include-toggle[data-include="${key}"]`).forEach(cb=>{cb.checked=on});
 }
-async function onIncludeSkipLiveChange(value){
- setIncludeSkipLive(value);
+function setIncludeSkipLive(value){setInclude('skipLive',value)}
+// Překreslí to, co z výkonových čísel stojí.
+async function onIncludeChange(key,value){
+ setInclude(key,value);
  renderAll();
  if(typeof applyAccountOverview==='function'&&overviewAllTrades.length)applyAccountOverview();
  if(typeof drawInstrumentPortfolio==='function')drawInstrumentPortfolio();
@@ -2131,7 +2191,7 @@ function instrumentPortfolioFilteredRows(){
   return true;
  });
 }
-function groupInstrumentPortfolio(rows,include=includeSkipLive){
+function groupInstrumentPortfolio(rows,include=currentInclude()){
  rows=performanceRecords(rows,include);
  const grouped={};
  rows.forEach(t=>{
@@ -2188,7 +2248,7 @@ async function initInstrumentPortfolioSection(){
  select.value=current;
  drawInstrumentPortfolio();
 }
-function computeDrawdownByDate(rows=trades,include=includeSkipLive){
+function computeDrawdownByDate(rows=trades,include=currentInclude()){
  rows=performanceRecords(rows,include);
  const daily={};rows.forEach(t=>{if(t.date)daily[t.date]=(daily[t.date]||0)+signed(t)});
  const dates=Object.keys(daily).sort();
@@ -2201,7 +2261,7 @@ function computeDrawdownByDate(rows=trades,include=includeSkipLive){
  });
  return map;
 }
-function evaluateDayRisk(date, drawdownByDate, rows=trades, include=includeSkipLive){
+function evaluateDayRisk(date, drawdownByDate, rows=trades, include=currentInclude()){
  rows=performanceRecords(rows,include);
  const r=settings.risk||{};
  const dayTrades=rows.filter(t=>t.date===date);
@@ -2219,7 +2279,7 @@ function evaluateDayRisk(date, drawdownByDate, rows=trades, include=includeSkipL
  if(r.profitTargetPerDay && dailyPnl>=r.profitTargetPerDay) achievements.push(`Splněn profit target ${dualMoneyText(r.profitTargetPerDay)}`);
  return {violations,achievements};
 }
-function computeOverallStats(rows,include=includeSkipLive){
+function computeOverallStats(rows,include=currentInclude()){
  rows=performanceRecords(rows,include);
  const wins=rows.filter(t=>t.result==='target'), losses=rows.filter(t=>t.result==='stoploss'), breakevens=rows.filter(t=>t.result==='breakeven');
  const gainSum=wins.reduce((a,t)=>a+signed(t),0), lossSum=losses.reduce((a,t)=>a+signed(t),0);
@@ -2315,6 +2375,8 @@ function renderDashboard(rows=trades,setups=setupRecords){
  const allTrades=tradeRecords(rows);
  const safeRows=performanceRecords(rows);
  renderSkipLiveStats(computeSkipLiveStats(allTrades));
+ renderGroupStats('noFillStatsBox','noFill',computeGroupStats(allTrades,'noFill'));
+ renderGroupStats('skippedStatsBox','skipped',computeGroupStats(allTrades,'skipped'));
  renderSetupStats(computeSetupStats([...allTrades,...(Array.isArray(setups)?setups.filter(isSetupRecord):[])]));
  const stats=computeOverallStats(safeRows);
  const total=stats.gainSum+stats.lossSum, balance=Number(settings.startingBalance)+total;
@@ -3105,7 +3167,7 @@ function applyPostExitFields(t,src=settings,{deriveCourse=true}={}){
  // přepočtu obnoví, nebo zmizí, když už výstup cíli / SL neodpovídá. Obchod
  // s víc nohami se nechává být – jeho hodnoty vznikly sloučením.
  const legs=FJPoints.legsOf(t);
- if(deriveCourse&&!(legs&&legs.length>1)&&(!t.fillStatus||t.fillStatus==='FILLED')){
+ if(deriveCourse&&!(legs&&legs.length>1)&&postExitApplies(t.fillStatus,t.exitPrice)){
   const d=FJPoints.deriveCourseTicks(t,getTickSizeForInstrument(t?.instrument,src));
   for(const key of ['mfeTicks','maeTicks']){
    const has=t[key]!=null&&t[key]!=='';
@@ -3180,17 +3242,27 @@ function tradeHTML(t){
  // karta je navíc tónovaná, ať se obchod v seznamu nesplete se živým.
  const skipLive=t.wouldSkipLive===true;
  const skipBadge=skipLive?`<span class="pill skip-live-pill" title="Naživo bych nevzal – vzato jen kvůli měření. Ve výchozím stavu mimo P/L a statistiky výkonu.">${esc(t.wouldSkipReason?FJTaxonomy.labelOf('SKIP_REASON',t.wouldSkipReason):'naživo bych nevzal')}</span>`:'';
- return `<div class="card trade${skipLive?' skip-live':''}">
+ // Hypotetický obchod (no fill / vědomě vynechaný setup vyplněný jako obchod):
+ // stav naplnění ukazuje pilulka v kontextu, karta je navíc tónovaná a nese
+ // štítek, že je ve výchozím stavu mimo P/L.
+ const hypo=hypotheticalGroup(t);
+ const hypoBadge=hypo?`<span class="pill hypo-pill" title="Hypotetický obchod – co by to udělalo. Ve výchozím stavu mimo P/L a statistiky výkonu (přepínač „${hypo==='noFill'?'včetně no fill obchodů':'včetně vědomě vynechaných'}“).">hypoteticky</span>`:'';
+ const setupInfo=[];
+ if(t.missedByTicks!=null&&t.missedByTicks!=='')setupInfo.push(`minuto o ${esc(t.missedByTicks)} t`);
+ if(t.setupMaxFavorableTicks!=null&&t.setupMaxFavorableTicks!=='')setupInfo.push(`max ${esc(t.setupMaxFavorableTicks)} t ve směru`);
+ if(t.maxLevel)setupInfo.push(`došlo na ${esc(FJTaxonomy.labelOf('TARGET_LEVEL',t.maxLevel))}`);
+ return `<div class="card trade${skipLive?' skip-live':''}${hypo?' hypo-'+hypo.toLowerCase():''}">
  <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${incompleteBadge?' '+incompleteBadge:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
  <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů${totalPointsDisplay} · ${dualMoney(pnlVal,true)}</div>
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
  ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}${t.plannedRMultiple!=null&&shown('sltp')?` · <span title="Plánované R: nejvzdálenější target ÷ riziko">plán R <b>${Number(t.plannedRMultiple).toFixed(2)}</b></span>`:''}</div>`:''}
+ ${setupInfo.length?`<div class="sub" style="margin-top:2px" title="Ze záznamu setupu bez vstupu">${setupInfo.join(' · ')}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
  </div>
  ${(ctxPills||levelsBlock)?`<div>${ctxPills?`<div class="trade-legs" style="margin-top:6px">${ctxPills}</div>`:''}${levelsBlock}</div>`:''}
  <div><div class="meta">Kontrakty: ${t.contracts}</div>${shown('setup')?`<div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div>`:''}</div>
- <div>${t.comment&&shown('comments')?`<div class="comment">${esc(t.comment)}</div>`:''}${(importedBadge||skipBadge)?`<div class="sub" style="margin-top:2px">${[skipBadge,importedBadge].filter(Boolean).join(' ')}</div>`:''}
+ <div>${t.comment&&shown('comments')?`<div class="comment">${esc(t.comment)}</div>`:''}${(importedBadge||skipBadge||hypoBadge)?`<div class="sub" style="margin-top:2px">${[hypoBadge,skipBadge,importedBadge].filter(Boolean).join(' ')}</div>`:''}
  ${t.dailyPlan?`<details class="trade-plan-details"><summary>Obchodní plán</summary><div class="trade-plan-content">
  ${t.dailyPlan.instrument?`<div><b>Instrument:</b> ${esc(t.dailyPlan.instrument)}</div>`:''}
  ${t.dailyPlan.maxTrades?`<div><b>Max. obchodů:</b> ${esc(t.dailyPlan.maxTrades)}</div>`:''}
@@ -3214,7 +3286,7 @@ window.rememberTradeLevels=(id,open)=>{if(open)openTradeLevels.add(id);else open
 const extraEmptyDays=new Set();
 const DOW_LABELS=['Ne','Po','Út','St','Čt','Pá','So'];
 function czPluralObchod(n){if(n===1)return 'obchod';if(n>=2&&n<=4)return 'obchody';return 'obchodů'}
-function dayKpis(dayTrades,include=includeSkipLive){
+function dayKpis(dayTrades,include=currentInclude()){
  dayTrades=performanceRecords(dayTrades,include);
  const pnl=dayTrades.reduce((a,t)=>a+signed(t),0);
  const wins=dayTrades.filter(t=>t.result==='target').length, losses=dayTrades.filter(t=>t.result==='stoploss').length;
@@ -3250,13 +3322,21 @@ function setupRowHTML(s){
    ${price.length?`<div class="sub">${price.join(' · ')}</div>`:''}
    ${s.reason||s.note?`<div class="sub">${esc([s.reason,s.note].filter(Boolean).join(' — '))}</div>`:''}
   </div>
-  <div class="setup-actions"><button type="button" class="btn" onclick="editTrade('${esc(s.id)}')">Upravit</button><button type="button" class="btn" onclick="deleteTrade('${esc(s.id)}')">Smazat</button></div>
+  <div class="setup-actions"><button type="button" class="btn" onclick="convertSetupToTrade('${esc(s.id)}')" title="Doplnit hypotetický výstup a výsledek (co by to udělalo) – ve výchozím stavu mimo P/L a statistiky výkonu">Vyplnit jako obchod</button><button type="button" class="btn" onclick="editTrade('${esc(s.id)}')">Upravit</button><button type="button" class="btn" onclick="deleteTrade('${esc(s.id)}')">Smazat</button></div>
  </div>`;
 }
 function dayGroupHTML(date,dayTrades,daySetups=[]){
  const note=getDayNote(date);
  const kpi=dayKpis(dayTrades);
  const skipCount=dayTrades.filter(isSkipLive).length;
+ const noFillCount=dayTrades.filter(t=>hypotheticalGroup(t)==='noFill').length;
+ const skippedCount=dayTrades.filter(t=>hypotheticalGroup(t)==='skipped').length;
+ // Obchody, které přepínače z P/L dne vyřadily, mají vlastní tlumený součet –
+ // jinak by den jen s hypotetickými obchody ukazoval +$0.00 bez vysvětlení.
+ const counted=new Set(performanceRecords(dayTrades).map(t=>t.id));
+ const excluded=dayTrades.filter(t=>!counted.has(t.id));
+ const excludedPnl=excluded.reduce((a,t)=>a+signed(t),0);
+ const excludedHTML=excluded.length?`<span class="stat-excluded" title="P/L obchodů, které jsou podle přepínačů mimo statistiku („naživo bych nevzal“, no fill, vědomě vynechané)">mimo: ${excludedPnl>=0?'+':''}${money(excludedPnl)}</span>`:'';
  const open=openDayNotes.has(date);
  const d=new Date(date+'T00:00:00');
  const weekday=isNaN(d)?'':DOW_LABELS[d.getDay()];
@@ -3271,9 +3351,10 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
+ <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
  <div class="spacer"></div>
  ${levelsBtn}
+ ${excludedHTML}
  <span class="stat ${kpi.pnl>=0?'pos':'neg'}">${kpi.pnl>=0?'+':''}${money(kpi.pnl)}</span>
  </div>
  <div class="day-comment-row"><span class="lbl">Komentář</span><input type="text" placeholder="Volitelné" value="${esc(note.comment)}" onclick="event.stopPropagation()" onblur="saveDayField('${date}','comment',this.value)"></div>
@@ -3351,12 +3432,15 @@ async function handleDayShotInputChange(e){
  if(el)el.innerHTML=dayThumbsHTML(date);else renderTrades();
 }
 function renderTrades(){
- const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'',sk=$('filterSkipLive')?.value||'';
+ const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'',sk=$('filterSkipLive')?.value||'',fl=$('filterFill')?.value||'';
  const sideOk=t=>!s||(s==='none'?(t.side!=='long'&&t.side!=='short'):t.side===s);
  // Filtr skupiny „naživo bych nevzal“: jen ona / bez ní. Výchozí „vše“ ukazuje
  // obchody vždy – P/L dne se z nich počítá podle přepínače (dayKpis).
  const skipOk=t=>!sk||(sk==='only'?isSkipLive(t):!isSkipLive(t));
- const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&skipOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
+ // Filtr stavu naplnění: naplněné (i bez uloženého stavu) / no fill / vědomě
+ // vynechané. Platí i pro setupy bez vstupu.
+ const fillOk=t=>!fl||(fl==='filled'?!hypotheticalGroup(t):hypotheticalGroup(t)===fl);
+ const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&skipOk(t)&&fillOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
  const groups=[];
  for(const t of list){
   const last=groups[groups.length-1];
@@ -3368,7 +3452,7 @@ function renderTrades(){
  if(!r&&sk!=='only'){
   for(const s of setupRecords){
    if(q&&!(String(s.instrument||'')+' '+String(s.note||'')+' '+String(s.reason||'')).toLowerCase().includes(q))continue;
-   if(!sideOk(s)||(d&&s.date!==d))continue;
+   if(!sideOk(s)||!fillOk(s)||(d&&s.date!==d))continue;
    let g=groups.find(x=>x.date===s.date);
    if(!g){g={date:s.date,trades:[]};groups.push(g)}
    (g.setups||(g.setups=[])).push(s);
@@ -3377,7 +3461,7 @@ function renderTrades(){
  }
  // Prázdné dny (jen s poznámkou) se přidávají jen když se nefiltruje – jinak by
  // se objevovaly i u filtru, kterému žádný jejich obchod neodpovídá.
- if(!q&&!r&&!s&&!sk){
+ if(!q&&!r&&!s&&!sk&&!fl){
   const tradeDates=new Set(groups.map(g=>g.date));
   const extraDates=new Set([...Object.keys(db?.data?.dayNotes||{}),...extraEmptyDays]);
   extraDates.forEach(date=>{
@@ -3487,6 +3571,7 @@ function goToJournalForDate(date){
  if($('filterResult'))$('filterResult').value='';
  if($('filterSide'))$('filterSide').value='';
  if($('filterSkipLive'))$('filterSkipLive').value='';
+ if($('filterFill'))$('filterFill').value='';
  if($('search'))$('search').value='';
  renderTrades();
 }
@@ -3563,9 +3648,9 @@ $('imgSaveAsBtn').onclick=async()=>{
  const a=document.createElement('a');a.href=currentViewedImage;a.download=`screenshot-${Date.now()}.png`;document.body.appendChild(a);a.click();document.body.removeChild(a);
 };
 
-function openModal(t=null){
+function openModal(t=null,{title}={}){
  $('tradeForm').reset();editImages=[];$('imagePreview').innerHTML='';$('tradeId').value=t?.id||'';
- $('modalTitle').textContent=t?'Upravit obchod':'Nový obchod';
+ $('modalTitle').textContent=title||(t?'Upravit obchod':'Nový obchod');
  resetLegRows();
  if($('templateHint'))$('templateHint').textContent='';
  if($('pnlCalcHint'))$('pnlCalcHint').innerHTML='';
@@ -3799,6 +3884,47 @@ function readLegRows(){
 if($('addLegBtn'))$('addLegBtn').onclick=()=>{addLegRow();renderPostExitHints()};
 function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div><img src="${src}" style="cursor:pointer" title="Otevřít obrázek ve výchozím prohlížeči obrázků" onclick="openImageFromForm('${src}')"><button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
 window.removeImg=i=>{editImages.splice(i,1);showPreviews()}
+// ---- Setup bez vstupu → celý (hypotetický) obchod ----
+// Formulář obchodu dostane, co setup zná (plánovaný vstup jako cenu vstupu,
+// SL, cíl, kontext, stav naplnění); výstup a výsledek doplní uživatel – „co by
+// to udělalo“. Ukládá se pod STEJNÝM id, takže obchod setup nahradí.
+function tradeDraftFromSetup(s){
+ const tg=FJTaxonomy.sanitizeTargetLevel(s&&s.targetLevel1);
+ const draft={
+  id:s.id,date:s.date||'',entryTime:s.entryTime||'',instrument:s.instrument||'',
+  side:(s.side==='long'||s.side==='short')?s.side:'',
+  entryPrice:s.plannedEntryPrice??'',exitTime:'',exitPrice:'',result:'',points:'',pnl:'',
+  contracts:1,commission:0,planFollowed:'ano',
+  setupCode:FJTaxonomy.sanitizeSingle('SETUP',s.setupCode),
+  entryLevels:FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',s.entryLevels),
+  ofConfirm:FJTaxonomy.sanitizeMulti('OF_CONFIRM',s.ofConfirm),
+  fillStatus:s.fillStatus==='SKIPPED'||s.fillStatus==='MISSED'?s.fillStatus:'NO_FILL',
+  comment:[s.reason,s.note].map(v=>String(v||'').trim()).filter(Boolean).join(' — '),
+  images:Array.isArray(s.images)?[...s.images]:[]
+ };
+ if(s.slPrice!=null&&s.slPrice!=='')draft.slPrice=s.slPrice;
+ if(tg)draft.targetLevel1=tg;
+ return draft;
+}
+// Při uložení převedeného setupu: přestane být SETUP_ONLY a pole, která
+// formulář převzal jinam (plánovaný vstup, důvod a poznámka v komentáři),
+// zmizí. Max. pohyb ze setupu se přejmenuje na setupMaxFavorableTicks –
+// maxFavorableTicks je u obchodu dopočítané pole a applyPostExitFields by ho
+// přepsalo. Minutí o ticky a nejdál došlá hladina zůstávají, s ničím nekolidují.
+function convertSetupRecordFields(obj,existing){
+ if(!isSetupRecord(existing))return obj;
+ for(const k of ['recordType','plannedEntryPrice','reason','note','maxFavorableTicks'])delete obj[k];
+ if(existing.maxFavorableTicks!=null&&existing.maxFavorableTicks!=='')obj.setupMaxFavorableTicks=existing.maxFavorableTicks;
+ return obj;
+}
+window.convertSetupToTrade=id=>{
+ const s=setupRecords.find(t=>t.id===id);
+ if(!s)return;
+ const draft=tradeDraftFromSetup(s);
+ const def=getDefaultCommissionForInstrument(draft.instrument);
+ if(def!=null)draft.commission=Math.round(def*draft.contracts*100)/100;
+ openModal(draft,{title:'Doplnit obchod ze setupu'});
+};
 window.editTrade=id=>{
  const setup=setupRecords.find(t=>t.id===id);
  if(setup)return openSetupModal(setup);
@@ -3887,9 +4013,12 @@ $('pnl')?.addEventListener('input',updateResultBadge);
 // z čeho měřit – žádný výstup neexistuje. Nevyplněný stav se bere jako
 // naplněný, protože u ručně zadaného obchodu zůstává prázdný a schovat před
 // ním pole by znamenalo, že se k nim uživatel vůbec nedostane. Skrývá se
-// tedy jen u VÝSLOVNĚ nenaplněného setupu.
-function postExitApplies(fillStatus){
- return !fillStatus||fillStatus==='FILLED';
+// tedy jen u VÝSLOVNĚ nenaplněného setupu – a jen dokud nemá výstupní cenu.
+// Nenaplněný / vynechaný setup vyplněný jako celý obchod (hypotetický výstup
+// „co by to udělalo“) se měří stejně jako naplněný.
+function postExitApplies(fillStatus,exitPrice){
+ if(!fillStatus||fillStatus==='FILLED')return true;
+ return exitPrice!==undefined&&exitPrice!==null&&String(exitPrice).trim()!==''&&Number.isFinite(Number(exitPrice));
 }
 // Rozpracovaný obchod z formuláře, jen v rozsahu, který dopočty potřebují.
 // Cena SL se dopočítává stejně jako při ukládání (u stopnutého obchodu z ceny
@@ -3957,8 +4086,13 @@ function renderPostExitHints(){
 }
 // Pohyb ceny (MFE, MAE, ticky po výstupu) a jejich dopočty.
 function renderCourseHints(){
+ const fillHint=$('fillStatusHint');
+ if(fillHint){
+  const st=$('fillStatus')?.value;
+  fillHint.textContent=st&&st!=='FILLED'?'Hypotetický obchod: vyplň, co by se stalo (cena vstupu = plánovaná). Ve výchozím stavu mimo P/L a statistiky výkonu.':'';
+ }
  const block=$('postExitBlock');
- const applies=postExitApplies($('fillStatus')?.value);
+ const applies=postExitApplies($('fillStatus')?.value,$('exitPrice')?.value);
  if(block)block.style.display=applies?'':'none';
  if($('postExitNotApplies'))$('postExitNotApplies').style.display=applies?'none':'';
  if(!applies)return;
@@ -4079,7 +4213,7 @@ function renderTradeSections(){
  if(planned!=null)sltp.push('plán R '+planned);
  $('sltpSummary').textContent=sltp.length?'— '+sltp.join(' · '):'';
  const course=[];
- if(!postExitApplies(d.fillStatus))course.push('nenaplněný setup');
+ if(!postExitApplies(d.fillStatus,d.exitPrice))course.push('nenaplněný setup');
  else{
   if(val(d.mfeTicks))course.push('MFE '+d.mfeTicks);
   if(val(d.maeTicks))course.push('MAE '+d.maeTicks);
@@ -4303,6 +4437,7 @@ $('tradeForm').addEventListener('submit',async e=>{
    createdAt:existing?.createdAt||Date.now(),
    updatedAt:Date.now()
   };
+  convertSetupRecordFields(obj,existing);
   // Cíle se níž staví znovu z formuláře; kdyby tu zůstaly staré, odstranění
   // všech cílů v editaci by je neodstranilo (viz komentář u obj.legs níž).
   delete obj.legs;
@@ -4423,8 +4558,8 @@ $('tradeForm').addEventListener('submit',async e=>{
   //
   // Záporné zadání formulář nezablokuje (měkká validace), ale do dat se ukládá
   // v absolutní hodnotě – směr nese název pole, ne znaménko.
-  const postExitFav=postExitApplies(obj.fillStatus)?$('postExitFavorableTicks')?.value:'';
-  const postExitAdv=postExitApplies(obj.fillStatus)?$('postExitAdverseTicks')?.value:'';
+  const postExitFav=postExitApplies(obj.fillStatus,obj.exitPrice)?$('postExitFavorableTicks')?.value:'';
+  const postExitAdv=postExitApplies(obj.fillStatus,obj.exitPrice)?$('postExitAdverseTicks')?.value:'';
   const hasPostExit=[postExitFav,postExitAdv].some(v=>v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v)));
   if(hasPostExit){
    if(postExitFav!==undefined&&String(postExitFav).trim()!==''&&Number.isFinite(Number(postExitFav)))obj.postExitFavorableTicks=Math.abs(Number(postExitFav));
@@ -4439,7 +4574,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   // jako u čísel po výstupu: prázdné se neukládá, záporné jde v absolutní
   // hodnotě, u nenaplněného setupu se neukládá nic.
   for(const key of ['mfeTicks','maeTicks','observedMinutes']){
-   const raw=postExitApplies(obj.fillStatus)?$(key)?.value:'';
+   const raw=postExitApplies(obj.fillStatus,obj.exitPrice)?$(key)?.value:'';
    if(raw!==undefined&&String(raw).trim()!==''&&Number.isFinite(Number(raw)))obj[key]=Math.abs(Number(raw));
    else delete obj[key];
    // Příznak odvození přežije jen u hodnoty, kterou uživatel nepřepsal. Platí
@@ -4834,11 +4969,19 @@ async function saveSetupRecord(){
  $('setupModal').classList.remove('open');
  await load();
  showToast('Setup bez vstupu uložen.');
+ return id;
+}
+// Z okna setupu rovnou do celého obchodu: setup se nejdřív uloží (zrušení
+// formuláře obchodu ho tedy neztratí), pak se otevře převod.
+async function saveSetupAndConvert(){
+ const id=await saveSetupRecord();
+ if(id)window.convertSetupToTrade(id);
 }
 $('addSetupBtn').onclick=()=>openSetupModal();
 $('closeSetupModal').onclick=()=>$('setupModal').classList.remove('open');
 $('cancelSetup').onclick=()=>$('setupModal').classList.remove('open');
 $('saveSetup').onclick=()=>saveSetupRecord().catch(e=>showToast('Uložení se nezdařilo: '+e.message));
+$('convertSetup').onclick=()=>saveSetupAndConvert().catch(e=>showToast('Uložení se nezdařilo: '+e.message));
 $('closeModal').onclick=async()=>{
  if(tradeFormSnapshot()!==tradeFormBaseline && !(await showConfirm('Neuložené změny v obchodu budou ztraceny. Zavřít bez uložení?')))return;
  $('tradeModal').classList.remove('open');
@@ -4846,8 +4989,8 @@ $('closeModal').onclick=async()=>{
 // Záměrně BEZ zavírání kliknutím mimo okno – u rozdělaného formuláře (Nový/
 // Upravit obchod) by omylem kliknutí mimo mohlo smazat rozepsanou práci.
 // Zavírá se jen křížkem (#closeModal) nahoře.
-['search','filterResult','filterSide','filterSkipLive','filterDate'].forEach(id=>$(id)?.addEventListener('input',renderTrades));
-document.querySelectorAll('.include-skip-live').forEach(cb=>{cb.checked=includeSkipLive;cb.addEventListener('change',()=>onIncludeSkipLiveChange(cb.checked))});
+['search','filterResult','filterSide','filterSkipLive','filterFill','filterDate'].forEach(id=>$(id)?.addEventListener('input',renderTrades));
+document.querySelectorAll('.include-toggle').forEach(cb=>{const key=cb.dataset.include;cb.checked=currentInclude()[key]===true;cb.addEventListener('change',()=>onIncludeChange(key,cb.checked))});
 $('addEmptyDay').onclick=()=>{
  const date=$('newDayDate').value||new Date().toISOString().slice(0,10);
  extraEmptyDays.add(date);

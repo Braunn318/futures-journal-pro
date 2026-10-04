@@ -26,7 +26,7 @@ const eq = (actual, expected, message) => assert.deepEqual(JSON.parse(JSON.strin
 const merging = () => loadRenderer([
   'normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument',
   'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'POST_EXIT_DERIVED_KEYS',
-  'postExitFields', 'applyPostExitFields', 'getDefaultCommissionForInstrument',
+  'postExitFields', 'applyPostExitFields', 'postExitApplies', 'getDefaultCommissionForInstrument',
   'classifyResult', 'signed', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal',
   'weightedExitFields', 'legFromTrade', 'mergeSamePriceLegs', 'labelLegs',
   'mergeContextFields', 'combineTradeObjects', 'deriveTargetPrices', 'deriveStopLossPrice'

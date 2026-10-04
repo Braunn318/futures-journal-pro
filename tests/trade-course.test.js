@@ -27,7 +27,7 @@ const SETTINGS = {
 const NAMES = [
   'normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument',
   'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'POST_EXIT_DERIVED_KEYS',
-  'postExitFields', 'applyPostExitFields', 'getDefaultCommissionForInstrument',
+  'postExitFields', 'applyPostExitFields', 'postExitApplies', 'getDefaultCommissionForInstrument',
   'classifyResult', 'signed', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal',
   'weightedExitFields', 'legFromTrade', 'mergeSamePriceLegs', 'labelLegs',
   'mergeContextFields', 'combineTradeObjects', 'sideMeta', 'reportSigned',
@@ -121,7 +121,9 @@ test('neúplný kontext: naplněný obchod bez MFE nebo MAE', () => {
   assert.equal(FJPoints.contextIncomplete(course({ mfeTicks: 5 })), true, 'chybí MAE');
   assert.equal(FJPoints.contextIncomplete(course({ maeTicks: 5 })), true, 'chybí MFE');
   assert.equal(FJPoints.contextIncomplete(course({ mfeTicks: 5, maeTicks: 0 })), false, 'nula je vyplněná hodnota');
-  assert.equal(FJPoints.contextIncomplete(course({ fillStatus: 'MISSED' })), false, 'nenaplněný setup se neposuzuje');
+  assert.equal(FJPoints.contextIncomplete(course({ fillStatus: 'MISSED', exitPrice: '' })), false, 'nenaplněný setup se neposuzuje');
+  // Setup vyplněný jako hypotetický obchod (má výstup) se posuzuje jako naplněný.
+  assert.equal(FJPoints.contextIncomplete(course({ fillStatus: 'NO_FILL' })), true, 'hypotetický obchod s výstupem');
 });
 
 // -------------------------------------------------------------- číselník
@@ -347,7 +349,9 @@ test('applyPostExitFields: odvozená hodnota má příznak, ruční ji nikdy nep
   assert.equal(gone.mfeTicksDerived, undefined);
 
   // Nenaplněný setup se nepředvyplňuje.
-  assert.equal(r.applyPostExitFields(course({ fillStatus: 'MISSED' })).mfeTicks, undefined);
+  assert.equal(r.applyPostExitFields(course({ fillStatus: 'MISSED', exitPrice: '' })).mfeTicks, undefined);
+  // Hypotetický obchod (nenaplněný setup s doplněným výstupem) se dopočítává jako naplněný.
+  assert.equal(r.applyPostExitFields(course({ fillStatus: 'NO_FILL' })).mfeTicks, 24);
 });
 
 test('sloučení: příznak odvození jde s nohou, která dodala maximum', () => {
@@ -374,7 +378,8 @@ test('chybějící MFE/MAE hlásí štítek „Neúplné", ne druhý štítek v 
   assert.ok(!r.contextPillsHTML(trade).includes('neúplný kontext'));
   assert.match(r.incompleteBadgeHTML(trade), /title="Chybí:[^"]*MFE, MAE/);
   for (const status of ['NO_FILL', 'MISSED', 'SKIPPED']) {
-    assert.doesNotMatch(r.incompleteBadgeHTML(course({ fillStatus: status })), /MFE/, status);
+    assert.doesNotMatch(r.incompleteBadgeHTML(course({ fillStatus: status, exitPrice: '' })), /MFE/, status);
+    assert.match(r.incompleteBadgeHTML(course({ fillStatus: status })), /MFE/, status + ' s hypotetickým výstupem');
   }
 });
 

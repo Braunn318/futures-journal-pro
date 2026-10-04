@@ -33,7 +33,7 @@ const NAMES = [
   'mergeSamePriceLegs',
   'labelLegs',
   'mergeContextFields',
-  'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects'
+  'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'postExitApplies', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects'
 ];
 
 function renderer() {
@@ -114,7 +114,7 @@ test('karta obchodu ukazuje celkové body, ne body na kontrakt', () => {
   // u obchodů, které jsou dnes zobrazené správně (spec §2.1 KOREKCE).
   const r = loadRenderer([
     'esc', 'money', 'moneyCzk', 'dualMoney', 'signed', 'sideMeta', 'resultMeta',
-    'legPillHTML', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'formatLevelRow', 'contextPillsHTML', 'incompleteBadgeHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML', 'tradeHTML',
+    'legPillHTML', 'hypotheticalGroup', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'formatLevelRow', 'contextPillsHTML', 'incompleteBadgeHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML', 'tradeHTML',
     'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'srRefDistanceText'
   ], {
     settings: { ...SETTINGS, usdCzkRate: 23 },

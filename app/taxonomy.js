@@ -417,8 +417,10 @@
     if (!sanitizeMulti('OF_CONFIRM', trade.ofConfirm, config).length) missing.push('ofConfirm');
     const target = sanitizeTargetLevel(trade.targetLevel1, config);
     if (!target || !target.type || target.price == null) missing.push('targetLevel1');
+    // Nenaplněný / vynechaný setup vyplněný jako celý hypotetický obchod (má
+    // výstupní cenu) se posuzuje jako naplněný.
     const fill = trade.fillStatus;
-    if (!fill || fill === 'FILLED') {
+    if (!fill || fill === 'FILLED' || filledNumber(trade.exitPrice)) {
       for (const key of ['slPrice', 'mfeTicks', 'maeTicks', 'postExitFavorableTicks', 'postExitAdverseTicks']) {
         if (!filledNumber(trade[key])) missing.push(key);
       }

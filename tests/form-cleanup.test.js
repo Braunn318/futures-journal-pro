@@ -40,7 +40,7 @@ function merger() {
   return loadRenderer([
     'normalizeInstrumentCode', 'findTemplate', 'getPointValueForInstrument',
     'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'POST_EXIT_DERIVED_KEYS',
-    'postExitFields', 'applyPostExitFields', 'getDefaultCommissionForInstrument',
+    'postExitFields', 'applyPostExitFields', 'postExitApplies', 'getDefaultCommissionForInstrument',
     'classifyResult', 'signed', 'tradeTotalPoints', 'weightedExitFields', 'legFromTrade',
     'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'combineTradeObjects'
   ], { settings: SETTINGS, Date });

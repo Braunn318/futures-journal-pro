@@ -38,7 +38,7 @@ function domStub() {
 function render(calendarDate, rows = TRADES) {
   const dom = domStub();
   const r = loadRenderer([
-    'isSetupRecord', 'tradeRecords', 'signed', 'INCLUDE_SKIP_LIVE_KEY', 'isSkipLive', 'readIncludeSkipLive', 'includeSkipLive', 'performanceRecords',
+    'isSetupRecord', 'tradeRecords', 'signed', 'INCLUDE_SKIP_LIVE_KEY', 'isSkipLive', 'readIncludeSkipLive', 'includeSkipLive', 'INCLUDE_NO_FILL_KEY', 'INCLUDE_SKIPPED_KEY', 'hypotheticalGroup', 'readIncludeFlag', 'includeNoFill', 'includeSkipped', 'currentInclude', 'performanceRecords',
     'computeDrawdownByDate', 'evaluateDayRisk', 'getCalendarRows', 'computeOverallStats', 'renderCalendar', 'renderCalendarMonthSummary'
   ], {
     settings: SETTINGS, trades: rows, calendarAllTrades: null, calendarDate,

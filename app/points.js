@@ -283,8 +283,10 @@
   function contextIncomplete(trade) {
     // Záznam setupu bez exekuce nemá výstup, od kterého by se MFE/MAE měřilo.
     if (trade?.recordType === 'SETUP_ONLY') return false;
+    // Nenaplněný setup vyplněný jako hypotetický obchod (s výstupní cenou) se
+    // posuzuje jako naplněný.
     const fill = trade?.fillStatus;
-    if (fill && fill !== 'FILLED') return false;
+    if (fill && fill !== 'FILLED' && finiteOrNull(trade?.exitPrice) == null) return false;
     return finiteOrNull(trade?.mfeTicks) == null || finiteOrNull(trade?.maeTicks) == null;
   }
 
