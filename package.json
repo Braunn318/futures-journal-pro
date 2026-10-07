@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.7.3",
-  "description": "Futures Journal PRO 4.7.2 – skrývání a úplné mazání deníků, výchozí deník v Přehledu účtu, kalendář po celých týdnech s výsledkem měsíce a Nastavení → Přizpůsobení: karty obchodu (vč. nové karty Hladiny) a upozornění na nevyplněné po kartách.",
+  "version": "4.7.4",
+  "description": "Futures Journal PRO 4.7.4 – AI export nese úpravu číselníků deníku (vlastní volby, přejmenování) pro Backtest Lab; nenaplněné a vynechané setupy jako hypotetické obchody s přepínači započtení do výkonu.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

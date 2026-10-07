@@ -2,6 +2,9 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.7.4 - 2026-10-07
+- AI export (`ai-export/<id>.json`) now also carries the journal's dictionary customisation as `taxonomy` (custom options, renames, hidden, order – the same object as `settings.taxonomy`). Tools reading the export (Backtest Lab) can now recognise and label custom keys like `CUSTOM_FIX_RRR` instead of reporting them as unknown. Other settings stay out of the export. The file refreshes on the next save, or via "přegenerovat AI export".
+
 ## 4.7.3 - 2026-10-04
 - New: an unfilled limit order or a consciously skipped setup can be filled in as a complete hypothetical trade ("what would it have done"). In the "Setup bez vstupu" window there is a new button "Vyplnit jako celý obchod" (saves the setup, then opens the full trade form), and every setup row in the Deník has "Vyplnit jako obchod". The form is prefilled from the setup (planned entry → entry price, SL, target 1, setup, entry levels, order flow, fill state, reason + note → comment, 1 contract, template commission) and the trade replaces the setup under the same id. "Minuto o" and "došlo na" stay on the trade; the setup's max favourable move is kept as `setupMaxFavorableTicks` (the trade's `maxFavorableTicks` is a computed field).
 - A hypothetical trade is a normal trade whose "Stav naplnění" is not "naplněno": NO_FILL and MISSED form the "no fill" group, SKIPPED the "vědomě vynechané" group. No new data field.

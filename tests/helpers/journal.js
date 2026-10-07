@@ -1,7 +1,7 @@
 'use strict';
 // Načtení deníku pro testy. Zvládne tři tvary, které aplikace produkuje:
 //  - jeden deník:   journal-data/<id>.json          → { trades, settings, dayNotes }
-//  - odlehčená kopie: ai-export/<id>.json           → { journalId, trades, dayNotes }  (bez settings!)
+//  - odlehčená kopie: ai-export/<id>.json           → { journalId, taxonomy, trades, dayNotes }  (bez settings, jen jejich taxonomy)
 //  - záloha všech:  collectAllJournalsBackup()      → { profiles, journals:[{profile,trades,settings}] }
 
 const fs = require('fs');

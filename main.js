@@ -504,8 +504,12 @@ function writeAiExportMirror(id, data) {
     const trades = Array.isArray(data?.trades) ? data.trades.map(stripImages) : [];
     const dayNotes = {};
     for (const date in (data?.dayNotes || {})) dayNotes[date] = stripDayNote(data.dayNotes[date]);
+    // Úprava číselníků deníku (vlastní volby, přejmenování) – bez ní by
+    // nástroj čtoucí export neznal klíče typu CUSTOM_… a jejich popisky.
+    const settings = Array.isArray(data?.settings) ? data.settings : [];
+    const taxonomy = settings.find(s => s?.key === 'main')?.value?.taxonomy || {};
     const temp = `${aiExportPath(id)}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify({ journalId: id, updatedAt: new Date().toISOString(), trades, dayNotes }, null, 2), 'utf8');
+    fs.writeFileSync(temp, JSON.stringify({ journalId: id, updatedAt: new Date().toISOString(), taxonomy, trades, dayNotes }, null, 2), 'utf8');
     fs.renameSync(temp, aiExportPath(id));
   } catch (error) {
     logError('writeAiExportMirror', error);
