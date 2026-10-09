@@ -224,7 +224,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .dow.week{color:var(--blue);font-weight:700}
 .day{min-height:105px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px;position:relative}
 .day.empty{opacity:.25}.day.out-month{opacity:.5}.day.out-month .num{color:var(--muted)}.day .num{font-weight:800}.day .pnl{font-size:12px;margin-top:7px}.day .count{font-size:11px;color:var(--muted);margin-top:4px}
-.day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
+.day[data-date]{cursor:pointer}.day[data-date]:hover{border-color:rgba(var(--blue-rgb),.6)}.day-ctx-flag{position:absolute;bottom:6px;right:8px;font-size:12px;opacity:.8}.day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
 .day.week-summary{background:var(--panel2);border-color:rgba(var(--blue-rgb),.4)}
 .day.week-summary .num{color:var(--blue);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
 .day-flag{position:absolute;top:6px;right:8px;font-size:14px}
@@ -660,8 +660,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
         <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
+        <button class="btn" id="dayContextBtn" type="button" title="Kontext dne (otevření vs value, očekávaný typ dne, zprávy …) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button>
         <button class="btn" id="quickContextBtn" type="button" title="Doplnit kontext obchodům z aktuálního výběru, které ho nemají úplný – celé na klávesnici">⚡ Rychlý kontext</button>
         <select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select>
+        <button class="btn" id="clearSkipLiveBtn" type="button" style="display:none" title="Živý deník: odebere chybné „naživo bych nevzal“ (i s důvodem) u všech takových záznamů aktivního deníku. Nic jiného se nemění.">Odebrat „naživo bych nevzal“</button>
         <span class="include-toggles" data-include-scope="journal"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span>
         <input type="date" id="filterDate">
         <input type="date" id="newDayDate" title="Datum dne k přidání">
@@ -697,7 +699,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <h3>Obchody vybraného dne</h3>
         <div id="dayRiskNote" class="alert"></div>
         <div id="dayContextBox"></div>
-        <div id="dayTrades" class="trade-list"><div class="sub">Klikni v kalendáři na den s obchody.</div></div>
+        <div id="dayTrades" class="trade-list"><div class="sub">Klikni v kalendáři na den – i bez obchodů, kontext dne jde vyplnit předem.</div></div>
       </div>
     </section>
 
@@ -1113,6 +1115,15 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   </div>
 </div>
 
+<div class="modal" id="dayContextModal">
+  <div class="modalbox" style="max-width:760px">
+    <div class="modalhead"><h2>Kontext dne</h2><button class="icon" id="closeDayContext" title="Zavřít (Esc)">✕</button></div>
+    <div class="field" style="max-width:220px;margin-bottom:10px"><label>Datum</label><input type="date" id="dayContextDate"></div>
+    <div id="dayContextModalBox"></div>
+    <div class="sub qc-help">Ranní pole vyplň před obchodováním, večerní po něm. Volba se uloží hned (klik / Enter / mezerník), druhý výběr téže volby ji zruší · Tab = další volba · Esc = zavřít</div>
+  </div>
+</div>
+
 <div class="modal" id="quickContextModal">
   <div class="modalbox qc-box" style="max-width:880px">
     <div class="modalhead"><h2>Rychlý kontext <span class="sub" id="qcProgress"></span></h2><button class="icon" id="closeQuickContext" title="Zavřít bez uložení (Esc)">✕</button></div>
@@ -1278,7 +1289,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
           <div class="field full"><label>Vybraná likvidita před vstupem <span class="sub">— past na retail</span></label><div id="liquiditySwept" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
-          <div class="field" id="wouldSkipLiveField"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
+          <div class="field" id="wouldSkipLiveField"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select><div class="sub" id="wouldSkipLiveNote"></div></div>
           <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
         </div>
       </details>
@@ -3705,7 +3716,32 @@ function renderDataCheckCount(mode){
  const opt=$('filterDataCheck')?.querySelector?.('option[value="only"]'); if(!opt)return;
  const n=[...tradeRecords(trades),...setupRecords].filter(t=>FJContext.dataCheckIssues(t,mode).length).length;
  opt.textContent=`Kontrola dat (${n})`;
+ // Hromadné odebrání „naživo bych nevzal“ – jen v živém deníku, jen ve
+ // filtru Kontrola dat a jen když je co odebrat.
+ const btn=$('clearSkipLiveBtn'); if(!btn)return;
+ const k=FJContext.skipLiveAllowed(mode)?0:[...tradeRecords(trades),...setupRecords].filter(isSkipLive).length;
+ btn.style.display=k&&$('filterDataCheck')?.value==='only'?'':'none';
+ btn.textContent=`Odebrat „naživo bych nevzal“ (${k})`;
 }
+async function clearSkipLiveInActiveJournal(){
+ const mode=activeJournalMode();
+ if(FJContext.skipLiveAllowed(mode))return;
+ const n=[...tradeRecords(trades),...setupRecords].filter(isSkipLive).length;
+ if(!n)return;
+ const ok=await showConfirm(`Odebrat „naživo bych nevzal“ (i s důvodem) u ${n} záznamů v živém deníku?\n\nTyto obchody se pak počítají do P/L a statistik jako běžné živé obchody. Nic jiného se na nich nemění.`,{ok:'Odebrat'});
+ if(!ok)return;
+ try{
+  // Zapisuje se z živých dat deníku (modulové `trades` je klon), jedním zápisem.
+  const count=await commitJournal(journal=>{
+   const r=FJContext.clearSkipLiveInLive(journal.trades,mode);
+   journal.trades=r.records;
+   return r.count;
+  });
+  showToast(`„Naživo bych nevzal“ odebráno u ${count} záznamů.`);
+  await load();
+ }catch(e){showToast('Odebrání se nepodařilo: '+e.message)}
+}
+if($('clearSkipLiveBtn'))$('clearSkipLiveBtn').onclick=clearSkipLiveInActiveJournal;
 function renderTrades(){
  if(typeof refreshIncludeToggles==='function')syncJournalModeFilters(refreshIncludeToggles('journal',includeJournalsFor(trades,[activeJournalId])));
  const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'',sk=$('filterSkipLive')?.value||'',fl=$('filterFill')?.value||'';
@@ -3722,6 +3758,7 @@ function renderTrades(){
  const mode=activeJournalMode();
  const checkOk=t=>!dc||FJContext.dataCheckIssues(t,mode).length>0;
  renderDataCheckCount(mode);
+ if(typeof renderDayContextBtn==='function')renderDayContextBtn();
  const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&skipOk(t)&&fillOk(t)&&checkOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
  journalVisibleTrades=list;
  const groups=[];
@@ -3817,7 +3854,9 @@ function renderCalendar(){
   const {violations,achievements}=showRisk?evaluateDayRisk(date, drawdownByDate, rows):{violations:[],achievements:[]};
   const flagCls=violations.length?'risk':(achievements.length?'goal':'');
   const title=[...violations,...achievements].join(' | ');
-  html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" ${ts.length?`onclick="showDay('${date}')"`:''} ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}</div>`;
+  // ☀ = den má kontext dne (jen aktivní deník – kontext patří deníku).
+  const ctxSummary=!scope&&typeof getDayNote==='function'?dayContextSummary(getDayNote(date).dayContext):'';
+  html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" onclick="showDay('${date}')" ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}${ctxSummary?`<div class="day-ctx-flag" title="Kontext dne: ${esc(ctxSummary)}">☀</div>`:''}</div>`;
   weekPnl+=p;weekCount+=ts.length;
   cellsInRow++;
   if(cellsInRow===7){flushWeek();cellsInRow=0}
@@ -3875,10 +3914,14 @@ function dayContextSummary(dc){
  for(const k of Object.keys(FJContext.DAY_CONTEXT))if(dc[k])parts.push(FJContext.DAY_CONTEXT[k][dc[k]]);
  return parts.join(' · ');
 }
-function renderDayContextBox(date){
- const box=$('dayContextBox'); if(!box)return;
- const scope=$('calendarJournal')?.value||'';
+// Týž renderer slouží i oknu „☀ Kontext dne“ v Deníku (box + onSaved) – tam
+// jde kontext vyplnit ráno, ještě před prvním obchodem dne.
+function renderDayContextBox(date,box=$('dayContextBox'),opts={}){
+ if(!box)return;
+ const inCalendar=!opts.onSaved;
+ const scope=inCalendar?($('calendarJournal')?.value||''):'';
  if(scope){box.innerHTML='<div class="sub" style="margin-bottom:10px">Kontext dne jde upravit jen u aktivního deníku (výběr „Aktivní deník“).</div>';return}
+ if(!date){box.innerHTML='<div class="sub">Vyber datum.</div>';return}
  const dc=getDayNote(date).dayContext||{};
  const group=k=>`<div class="day-context-group${FJContext.DAY_CONTEXT_EVENING.includes(k)?' evening':''}" data-key="${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}${FJContext.DAY_CONTEXT_EVENING.includes(k)?' <span class="sub">— večer</span>':' <span class="sub">— ráno</span>'}</div><div class="chip-grid">${Object.entries(FJContext.DAY_CONTEXT[k]).map(([v,label])=>`<span class="chip${dc[k]===v?' on':''}" data-value="${esc(v)}" role="button" tabindex="0">${esc(label)}</span>`).join('')}</div></div>`;
  box.innerHTML=`<div class="day-context-card"><div class="day-context-title">Kontext dne ${esc(date)} <span class="sub">— platí pro všechny obchody dne, kliknutím se uloží</span></div>${Object.keys(FJContext.DAY_CONTEXT).map(group).join('')}</div>`;
@@ -3889,8 +3932,9 @@ function renderDayContextBox(date){
     const v=chip.dataset.value;
     try{
      await saveDayContext(date,{[key]:dc[key]===v?'':v});
-     renderDayContextBox(date);
-     renderTrades();
+     renderDayContextBox(date,box,opts);
+     box.querySelector(`.day-context-group[data-key="${key}"] .chip[data-value="${CSS.escape(v)}"]`)?.focus();
+     if(opts.onSaved)opts.onSaved(key);else{renderTrades();renderCalendar()}
     }catch(e){showToast('Kontext dne se nepodařilo uložit: '+e.message)}
    };
    chip.onclick=pick;
@@ -3914,8 +3958,42 @@ window.showDay=date=>{
   }
  }
  const dayRows=rows.filter(t=>t.date===date).sort((a,b)=>a.entryTime.localeCompare(b.entryTime));
- $('dayTrades').innerHTML=(dayRows.length?`<button class="btn primary" onclick="goToJournalForDate('${date}')" style="margin-bottom:12px">📒 Otevřít tento den v Deníku</button>`:'')+dayRows.map(tradeHTML).join('');
+ $('dayTrades').innerHTML=dayRows.length?`<button class="btn primary" onclick="goToJournalForDate('${date}')" style="margin-bottom:12px">📒 Otevřít tento den v Deníku</button>`+dayRows.map(tradeHTML).join(''):'<div class="sub">Tento den zatím nemá obchody.</div>';
 };
+// Okno „☀ Kontext dne“ v Deníku: den nemusí mít obchody – ranní kontext se
+// vyplňuje před prvním obchodem. Výchozí je dnešek (místní datum).
+function localDateStr(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function morningContextDone(date){
+ const dc=getDayNote(date).dayContext||{};
+ return FJContext.DAY_CONTEXT_MORNING.every(k=>dc[k]);
+}
+function renderDayContextBtn(){
+ const btn=$('dayContextBtn'); if(!btn)return;
+ btn.textContent=morningContextDone(localDateStr())?'☀ Kontext dne ✓':'☀ Kontext dne';
+}
+function renderDayContextModal(focusFirst){
+ const date=$('dayContextDate').value,box=$('dayContextModalBox');
+ renderDayContextBox(date,box,{onSaved:renderDayContextBtn});
+ if(!focusFirst||!date)return;
+ // Fokus na první nevyplněnou skupinu – nejdřív ranní, pak večerní.
+ const dc=getDayNote(date).dayContext||{};
+ const key=FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k])||Object.keys(FJContext.DAY_CONTEXT).find(k=>!dc[k])||FJContext.DAY_CONTEXT_MORNING[0];
+ const g=box.querySelector(`.day-context-group[data-key="${key}"]`);
+ (g?.querySelector('.chip.on')||g?.querySelector('.chip'))?.focus();
+}
+window.openDayContext=date=>{
+ $('dayContextDate').value=date||localDateStr();
+ $('dayContextModal').classList.add('open');
+ renderDayContextModal(true);
+};
+function closeDayContext(){$('dayContextModal').classList.remove('open');renderTrades()}
+if($('dayContextBtn'))$('dayContextBtn').onclick=()=>openDayContext();
+if($('closeDayContext'))$('closeDayContext').onclick=closeDayContext;
+if($('dayContextDate'))$('dayContextDate').addEventListener('change',()=>renderDayContextModal(true));
+if($('dayContextModal')){
+ $('dayContextModal').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeDayContext()}});
+ $('dayContextModal').onclick=e=>{if(e.target===$('dayContextModal'))closeDayContext()};
+}
 let currentViewedImage='';
 window.openImage=src=>{
  currentViewedImage=src;
@@ -3996,6 +4074,7 @@ function openModal(t=null,{title}={}){
  fillContextSelect('fillStatus','FILL_STATUS','— nevyplněno —',t&&t.fillStatus);
  restrictFillStatusOptions('fillStatus',t&&t.fillStatus);
  fillContextSelect('wouldSkipReason','SKIP_REASON','— nevyplněno —',t&&t.wouldSkipReason);
+ formHadSkipLive=isSkipLive(t);
  if($('wouldSkipLive'))$('wouldSkipLive').value=isSkipLive(t)?'ano':'ne';
  if($('wouldSkipReason'))$('wouldSkipReason').value=FJTaxonomy.sanitizeSingle('SKIP_REASON',t&&t.wouldSkipReason);
  syncWouldSkipField();
@@ -4684,19 +4763,29 @@ function activeJournalMode(){
  return FJContext.journalMode(journalProfiles.find(j=>j.id===activeJournalId));
 }
 // „Naživo bych nevzal“ je jen v backtest deníku. Důvod se ukazuje jen tehdy,
-// když příznak platí.
+// když příznak platí. V živém deníku se pole ukáže jen u obchodu, který
+// příznak (chybně) už má – aby šel výslovně odebrat; nový se tu zadat nedá.
+let formHadSkipLive=false;
+function skipLiveFieldShown(mode,had){return FJContext.skipLiveAllowed(mode)||had===true}
 function syncWouldSkipField(){
- const allowed=FJContext.skipLiveAllowed(activeJournalMode());
+ const mode=activeJournalMode();
+ const allowed=FJContext.skipLiveAllowed(mode);
+ const shown=skipLiveFieldShown(mode,formHadSkipLive);
  const wrap=$('wouldSkipLiveField');
- if(wrap)wrap.style.display=allowed?'':'none';
+ if(wrap)wrap.style.display=shown?'':'none';
+ const note=$('wouldSkipLiveNote');
+ if(note)note.textContent=shown&&!allowed?'V živém deníku neplatí – vyber „Ano“ a ulož, příznak se odebere.':'';
  const f=$('wouldSkipReasonField'); if(!f)return;
  f.style.display=allowed&&$('wouldSkipLive')?.value==='ano'?'':'none';
 }
-// Uložení „naživo bych nevzal“ z formuláře. V živém deníku je pole skryté
-// a NIC se nemění – existující hodnota (z doby, kdy pole bylo všude) zůstává
-// a ukáže se v Kontrole dat.
-function applySkipLiveFromForm(obj,mode,choice,reason){
- if(!FJContext.skipLiveAllowed(mode))return obj;
+// Uložení „naživo bych nevzal“ z formuláře. V živém deníku se nikdy nic
+// nepřidá. Existující hodnota zůstane, dokud ji uživatel ve viditelném poli
+// (`shown`) výslovně nepřepne na „Ano“ – pak se smaže i s důvodem.
+function applySkipLiveFromForm(obj,mode,choice,reason,shown){
+ if(!FJContext.skipLiveAllowed(mode)){
+  if(shown===true&&choice==='ne'){delete obj.wouldSkipLive;delete obj.wouldSkipReason}
+  return obj;
+ }
  if(choice==='ano'){
   obj.wouldSkipLive=true;
   const r=FJTaxonomy.sanitizeSingle('SKIP_REASON',reason);
@@ -4954,7 +5043,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   else delete obj.missedByTicks;
   // „Naživo bych nevzal“ je samostatná otázka, NE planFollowed. Bez příznaku
   // se důvod nedrží – visel by u obchodu, který se do výkonu počítá.
-  applySkipLiveFromForm(obj,activeJournalMode(),$('wouldSkipLive')?.value,$('wouldSkipReason')?.value);
+  applySkipLiveFromForm(obj,activeJournalMode(),$('wouldSkipLive')?.value,$('wouldSkipReason')?.value,skipLiveFieldShown(activeJournalMode(),formHadSkipLive));
   obj.trend=readSingleChipGrid('trend','TREND');
   obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
   obj.srTarget=readLevelRows('srTarget');

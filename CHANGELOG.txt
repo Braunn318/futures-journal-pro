@@ -2,6 +2,17 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.2 - 2026-10-10
+Feedback on 4.8.1. Stored trades are not migrated; P/L, commission, points and exports are untouched.
+- Day context can be filled in before the first trade of the day. Before, it could only be set in Kalendář → day detail (only days with trades were clickable) or in the morning strip of ⚡ Rychlý kontext (only opens with trades).
+  - Deník: new button "☀ Kontext dne" next to ⚡ Rychlý kontext. It opens a window for today (date can be changed, also to a future day) with the same five fields as in Kalendář: morning fields first, evening fields highlighted. Every choice is saved immediately; picking the same choice again clears it. Works from the keyboard (focus on the first empty morning field, Tab, Enter / Space, Esc closes). The button shows "☀ Kontext dne ✓" once today's morning context is complete.
+  - Kalendář: every day can be clicked, also days without trades and future days. A day without trades shows the day context and "Tento den zatím nemá obchody." A day with a day context has a small ☀ in its cell (tooltip with the summary; only for the active journal).
+- Live journal: a wrongly set "naživo bych nevzal" can now be removed.
+  - Trade form: in a live journal the field "Naživo bych to vzal?" appears only for a trade that has the flag, with the note "V živém deníku neplatí – vyber „Ano“ a ulož, příznak se odebere." Choosing "Ano" and saving removes the flag and its reason. A new flag still cannot be set in a live journal; a trade without the flag does not see the field.
+  - Kontrola dat: with the filter on "Kontrola dat" in a live journal, a button "Odebrat „naživo bych nevzal“ (N)" removes the flag and reason from all such records of the active journal after a confirmation. Nothing else changes; other Kontrola dat issues (target / SL on the wrong side) stay. After removal the trades count in P/L and stats like any live trade. Logic: FJContext.clearSkipLiveInLive (app/context.js).
+  - Nothing is removed automatically; a backtest journal behaves as before.
+- Tests: 393 (extended day-context, context-validation, date-picker), mutation-checked. UI checked in Electron with a temporary data folder (not live data).
+
 ## 4.8.1 - 2026-10-10
 Context v2, steps 3–6 (docs/ZADANI_KONTEXT.md A2–A6). Stored trades are not changed or migrated; P/L, commission, points and duplicate detection are untouched. CSV export of existing trades differs only by appended columns (checked against 4.8.0 on all live journals: 19 257 / 19 257 original cells identical).
 - "Včetně …" toggles follow the journal mode: "naživo bych nevzal" is shown only where a backtest journal is displayed, "vědomě vynechané" only where a live journal is. If a journal still contains such records (Kontrola dat), the toggle stays with "N× neplatné v živém / backtest deníku" so they can still be counted. Same for the Deník filters and the two blocks in Přehled. Numbers do not change.

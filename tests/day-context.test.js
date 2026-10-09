@@ -91,3 +91,102 @@ test('A5: kontext dne se doplňuje po polích – večerní pole nepřepíše ra
   assert.equal(j.data().dayNotes['2026-10-09'].dayContext, undefined, 'prázdný kontext se neukládá');
   assert.equal(j.data().dayNotes['2026-10-09'].comment, 'ráno');
 });
+
+// ---------------------------------------------- 4.8.2: kontext dne předem
+// Ranní kontext patří PŘED první obchod. Do 4.8.1 šel zadat jen v detailu
+// dne v Kalendáři (klikat šlo jen na den s obchody) a v ranním pruhu
+// Rychlého kontextu (otevře se jen s obchody) – den bez obchodů neměl kde.
+
+const { readRepoFile } = require('./helpers/extract');
+
+function calendarGrid(trades, dayNotes = {}, scope = '') {
+  const nodes = new Map();
+  const $ = id => { if (!nodes.has(id)) nodes.set(id, { id, value: id === 'calendarJournal' ? scope : '', textContent: '', innerHTML: '', style: {} }); return nodes.get(id); };
+  const r = loadRenderer([
+    'isSetupRecord', 'tradeRecords', 'signed', 'INCLUDE_SKIP_LIVE_KEY', 'isSkipLive', 'readIncludeSkipLive', 'includeSkipLive', 'INCLUDE_NO_FILL_KEY', 'INCLUDE_SKIPPED_KEY', 'hypotheticalGroup', 'readIncludeFlag', 'includeNoFill', 'includeSkipped', 'currentInclude', 'performanceRecords',
+    'computeDrawdownByDate', 'evaluateDayRisk', 'getCalendarRows', 'computeOverallStats', 'renderCalendar', 'renderCalendarMonthSummary',
+    'emptyDayNote', 'getDayNote', 'dayContextSummary'
+  ], {
+    settings: { startingBalance: 10000, usdCzkRate: 23, risk: {}, templates: [] }, trades, calendarAllTrades: [], calendarDate: new Date(2026, 9, 1),
+    db: { data: { dayNotes } }, FJContext, visibleJournalProfiles: () => [],
+    $, dualMoney: v => `[${v}]`, dualMoneyText: v => String(v), money: v => String(v), esc: v => String(v), Intl
+  });
+  r.renderCalendar();
+  return nodes.get('calendarGrid').innerHTML;
+}
+
+test('4.8.2: v Kalendáři jde kliknout i na den bez obchodů (i budoucí)', () => {
+  const grid = calendarGrid([{ id: 'a', date: '2026-10-01', entryTime: '15:30', instrument: 'MES', result: 'target', pnl: 5, pnlRaw: 5, contracts: 1 }]);
+  assert.match(grid, /data-date="2026-10-01" onclick="showDay\('2026-10-01'\)"/);
+  assert.match(grid, /<div class="day  [^"]*" data-date="2026-10-20" onclick="showDay\('2026-10-20'\)"/, 'prázdný den je klikací');
+  assert.doesNotMatch(grid, /week-summary"[^>]*onclick/, 'součet týdne není den');
+});
+
+test('4.8.2: den s kontextem dne má v Kalendáři ☀, jen u aktivního deníku', () => {
+  const notes = { '2026-10-20': { dayContext: { openVsValue: 'GAP_UP', newsEvent: 'CPI' } } };
+  const grid = calendarGrid([], notes);
+  const cell = grid.split('data-date="').find(c => c.startsWith('2026-10-20'));
+  const summary = FJContext.DAY_CONTEXT.openVsValue.GAP_UP + ' · ' + FJContext.DAY_CONTEXT.newsEvent.CPI;
+  assert.ok(cell.includes(`<div class="day-ctx-flag" title="Kontext dne: ${summary}">☀</div>`), cell);
+  assert.equal((grid.match(/day-ctx-flag/g) || []).length, 1, 'jen den s kontextem');
+  assert.equal((calendarGrid([], notes, 'all').match(/day-ctx-flag/g) || []).length, 0, 'přes všechny deníky ne – kontext patří deníku');
+});
+
+test('4.8.2: detail dne bez obchodů ukáže kontext dne a „zatím nemá obchody"', () => {
+  const nodes = new Map();
+  const $ = id => { if (!nodes.has(id)) nodes.set(id, { id, value: '', textContent: '', innerHTML: '', className: '' }); return nodes.get(id); };
+  const ctx = { $, window: {}, rendered: [], getCalendarRows: () => [], computeDrawdownByDate: () => ({}), evaluateDayRisk: () => ({ violations: [], achievements: [] }), tradeHTML: () => 'X' };
+  const r = loadRenderer([], ctx);
+  vm.runInContext('renderDayContextBox=d=>rendered.push(d);' + extractShowDay(), r.__context);
+  vm.runInContext('window.showDay("2026-10-20")', r.__context);
+  assert.deepEqual(plain(vm.runInContext('rendered', r.__context)), ['2026-10-20']);
+  assert.equal(nodes.get('dayTrades').innerHTML, '<div class="sub">Tento den zatím nemá obchody.</div>');
+});
+
+function extractShowDay() {
+  const html = readRepoFile('app/index.html');
+  const start = html.indexOf('window.showDay=date=>{');
+  const end = html.indexOf('\n};', start);
+  return html.slice(start, end + 3);
+}
+
+test('4.8.2: renderer kontextu dne do okna v Deníku – bez omezení Kalendáře', () => {
+  const box = { innerHTML: '', querySelectorAll() { return []; }, querySelector() { return null; } };
+  const nodes = new Map();
+  const $ = id => { if (!nodes.has(id)) nodes.set(id, { id, value: id === 'calendarJournal' ? 'all' : '', innerHTML: '' }); return nodes.get(id); };
+  const r = loadRenderer(['emptyDayNote', 'getDayNote', 'renderDayContextBox'], {
+    $, FJContext, esc: v => String(v), db: { data: { dayNotes: { '2026-10-20': { dayContext: { openVsValue: 'GAP_UP' } } } } }
+  });
+  r.renderDayContextBox('2026-10-20', box, { onSaved() {} });
+  assert.match(box.innerHTML, /Kontext dne 2026-10-20/, 'výběr deníku v Kalendáři okno v Deníku neblokuje');
+  assert.match(box.innerHTML, /data-value="GAP_UP" role="button"/);
+  assert.match(box.innerHTML, /chip on" data-value="GAP_UP"/, 'uložená volba je vybraná');
+  const cal = { innerHTML: '' };
+  r.renderDayContextBox('2026-10-20', cal);
+  assert.match(cal.innerHTML, /jen u aktivního deníku/, 'Kalendář přes všechny deníky dál neupravuje');
+  r.renderDayContextBox('', box, { onSaved() {} });
+  assert.match(box.innerHTML, /Vyber datum/);
+});
+
+test('4.8.2: tlačítko ☀ Kontext dne ukáže ✓, když má dnešek ranní kontext kompletní', () => {
+  const nodes = new Map();
+  const $ = id => { if (!nodes.has(id)) nodes.set(id, { id, textContent: '' }); return nodes.get(id); };
+  const today = new Date(2026, 9, 10, 8, 30);
+  const run = dayNotes => {
+    const r = loadRenderer(['emptyDayNote', 'getDayNote', 'localDateStr', 'morningContextDone', 'renderDayContextBtn'], {
+      $, FJContext, db: { data: { dayNotes } }, Date: class extends Date { constructor(...a) { if (a.length) super(...a); else super(today); } }
+    });
+    assert.equal(r.localDateStr(), '2026-10-10', 'místní datum, ne UTC');
+    r.renderDayContextBtn();
+    return nodes.get('dayContextBtn').textContent;
+  };
+  assert.equal(run({}), '☀ Kontext dne');
+  assert.equal(run({ '2026-10-10': { dayContext: { openVsValue: 'IN_VA', dayTypeExpected: 'P' } } }), '☀ Kontext dne', 'chybí zprávy');
+  assert.equal(run({ '2026-10-10': { dayContext: { openVsValue: 'IN_VA', dayTypeExpected: 'P', newsEvent: 'NONE' } } }), '☀ Kontext dne ✓');
+});
+
+test('4.8.2: Deník má tlačítko a okno kontextu dne s nativním datem', () => {
+  const html = readRepoFile('app/index.html');
+  assert.match(html, /<button class="btn" id="dayContextBtn" type="button"[^>]*>☀ Kontext dne<\/button>/);
+  assert.match(html, /<div class="modal" id="dayContextModal">[\s\S]*?<input type="date" id="dayContextDate">[\s\S]*?<div id="dayContextModalBox"><\/div>/);
+});

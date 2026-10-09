@@ -449,6 +449,25 @@
     return issues;
   }
 
+  // Hromadné odebrání „naživo bych nevzal" v živém deníku – jen na výslovný
+  // pokyn uživatele (tlačítko v Kontrole dat). Mění jen záznamy s kódem
+  // SKIP_LIVE_IN_LIVE a jen tyto dvě vlastnosti; v backtestu nic.
+  // Vrací nové pole (ostatní záznamy stejné objekty) a počet změněných.
+  function clearSkipLiveInLive(records, mode) {
+    const list = Array.isArray(records) ? records : [];
+    if (mode === MODES.BACKTEST) return { records: list, count: 0 };
+    let count = 0;
+    const out = list.map(r => {
+      if (r?.wouldSkipLive !== true) return r;
+      count++;
+      const next = { ...r };
+      delete next.wouldSkipLive;
+      delete next.wouldSkipReason;
+      return next;
+    });
+    return { records: out, count };
+  }
+
   function dataCheckLabel(code) {
     return DATA_CHECK_LABELS[code] || code;
   }
@@ -491,7 +510,7 @@
     SESSION_LABELS, PATH_LABELS, derivedSummaryParts, applyGrade, gradeRetro,
     DAY_CONTEXT, DAY_CONTEXT_LABELS, DAY_CONTEXT_MORNING, DAY_CONTEXT_EVENING, sanitizeDayContext,
     journalMode, skipLiveAllowed, allowedFillStatus,
-    dataCheckIssues, dataCheckLabel, DATA_CHECK_LABELS,
+    dataCheckIssues, dataCheckLabel, DATA_CHECK_LABELS, clearSkipLiveInLive,
     includeToggleState, includeInvalidNote
   };
 }));

@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.8.1",
-  "description": "Futures Journal PRO 4.8.1 – kontext obchodu v2: dopočty cesty k cíli, zón chránících SL, pořadí v dni a seance; nová pole trend 30m, absorpce, kolikátý test, vybraná likvidita, profil cesty, známka A/B/C s ochranou proti dodatečnému hodnocení; netest/test u hladin; rozšířený slovník hladin; rychlý kontextový formulář na klávesnici; kontext dne; export CSV a AI exportu s novými poli a dopočty; přepínače „včetně …“ podle režimu deníku; kontrola ceny cíle a SL při ukládání, filtr „Kontrola dat“, režim deníku živý / backtest; formulář obchodu nese „Minuto o (ticků)“ u nenaplněného setupu; AI export nese úpravu číselníků deníku (vlastní volby, přejmenování) pro Backtest Lab; nenaplněné a vynechané setupy jako hypotetické obchody s přepínači započtení do výkonu.",
+  "version": "4.8.2",
+  "description": "Futures Journal PRO 4.8.2 – kontext dne předem (☀ Kontext dne v Deníku, klik na každý den v Kalendáři); odebrání chybného „naživo bych nevzal“ v živém deníku (formulář i hromadně v Kontrole dat); kontext obchodu v2: dopočty cesty k cíli, zón chránících SL, pořadí v dni a seance; nová pole trend 30m, absorpce, kolikátý test, vybraná likvidita, profil cesty, známka A/B/C s ochranou proti dodatečnému hodnocení; netest/test u hladin; rozšířený slovník hladin; rychlý kontextový formulář na klávesnici; kontext dne; export CSV a AI exportu s novými poli a dopočty; přepínače „včetně …“ podle režimu deníku; kontrola ceny cíle a SL při ukládání, filtr „Kontrola dat“, režim deníku živý / backtest; formulář obchodu nese „Minuto o (ticků)“ u nenaplněného setupu; AI export nese úpravu číselníků deníku (vlastní volby, přejmenování) pro Backtest Lab; nenaplněné a vynechané setupy jako hypotetické obchody s přepínači započtení do výkonu.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

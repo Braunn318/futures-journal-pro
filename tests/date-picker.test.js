@@ -26,7 +26,7 @@ test('ikona kalendáře je klikací', () => {
 
 test('pole s datem zůstávají nativní (ruční zápis i kalendář)', () => {
   for (const id of ['accountDay', 'accountFrom', 'accountTo', 'instrumentPortfolioFrom', 'instrumentPortfolioTo',
-    'filterDate', 'newDayDate', 'reportFrom', 'reportTo', 'sfDate', 'date']) {
+    'filterDate', 'newDayDate', 'dayContextDate', 'reportFrom', 'reportTo', 'sfDate', 'date']) {
     const tag = html.match(new RegExp('<input[^>]*id="' + id + '"[^>]*>'));
     assert.ok(tag, id);
     assert.match(tag[0], /type="date"/, id);

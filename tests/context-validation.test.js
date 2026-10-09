@@ -188,17 +188,65 @@ test('Kontrola dat: filtr v Deníku ukáže jen záznamy ke kontrole, podle rež
   assert.deepEqual(shown(true, 'only'), ['bad', 'setupBad', 'skipped'], 'backtest: cíl / SL na špatné straně + vědomě vynechán');
 });
 
-test('režim: uložení obchodu v živém deníku nezmění existující „naživo bych nevzal"', () => {
-  const { applySkipLiveFromForm } = loadRenderer(['applySkipLiveFromForm'], { FJContext });
+test('režim: uložení obchodu v živém deníku nezmění „naživo bych nevzal", dokud ho uživatel výslovně neodebere', () => {
+  const { applySkipLiveFromForm, skipLiveFieldShown } = loadRenderer(['applySkipLiveFromForm', 'skipLiveFieldShown'], { FJContext });
   const kept = { wouldSkipLive: true, wouldSkipReason: 'CONTEXT' };
-  applySkipLiveFromForm(kept, 'LIVE', 'ne', '');
+  applySkipLiveFromForm(kept, 'LIVE', 'ne', '', false);
   assert.deepEqual(kept, { wouldSkipLive: true, wouldSkipReason: 'CONTEXT' }, 'skryté pole hodnotu nesmaže');
+  applySkipLiveFromForm(kept, 'LIVE', 'ano', '', true);
+  assert.deepEqual(kept, { wouldSkipLive: true, wouldSkipReason: 'CONTEXT' }, 'ponechané „Ne" hodnotu ani důvod nezmění');
+  applySkipLiveFromForm(kept, 'LIVE', 'ne', '', true);
+  assert.deepEqual(kept, {}, 'viditelné pole přepnuté na „Ano" příznak i důvod odebere');
   const none = {};
-  applySkipLiveFromForm(none, 'LIVE', 'ano', 'CONTEXT');
+  applySkipLiveFromForm(none, 'LIVE', 'ano', 'CONTEXT', true);
   assert.deepEqual(none, {}, 'v živém deníku se nová hodnota nezapíše');
+  // Pole se v živém deníku ukáže jen u obchodu, který příznak už má.
+  assert.equal(skipLiveFieldShown('LIVE', false), false);
+  assert.equal(skipLiveFieldShown('LIVE', true), true);
+  assert.equal(skipLiveFieldShown('BACKTEST', false), true);
   const bt = {};
   applySkipLiveFromForm(bt, 'BACKTEST', 'ano', 'CONTEXT');
   assert.deepEqual(bt, { wouldSkipLive: true, wouldSkipReason: 'CONTEXT' });
   applySkipLiveFromForm(bt, 'BACKTEST', 'ne', '');
   assert.deepEqual(bt, {}, 'v backtestu jde hodnotu vypnout jako dřív');
+});
+
+test('hromadné odebrání „naživo bych nevzal" (4.8.2): jen v živém deníku, jen příznak a důvod', () => {
+  const ok = { id: 'ok', ...trade(), result: 'target' };
+  const flagged = { id: 'f', ...trade(), wouldSkipLive: true, wouldSkipReason: 'CONTEXT', planFollowed: 'ne', result: 'target', pnlRaw: 10 };
+  const setup = { id: 's', recordType: 'SETUP_ONLY', wouldSkipLive: true, fillStatus: 'NO_FILL' };
+  const bad = { id: 'bad', ...WRONG_TARGET_FIXTURES[1].t };
+  const rows = [ok, flagged, setup, bad];
+  const live = FJContext.clearSkipLiveInLive(rows, 'LIVE');
+  assert.equal(live.count, 2);
+  assert.equal(live.records[0], ok, 'nedotčený záznam je týž objekt');
+  assert.equal(live.records[3], bad);
+  const { wouldSkipLive, wouldSkipReason, ...rest } = flagged;
+  assert.deepEqual(live.records[1], rest, 'jen příznak a důvod, nic jiného');
+  assert.deepEqual(live.records[2], { id: 's', recordType: 'SETUP_ONLY', fillStatus: 'NO_FILL' });
+  assert.equal(flagged.wouldSkipLive, true, 'vstup se nemění');
+  assert.deepEqual(live.records.flatMap(r => FJContext.dataCheckIssues(r, 'LIVE').map(i => i.code)), ['TARGET_WRONG_SIDE'], 'ostatní kontroly zůstanou');
+  const bt = FJContext.clearSkipLiveInLive(rows, 'BACKTEST');
+  assert.equal(bt.count, 0);
+  assert.equal(bt.records, rows, 'v backtestu se nic nemění');
+  assert.deepEqual(FJContext.clearSkipLiveInLive(null, 'LIVE'), { records: [], count: 0 });
+});
+
+test('tlačítko „Odebrat naživo bych nevzal": jen živý deník, filtr Kontrola dat a něco k odebrání', () => {
+  const run = (mode, filter, rows) => {
+    const nodes = new Map();
+    const opt = { textContent: '' };
+    const $ = id => {
+      if (!nodes.has(id)) nodes.set(id, { id, value: id === 'filterDataCheck' ? filter : '', style: {}, textContent: '', querySelector: () => opt });
+      return nodes.get(id);
+    };
+    const r = loadRenderer(['isSetupRecord', 'tradeRecords', 'isSkipLive', 'renderDataCheckCount'], { FJContext, $, trades: rows, setupRecords: [] });
+    r.renderDataCheckCount(mode);
+    return { display: nodes.get('clearSkipLiveBtn').style.display, text: nodes.get('clearSkipLiveBtn').textContent };
+  };
+  const rows = [{ id: 'a', wouldSkipLive: true }, { id: 'b' }, { id: 'c', wouldSkipLive: true }];
+  assert.deepEqual(run('LIVE', 'only', rows), { display: '', text: 'Odebrat „naživo bych nevzal“ (2)' });
+  assert.equal(run('LIVE', '', rows).display, 'none', 'mimo filtr Kontrola dat schované');
+  assert.equal(run('BACKTEST', 'only', rows).display, 'none', 'v backtestu příznak platí');
+  assert.equal(run('LIVE', 'only', [{ id: 'b' }]).display, 'none', 'nic k odebrání');
 });
