@@ -402,7 +402,7 @@ function courseForm(values, datasets, legs) {
     '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
     'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'postExitTicksWarning', 'postExitApplies',
     'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField',
-    'editCourseManually', 'useDerivedCourse', 'deriveTargetPrices', 'renderCourseHints', 'sourceLabel'
+    'editCourseManually', 'useDerivedCourse', 'deriveTargetPrices', 'renderCourseHints', 'missedByApplies', 'sourceLabel'
   ];
   if (legs) {
     const field = value => ({ value: String(value ?? '') });

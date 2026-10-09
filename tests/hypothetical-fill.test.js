@@ -176,6 +176,7 @@ test('tradeDraftFromSetup: formulář dostane, co setup zná', () => {
   assert.deepEqual(d.targetLevel1, { type: 'VWAP', price: 7792.75 });
   assert.equal(d.fillStatus, 'NO_FILL');
   assert.equal(d.setupCode, 'M2_OF');
+  assert.equal(d.missedByTicks, 3, 'minutí limitky se ukáže ve formuláři obchodu');
   assert.equal(d.comment, 'Bez PB — TOp');
   assert.equal(d.contracts, 1);
   assert.equal(d.exitPrice, '', 'výstup doplní uživatel');
@@ -198,6 +199,13 @@ test('convertSetupRecordFields: uložený obchod už není SETUP_ONLY, max. pohy
   assert.equal(obj.maxLevel, 'VAH');
   const plainTrade = { id: 't', maxFavorableTicks: 12 };
   assert.deepEqual(plain(r.convertSetupRecordFields({ ...plainTrade }, plainTrade)), plainTrade, 'běžný obchod beze změny');
+});
+
+test('missedByApplies: „Minuto o“ jen u nenaplněného / vynechaného setupu', () => {
+  const r = load(['missedByApplies']);
+  for (const st of ['NO_FILL', 'MISSED', 'SKIPPED']) assert.equal(r.missedByApplies(st), true, st);
+  assert.equal(r.missedByApplies('FILLED'), false);
+  assert.equal(r.missedByApplies(''), false);
 });
 
 test('postExitApplies: nenaplněný setup s hypotetickým výstupem se měří', () => {

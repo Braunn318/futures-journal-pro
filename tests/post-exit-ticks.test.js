@@ -319,7 +319,7 @@ function postExitForm(values) {
     '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
     'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'postExitTicksWarning', 'postExitApplies',
     'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'syncCourseField',
-    'deriveTargetPrices', 'renderCourseHints', 'sourceLabel'
+    'deriveTargetPrices', 'renderCourseHints', 'missedByApplies', 'sourceLabel'
   ], { document: dom.document, settings: SETTINGS, ...DISPLAY_STUBS });
   r.renderPostExitHints();
   return dom.nodes;

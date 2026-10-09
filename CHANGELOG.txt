@@ -2,6 +2,9 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.7.5 - 2026-10-08
+- Trade form: new field "Minuto o (ticků)" (`missedByTicks`, how many ticks the price missed the limit order) in the Setup card, shown when "Stav naplnění" is not "naplněno" (NO_FILL / MISSED / SKIPPED), like in the "Setup bez vstupu" window. Until now an unfilled setup filled in as a trade ("Vyplnit jako obchod"), or a trade saved directly as no fill, had no way to enter or edit it. The form is prefilled from the setup, saved as a positive number, empty = not saved, and dropped when the state is switched to "naplněno". It also shows in the Setup card summary.
+
 ## 4.7.4 - 2026-10-07
 - AI export (`ai-export/<id>.json`) now also carries the journal's dictionary customisation as `taxonomy` (custom options, renames, hidden, order – the same object as `settings.taxonomy`). Tools reading the export (Backtest Lab) can now recognise and label custom keys like `CUSTOM_FIX_RRR` instead of reporting them as unknown. Other settings stay out of the export. The file refreshes on the next save, or via "přegenerovat AI export".
 

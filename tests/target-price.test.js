@@ -138,7 +138,7 @@ function targetForm(values, datasets, legs) {
   const names = [
     '$', 'esc', 'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument',
     'BUILTIN_TICK_SIZES', 'deriveStopLossPrice', 'deriveTargetPrices', 'postExitTicksWarning', 'postExitApplies',
-    'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'renderCourseHints', 'syncCourseField',
+    'postExitDraftFromForm', 'formatTicks', 'renderPostExitHints', 'renderCourseHints', 'missedByApplies', 'syncCourseField',
     'sourceLabel', 'editCourseManually', 'useDerivedCourse'
   ];
   if (legs) {

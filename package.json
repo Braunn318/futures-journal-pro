@@ -1,7 +1,7 @@
 {
   "name": "futures-journal-pro",
-  "version": "4.7.4",
-  "description": "Futures Journal PRO 4.7.4 – AI export nese úpravu číselníků deníku (vlastní volby, přejmenování) pro Backtest Lab; nenaplněné a vynechané setupy jako hypotetické obchody s přepínači započtení do výkonu.",
+  "version": "4.7.5",
+  "description": "Futures Journal PRO 4.7.5 – formulář obchodu nese „Minuto o (ticků)“ u nenaplněného setupu; AI export nese úpravu číselníků deníku (vlastní volby, přejmenování) pro Backtest Lab; nenaplněné a vynechané setupy jako hypotetické obchody s přepínači započtení do výkonu.",
   "main": "main.js",
   "author": "Jája S",
   "license": "MIT",

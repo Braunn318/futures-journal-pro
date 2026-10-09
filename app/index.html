@@ -1217,6 +1217,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="formgrid">
           <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
           <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
+          <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="missedByTicks" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
           <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
@@ -3676,6 +3677,7 @@ function openModal(t=null,{title}={}){
  syncWouldSkipField();
  if($('setupCode'))$('setupCode').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode);
  if($('fillStatus'))$('fillStatus').value=FJTaxonomy.sanitizeSingle('FILL_STATUS',t&&t.fillStatus);
+ if($('missedByTicks'))$('missedByTicks').value=(t&&t.missedByTicks!=null&&t.missedByTicks!=='')?t.missedByTicks:'';
  // Chování ceny po výstupu: ručně zadaná čísla v ticích. Prázdno se nenahrazuje
  // nulou – nula by v analýze znamenala „cena se nehnula", ne „nevyplněno".
  if($('postExitFavorableTicks'))$('postExitFavorableTicks').value=(t&&t.postExitFavorableTicks!=null&&t.postExitFavorableTicks!=='')?t.postExitFavorableTicks:'';
@@ -3903,6 +3905,7 @@ function tradeDraftFromSetup(s){
   images:Array.isArray(s.images)?[...s.images]:[]
  };
  if(s.slPrice!=null&&s.slPrice!=='')draft.slPrice=s.slPrice;
+ if(s.missedByTicks!=null&&s.missedByTicks!=='')draft.missedByTicks=s.missedByTicks;
  if(tg)draft.targetLevel1=tg;
  return draft;
 }
@@ -4008,6 +4011,11 @@ $('commission')?.addEventListener('input',recomputePnlFromInputs);
 $('contracts')?.addEventListener('input',()=>{applyTemplateCommission();recomputePnlFromInputs();recomputeAllLegRows()});
 // Ruční přepis zisku/ztráty přepíše i odznak výsledku (ten se z něj odvozuje).
 $('pnl')?.addEventListener('input',updateResultBadge);
+// „Minuto o N ticků“ má smysl jen u setupu, který se nenaplnil / nebyl vzat –
+// stejně jako ve formuláři setupu. Naplněný (nebo nevyplněný) obchod ho nenese.
+function missedByApplies(fillStatus){
+ return !!fillStatus&&fillStatus!=='FILLED';
+}
 // --- Chování ceny po výstupu ve formuláři ---------------------------------
 // Blok se týká obchodu, který se naplnil: u setupu, který se nenaplnil, není
 // z čeho měřit – žádný výstup neexistuje. Nevyplněný stav se bere jako
@@ -4091,6 +4099,7 @@ function renderCourseHints(){
   const st=$('fillStatus')?.value;
   fillHint.textContent=st&&st!=='FILLED'?'Hypotetický obchod: vyplň, co by se stalo (cena vstupu = plánovaná). Ve výchozím stavu mimo P/L a statistiky výkonu.':'';
  }
+ if($('missedByField'))$('missedByField').style.display=missedByApplies($('fillStatus')?.value)?'':'none';
  const block=$('postExitBlock');
  const applies=postExitApplies($('fillStatus')?.value,$('exitPrice')?.value);
  if(block)block.style.display=applies?'':'none';
@@ -4193,7 +4202,7 @@ function formContextDraft(){
  const d=postExitDraftFromForm();
  const srNone=field=>typeof readSrNone==='function'&&readSrNone(field);
  return {...d,
-  setupCode:$('setupCode')?.value||'',fillStatus:$('fillStatus')?.value||'',
+  setupCode:$('setupCode')?.value||'',fillStatus:$('fillStatus')?.value||'',missedByTicks:$('missedByTicks')?.value??'',
   trend:readSingleChipGrid('trend','TREND'),entryLevels:readChipGrid('entryLevels','ENTRY_LEVEL'),
   srTarget:readLevelRows('srTarget'),srStopLoss:readLevelRows('srStopLoss'),
   srTargetNone:srNone('srTarget'),srStopLossNone:srNone('srStopLoss'),
@@ -4224,6 +4233,7 @@ function renderTradeSections(){
  const setup=[];
  if(d.setupCode)setup.push(FJTaxonomy.labelOf('SETUP',d.setupCode));
  if(d.fillStatus&&d.fillStatus!=='FILLED')setup.push(FJTaxonomy.labelOf('FILL_STATUS',d.fillStatus));
+ if(missedByApplies(d.fillStatus)&&val(d.missedByTicks))setup.push('minuto o '+d.missedByTicks+' t');
  if(d.trend)setup.push('trend '+FJTaxonomy.labelOf('TREND',d.trend));
  if($('setupSummary'))$('setupSummary').textContent=setup.length?'— '+setup.join(' · '):'';
  const texts=['tradePlanSetup','tradePlanPsychology','tradePlanNote','comment'].filter(id=>val($(id)?.value)).length;
@@ -4519,6 +4529,11 @@ $('tradeForm').addEventListener('submit',async e=>{
   // nepovinná a nesmí blokovat uložení obchodu.
   obj.setupCode=FJTaxonomy.sanitizeSingle('SETUP',$('setupCode')?.value);
   obj.fillStatus=FJTaxonomy.sanitizeSingle('FILL_STATUS',$('fillStatus')?.value);
+  // Minutí limitky v ticích (vždy kladně) – jen u nenaplněného / vynechaného
+  // setupu; u naplněného obchodu by tvrdilo, že limitka minula.
+  const missedRaw=missedByApplies(obj.fillStatus)?$('missedByTicks')?.value:'';
+  if(missedRaw!==undefined&&String(missedRaw).trim()!==''&&Number.isFinite(Number(missedRaw)))obj.missedByTicks=Math.abs(Number(missedRaw));
+  else delete obj.missedByTicks;
   // „Naživo bych nevzal“ je samostatná otázka, NE planFollowed. Bez příznaku
   // se důvod nedrží – visel by u obchodu, který se do výkonu počítá.
   if($('wouldSkipLive')?.value==='ano'){
