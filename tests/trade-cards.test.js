@@ -24,6 +24,7 @@ const complete = (extra = {}) => ({
   targetLevel1: { type: 'VPOC_1M', price: 7737.75 },
   slPrice: 7746, mfeTicks: 18, maeTicks: 2,
   postExitFavorableTicks: 1, postExitAdverseTicks: 30,
+  trendHtf: 'DOWN', grade: 'A',
   ...extra
 });
 const plain = v => JSON.parse(JSON.stringify(v));
@@ -44,7 +45,7 @@ test('prázdný obchod: každé pole je ve své kartě', () => {
   assert.deepEqual(plain(FJTaxonomy.missingContextByCard({ instrument: 'MES' })), {
     sltp: ['Cena targetu', 'Cena Stop Lossu'],
     course: ['MFE', 'MAE', 'Ticky po výstupu – ve směru zisku', 'Ticky po výstupu – proti'],
-    setup: ['Setup', 'Stav naplnění', 'Trend'],
+    setup: ['Setup', 'Stav naplnění', 'Trend', 'Trend 30m', 'Známka'],
     levels: ['Hladina vstupu', 'SR proti targetu', 'SR proti S/L', 'Order flow potvrzení', 'Cílová hladina 1 (typ)'],
     comments: []
   });

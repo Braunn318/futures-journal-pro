@@ -223,7 +223,7 @@ test('chybějící pole se rozdělí do karet; cílová hladina 1 podle toho, co
   // Od 4.7.2 rozhoduje FJTaxonomy.missingContextByCard (typ cíle je v Hladinách).
   const r = { missingBySection: d => FJTaxonomy.missingContextByCard(d) };
   const base = {
-    setupCode: 'M2_OF', fillStatus: 'FILLED', trend: 'SHORT', entryLevels: ['VPOC_DAY'],
+    setupCode: 'M2_OF', fillStatus: 'FILLED', trend: 'SHORT', trendHtf: 'DOWN', grade: 'B', entryLevels: ['VPOC_DAY'],
     srTargetNone: true, srStopLossNone: true, ofConfirm: ['ABS_ASK'],
     slPrice: 7746, mfeTicks: 18, maeTicks: 2, postExitFavorableTicks: 1, postExitAdverseTicks: 30
   };

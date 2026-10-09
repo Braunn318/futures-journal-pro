@@ -434,7 +434,36 @@
     return round2(Math.max(...reward) / risk);
   }
 
+  // Šablona instrumentu: nejdřív přesná shoda názvu, pak šablona, jejíž název
+  // je v instrumentu obsažený ("MES 12-26" → šablona "MES").
+  function findTemplateIn(templates, instrument) {
+    const val = String(instrument || '').trim().toLowerCase();
+    if (!val) return null;
+    const list = Array.isArray(templates) ? templates : [];
+    return list.find(tpl => val === String(tpl?.instrument || '').trim().toLowerCase())
+      || list.find(tpl => tpl?.instrument && val.includes(String(tpl.instrument).trim().toLowerCase()))
+      || null;
+  }
+
+  // Vestavěná velikost ticku pro běžné kontrakty. Kód se porovnává bez čísla
+  // kontraktního měsíce ("MES 09-26" = "MES").
+  const BUILTIN_TICK_SIZES = {
+    ES: 0.25, MES: 0.25, NQ: 0.25, MNQ: 0.25, YM: 1, MYM: 1, RTY: 0.1, M2K: 0.1
+  };
+
+  // Velikost ticku: šablona instrumentu, jinak vestavěná tabulka, jinak null
+  // (nehádá se). Jedno místo pro renderer i main proces (AI export).
+  function tickSizeFor(instrument, templates) {
+    const tpl = findTemplateIn(templates, instrument);
+    if (tpl && tpl.tickSize !== undefined && tpl.tickSize !== null && tpl.tickSize !== '' && Number(tpl.tickSize) > 0) return Number(tpl.tickSize);
+    const code = String(instrument || '').trim().toUpperCase().split(/\s+/)[0];
+    return code && BUILTIN_TICK_SIZES[code] !== undefined ? BUILTIN_TICK_SIZES[code] : null;
+  }
+
   return {
+    findTemplateIn,
+    BUILTIN_TICK_SIZES,
+    tickSizeFor,
     POINTS_CONVENTION,
     MONEY_TOLERANCE,
     legsOf,

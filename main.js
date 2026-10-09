@@ -3,6 +3,10 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
+// Dopočty kontextu obchodu (kontext v2, A3) – tytéž čisté funkce jako
+// v rendereru, pro AI export. Modul je dual (script src i require).
+const FJContext = require('./app/context.js');
+const FJPoints = require('./app/points.js');
 
 // Screenshoty obchodů se nedrží v JSONu deníku, ale jako obyčejné soubory, na
 // které deník odkazuje adresou "fjimg://store/<otisk>.<přípona>" (viz sekce
@@ -498,10 +502,31 @@ function stripDayNote(note) {
   const { images, ...rest } = note || {};
   return { ...rest, imageCount: Array.isArray(images) ? images.length : 0 };
 }
+// Režim deníku (LIVE / BACKTEST) z manifestu index.json – profil deníku žije
+// v rendereru, do main procesu se dostane jen přes manifest. Bez něj živý.
+function aiExportModeOf(id) {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(aiExportRoot(), 'index.json'), 'utf8'));
+    const entry = (Array.isArray(manifest?.journals) ? manifest.journals : []).find(j => j?.id === id);
+    return entry?.mode === 'BACKTEST' ? 'BACKTEST' : 'LIVE';
+  } catch {
+    return 'LIVE';
+  }
+}
+// Dopočty (A3) ke každému obchodu – v samostatném objektu `derived`, uložené
+// hodnoty obchodu zůstávají, jak jsou. Pořadí v dni nad celým deníkem.
+function aiDerivedFields(rawTrades, main, mode) {
+  const order = FJContext.dayOrder(rawTrades);
+  const templates = Array.isArray(main?.templates) ? main.templates : [];
+  return t => FJContext.derivedFields(t, { tickSize: FJPoints.tickSizeFor(t?.instrument, templates), config: main?.taxonomy || {}, dayOrder: order, mode });
+}
 function writeAiExportMirror(id, data) {
   try {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
-    const trades = Array.isArray(data?.trades) ? data.trades.map(stripImages) : [];
+    const rawTrades = Array.isArray(data?.trades) ? data.trades : [];
+    const mainSettings = (Array.isArray(data?.settings) ? data.settings : []).find(s => s?.key === 'main')?.value || {};
+    const derivedOf = aiDerivedFields(rawTrades, mainSettings, aiExportModeOf(id));
+    const trades = rawTrades.map(t => ({ ...stripImages(t), derived: derivedOf(t) }));
     const dayNotes = {};
     for (const date in (data?.dayNotes || {})) dayNotes[date] = stripDayNote(data.dayNotes[date]);
     // Úprava číselníků deníku (vlastní volby, přejmenování) – bez ní by
@@ -515,6 +540,11 @@ function writeAiExportMirror(id, data) {
     logError('writeAiExportMirror', error);
   }
 }
+// Položka manifestu: id, název a režim deníku (kontext v2) – Lab i export
+// deníku z něj poznají backtest.
+function aiManifestEntry(j) {
+  return { id: j?.id, name: j?.name, mode: j?.backtest === true ? 'BACKTEST' : 'LIVE' };
+}
 ipcMain.handle('data:getAiExportInfo', async () => {
   try { return { ok: true, path: aiExportRoot() }; }
   catch (error) { return { ok: false, error: error.message }; }
@@ -525,12 +555,13 @@ ipcMain.handle('data:regenerateAiExports', async (_event, journals) => {
   try {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
     const list = Array.isArray(journals) ? journals : [];
+    // Manifest nejdřív – export deníku z něj bere režim (gradeRetro).
+    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(aiManifestEntry) };
+    fs.writeFileSync(path.join(aiExportRoot(), 'index.json'), JSON.stringify(manifest, null, 2), 'utf8');
     for (const j of list) {
       if (!j?.id) continue;
       writeAiExportMirror(j.id, readJournal(j.id));
     }
-    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(j => ({ id: j.id, name: j.name })) };
-    fs.writeFileSync(path.join(aiExportRoot(), 'index.json'), JSON.stringify(manifest, null, 2), 'utf8');
     return { ok: true, count: list.length, path: aiExportRoot() };
   } catch (error) {
     logError('data:regenerateAiExports', error);
@@ -541,7 +572,7 @@ ipcMain.handle('data:writeAiExportManifest', async (_event, journals) => {
   try {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
     const list = Array.isArray(journals) ? journals : [];
-    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(j => ({ id: j.id, name: j.name })) };
+    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(aiManifestEntry) };
     fs.writeFileSync(path.join(aiExportRoot(), 'index.json'), JSON.stringify(manifest, null, 2), 'utf8');
     return { ok: true };
   } catch (error) {

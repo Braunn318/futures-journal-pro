@@ -131,7 +131,10 @@ test('neúplný kontext: naplněný obchod bez MFE nebo MAE', () => {
 test('typ cílové hladiny má výchozí hodnoty ze zadání', () => {
   assert.deepEqual(FJTaxonomy.allKeys('TARGET_LEVEL'), [
     'LIQUIDITY', 'VPOC_DAY', 'VPOC_30M', 'VPOC_1M', 'VAH', 'VAL', 'VWAP', 'LVN',
-    'GAP_EDGE', 'LTA_LEVEL', 'TRAIL_M2', 'MANUAL_EXIT'
+    'GAP_EDGE', 'LTA_LEVEL', 'TRAIL_M2', 'MANUAL_EXIT',
+    // Kontext v2 (A2.1): doplněné na konec, původní pořadí beze změny.
+    'VPOC_PREV_DAY', 'VPOC_IB', 'VAH_PREV', 'VAL_PREV', 'VWAP_DEV1', 'VWAP_DEV2', 'HVN', 'HOD_LOD',
+    'M2_EDGE', 'IB_EDGE', 'PDH_PDL', 'ONH_ONL'
   ]);
   assert.equal(FJTaxonomy.labelOf('TARGET_LEVEL', 'VPOC_30M'), 'Netestovaný VPOC 30min svíce');
   assert.equal(FJTaxonomy.labelOf('TARGET_LEVEL', 'TRAIL_M2'), 'Trail podle 1min M2');

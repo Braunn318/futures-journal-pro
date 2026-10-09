@@ -24,6 +24,8 @@ const complete = (extra = {}) => ({
   targetLevel1: { type: 'VPOC_1M', price: 7737.75 },
   slPrice: 7746, mfeTicks: 18, maeTicks: 2,
   postExitFavorableTicks: 1, postExitAdverseTicks: 30,
+  // Kontext v2 (A4): trend 30m a známka patří k úplnému kontextu.
+  trendHtf: 'DOWN', grade: 'A',
   ...extra
 });
 
@@ -34,7 +36,7 @@ test('úplný obchod nemá nic chybějícího', () => {
 test('prázdný obchod: chybí všechno, v pořadí formuláře', () => {
   assert.deepEqual(FJTaxonomy.missingContextKeys({ instrument: 'MES' }), [
     'setupCode', 'fillStatus', 'trend', 'entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm',
-    'targetLevel1', 'slPrice', 'mfeTicks', 'maeTicks', 'postExitFavorableTicks', 'postExitAdverseTicks'
+    'trendHtf', 'grade', 'targetLevel1', 'slPrice', 'mfeTicks', 'maeTicks', 'postExitFavorableTicks', 'postExitAdverseTicks'
   ]);
 });
 

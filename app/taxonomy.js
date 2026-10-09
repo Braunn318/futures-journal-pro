@@ -69,7 +69,16 @@
     LTA_LEVEL: 'LTA hladina',
     PDH_PDL: 'PDH / PDL',
     ONH_ONL: 'ONH / ONL',
-    NONE: 'Žádná hladina'
+    NONE: 'Žádná hladina',
+    // Kontext v2 (ZADANI_KONTEXT A2.1) – přidané klíče, existující beze změny.
+    VPOC_PREV_DAY: 'VPOC předchozího dne',
+    VAH_PREV: 'VAH předchozího dne',
+    VAL_PREV: 'VAL předchozího dne',
+    VWAP_DEV1: 'VWAP odchylka 1',
+    VWAP_DEV2: 'VWAP odchylka 2',
+    HVN: 'HVN',
+    LVN: 'LVN',
+    HOD_LOD: 'HOD / LOD'
   };
 
   // Potvrzení z order flow. MULTI-SELECT.
@@ -119,8 +128,41 @@
     GAP_EDGE: 'Hrana gapu',
     LTA_LEVEL: 'LTA hladina',
     TRAIL_M2: 'Trail podle 1min M2',
-    MANUAL_EXIT: 'Ruční výstup bez hladiny'
+    MANUAL_EXIT: 'Ruční výstup bez hladiny',
+    // Kontext v2 (ZADANI_KONTEXT A2.1) – klíče ze slovníku hladin, které tu
+    // chyběly. Existující klíče i popisky beze změny.
+    VPOC_PREV_DAY: 'VPOC předchozího dne',
+    VPOC_IB: 'VPOC IB',
+    VAH_PREV: 'VAH předchozího dne',
+    VAL_PREV: 'VAL předchozího dne',
+    VWAP_DEV1: 'VWAP odchylka 1',
+    VWAP_DEV2: 'VWAP odchylka 2',
+    HVN: 'HVN',
+    HOD_LOD: 'HOD / LOD',
+    M2_EDGE: 'Hrana M2',
+    IB_EDGE: 'Hrana IB',
+    PDH_PDL: 'PDH / PDL',
+    ONH_ONL: 'ONH / ONL'
   };
+
+  // Nová ruční pole obchodu (ZADANI_KONTEXT A4). Single-select, klíče ze
+  // zadání, popisky jdou upravit jako u ostatních číselníků.
+  // Trend na 30min grafu – existující `trend` (TREND) zůstává beze změny.
+  const TREND_HTF = { UP: 'Nahoru', DOWN: 'Dolů', RANGE: 'Range' };
+  // Kde byla absorpce: na extrému svíčky / pohybu, nebo uprostřed.
+  const ABS_LOCATION = { EXTREME: 'Na extrému', MIDDLE: 'Uprostřed', NONE: 'Bez absorpce' };
+  // Kolikátý test vstupní hladiny v seanci.
+  const ENTRY_TEST_NO = { '1': '1. test', '2': '2. test', '3+': '3. a další' };
+  // Byla před vstupem vybraná likvidita (past na retail)?
+  const LIQUIDITY_SWEPT = { YES: 'Ano', NO: 'Ne' };
+  // Co leží ve volume profilu mezi vstupem a cílem. UNKNOWN je vědomé „nevím",
+  // ne „nevyplněno".
+  const PATH_PROFILE = { LVN: 'LVN – volná cesta', HVN: 'HVN – brzda', MIXED: 'Smíšené', UNKNOWN: 'Nevím' };
+  // Známka zadaná PŘED vstupem (ochrana: gradeSetAt / gradeEdited / gradeRetro).
+  const GRADE = { A: 'A', B: 'B', C: 'C' };
+  // Netest / test hladiny: cena se hladiny v seanci ještě nedotkla / už ano.
+  // Pevné, needitovatelné – na obou hodnotách stojí analýza.
+  const TEST_STATE = { UNTESTED: 'netest', TESTED: 'test' };
 
   // Proč by obchod naživo NEVZAL (wouldSkipLive). V backtestu se setup dá vzít
   // i tak – replay nic nestojí a výsledek je informace –, ale do výkonu
@@ -137,7 +179,12 @@
     OTHER: 'Jiný důvod'
   };
 
-  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON };
+  const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
+    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, LIQUIDITY_SWEPT, PATH_PROFILE, GRADE };
+
+  // Výchozí skryté klíče (uživatel je zobrazí tlačítkem Zobrazit). PDH/PDL
+  // a ONH/ONL jsou skryté i u vstupu – Adam je nepoužívá.
+  const DEFAULT_HIDDEN = { TARGET_LEVEL: ['PDH_PDL', 'ONH_ONL'] };
 
   // Sloučené volby. Klíč vlevo zůstává PLATNÝ (starý obchod ho může mít
   // uložený), ale ve statistikách se počítá pod klíčem vpravo a u nových
@@ -167,7 +214,13 @@
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
     { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' },
     { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' },
-    { name: 'SKIP_REASON', label: 'Důvod „naživo bych nevzal“', cardinality: 'single' }
+    { name: 'SKIP_REASON', label: 'Důvod „naživo bych nevzal“', cardinality: 'single' },
+    { name: 'TREND_HTF', label: 'Trend 30m', cardinality: 'single' },
+    { name: 'ABS_LOCATION', label: 'Absorpce – kde', cardinality: 'single' },
+    { name: 'ENTRY_TEST_NO', label: 'Kolikátý test vstupu', cardinality: 'single' },
+    { name: 'LIQUIDITY_SWEPT', label: 'Vybraná likvidita', cardinality: 'single' },
+    { name: 'PATH_PROFILE', label: 'Profil cesty k cíli', cardinality: 'single' },
+    { name: 'GRADE', label: 'Známka', cardinality: 'single' }
   ];
 
   const GROUP_BY_NAME = Object.fromEntries(GROUPS.map(g => [g.name, g]));
@@ -211,7 +264,20 @@
     // po tom, co pozice fakticky skončila, ne po částečném výstupu uprostřed.
     { key: 'postExitFavorableTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Ticky po výstupu – ve směru zisku' },
     { key: 'postExitAdverseTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Ticky po výstupu – proti' },
-    { key: 'postExitAdverseFirst', cardinality: 'bool', enumName: null, merge: 'lastExit', label: 'Protipohyb přišel dřív' }
+    { key: 'postExitAdverseFirst', cardinality: 'bool', enumName: null, merge: 'lastExit', label: 'Protipohyb přišel dřív' },
+    // Kontext v2 (A4). Single-select bere první neprázdný; netest/test hladin
+    // vstupu je mapa { KLÍČ: UNTESTED|TESTED } sjednocená přes nohy.
+    { key: 'trendHtf', cardinality: 'single', enumName: 'TREND_HTF', label: 'Trend 30m' },
+    { key: 'entryLevelTests', cardinality: 'levelTests', enumName: 'ENTRY_LEVEL', label: 'Hladina vstupu – netest/test' },
+    { key: 'entryTestNo', cardinality: 'single', enumName: 'ENTRY_TEST_NO', label: 'Kolikátý test vstupu' },
+    { key: 'absLocation', cardinality: 'single', enumName: 'ABS_LOCATION', label: 'Absorpce – kde' },
+    { key: 'liquiditySwept', cardinality: 'single', enumName: 'LIQUIDITY_SWEPT', label: 'Vybraná likvidita' },
+    { key: 'pathProfile', cardinality: 'single', enumName: 'PATH_PROFILE', label: 'Profil cesty k cíli' },
+    { key: 'grade', cardinality: 'single', enumName: 'GRADE', label: 'Známka' },
+    // Čas prvního zadání známky: sloučený obchod bere nejdřívější. „Změněno
+    // dodatečně" platí, když to tvrdí kterákoli noha.
+    { key: 'gradeSetAt', cardinality: 'string', enumName: null, merge: 'min', label: 'Známka zadána' },
+    { key: 'gradeEdited', cardinality: 'bool', enumName: null, merge: 'any', label: 'Známka změněna dodatečně' }
   ];
 
   // ------------------------------------------------------- uživatelská úprava
@@ -285,7 +351,8 @@
     const explicit = Array.isArray(g.hidden) ? g.hidden : [];
     const unhidden = Array.isArray(g.visible) ? g.visible : [];
     const aliased = Object.keys(aliasesFor(group, config));
-    return new Set([...explicit, ...aliased].filter(k => !unhidden.includes(k)));
+    const defaults = DEFAULT_HIDDEN[group] || [];
+    return new Set([...defaults, ...explicit, ...aliased].filter(k => !unhidden.includes(k)));
   }
 
   function isHidden(group, key, config) {
@@ -308,6 +375,20 @@
 
   function isValidKey(group, key, config) {
     return allKeys(group, config).includes(key);
+  }
+
+  // „Je to hladina" u položky slovníku cílů (TARGET_LEVEL). Cíl, který není
+  // hladina (ruční výstup, trail, pevné RRR), neříká nic o tom, jestli cena
+  // na hladině reagovala. Výchozí je true; uživatel to přepne v Nastavení →
+  // Číselníky a uloží se do `TARGET_LEVEL.isLevel { KLÍČ: bool }`.
+  // CUSTOM_FIX_RRR je uživatelský klíč, výchozí „ne" pro něj schválil Adam
+  // (nastavení slovníku, ne data obchodů).
+  const DEFAULT_NOT_LEVEL = { TARGET_LEVEL: ['MANUAL_EXIT', 'TRAIL_M2', 'CUSTOM_FIX_RRR'] };
+
+  function isLevelKey(key, config, group = 'TARGET_LEVEL') {
+    const own = groupConfig(group, config).isLevel;
+    if (own && typeof own === 'object' && typeof own[key] === 'boolean') return own[key];
+    return !(DEFAULT_NOT_LEVEL[group] || []).includes(key);
   }
 
   // Nabídka pro NOVÝ obchod: ve zvoleném pořadí, bez skrytých a aliasovaných.
@@ -345,6 +426,22 @@
     return { type, price };
   }
 
+  // Netest / test: platný stav, nebo '' (nevyplněno).
+  function sanitizeTestState(value) {
+    return Object.prototype.hasOwnProperty.call(TEST_STATE, value) ? value : '';
+  }
+
+  // Netest / test u hladin vstupu: mapa { KLÍČ: UNTESTED|TESTED } jen pro
+  // vybrané hladiny (bez NONE). Nic vyplněno = null, ne prázdný objekt.
+  function sanitizeLevelTests(levels, tests) {
+    const chosen = new Set((Array.isArray(levels) ? levels : []).filter(k => k && k !== 'NONE'));
+    const out = {};
+    for (const [key, state] of Object.entries(tests && typeof tests === 'object' ? tests : {})) {
+      if (chosen.has(key) && sanitizeTestState(state)) out[key] = state;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
   // SR hladiny: seznam řádků { level, price, ticksFromEntry }.
   //   level          klíč číselníku (SR_TARGET / SR_SL)
   //   price          cena hladiny, nebo null
@@ -376,7 +473,10 @@
       const price = numOrNull(raw.price);
       const ticks = numOrNull(raw.ticksFromEntry);
       const row = { level, price, ticksFromEntry: ticks == null ? null : Math.abs(ticks) };
-      const sig = row.level + '|' + row.price + '|' + row.ticksFromEntry;
+      // Netest / test jen když je vyplněný – tvar starých řádků se nemění.
+      const testState = sanitizeTestState(raw.testState);
+      if (testState) row.testState = testState;
+      const sig = row.level + '|' + row.price + '|' + row.ticksFromEntry + '|' + (row.testState || '');
       if (seen.has(sig)) continue;
       seen.add(sig);
       rows.push(row);
@@ -415,6 +515,10 @@
     if (!sanitizeLevelRows('SR_TARGET', trade.srTarget, config).length && trade.srTargetNone !== true) missing.push('srTarget');
     if (!sanitizeLevelRows('SR_SL', trade.srStopLoss, config).length && trade.srStopLossNone !== true) missing.push('srStopLoss');
     if (!sanitizeMulti('OF_CONFIRM', trade.ofConfirm, config).length) missing.push('ofConfirm');
+    // Kontext v2 (A4): trend 30m a známka. Ostatní nová pole úplnost
+    // neblokují, ať „Neúplné" nezčervená celý deník najednou.
+    if (!sanitizeSingle('TREND_HTF', trade.trendHtf, config)) missing.push('trendHtf');
+    if (!sanitizeSingle('GRADE', trade.grade, config)) missing.push('grade');
     const target = sanitizeTargetLevel(trade.targetLevel1, config);
     if (!target || !target.type || target.price == null) missing.push('targetLevel1');
     // Nenaplněný / vynechaný setup vyplněný jako celý hypotetický obchod (má
@@ -449,7 +553,7 @@
   const CARD_OF_FIELD = {
     slPrice: 'sltp',
     mfeTicks: 'course', maeTicks: 'course', postExitFavorableTicks: 'course', postExitAdverseTicks: 'course',
-    setupCode: 'setup', fillStatus: 'setup', trend: 'setup',
+    setupCode: 'setup', fillStatus: 'setup', trend: 'setup', trendHtf: 'setup', grade: 'setup',
     entryLevels: 'levels', srTarget: 'levels', srStopLoss: 'levels', ofConfirm: 'levels'
   };
 
@@ -550,7 +654,15 @@
         if (Object.keys(custom).length) clean.custom = custom;
       }
 
-      const valid = new Set([...Object.keys(defaults), ...Object.keys(custom)]);
+      // Odvozená skupina (SR kolonky) nemá vlastní volby, sdílí je se zdrojovou
+      // skupinou – její vlastní volby se proto smí skrývat a řadit i tady.
+      // Bez toho kopie / export číselníků tiše zahodila např. skrytý
+      // CUSTOM_FIX_RRR u SR proti targetu.
+      const source = vocabularyOf(group.name);
+      const sourceCustom = source !== group.name && raw[source]?.custom && typeof raw[source].custom === 'object'
+        ? Object.keys(raw[source].custom).filter(k => CUSTOM_KEY_RE.test(k) && cleanLabel(raw[source].custom[k]))
+        : [];
+      const valid = new Set([...Object.keys(defaults), ...Object.keys(custom), ...sourceCustom]);
 
       if (g.labels && typeof g.labels === 'object') {
         const labels = {};
@@ -566,6 +678,15 @@
         if (!Array.isArray(g[field])) continue;
         const list = [...new Set(g[field].filter(key => valid.has(key)))];
         if (list.length) clean[field] = list;
+      }
+
+      // „Je to hladina" (jen slovník cílů): známé klíče, jen true / false.
+      if (group.name === 'TARGET_LEVEL' && g.isLevel && typeof g.isLevel === 'object') {
+        const isLevel = {};
+        for (const key of Object.keys(g.isLevel)) {
+          if (valid.has(key) && typeof g.isLevel[key] === 'boolean') isLevel[key] = g.isLevel[key];
+        }
+        if (Object.keys(isLevel).length) clean.isLevel = isLevel;
       }
 
       if (Object.keys(clean).length) out[group.name] = clean;
@@ -612,6 +733,7 @@
       if (g.custom) parts.push(Object.keys(g.custom).length + '× vlastní volba');
       if (g.hidden && g.hidden.length) parts.push(g.hidden.length + '× skryto');
       if (g.order) parts.push('vlastní pořadí');
+      if (g.isLevel) parts.push(Object.keys(g.isLevel).length + '× „je to hladina"');
       return parts.length ? group.label + ': ' + parts.join(', ') : null;
     }).filter(Boolean);
   }
@@ -619,11 +741,13 @@
   return {
     // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
     SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
+    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, LIQUIDITY_SWEPT, PATH_PROFILE, GRADE, TEST_STATE, DEFAULT_HIDDEN,
+    sanitizeTestState, sanitizeLevelTests,
     ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, TRADE_CONTEXT_FIELDS,
     // konfigurace
     applyConfig, getConfig, groupConfig,
     // dotazy
-    allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey,
+    allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey, isLevelKey, DEFAULT_NOT_LEVEL,
     visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     missingContextKeys, contextFieldLabel,
     TRADE_CARDS, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingForCards,

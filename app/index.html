@@ -124,6 +124,8 @@ canvas{width:100%;height:100%}
 /* Dlaždice číselníků: vyplnit jeden obchod má trvat do 15 s, takže se vybírá
    klikem do mřížky, ne rozbalovacím seznamem. */
 .chip-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+/* Klávesa dlaždice v rychlém formuláři (§6.2) – v rohu. */
+.chip .chip-key{display:inline-block;min-width:14px;margin-right:5px;padding:0 3px;border-radius:4px;font-size:10px;font-weight:800;background:rgba(var(--blue-rgb),.18);color:var(--blue);text-align:center}
 /* Sbalitelná položka „Hladiny" – ve formuláři obchodu i na kartě v Deníku.
    Rozbalené hladiny zabíraly přes polovinu formuláře a na kartě pět řádků,
    takže se ke screenshotům nedalo dojet bez dlouhého scrollování.
@@ -253,10 +255,36 @@ input.input-error{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
 .pill.hypo-pill{font-size:10px;padding:1px 6px;background:rgba(120,140,255,.16);color:#9fb0ff;border:1px solid rgba(120,140,255,.4)}
 .day-header .stat-excluded{font-size:12px;font-weight:600;color:var(--muted);margin-right:8px;opacity:.85}
 .sr-rows{display:flex;flex-direction:column;gap:6px}
-.sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr auto;gap:6px;align-items:center}
+.sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr minmax(90px,.8fr) auto;gap:6px;align-items:center}
 .sr-row .sr-warn{grid-column:1/-1;font-size:12px}
 /* ✕ zůstává v posledním sloupci, i když jsou ticky schované (dopočet z ceny). */
-.sr-row .sr-remove{grid-column:4;grid-row:1}
+.sr-row .sr-remove{grid-column:5;grid-row:1}
+/* Netest / test (kontext v2, A2.2) – pevně ve 4. sloupci i se schovanými ticky. */
+.sr-row .sr-test{grid-column:4;grid-row:1}
+.level-tests{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.level-test-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.level-test-name{min-width:140px;font-size:13px;font-weight:700}
+/* Rychlý kontextový formulář (§6.2): skupina dlaždic = jedna zastávka Tabu. */
+.qc-trade{margin:0 0 10px;font-size:14px}
+.qc-group{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px;outline:none}
+.qc-group:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(var(--blue-rgb),.25)}
+.qc-label{font-size:12px;font-weight:800;letter-spacing:.03em;color:var(--muted)}
+.qc-group:focus .qc-label{color:var(--blue)}
+.qc-day{border:1px dashed rgba(var(--yellow-rgb),.6);border-radius:12px;padding:8px 10px;margin-bottom:10px}
+.qc-day .qc-group{border:none;padding:4px 0;margin:0}
+.qc-day-title{font-weight:800;margin-bottom:4px}
+.qc-rows{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.qc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.qc-row .qc-row-price{max-width:140px}
+.qc-numbers{margin-top:6px}
+.day-context-card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.day-context-title{font-weight:800;margin-bottom:6px}
+.day-context-group{margin-bottom:6px}
+.day-context-group.evening{border-left:3px solid rgba(var(--yellow-rgb),.7);padding-left:8px}
+.day-header .day-context-pill{margin-left:8px;font-weight:600}
+.qc-help{margin-top:8px}
+.pill.grade-flag{outline:1px dashed var(--yellow)}
+.pill.derived-pill{opacity:.85;font-weight:600}
 .sr-actions{display:flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap}
 .sr-actions .btn:disabled{opacity:.4;cursor:default}
 .field .sr-none{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0;cursor:pointer}
@@ -522,7 +550,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Deník / karta</label><select id="accountJournal"><option value="">Všechny deníky</option></select></div>
           <div class="field"><label>Instrument</label><select id="accountInstrument"><option value="">Všechny instrumenty</option></select></div>
           <div class="field"><label>&nbsp;</label><button class="btn primary" id="applyAccountFilters">Zobrazit</button></div>
-          <div class="field include-field"><span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveOverview"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillOverview"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedOverview"> včetně vědomě vynechaných</label></span></div>
+          <div class="field include-field"><span class="include-toggles" data-include-scope="overview"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveOverview"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillOverview"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedOverview"> včetně vědomě vynechaných</label></span></div>
         </div>
       </div>
 
@@ -545,12 +573,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="topInstruments" class="bar-list"></div>
           <div class="panel-subtitle">Setupy a fill rate</div>
           <div id="setupStatsBox" class="stat-list"></div>
-          <div class="panel-subtitle">Naživo bych nevzal <span class="sub">— evidováno zvlášť</span></div>
-          <div id="skipLiveStatsBox" class="stat-list"></div>
+          <div id="skipLiveStatsBlock"><div class="panel-subtitle">Naživo bych nevzal <span class="sub">— evidováno zvlášť</span></div>
+          <div id="skipLiveStatsBox" class="stat-list"></div></div>
           <div class="panel-subtitle">No fill – hypoteticky <span class="sub">— nenaplněno / nestihnuto, evidováno zvlášť</span></div>
           <div id="noFillStatsBox" class="stat-list"></div>
-          <div class="panel-subtitle">Vědomě vynechané – hypoteticky <span class="sub">— evidováno zvlášť</span></div>
-          <div id="skippedStatsBox" class="stat-list"></div>
+          <div id="skippedStatsBlock"><div class="panel-subtitle">Vědomě vynechané – hypoteticky <span class="sub">— evidováno zvlášť</span></div>
+          <div id="skippedStatsBox" class="stat-list"></div></div>
         </div>
         <div class="card">
           <h3>Rozložení zisků a ztrát</h3>
@@ -632,8 +660,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
         <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
+        <button class="btn" id="quickContextBtn" type="button" title="Doplnit kontext obchodům z aktuálního výběru, které ho nemají úplný – celé na klávesnici">⚡ Rychlý kontext</button>
         <select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select>
-        <span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span>
+        <span class="include-toggles" data-include-scope="journal"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span>
         <input type="date" id="filterDate">
         <input type="date" id="newDayDate" title="Datum dne k přidání">
         <button class="btn" id="addEmptyDay" title="Přidá denní blok (komentář/náhled/poznámky/screenshoty) i bez obchodu">+ Přidat den</button>
@@ -658,7 +687,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <label>Deník / karta</label>
             <select id="calendarJournal"><option value="">Aktivní deník</option><option value="all">Všechny deníky</option></select>
           </div>
-          <span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveCalendar"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillCalendar"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedCalendar"> včetně vědomě vynechaných</label></span>
+          <span class="include-toggles" data-include-scope="calendar"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveCalendar"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillCalendar"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedCalendar"> včetně vědomě vynechaných</label></span>
         </div>
         <div class="sub" id="calendarRiskNote" style="margin:-4px 0 10px"></div>
         <div id="calendarMonthSummary"></div>
@@ -667,6 +696,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="card" style="margin-top:16px">
         <h3>Obchody vybraného dne</h3>
         <div id="dayRiskNote" class="alert"></div>
+        <div id="dayContextBox"></div>
         <div id="dayTrades" class="trade-list"><div class="sub">Klikni v kalendáři na den s obchody.</div></div>
       </div>
     </section>
@@ -683,7 +713,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn primary" id="generateReport">Vytvořit report</button>
           <button class="btn" id="reportCsv">Export CSV</button>
           <button class="btn" id="reportPrint">Tisk / PDF</button>
-          <span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveReports"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillReports"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedReports"> včetně vědomě vynechaných</label></span>
+          <span class="include-toggles" data-include-scope="reports"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveReports"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillReports"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedReports"> včetně vědomě vynechaných</label></span>
         </div>
       </div>
       <div class="grid stats" style="margin-top:16px">
@@ -1083,6 +1113,23 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   </div>
 </div>
 
+<div class="modal" id="quickContextModal">
+  <div class="modalbox qc-box" style="max-width:880px">
+    <div class="modalhead"><h2>Rychlý kontext <span class="sub" id="qcProgress"></span></h2><button class="icon" id="closeQuickContext" title="Zavřít bez uložení (Esc)">✕</button></div>
+    <div class="qc-trade" id="qcTrade"></div>
+    <div id="qcDay"></div>
+    <div id="qcGroups"></div>
+    <div class="formgrid qc-numbers">
+      <div class="field"><label>Cena Stop Lossu</label><input id="qcSlPrice" type="number" step="any"><div class="sub" id="qcSlNote"></div></div>
+      <div class="field"><label>MFE <span class="sub">— ticky</span></label><input id="qcMfeTicks" type="number" step="any" min="0"><div class="sub" id="qcMfeNote"></div></div>
+      <div class="field"><label>MAE <span class="sub">— ticky</span></label><input id="qcMaeTicks" type="number" step="any" min="0"><div class="sub" id="qcMaeNote"></div></div>
+    </div>
+    <div class="sub qc-help">Tab / Shift+Tab = další / předchozí skupina · klávesa v rohu dlaždice = volba (výběr z jedné posune dál) · Enter = uložit a další · Esc = zavřít bez uložení</div>
+    <div id="qcAlert" class="alert red"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn" id="qcSkip" title="Další obchod bez uložení">Přeskočit</button><button class="btn primary" id="qcSave">Uložit a další (Enter)</button></div>
+  </div>
+</div>
+
 <div class="modal" id="confirmModal">
   <div class="modalbox" style="max-width:440px">
     <div class="modalhead"><h2>Potvrzení</h2></div>
@@ -1227,6 +1274,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
           <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="missedByTicks" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
           <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
+          <div class="field full"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
+          <div class="field full"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
+          <div class="field full"><label>Vybraná likvidita před vstupem <span class="sub">— past na retail</span></label><div id="liquiditySwept" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <div class="field" id="wouldSkipLiveField"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
           <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
@@ -1236,11 +1286,16 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Hladiny</span><span class="sub trade-section-summary" id="levelsSummary"></span><span class="trade-section-missing" id="levelsMissing"></span></summary>
         <div class="formgrid">
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
+          <div class="field full" id="entryLevelTestsField" style="display:none"><label>Hladina vstupu – netest / test <span class="sub">— netest = cena se jí v seanci ještě nedotkla</span></label><div id="entryLevelTests" class="level-tests"></div></div>
+          <div class="field full"><label>Kolikátý test vstupní hladiny <span class="sub">— v seanci</span></label><div id="entryTestNo" class="chip-grid"></div></div>
           <div class="field full"><label>SR proti targetu <span class="sub">— hladiny v cestě k cíli (ve směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srTarget" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srTargetAdd" onclick="appendLevelRow('srTarget')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srTargetNone"> žádná hladina v cestě</label></div></div>
+          <div class="field full"><label>Profil cesty k cíli <span class="sub">— co leží ve volume profilu mezi vstupem a cílem</span></label><div id="pathProfile" class="chip-grid"></div></div>
           <div class="field full"><label>SR proti S/L <span class="sub">— zóny, které chrání Stop Loss (mezi SL a cenou trhu – smí ležet i na vstupu nebo kousek za ním); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srStopLossAdd" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srStopLossNone"> žádná hladina v cestě</label></div><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
+          <div class="field full"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
           <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
           <div class="field"><label>Cílová hladina 2 <span class="sub">— typ</span></label><select id="targetLevel2Type"></select></div>
+          <div class="field full sub" id="contextDerived" title="Dopočítáno z cen hladin, vstupu, SL a cíle – needituje se a do obchodu se neukládá."></div>
         </div>
       </details>
       <details class="trade-section" data-card="comments">
@@ -1338,7 +1393,10 @@ async function storeScreenshot(dataUrl){
 let tradeFormBaseline='';
 function tradeFormSnapshot(){
  const vals=[...$('tradeForm').querySelectorAll('input,select,textarea')].map(el=>el.type==='file'?'':(el.type==='checkbox'?el.checked:el.value));
- return JSON.stringify(vals)+'|'+JSON.stringify(editImages);
+ // Dlaždice (trend, známka, hladiny…) drží stav jen v DOM – bez nich by
+ // změna dlaždice nebyla „neuložená změna".
+ const chips=[...$('tradeForm').querySelectorAll('.chip.on')].map(c=>(c.parentElement?.id||'')+':'+c.dataset.key);
+ return JSON.stringify(vals)+'|'+JSON.stringify(chips)+'|'+JSON.stringify(formLevelTests)+'|'+JSON.stringify(editImages);
 }
 
 async function openDB(){
@@ -1418,7 +1476,21 @@ async function saveDayNote(date,patch){
  await commitJournal(journal=>{
   const current=journal.dayNotes[date]||emptyDayNote();
   const next={...current,...patch};
-  const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length);
+  // Kontext dne (A5) je taky obsah – den jen s kontextem se nesmí smazat.
+  const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length)&&!next.dayContext;
+  if(isEmpty)delete journal.dayNotes[date];else journal.dayNotes[date]=next;
+ });
+}
+// Kontext dne (A5): doplňuje se po polích – večerní pole nepřepíše ranní.
+// Prázdná hodnota pole smaže; prázdný kontext se neukládá vůbec.
+async function saveDayContext(date,patch){
+ await commitJournal(journal=>{
+  const current=journal.dayNotes[date]||emptyDayNote();
+  const merged={...(current.dayContext||{}),...(patch||{})};
+  const clean=FJContext.sanitizeDayContext(merged);
+  const next={...current};
+  if(clean)next.dayContext=clean;else delete next.dayContext;
+  const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length)&&!next.dayContext;
   if(isEmpty)delete journal.dayNotes[date];else journal.dayNotes[date]=next;
  });
 }
@@ -1682,6 +1754,59 @@ async function onIncludeChange(key,value){
  if(typeof drawInstrumentPortfolio==='function')drawInstrumentPortfolio();
  if(typeof reportRows!=='undefined'&&reportRows)generateReportView();
 }
+// Které přepínače „včetně …" dávají v zobrazeném pohledu smysl – podle
+// režimu zobrazených deníků (FJContext.includeToggleState). `ids` = deníky
+// v rozsahu pohledu i bez obchodů; obchod bez journalId patří aktivnímu deníku.
+// Přepínač se jen schová, uložená volba se nemění.
+function includeJournalsFor(rows,ids=[]){
+ const byId=new Map();
+ for(const id of ids)if(id&&!byId.has(id))byId.set(id,[]);
+ for(const t of tradeRecords(rows)){
+  const id=t?.journalId||activeJournalId;
+  if(!byId.has(id))byId.set(id,[]);
+  byId.get(id).push(t);
+ }
+ return [...byId].map(([id,records])=>({mode:FJContext.journalMode(journalProfiles.find(j=>j.id===id)),records}));
+}
+function refreshIncludeToggles(scope,journals){
+ const states={};
+ for(const key of ['skipLive','noFill','skipped'])states[key]=FJContext.includeToggleState(key,journals);
+ document.querySelectorAll(`.include-toggles[data-include-scope="${scope}"] .include-toggle`).forEach(cb=>{
+  const st=states[cb.dataset.include],label=cb.closest('label'); if(!st||!label)return;
+  label.style.display=st.show?'':'none';
+  const text=FJContext.includeInvalidNote(cb.dataset.include,st.invalidCount);
+  let note=label.querySelector('.include-invalid');
+  if(text&&!note){note=document.createElement('span');note.className='include-invalid sub';label.appendChild(note)}
+  if(note){
+   note.textContent=text?' · '+text:'';
+   note.title=text?'Typ záznamu, který do režimu tohoto deníku nepatří – najdeš ho v Deníku pod „Kontrola dat“ a opravíš ručně.':'';
+  }
+ });
+ return states;
+}
+// Filtry Deníku podle režimu aktivního deníku: „naživo bych nevzal“ jen
+// v backtestu, „vědomě vynechané“ jen v živém. Neplatné záznamy (Kontrola dat)
+// jdou dál vyfiltrovat, filtr je pak pojmenovaný jako neplatný typ.
+function syncJournalModeFilters(states){
+ const mode=activeJournalMode();
+ const sk=$('filterSkipLive');
+ if(sk){
+  const st=states.skipLive,invalid=st.show&&mode!=='BACKTEST';
+  sk.style.display=st.show?'':'none';
+  if(!st.show)sk.value='';
+  const texts=invalid
+   ?{'':'Všechny obchody',only:'Neplatný typ v živém deníku: naživo bych nevzal',exclude:'Bez neplatných „naživo bych nevzal“'}
+   :{'':'Živé i „naživo bych nevzal“',only:'Jen „naživo bych nevzal“',exclude:'Bez „naživo bych nevzal“'};
+  [...sk.options].forEach(o=>{o.textContent=texts[o.value]});
+ }
+ const opt=$('filterFill')?.querySelector?.('option[value="skipped"]');
+ if(opt){
+  const st=states.skipped;
+  opt.hidden=!st.show;opt.disabled=!st.show;
+  if(!st.show&&$('filterFill').value==='skipped')$('filterFill').value='';
+  opt.textContent=st.show&&mode==='BACKTEST'?'Neplatný typ v backtest deníku: vědomě vynechané':'Jen vědomě vynechané';
+ }
+}
 function setRecords(all){
  const rows=Array.isArray(all)?all:[];
  trades=tradeRecords(rows);
@@ -1924,19 +2049,13 @@ function getPointValueForInstrument(instrument){
  if(code && BUILTIN_POINT_VALUES[code]!==undefined) return BUILTIN_POINT_VALUES[code];
  return null;
 }
-// Vestavěná tabulka velikosti ticku (nejmenší pohyb ceny) pro tytéž běžné
-// kontrakty jako u hodnoty bodu. Používá se na přepočet bodů na tiky
-// u chování ceny po výstupu. Pro jiný instrument se velikost ticku NEHÁDÁ –
-// buď je vyplněná v šabloně instrumentu, nebo se dopočty nezobrazí.
-const BUILTIN_TICK_SIZES={
- ES:0.25, MES:0.25, NQ:0.25, MNQ:0.25, YM:1, MYM:1, RTY:0.1, M2K:0.1
-};
+// Velikost ticku (nejmenší pohyb ceny): šablona instrumentu, jinak vestavěná
+// tabulka. Pro jiný instrument se NEHÁDÁ – dopočty se pak nezobrazí. Tabulka
+// i výběr šablony jsou v app/points.js, protože stejné číslo potřebuje i main
+// proces pro dopočty v AI exportu.
+const BUILTIN_TICK_SIZES=FJPoints.BUILTIN_TICK_SIZES;
 function getTickSizeForInstrument(instrument,src=settings){
- const tpl=findTemplate(instrument,src);
- if(tpl && tpl.tickSize!==undefined && tpl.tickSize!==null && tpl.tickSize!=='' && Number(tpl.tickSize)>0) return Number(tpl.tickSize);
- const code=normalizeInstrumentCode(instrument);
- if(code && BUILTIN_TICK_SIZES[code]!==undefined) return BUILTIN_TICK_SIZES[code];
- return null;
+ return FJPoints.tickSizeFor(instrument,src?.templates);
 }
 // `src` je zdroj nastavení. Ve výchozím stavu globální `settings` aktivního
 // deníku; automatický import ale zapisuje do deníku podle mapování účtů a běží
@@ -1948,11 +2067,7 @@ function getDefaultCommissionForInstrument(instrument,src=settings){
  return null;
 }
 function findTemplate(instrument,src=settings){
- const val=String(instrument||'').trim().toLowerCase();
- if(!val)return null;
- const list=src?.templates||[];
- return list.find(tpl=>val===String(tpl.instrument||'').trim().toLowerCase())
-  ||list.find(tpl=>tpl.instrument&&val.includes(String(tpl.instrument).trim().toLowerCase()));
+ return FJPoints.findTemplateIn(src?.templates,instrument);
 }
 function renderTemplateList(){
  const list=settings.templates||[];
@@ -2384,6 +2499,16 @@ function renderDashboard(rows=trades,setups=setupRecords){
  // Fill rate bere i obchody „naživo bych nevzal“ (mechanika vstupu), výkon ne.
  const allTrades=tradeRecords(rows);
  const safeRows=performanceRecords(rows);
+ // Přepínače a bloky „naživo bych nevzal“ / „vědomě vynechané“ jen tam, kam
+ // podle režimu zobrazených deníků patří (nebo kde jsou neplatné záznamy).
+ const ovJournal=$('accountJournal')?.value||'';
+ // Testy načítají render funkce bez těchto pomocníků – proto typeof.
+ if(typeof refreshIncludeToggles==='function'){
+  const ovIds=ovJournal?[ovJournal]:(typeof overviewAllTrades!=='undefined'&&overviewAllTrades.length?visibleJournalProfiles().map(j=>j.id):[activeJournalId]);
+  const ov=refreshIncludeToggles('overview',includeJournalsFor(allTrades,ovIds));
+  if($('skipLiveStatsBlock'))$('skipLiveStatsBlock').style.display=ov.skipLive.show?'':'none';
+  if($('skippedStatsBlock'))$('skippedStatsBlock').style.display=ov.skipped.show?'':'none';
+ }
  renderSkipLiveStats(computeSkipLiveStats(allTrades));
  renderGroupStats('noFillStatsBox','noFill',computeGroupStats(allTrades,'noFill'));
  renderGroupStats('skippedStatsBox','skipped',computeGroupStats(allTrades,'skipped'));
@@ -2616,7 +2741,7 @@ function renderTaxonomyEditor(){
      <button type="button" class="btn tax-down" ${index===keys.length-1?'disabled':''} title="Posunout dolů">↓</button>
     </div>
     <div class="tax-actions"><button type="button" class="btn tax-toggle">${hidden?'Zobrazit':'Skrýt'}</button></div>
-    <div class="sub" style="font-size:11px">${hidden?'skrytá':''}</div>
+    <div class="sub" style="font-size:11px">${hidden?'skrytá':''}${group.name==='TARGET_LEVEL'?`<label class="tax-is-level" title="Vypni u cíle, který není hladina (ruční výstup, trail, pevné RRR) – dopočet „cíl na hladině“ ho pak nebere jako hladinu."><input type="checkbox" class="tax-level"${FJTaxonomy.isLevelKey(key)?' checked':''}> je to hladina</label>`:''}</div>
    </div>`;
   }).join('');
   return `<details style="margin-bottom:14px"${group.name==='ENTRY_LEVEL'?' open':''}>
@@ -2685,6 +2810,21 @@ function wireTaxonomyEditor(){
   g.order=keys;
   await saveTaxonomyConfig(cfg);
  };
+ // „Je to hladina“ (jen cíle). Ukládá se jen odchylka od výchozího stavu.
+ document.querySelectorAll('#taxonomyGroups .tax-level').forEach(box=>{
+  box.onchange=async()=>{
+   const row=box.closest('.tax-row');
+   const key=row.dataset.key;
+   const cfg=taxonomyConfig();
+   const g=taxonomyGroupPatch(cfg,'TARGET_LEVEL');
+   g.isLevel=g.isLevel&&typeof g.isLevel==='object'?g.isLevel:{};
+   delete g.isLevel[key];
+   if(FJTaxonomy.isLevelKey(key,cfg)!==box.checked)g.isLevel[key]=box.checked;
+   if(!Object.keys(g.isLevel).length)delete g.isLevel;
+   await saveTaxonomyConfig(cfg);
+   showToast(`„${FJTaxonomy.labelOf('TARGET_LEVEL',key)}“ ${box.checked?'je':'není'} hladina. Obchody se nemění – dopočet „cíl na hladině“ se přepočítá při čtení.`);
+  };
+ });
  document.querySelectorAll('#taxonomyGroups .tax-up').forEach(b=>b.onclick=()=>move(b.closest('.tax-row'),-1));
  document.querySelectorAll('#taxonomyGroups .tax-down').forEach(b=>b.onclick=()=>move(b.closest('.tax-row'),1));
  document.querySelectorAll('#taxonomyGroups .tax-add').forEach(btn=>{
@@ -2774,6 +2914,40 @@ function fillContextSelect(id,enumName,emptyLabel,selected){
  const options=FJTaxonomy.visibleOptions(enumName,selected);
  el.innerHTML=`<option value="">${esc(emptyLabel)}</option>`
   +options.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('');
+}
+// Nová single-select pole kontextu v2 (A4): id prvku = klíč v obchodu.
+// Známka (grade) jde zvlášť přes FJContext.applyGrade.
+const NEW_SINGLE_FIELDS=[['trendHtf','TREND_HTF'],['entryTestNo','ENTRY_TEST_NO'],['absLocation','ABS_LOCATION'],['liquiditySwept','LIQUIDITY_SWEPT'],['pathProfile','PATH_PROFILE']];
+// Netest / test u hladin vstupu – stav formuláře (mapa klíč → stav). Ukládá
+// se jen pro hladiny, které jsou vybrané (FJTaxonomy.sanitizeLevelTests).
+let formLevelTests={};
+function renderEntryLevelTests(){
+ const host=$('entryLevelTests'),field=$('entryLevelTestsField'); if(!host)return;
+ const levels=readChipGrid('entryLevels','ENTRY_LEVEL').filter(k=>k!=='NONE');
+ if(field)field.style.display=levels.length?'':'none';
+ host.innerHTML=levels.map(k=>{
+  const cur=formLevelTests[k]||'';
+  const btn=(v,label)=>`<span class="chip${cur===v?' on':''}" data-level="${esc(k)}" data-state="${v}" role="button" tabindex="0">${label}</span>`;
+  return `<div class="level-test-row"><span class="level-test-name">${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',k))}</span>${btn('UNTESTED','netest')}${btn('TESTED','test')}</div>`;
+ }).join('');
+ host.querySelectorAll('.chip').forEach(chip=>{
+  const pick=()=>{
+   const k=chip.dataset.level,v=chip.dataset.state;
+   if(formLevelTests[k]===v)delete formLevelTests[k];else formLevelTests[k]=v;
+   renderEntryLevelTests();
+  };
+  chip.onclick=pick;
+  chip.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();pick()}};
+ });
+}
+// Pod známkou: kdy byla zadaná a jestli se dodatečně měnila / doplnila zpětně.
+function renderGradeNote(t){
+ const el=$('gradeNote'); if(!el)return;
+ const parts=[];
+ if(t?.gradeSetAt){const d=new Date(t.gradeSetAt);if(!isNaN(d))parts.push('zadáno '+d.toLocaleString('cs-CZ',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}))}
+ if(t?.gradeEdited===true)parts.push('změněno dodatečně');
+ if(t&&FJContext.gradeRetro(t,journalModeOf(t))===true)parts.push('doplněno zpětně (po výstupu)');
+ el.textContent=parts.join(' · ');
 }
 // Mřížka dlaždic pro multi-select. Stav drží samotný DOM (class "on"), ať
 // není potřeba další zdroj pravdy vedle formuláře.
@@ -2901,10 +3075,12 @@ window.appendLevelRow=(field,row={})=>{
  el.innerHTML=`<select class="sr-level" aria-label="Typ hladiny"><option value="">— hladina —</option>${options.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('')}</select>`
   +'<input class="sr-price" type="number" step="any" placeholder="cena" aria-label="Cena hladiny">'
   +'<input class="sr-ticks" type="number" step="any" min="0" placeholder="ticky od vstupu" aria-label="Vzdálenost od vstupu v ticích">'
+  +'<select class="sr-test" aria-label="Netest / test" title="Netest = cena se hladiny v seanci ještě nedotkla"><option value="">— test? —</option><option value="UNTESTED">netest</option><option value="TESTED">test</option></select>'
   +'<button type="button" class="icon sr-remove" title="Odebrat hladinu">✕</button><div class="sub sr-dist"></div><div class="sub post-exit-warn sr-warn"></div>';
  el.querySelector('.sr-level').value=row.level||'';
  el.querySelector('.sr-price').value=row.price!=null?row.price:'';
  el.querySelector('.sr-ticks').value=row.ticksFromEntry!=null?row.ticksFromEntry:'';
+ el.querySelector('.sr-test').value=row.testState||'';
  el.dataset.anchor=row.price!=null?'price':(row.ticksFromEntry!=null?'ticks':'');
  el.querySelector('.sr-level').addEventListener('change',()=>updateLevelsSummary());
  el.querySelector('.sr-price').addEventListener('input',()=>{el.dataset.anchor='price';recomputeLevelRow(field,el);updateLevelsSummary()});
@@ -2948,7 +3124,8 @@ function readLevelRows(field){
  const rows=[...host.querySelectorAll('.sr-row')].map(el=>({
   level:el.querySelector('.sr-level')?.value||'',
   price:el.querySelector('.sr-price')?.value,
-  ticksFromEntry:el.querySelector('.sr-ticks')?.value
+  ticksFromEntry:el.querySelector('.sr-ticks')?.value,
+  testState:el.querySelector('.sr-test')?.value||''
  }));
  return FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],rows);
 }
@@ -2965,6 +3142,8 @@ function updateConfluenceHint(){
 const LEVEL_FIELDS=[['entryLevels','ENTRY_LEVEL','Vstup'],['srTarget','SR_TARGET','SR→TG'],['srStopLoss','SR_SL','SR→SL'],['ofConfirm','OF_CONFIRM','OF']];
 function updateLevelsSummary(){
  syncSrNoneControls();
+ if(typeof renderEntryLevelTests==='function')renderEntryLevelTests();
+ if(typeof renderContextDerived==='function')renderContextDerived();
  const out=$('levelsSummary'); if(!out)return;
  const parts=[];
  for(const [id,enumName,label] of LEVEL_FIELDS){
@@ -3002,6 +3181,20 @@ function mergeContextFields(list){
    // hodnoty se nepřepočítávají (sanitizeLevelRows).
    const rows=FJTaxonomy.sanitizeLevelRows(field.enumName,list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]));
    if(rows.length)out[field.key]=rows;
+  }else if(field.cardinality==='levelTests'){
+   // Netest / test hladin vstupu: sjednocení map přes nohy (první vyplněný
+   // stav hladiny vyhrává), jen pro hladiny, které sloučený obchod má.
+   const union={};
+   for(const t of list)for(const [k,v] of Object.entries(t?.[field.key]&&typeof t[field.key]==='object'?t[field.key]:{}))if(!union[k])union[k]=v;
+   const levels=FJTaxonomy.sanitizeMulti(field.enumName,list.flatMap(t=>Array.isArray(t?.entryLevels)?t.entryLevels:[]));
+   const clean=FJTaxonomy.sanitizeLevelTests(levels,union);
+   if(clean)out[field.key]=clean;
+  }else if(field.merge==='min'){
+   // Nejdřívější hodnota (čas prvního zadání známky).
+   const vals=list.map(t=>t?.[field.key]).filter(v=>v!==undefined&&v!==null&&v!=='').sort();
+   if(vals.length)out[field.key]=vals[0];
+  }else if(field.merge==='any'){
+   if(list.some(t=>t?.[field.key]===true))out[field.key]=true;
   }else if(field.noneFor){
    // „Žádná hladina" platí za celou pozici, jen když ji tvrdí všechny nohy
    // a žádná noha hladinu nezadala (řádky jsou v TRADE_CONTEXT_FIELDS dřív).
@@ -3068,6 +3261,12 @@ function contextPillsHTML(t){
  if(typeof tradeCardShown==='function'&&!tradeCardShown('setup'))return parts.join(' ');
  if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
  if(t.trend)parts.push(`<span class="pill context-pill" title="Trend">${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
+ if(t.trendHtf)parts.push(`<span class="pill context-pill" title="Trend 30m">30m: ${esc(FJTaxonomy.labelOf('TREND_HTF',t.trendHtf))}</span>`);
+ if(t.grade){
+  const flags=[t.gradeEdited===true?'změněno dodatečně':'',FJContext.gradeRetro(t,typeof journalModeOf==='function'?journalModeOf(t):'LIVE')===true?'doplněno zpětně':''].filter(Boolean);
+  parts.push(`<span class="pill context-pill${flags.length?' grade-flag':''}" title="Známka${flags.length?' – '+esc(flags.join(', ')):''}">Známka ${esc(FJTaxonomy.labelOf('GRADE',t.grade))}${flags.length?' *':''}</span>`);
+ }
+ if(t.liquiditySwept)parts.push(`<span class="pill context-pill" title="Vybraná likvidita před vstupem">Likvidita: ${esc(FJTaxonomy.labelOf('LIQUIDITY_SWEPT',t.liquiditySwept))}</span>`);
  if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
  return parts.join(' ');
 }
@@ -3094,10 +3293,26 @@ function dataCheckBadgeHTML(t){
 }
 // Hladiny a order flow – to, co se na kartě sbaluje. Vrací i počet pilulek,
 // protože hlavička sbalené položky říká, kolik jich je pod ní schovaných.
+// Dopočty (A3) k obchodu v seznamu. Pořadí v dni se počítá jednou nad celým
+// aktivním deníkem (cache podle pole obchodů – nové pole po load() = nový
+// výpočet). U obchodu jiného deníku (Přehled, Reporty) bez pořadí v dni.
+const dayOrderCache=new WeakMap();
+function cachedDayOrder(rows){
+ if(!Array.isArray(rows))return null;
+ let m=dayOrderCache.get(rows);
+ if(!m){m=FJContext.dayOrder(rows);dayOrderCache.set(rows,m)}
+ return m;
+}
+function tradeDerived(t){
+ const own=!t?.journalId||t.journalId===activeJournalId;
+ return FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(t?.instrument),dayOrder:own?cachedDayOrder(trades):null,mode:journalModeOf(t)});
+}
 function levelPillsHTML(t){
  const parts=[];
  const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
- if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + '))}</span>`);
+ const levelTests=t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{};
+ const levelName=k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)+(levelTests[k]?' ('+FJTaxonomy.TEST_STATE[levelTests[k]]+')':'');
+ if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(levelName).join(' + '))}${t.entryTestNo?' · '+esc(FJTaxonomy.labelOf('ENTRY_TEST_NO',t.entryTestNo)):''}</span>`);
  const srT=FJTaxonomy.sanitizeLevelRows('SR_TARGET',t.srTarget);
  // Vzdálenost od SL / před targetem se k řádku připíše jen pro zobrazení
  // (z uložené ceny SL a ceny targetu 1), uložená je jen ta od vstupu.
@@ -3119,7 +3334,14 @@ function levelPillsHTML(t){
  }
  const of=FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm);
  if(of.length)parts.push(`<span class="pill context-pill" title="Order flow potvrzení">OF: ${esc(of.map(k=>FJTaxonomy.labelOf('OF_CONFIRM',k)).join(', '))}</span>`);
- return {html:parts.join(' '),count:parts.length};
+ if(t.absLocation)parts.push(`<span class="pill context-pill" title="Absorpce – kde">Absorpce: ${esc(FJTaxonomy.labelOf('ABS_LOCATION',t.absLocation))}</span>`);
+ if(t.pathProfile)parts.push(`<span class="pill context-pill" title="Profil cesty k cíli">Cesta: ${esc(FJTaxonomy.labelOf('PATH_PROFILE',t.pathProfile))}</span>`);
+ // Dopočty se přidávají jen k vyplněným hladinám a do počtu se nepočítají –
+ // počet říká, jestli má obchod co rozbalovat.
+ const count=parts.length;
+ const derived=count&&typeof tradeDerived==='function'?FJContext.derivedSummaryParts(tradeDerived(t)):[];
+ if(derived.length)parts.push(`<span class="pill context-pill derived-pill" title="Dopočítáno z cen – needituje se">${esc(derived.join(' · '))}</span>`);
+ return {html:parts.join(' '),count};
 }
 // Sbalitelná položka s hladinami na kartě obchodu. Samostatná funkce proto, že
 // `tradeHTML` táhne půlku rendereru a tohle jde otestovat zvlášť.
@@ -3320,7 +3542,7 @@ function tradeHTML(t){
  ${t.dailyPlan.note?`<div><b>Komentář k setupu:</b> ${esc(t.dailyPlan.note)}</div>`:''}
  </div></details>`:''}
  <div class="thumbs">${(t.images||[]).map(i=>`<img src="${i}" loading="lazy" decoding="async" onclick="openImage('${i}')">`).join('')}</div></div>
- <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
+ <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" title="Rychlý kontext (od tohoto obchodu dál)" onclick="openQuickContext('${t.id}')">⚡</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
 }
 
 const openDayNotes=new Set();
@@ -3397,7 +3619,7 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span><span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
+ <span class="date">${date}</span>${note.dayContext?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
  <div class="spacer"></div>
  ${levelsBtn}
  ${excludedHTML}
@@ -3485,6 +3707,7 @@ function renderDataCheckCount(mode){
  opt.textContent=`Kontrola dat (${n})`;
 }
 function renderTrades(){
+ if(typeof refreshIncludeToggles==='function')syncJournalModeFilters(refreshIncludeToggles('journal',includeJournalsFor(trades,[activeJournalId])));
  const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'',sk=$('filterSkipLive')?.value||'',fl=$('filterFill')?.value||'';
  const sideOk=t=>!s||(s==='none'?(t.side!=='long'&&t.side!=='short'):t.side===s);
  // Filtr skupiny „naživo bych nevzal“: jen ona / bez ní. Výchozí „vše“ ukazuje
@@ -3500,6 +3723,7 @@ function renderTrades(){
  const checkOk=t=>!dc||FJContext.dataCheckIssues(t,mode).length>0;
  renderDataCheckCount(mode);
  const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&skipOk(t)&&fillOk(t)&&checkOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
+ journalVisibleTrades=list;
  const groups=[];
  for(const t of list){
   const last=groups[groups.length-1];
@@ -3566,6 +3790,13 @@ function renderCalendar(){
  const first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate();
  const last=(new Date(y,m,days).getDay()+6)%7;
  const scope=$('calendarJournal')?.value||'';
+ // Přepínače „včetně …" podle režimu deníků, které kalendář ukazuje.
+ // Testy načítají renderCalendar bez těchto pomocníků – proto typeof.
+ if(typeof refreshIncludeToggles==='function'){
+  const scopeRows=!scope?trades:(scope==='all'?(calendarAllTrades||[]):(calendarAllTrades||[]).filter(t=>t.journalId===scope));
+  const scopeIds=!scope?[activeJournalId]:(scope==='all'?visibleJournalProfiles().map(j=>j.id):[scope]);
+  refreshIncludeToggles('calendar',includeJournalsFor(scopeRows,scopeIds));
+ }
  const rows=performanceRecords(getCalendarRows());
  const showRisk=!scope; // řízení rizika je nastavené vždy jen pro jeden konkrétní deník
  const riskNote=$('calendarRiskNote');
@@ -3635,7 +3866,40 @@ function goToJournalForDate(date){
  if($('search'))$('search').value='';
  renderTrades();
 }
+// Kontext dne (A5) v detailu dne v Kalendáři: všech pět polí, večerní
+// (skutečný typ dne, migrace value) zvýrazněná – vyplňují se po obchodování.
+// Ukládá se hned po kliknutí, jen u aktivního deníku (kontext dne patří deníku).
+function dayContextSummary(dc){
+ if(!dc)return '';
+ const parts=[];
+ for(const k of Object.keys(FJContext.DAY_CONTEXT))if(dc[k])parts.push(FJContext.DAY_CONTEXT[k][dc[k]]);
+ return parts.join(' · ');
+}
+function renderDayContextBox(date){
+ const box=$('dayContextBox'); if(!box)return;
+ const scope=$('calendarJournal')?.value||'';
+ if(scope){box.innerHTML='<div class="sub" style="margin-bottom:10px">Kontext dne jde upravit jen u aktivního deníku (výběr „Aktivní deník“).</div>';return}
+ const dc=getDayNote(date).dayContext||{};
+ const group=k=>`<div class="day-context-group${FJContext.DAY_CONTEXT_EVENING.includes(k)?' evening':''}" data-key="${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}${FJContext.DAY_CONTEXT_EVENING.includes(k)?' <span class="sub">— večer</span>':' <span class="sub">— ráno</span>'}</div><div class="chip-grid">${Object.entries(FJContext.DAY_CONTEXT[k]).map(([v,label])=>`<span class="chip${dc[k]===v?' on':''}" data-value="${esc(v)}" role="button" tabindex="0">${esc(label)}</span>`).join('')}</div></div>`;
+ box.innerHTML=`<div class="day-context-card"><div class="day-context-title">Kontext dne ${esc(date)} <span class="sub">— platí pro všechny obchody dne, kliknutím se uloží</span></div>${Object.keys(FJContext.DAY_CONTEXT).map(group).join('')}</div>`;
+ box.querySelectorAll('.day-context-group').forEach(g=>{
+  const key=g.dataset.key;
+  g.querySelectorAll('.chip').forEach(chip=>{
+   const pick=async()=>{
+    const v=chip.dataset.value;
+    try{
+     await saveDayContext(date,{[key]:dc[key]===v?'':v});
+     renderDayContextBox(date);
+     renderTrades();
+    }catch(e){showToast('Kontext dne se nepodařilo uložit: '+e.message)}
+   };
+   chip.onclick=pick;
+   chip.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();pick()}};
+  });
+ });
+}
 window.showDay=date=>{
+ renderDayContextBox(date);
  const scope=$('calendarJournal')?.value||'';
  const rows=getCalendarRows();
  const showRisk=!scope;
@@ -3781,6 +4045,13 @@ function openModal(t=null,{title}={}){
   }
  }
  renderSingleChipGrid('trend','TREND',t&&t.trend);
+ // Kontext v2 (A4). Testy načítají openModal bez těchto pomocníků – typeof.
+ if(typeof NEW_SINGLE_FIELDS!=='undefined'){
+  for(const [id,group] of NEW_SINGLE_FIELDS)renderSingleChipGrid(id,group,t&&t[id]);
+  renderSingleChipGrid('grade','GRADE',t&&t.grade);
+  formLevelTests={...(t&&t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{})};
+  renderGradeNote(t);
+ }
  renderChipGrid('entryLevels','ENTRY_LEVEL',t&&t.entryLevels);
  renderLevelRows('srTarget',t&&t.srTarget);
  renderLevelRows('srStopLoss',t&&t.srStopLoss);
@@ -4260,6 +4531,26 @@ function renderSrDistances(){
    if(warn&&String(price??'').trim()!=='')warn.textContent=FJContext.srRowNotes(field,{price},draft,tick).join(' ');
   });
  }
+ renderContextDerived();
+}
+// Dopočty kontextu (A3) z toho, co je právě ve formuláři: cesta k cíli, zóny
+// chránící SL, pořadí obchodu v dni, seance. Jen zobrazení, nic se neukládá.
+function renderContextDerived(){
+ const box=$('contextDerived'); if(!box)return;
+ const d=postExitDraftFromForm();
+ const id=$('tradeId')?.value||'';
+ const t={
+  id,side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,
+  date:$('date')?.value||'',entryTime:$('entryTime')?.value||'',
+  srTarget:readLevelRows('srTarget'),srStopLoss:readLevelRows('srStopLoss'),
+  srTargetNone:readSrNone('srTarget'),srStopLossNone:readSrNone('srStopLoss'),
+  targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price},
+  targetLevel1PriceDerived:$('targetLevel1Price')?.dataset?.derived==='1'
+ };
+ // Pořadí v dni jen u uloženého obchodu – nový ještě v deníku není.
+ const order=id&&Array.isArray(trades)?FJContext.dayOrder(trades.map(x=>x.id===id?{...x,date:t.date,entryTime:t.entryTime}:x)):null;
+ const parts=FJContext.derivedSummaryParts(FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(d.instrument),dayOrder:order}));
+ box.textContent=parts.length?'Dopočet: '+parts.join(' · '):'';
 }
 // ---- Karty formuláře obchodu (SL / TP, Pohyb ceny, Setup, Hladiny, Komentáře) ----
 // Rozbalení se pamatuje (localStorage, jen pohodlí v tomhle zařízení);
@@ -4285,6 +4576,7 @@ function formContextDraft(){
   srTarget:readLevelRows('srTarget'),srStopLoss:readLevelRows('srStopLoss'),
   srTargetNone:srNone('srTarget'),srStopLossNone:srNone('srStopLoss'),
   ofConfirm:readChipGrid('ofConfirm','OF_CONFIRM'),
+  trendHtf:readSingleChipGrid('trendHtf','TREND_HTF'),grade:readSingleChipGrid('grade','GRADE'),
   targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price}
  };
 }
@@ -4673,6 +4965,15 @@ $('tradeForm').addEventListener('submit',async e=>{
   }
   obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
   obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
+  // Kontext v2 (A4): prázdné = nevyplněno, neukládá se nic.
+  for(const [key,group] of NEW_SINGLE_FIELDS){
+   const v=readSingleChipGrid(key,group);
+   if(v)obj[key]=v;else delete obj[key];
+  }
+  const levelTests=FJTaxonomy.sanitizeLevelTests(obj.entryLevels,formLevelTests);
+  if(levelTests)obj.entryLevelTests=levelTests;else delete obj.entryLevelTests;
+  // Známka: čas prvního zadání a příznak dodatečné změny (A4).
+  FJContext.applyGrade(obj,existing,readSingleChipGrid('grade','GRADE'),new Date().toISOString());
 
   // Cena Stop Lossu: ruční zadání má vždy přednost. Když je prázdná a obchod
   // skončil na SL, odvodí se z ceny nohy, která na SL šla (NE z váženého
@@ -4768,6 +5069,312 @@ $('tradeForm').addEventListener('submit',async e=>{
  }
 });
 
+
+// ---- Rychlý kontextový formulář (BACKTEST_MODE_SPEC §6.2, ZADANI_KONTEXT A4) ----
+// Celý kontext obchodu na klávesnici: dlaždice s klávesou v rohu, Tab mezi
+// skupinami, Enter uloží a otevře další nevyplněný obchod v dávce, Esc zavře.
+// Ukládá JEN kontextová pole, a jen ta, která se změnila – ostatní pole
+// obchodu (P/L, ceny, komise) se nedotknou.
+let journalVisibleTrades=null;
+// Dávka: obchody chronologicky; bez startu jen ty s nevyplněným kontextem,
+// se startem od daného obchodu dál (ten vždy, další jen nevyplněné).
+function quickBatch(list,startId){
+ const rows=tradeRecords(list).slice().sort((a,b)=>(String(a.date||'')+String(a.entryTime||'')).localeCompare(String(b.date||'')+String(b.entryTime||'')));
+ const incomplete=t=>FJTaxonomy.missingContextKeys(t).length>0;
+ if(!startId)return rows.filter(incomplete);
+ const i=rows.findIndex(t=>t.id===startId);
+ if(i<0)return [];
+ return [rows[i],...rows.slice(i+1).filter(incomplete)];
+}
+// Skupiny dlaždic v pořadí formuláře. type: single / multi / rows (SR řádky).
+const QC_GROUPS=[
+ {key:'setupCode',group:'SETUP',label:'Setup',type:'single'},
+ {key:'fillStatus',group:'FILL_STATUS',label:'Stav naplnění',type:'single'},
+ {key:'trend',group:'TREND',label:'Trend',type:'single'},
+ {key:'trendHtf',group:'TREND_HTF',label:'Trend 30m',type:'single'},
+ {key:'entryLevels',group:'ENTRY_LEVEL',label:'Hladina vstupu',type:'multi'},
+ {key:'entryTestNo',group:'ENTRY_TEST_NO',label:'Kolikátý test vstupu',type:'single'},
+ {key:'srTarget',group:'SR_TARGET',label:'SR proti targetu',type:'rows'},
+ {key:'pathProfile',group:'PATH_PROFILE',label:'Profil cesty k cíli',type:'single'},
+ {key:'srStopLoss',group:'SR_SL',label:'SR proti S/L',type:'rows'},
+ {key:'ofConfirm',group:'OF_CONFIRM',label:'Order flow',type:'multi'},
+ {key:'absLocation',group:'ABS_LOCATION',label:'Absorpce – kde',type:'single'},
+ {key:'liquiditySwept',group:'LIQUIDITY_SWEPT',label:'Vybraná likvidita',type:'single'},
+ {key:'grade',group:'GRADE',label:'Známka (před vstupem)',type:'single'},
+ {key:'targetLevel1Type',group:'TARGET_LEVEL',label:'Typ cíle 1',type:'single'}
+];
+const QC_KEYS='123456789abcdefghijklmnopqrstuvwxyz';
+// Pracovní kopie kontextu obchodu pro formulář.
+function quickDraftFrom(t){
+ const rows=field=>FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],t[field]).map(r=>({...r}));
+ return {
+  setupCode:t.setupCode||'',fillStatus:t.fillStatus||'',trend:t.trend||'',trendHtf:t.trendHtf||'',
+  entryLevels:FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels),
+  entryLevelTests:{...(t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{})},
+  entryTestNo:t.entryTestNo||'',srTarget:rows('srTarget'),srStopLoss:rows('srStopLoss'),
+  srTargetNone:t.srTargetNone===true,srStopLossNone:t.srStopLossNone===true,
+  pathProfile:t.pathProfile||'',ofConfirm:FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm),
+  absLocation:t.absLocation||'',liquiditySwept:t.liquiditySwept||'',grade:t.grade||'',
+  targetLevel1Type:t.targetLevel1?.type||'',
+  slPrice:t.slPrice??'',mfeTicks:t.mfeTicks??'',maeTicks:t.maeTicks??'',touched:{}
+ };
+}
+// Změny z rychlého formuláře do obchodu. Mění se jen pole, jejichž hodnota je
+// jiná než uložená – neupravený obchod zůstane bajt po bajtu stejný.
+// tickSize dopočítá kladné ticky SR řádku z jeho ceny (jako plný formulář).
+function quickContextApply(existing,d,nowIso,tickSize){
+ const obj={...existing};
+ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ for(const g of QC_GROUPS){
+  if(g.type!=='single'||g.key==='grade'||g.key==='targetLevel1Type')continue;
+  const v=FJTaxonomy.sanitizeSingle(g.group,d[g.key]);
+  if(v===(existing[g.key]||''))continue;
+  if(v)obj[g.key]=v;else if(g.key==='setupCode'||g.key==='fillStatus'||g.key==='trend')obj[g.key]='';else delete obj[g.key];
+ }
+ for(const [key,group] of [['entryLevels','ENTRY_LEVEL'],['ofConfirm','OF_CONFIRM']]){
+  const v=FJTaxonomy.sanitizeMulti(group,d[key]);
+  if(!same(v,FJTaxonomy.sanitizeMulti(group,existing[key])))obj[key]=v;
+ }
+ if(!same(obj.entryLevels,existing.entryLevels))obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
+ const tests=FJTaxonomy.sanitizeLevelTests(obj.entryLevels,d.entryLevelTests);
+ if(!same(tests,existing.entryLevelTests??null)){if(tests)obj.entryLevelTests=tests;else delete obj.entryLevelTests}
+ for(const field of Object.keys(SR_ENUMS)){
+  const rows=FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],(d[field]||[]).map(r=>{
+   const t=r.price!=null&&String(r.price).trim()!==''?FJPoints.srTicksFromPrice(r.price,existing.entryPrice,tickSize):null;
+   return {...r,ticksFromEntry:t!=null?t:r.ticksFromEntry};
+  }));
+  if(!same(rows,FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],existing[field])))obj[field]=rows;
+  const none=d[field+'None']===true&&!rows.length;
+  if(none!==(existing[field+'None']===true)){if(none)obj[field+'None']=true;else delete obj[field+'None']}
+ }
+ const type=FJTaxonomy.sanitizeSingle('TARGET_LEVEL',d.targetLevel1Type);
+ if(type!==(existing.targetLevel1?.type||'')){
+  const target=FJTaxonomy.sanitizeTargetLevel({type,price:existing.targetLevel1?.price});
+  if(target)obj.targetLevel1=target;else delete obj.targetLevel1;
+ }
+ if((d.grade||'')!==(existing.grade||''))FJContext.applyGrade(obj,existing,FJTaxonomy.sanitizeSingle('GRADE',d.grade),nowIso);
+ // Čísla jen když je uživatel přepsal: ruční hodnota ruší příznak dopočtu.
+ const touched=d.touched||{};
+ const numOrNull=v=>v!==undefined&&v!==null&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
+ if(touched.slPrice){
+  const v=numOrNull(d.slPrice);
+  if(v!=null){obj.slPrice=v;obj.slDerived=false}else{delete obj.slPrice;delete obj.slDerived}
+ }
+ for(const key of ['mfeTicks','maeTicks']){
+  if(!touched[key])continue;
+  const v=numOrNull(d[key]);
+  if(v!=null)obj[key]=Math.abs(v);else delete obj[key];
+  delete obj[key+'Derived'];delete obj[key+'Source'];
+ }
+ return obj;
+}
+const qc={batch:[],index:0,draft:null,dayDraft:null,dayShown:false,focusKey:''};
+window.openQuickContext=startId=>{
+ const list=Array.isArray(journalVisibleTrades)?journalVisibleTrades:tradeRecords(trades);
+ qc.batch=quickBatch(list,startId).map(t=>t.id);
+ if(!qc.batch.length){showToast('V aktuálním výběru Deníku není žádný obchod s nevyplněným kontextem.');return}
+ qc.index=0;
+ // Nejdřív zobrazit – skrytý prvek fokus nepřijme.
+ $('quickContextModal').classList.add('open');
+ loadQuickTrade();
+};
+function quickTrade(){return trades.find(t=>t.id===qc.batch[qc.index])||null}
+function loadQuickTrade(){
+ const t=quickTrade(); if(!t){closeQuickContext();return}
+ qc.draft=quickDraftFrom(t);
+ const dc=getDayNote(t.date).dayContext||{};
+ // Ranní pruh kontextu dne jen u dne, kterému ranní kontext chybí.
+ qc.dayShown=!!t.date&&FJContext.DAY_CONTEXT_MORNING.some(k=>!dc[k]);
+ qc.dayDraft={...dc};
+ qc.focusKey='';
+ $('qcAlert').classList.remove('show');
+ renderQuickContext();
+ const first=QC_GROUPS.find(g=>FJTaxonomy.missingContextKeys(t).includes(g.key==='targetLevel1Type'?'targetLevel1':g.key))?.key||QC_GROUPS[0].key;
+ focusQuickGroup(qc.dayShown?'day.'+FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k]):first);
+}
+function closeQuickContext(){$('quickContextModal').classList.remove('open');qc.batch=[];renderTrades()}
+function focusQuickGroup(key){
+ const el=document.querySelector(`#quickContextModal .qc-group[data-key="${CSS.escape(key)}"]`);
+ if(el)el.focus();
+}
+function quickChip(label,on,index,extra=''){
+ const k=QC_KEYS[index]||'';
+ return `<span class="chip${on?' on':''}" data-index="${index}"${extra} role="button" tabindex="-1">${k?`<span class="chip-key">${k}</span>`:''}${esc(label)}</span>`;
+}
+function quickOptions(g){
+ const keep=g.type==='single'?[qc.draft[g.key]]:(g.type==='multi'?qc.draft[g.key]:[]);
+ let opts=FJTaxonomy.visibleOptions(g.group,keep);
+ if(g.key==='fillStatus'){
+  const allowed=FJContext.allowedFillStatus(activeJournalMode(),opts.map(o=>o.key),qc.draft.fillStatus);
+  opts=opts.filter(o=>allowed.includes(o.key));
+ }
+ if(g.type==='rows')opts=[{key:'__NONE',label:'Žádná hladina v cestě'},...opts.filter(o=>o.key!=='NONE')];
+ return opts;
+}
+function renderQuickContext(){
+ const t=quickTrade(); if(!t)return;
+ const d=qc.draft;
+ $('qcProgress').textContent=`obchod ${qc.index+1} / ${qc.batch.length}`;
+ const side=sideMeta(t.side)?.text||'';
+ $('qcTrade').innerHTML=`<b>${esc(t.instrument||'')}</b> ${esc(side)} · ${esc(t.date||'')} ${esc(t.entryTime||'')} · vstup ${esc(t.entryPrice??'')} · ${esc(({target:"Target",stoploss:"Stop Loss",breakeven:"Break Even"})[t.result]||t.result||"")} ${esc(money(signed(t)))}`;
+ // Ranní pruh kontextu dne.
+ $('qcDay').innerHTML=qc.dayShown?`<div class="qc-day"><div class="qc-day-title">Kontext dne ${esc(t.date)} <span class="sub">— ráno, jednou za den</span></div>${FJContext.DAY_CONTEXT_MORNING.map(k=>{
+  const opts=Object.entries(FJContext.DAY_CONTEXT[k]);
+  return `<div class="qc-group" tabindex="0" data-key="day.${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}</div><div class="chip-grid">${opts.map(([v,label],i)=>quickChip(label,qc.dayDraft[k]===v,i)).join('')}</div></div>`;
+ }).join('')}</div>`:'';
+ $('qcGroups').innerHTML=QC_GROUPS.map(g=>{
+  const opts=quickOptions(g);
+  const isOn=o=>g.type==='single'?d[g.key]===o.key:(g.type==='multi'?d[g.key].includes(o.key):(o.key==='__NONE'&&d[g.key+'None']));
+  let extra='';
+  if(g.key==='entryLevels'){
+   const levels=d.entryLevels.filter(k=>k!=='NONE');
+   extra=levels.length?`<div class="level-tests">${levels.map(k=>`<div class="level-test-row"><span class="level-test-name">${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',k))}</span>${['UNTESTED','TESTED'].map(s=>`<span class="chip qc-test${d.entryLevelTests[k]===s?' on':''}" data-level="${esc(k)}" data-state="${s}" role="button" tabindex="0">${FJTaxonomy.TEST_STATE[s]}</span>`).join('')}</div>`).join('')}</div>`:'';
+  }
+  if(g.type==='rows'){
+   extra=d[g.key].length?`<div class="qc-rows">${d[g.key].map((r,i)=>`<div class="qc-row" data-field="${g.key}" data-row="${i}"><span class="level-test-name">${esc(FJTaxonomy.labelOf(g.group,r.level))}</span><input class="qc-row-price" type="number" step="any" placeholder="cena (nepovinné)" value="${esc(r.price??'')}"><select class="qc-row-test"><option value="">— test? —</option><option value="UNTESTED"${r.testState==='UNTESTED'?' selected':''}>netest</option><option value="TESTED"${r.testState==='TESTED'?' selected':''}>test</option></select>${r.price==null&&r.ticksFromEntry!=null?`<span class="sub">${esc(r.ticksFromEntry)} t</span>`:''}<button type="button" class="icon qc-row-remove" title="Odebrat">✕</button></div>`).join('')}</div>`:'';
+  }
+  return `<div class="qc-group" tabindex="0" data-key="${g.key}"><div class="qc-label">${esc(g.label)}${g.type==='multi'?' <span class="sub">— víc voleb</span>':''}</div><div class="chip-grid">${opts.map((o,i)=>quickChip(o.label+(o.hidden?' ·':''),isOn(o),i,` data-key="${esc(o.key)}"`)).join('')}</div>${extra}</div>`;
+ }).join('');
+ // Čísla pod dlaždicemi. Dopočet (z výstupu) nebo hodnota změřená konektorem
+ // se ukazuje zamčená a focus ji přeskočí – přepisuje se v plném formuláři.
+ const num=(id,key,noteId,locked,note)=>{
+  const el=$(id); el.value=d[key]??''; el.readOnly=locked; el.tabIndex=locked?-1:0;
+  $(noteId).textContent=locked?note:'';
+ };
+ num('qcSlPrice','slPrice','qcSlNote',t.slDerived===true&&!d.touched.slPrice,'dopočet z výstupu');
+ num('qcMfeTicks','mfeTicks','qcMfeNote',(t.mfeTicksDerived===true||!!t.mfeTicksSource)&&!d.touched.mfeTicks,t.mfeTicksSource?'změřeno konektorem':'dopočet z výstupu');
+ num('qcMaeTicks','maeTicks','qcMaeNote',(t.maeTicksDerived===true||!!t.maeTicksSource)&&!d.touched.maeTicks,t.maeTicksSource?'změřeno konektorem':'dopočet z výstupu');
+ wireQuickContext();
+}
+// Volba dlaždice podle indexu (klik i klávesa). Vrací true u single-select
+// výběru – pak se focus posune na další skupinu.
+function quickPick(key,index){
+ if(key.startsWith('day.')){
+  const k=key.slice(4),v=Object.keys(FJContext.DAY_CONTEXT[k])[index]; if(v===undefined)return false;
+  qc.dayDraft[k]=qc.dayDraft[k]===v?'':v;
+  return true;
+ }
+ const g=QC_GROUPS.find(x=>x.key===key); if(!g)return false;
+ const o=quickOptions(g)[index]; if(!o)return false;
+ const d=qc.draft;
+ if(g.type==='single'){d[key]=d[key]===o.key?'':o.key;return true}
+ if(g.type==='multi'){d[key]=d[key].includes(o.key)?d[key].filter(k=>k!==o.key):[...d[key],o.key];return false}
+ if(o.key==='__NONE'){
+  if(d[key].length){showToast('Nejdřív odeber zadané hladiny – „žádná hladina“ s nimi neplatí.');return false}
+  d[key+'None']=!d[key+'None'];return true;
+ }
+ d[key+'None']=false;
+ d[key].push({level:o.key,price:null,ticksFromEntry:null});
+ qc.focusRow={field:key,row:d[key].length-1};
+ return false;
+}
+function quickGroupKeys(){return [...document.querySelectorAll('#quickContextModal .qc-group')].map(el=>el.dataset.key)}
+function quickAfterPick(key,advance){
+ renderQuickContext();
+ if(qc.focusRow){
+  const el=document.querySelector(`#quickContextModal .qc-row[data-field="${qc.focusRow.field}"][data-row="${qc.focusRow.row}"] .qc-row-price`);
+  qc.focusRow=null;
+  if(el){el.focus();return}
+ }
+ const keys=quickGroupKeys();
+ focusQuickGroup(advance?(keys[keys.indexOf(key)+1]||key):key);
+}
+function wireQuickContext(){
+ document.querySelectorAll('#quickContextModal .qc-group').forEach(groupEl=>{
+  const key=groupEl.dataset.key;
+  groupEl.querySelectorAll(':scope > .chip-grid > .chip').forEach(chip=>{
+   chip.onclick=()=>quickAfterPick(key,quickPick(key,Number(chip.dataset.index)));
+  });
+ });
+ document.querySelectorAll('#quickContextModal .qc-test').forEach(chip=>{
+  const pick=()=>{
+   const k=chip.dataset.level,s=chip.dataset.state,tests=qc.draft.entryLevelTests;
+   if(tests[k]===s)delete tests[k];else tests[k]=s;
+   quickAfterPick('entryLevels',false);
+  };
+  chip.onclick=pick;
+  chip.onkeydown=e=>{if(e.key===' '){e.preventDefault();e.stopPropagation();pick()}};
+ });
+ document.querySelectorAll('#quickContextModal .qc-row').forEach(rowEl=>{
+  const field=rowEl.dataset.field,i=Number(rowEl.dataset.row),row=qc.draft[field][i];
+  rowEl.querySelector('.qc-row-price').oninput=e=>{const v=e.target.value;row.price=String(v).trim()===''?null:Number(v)};
+  rowEl.querySelector('.qc-row-test').onchange=e=>{if(e.target.value)row.testState=e.target.value;else delete row.testState};
+  rowEl.querySelector('.qc-row-remove').onclick=()=>{qc.draft[field].splice(i,1);quickAfterPick(field,false)};
+ });
+ for(const [id,key] of [['qcSlPrice','slPrice'],['qcMfeTicks','mfeTicks'],['qcMaeTicks','maeTicks']]){
+  $(id).oninput=e=>{qc.draft[key]=e.target.value;qc.draft.touched[key]=true};
+ }
+}
+if($('quickContextModal'))$('quickContextModal').addEventListener('keydown',e=>{
+ if(confirmResolver)return;
+ const target=e.target;
+ if(e.key==='Escape'){e.preventDefault();closeQuickContext();return}
+ // V ceně SR řádku Enter vrátí focus na skupinu (neukládá).
+ if(target.classList?.contains('qc-row-price')&&e.key==='Enter'){
+  e.preventDefault();
+  focusQuickGroup(target.closest('.qc-row')?.dataset.field||'');
+  return;
+ }
+ if(e.key==='Enter'&&!target.classList?.contains('qc-test')&&target.tagName!=='BUTTON'&&target.tagName!=='SELECT'){e.preventDefault();saveQuickContext();return}
+ if(!target.classList?.contains('qc-group')||e.ctrlKey||e.metaKey||e.altKey)return;
+ const index=QC_KEYS.indexOf(String(e.key).toLowerCase());
+ if(index<0)return;
+ e.preventDefault();
+ const key=target.dataset.key;
+ quickAfterPick(key,quickPick(key,index));
+});
+async function saveQuickContext(){
+ const t=quickTrade(); if(!t)return;
+ const a=$('qcAlert');a.classList.remove('show');a.textContent='';
+ try{
+  const data=await ensureActiveJournalData();
+  const existing=(Array.isArray(data.trades)?data.trades:[]).find(x=>x.id===t.id);
+  if(!existing)throw new Error('Obchod v deníku už není.');
+  const obj=quickContextApply(existing,qc.draft,new Date().toISOString(),getTickSizeForInstrument(existing.instrument));
+  const numbersChanged=['slPrice','slDerived','mfeTicks','maeTicks','targetLevel1','fillStatus'].some(k=>JSON.stringify(obj[k])!==JSON.stringify(existing[k]));
+  if(numbersChanged){
+   // Stejné dopočty jako plný formulář: prázdná cena SL se odvodí z výstupu,
+   // R a tikové průběhy se přepočítají.
+   if(obj.slPrice==null){const der=deriveStopLossPrice(obj);if(der!=null){obj.slPrice=der;obj.slDerived=true}}
+   Object.assign(obj,riskFields(obj));
+   applyPostExitFields(obj);
+  }
+  const changed=JSON.stringify(obj)!==JSON.stringify(existing);
+  if(changed){
+   obj.updatedAt=Date.now();
+   if(!(await confirmBlockingIssues(obj,msg=>showConfirm(msg,{title:'Zkontroluj cenu',ok:'Uložit i tak',cancel:'Opravit'}))))return;
+   await commitJournal(journal=>{
+    const rows=Array.isArray(journal.trades)?journal.trades:(journal.trades=[]);
+    const idx=rows.findIndex(x=>x.id===obj.id);
+    if(idx>=0)rows[idx]=obj;
+   });
+  }
+  if(qc.dayShown&&t.date){
+   const before=getDayNote(t.date).dayContext||{};
+   const patch={};
+   for(const k of FJContext.DAY_CONTEXT_MORNING)if((qc.dayDraft[k]||'')!==(before[k]||''))patch[k]=qc.dayDraft[k]||'';
+   if(Object.keys(patch).length)await saveDayContext(t.date,patch);
+  }
+  await load();
+  quickNext();
+ }catch(err){
+  a.textContent='Uložení se nepodařilo: '+(err?.message||err);
+  a.classList.add('show');
+ }
+}
+// Další NEVYPLNĚNÝ obchod v dávce; na konci se formulář zavře.
+function quickNext(){
+ for(let i=qc.index+1;i<qc.batch.length;i++){
+  const t=trades.find(x=>x.id===qc.batch[i]);
+  if(t&&FJTaxonomy.missingContextKeys(t).length){qc.index=i;loadQuickTrade();return}
+ }
+ closeQuickContext();
+ showToast('Dávka hotová – žádný další obchod s nevyplněným kontextem.');
+}
+if($('quickContextBtn'))$('quickContextBtn').onclick=()=>openQuickContext();
+if($('closeQuickContext'))$('closeQuickContext').onclick=closeQuickContext;
+if($('qcSave'))$('qcSave').onclick=saveQuickContext;
+if($('qcSkip'))$('qcSkip').onclick=quickNext;
 
 let pendingMoveTrade=null;
 window.openMoveTrade=async(id,sourceJournalId)=>{
@@ -5271,16 +5878,98 @@ function tradeCsvRow(t,dn,counts={tg:1,sl:1}){
  const p=t.dailyPlan||{};
  return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
-$('exportCsv').onclick=async()=>{
- const counts=srCsvCounts(trades);
- const h=tradeCsvHeader(counts);
- const firstIdByDate=firstTradeIdPerDate(trades);
- const rows=trades.map(t=>{
+// Kontext v2 (A6): nové sloupce se přidávají ZA konec původního řádku, takže
+// každá dosavadní buňka zůstává na svém místě i se svým obsahem (test
+// csv-export-compat). Dopočty mají v hlavičce „(dopočet)". Klíče, ne popisky.
+// Kontext dne jde na KAŽDÝ řádek dne (původní „Den: …" dál jen na první).
+const CONTEXT_CSV_MANUAL=[
+ ['Trend 30m','trendHtf'],['Absorpce – kde','absLocation'],['Kolikátý test vstupu','entryTestNo'],
+ ['Vybraná likvidita','liquiditySwept'],['Profil cesty k cíli','pathProfile'],['Známka','grade'],['Známka zadána','gradeSetAt']
+];
+const CONTEXT_CSV_DERIVED=[
+ ['Ticky k cíli','targetTicks'],['Cíl na hladině','targetOnLevel'],['První překážka – ticky','firstObstacleTicks'],
+ ['Cesta k cíli','pathState'],['Volná cesta R','freePathR'],['SL za zónou – ticky','slBufferTicks'],
+ ['Zón chránících SL','slZoneCount'],['Obchod dne č.','tradeNoInDay'],['Předchozí výsledek dne','prevResultInDay'],
+ ['P/L dne před obchodem','dayPnlBefore'],['Seance','session'],['Známka doplněná zpětně','gradeRetro']
+];
+const CONTEXT_CSV_DAY=[['Open vůči value','openVsValue'],['Typ dne očekávaný','dayTypeExpected'],['Typ dne skutečný','dayTypeActual'],['Migrace value','valueMigration'],['Zprávy','newsEvent']];
+function csvBool(v){return v==null?'':(v?'ano':'ne')}
+function contextCsvHeader(counts={tg:1,sl:1}){
+ const out=CONTEXT_CSV_MANUAL.map(([h])=>h);
+ out.push('Známka změněna dodatečně','Hladina vstupu – netest/test');
+ for(let i=1;i<=counts.tg;i++)out.push(`SR→TG ${i} test`,`SR→TG ${i} ticky ± (dopočet)`,`SR→TG ${i} za cílem (dopočet)`,`SR→TG ${i} na ztrátové straně (dopočet)`);
+ for(let i=1;i<=counts.sl;i++)out.push(`SR→SL ${i} test`,`SR→SL ${i} ticky ± (dopočet)`,`SR→SL ${i} ticky od SL (dopočet)`,`SR→SL ${i} za SL (dopočet)`);
+ for(const [h] of CONTEXT_CSV_DERIVED)out.push(h+' (dopočet)');
+ for(const [h] of CONTEXT_CSV_DAY)out.push('Den: '+h);
+ return out;
+}
+// ctx: { tickSize, config (číselníky deníku), dayOrder (FJContext.dayOrder
+// nad celým deníkem), mode (režim deníku), dayContext (kontext dne) }.
+function contextCsvCells(t,ctx={},counts={tg:1,sl:1}){
+ const d=FJContext.derivedFields(t,{tickSize:ctx.tickSize,config:ctx.config,dayOrder:ctx.dayOrder,mode:ctx.mode});
+ const out=CONTEXT_CSV_MANUAL.map(([,k])=>t[k]??'');
+ out.push(t.grade||t.gradeSetAt?csvBool(t.gradeEdited===true):'');
+ const tests=t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{};
+ out.push(Object.entries(tests).map(([k,v])=>k+':'+v).join('|'));
+ // SR řádky ve stejném pořadí jako bloky „SR→TG n hladina / cena / ticky".
+ for(const [field,n] of [['srTarget',counts.tg],['srStopLoss',counts.sl]]){
+  const rows=FJTaxonomy.sanitizeLevelRows(null,t?.[field]);
+  for(let i=0;i<n;i++){
+   const r=rows[i];
+   if(!r){out.push('','','','');continue}
+   const m=FJContext.srRowMetrics(field,r,t,ctx.tickSize);
+   out.push(r.testState||'',m.ticksFromEntrySigned??'');
+   if(field==='srTarget')out.push(csvBool(m.beyondTarget),csvBool(m.behindEntry));
+   else out.push(m.ticksFromStop??'',csvBool(m.beyondStop));
+  }
+ }
+ for(const [,k] of CONTEXT_CSV_DERIVED){
+  const v=d[k];
+  out.push(typeof v==='boolean'?csvBool(v):(v??''));
+ }
+ const dc=ctx.dayContext||{};
+ for(const [,k] of CONTEXT_CSV_DAY)out.push(dc[k]||'');
+ return out;
+}
+// Celá tabulka exportu Deníku (hlavička + řádky). dayNoteOf(date) vrací
+// denní poznámku nebo null; opts: { tickSizeOf(instrument), config, mode }.
+function journalCsvTable(rows,dayNoteOf,opts={}){
+ const counts=srCsvCounts(rows);
+ const firstIdByDate=firstTradeIdPerDate(rows);
+ const order=FJContext.dayOrder(rows);
+ const out=[[...tradeCsvHeader(counts),...contextCsvHeader(counts)]];
+ for(const t of rows){
+  const note=t.date?dayNoteOf(t.date):null;
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
-  const dn=isFirstOfDay?getDayNote(t.date):null;
-  return tradeCsvRow(t,dn,counts);
- });
- const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
+  const dn=isFirstOfDay?(note||emptyDayNoteCells()):null;
+  out.push([...tradeCsvRow(t,dn,counts),...contextCsvCells(t,{tickSize:opts.tickSizeOf?.(t.instrument),config:opts.config,dayOrder:order,mode:opts.mode,dayContext:note?.dayContext},counts)]);
+ }
+ return out;
+}
+function emptyDayNoteCells(){return {comment:'',preview:'',notes:''}}
+// Export Reportů přes víc deníků. Pořadí v dni se počítá nad CELÝM deníkem
+// (allRows), ne nad vyfiltrovanými řádky – jinak by filtr data nebo
+// instrumentu změnil „kolikátý obchod dne". journals: { id: { mode, config,
+// templates } }; dayNoteOf('journalId|datum').
+function reportCsvTable(rows,allRows,dayNoteOf,journals={}){
+ const counts=srCsvCounts(rows);
+ const first={};
+ rows.forEach(t=>{if(t.date){const k=t.journalId+'|'+t.date;const cur=first[k];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)first[k]=t}});
+ const orders={};
+ for(const id of new Set(rows.map(t=>t.journalId)))orders[id]=FJContext.dayOrder((allRows||rows).filter(t=>t.journalId===id));
+ const out=[[...reportCsvHeader(counts),...contextCsvHeader(counts)]];
+ for(const t of rows){
+  const key=t.journalId+'|'+t.date;
+  const note=t.date?dayNoteOf(key):null;
+  const dn=t.date&&first[key]===t?(note||{}):null;
+  const j=journals[t.journalId]||{};
+  out.push([...reportCsvRow(t,dn,counts),...contextCsvCells(t,{tickSize:FJPoints.tickSizeFor(t.instrument,j.templates),config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,dayContext:note?.dayContext},counts)]);
+ }
+ return out;
+}
+$('exportCsv').onclick=async()=>{
+ const table=journalCsvTable(trades,date=>(db?.data?.dayNotes||{})[date]||null,{tickSizeOf:i=>getTickSizeForInstrument(i),config:FJTaxonomy.getConfig(),mode:activeJournalMode()});
+ const csv=table.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
  if(window.desktopAPI?.exportBackupOnce){
   const r=await window.desktopAPI.exportBackupOnce(content,'futures-denik.csv');
@@ -5729,6 +6418,7 @@ function generateReportView(allRows=null){
  const run=async()=>{
   const all=allRows||await collectReportRows();
   const f=$('reportFrom').value,to=$('reportTo').value,j=$('reportJournal').value,i=$('reportInstrument').value;
+  if(typeof refreshIncludeToggles==='function')refreshIncludeToggles('reports',includeJournalsFor(j?all.filter(t=>t.journalId===j):all,j?[j]:visibleJournalProfiles().map(p=>p.id)));
   reportRows=performanceRecords(all).filter(t=>(!f||t.date>=f)&&(!to||t.date<=to)&&(!j||t.journalId===j)&&(!i||t.instrument===i));
   const wins=reportRows.filter(t=>t.result==='target'),losses=reportRows.filter(t=>t.result==='stoploss');
   const pnl=reportRows.reduce((a,t)=>a+reportSigned(t),0),gw=wins.reduce((a,t)=>a+Number(t.pnl||0),0),gl=losses.reduce((a,t)=>a+Number(t.pnl||0),0);
@@ -5757,20 +6447,18 @@ function reportCsvRow(t,dn,counts={tg:1,sl:1}){
  return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('reportCsv').onclick=async()=>{
- const counts=srCsvCounts(reportRows);
- const h=reportCsvHeader(counts);
- const dayNotesByJournal={};
- reportRows.forEach(t=>{if(t.date){const cur=dayNotesByJournal[t.journalId+'|'+t.date];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)dayNotesByJournal[t.journalId+'|'+t.date]=t}});
+ // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
+ // u pole "pnl" přednostně vrací pnlRaw – ve sloupci Body tak končily PENÍZE,
+ // ne body. displayPointsTotal() je stejná funkce, jakou používá i export deníku.
  const allDayNotes=await collectReportDayNotes();
- const rows=reportRows.map(t=>{
-  const isFirstOfDay=t.date&&dayNotesByJournal[t.journalId+'|'+t.date]===t;
-  const dn=isFirstOfDay?(allDayNotes[t.journalId+'|'+t.date]||{}):null;
-  // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
-  // u pole "pnl" přednostně vrací pnlRaw – ve sloupci Body tak končily PENÍZE,
-  // ne body. displayPointsTotal() je stejná funkce, jakou používá i export deníku.
-  return reportCsvRow(t,dn,counts);
- });
- const csv=[h,...rows].map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
+ const journals={};
+ for(const p of visibleJournalProfiles()){
+  const r=await window.desktopAPI.readJournal(p.id);
+  const main=(Array.isArray(r?.data?.settings)?r.data.settings:[]).find(s=>s?.key==='main')?.value||{};
+  journals[p.id]={mode:FJContext.journalMode(p),config:main.taxonomy||{},templates:main.templates||[]};
+ }
+ const table=reportCsvTable(reportRows,await collectReportRows(),k=>allDayNotes[k]||null,journals);
+ const csv=table.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
  if(window.desktopAPI?.exportBackupOnce){
   const r=await window.desktopAPI.exportBackupOnce(content,'futures-report.csv');
