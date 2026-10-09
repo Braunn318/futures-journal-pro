@@ -141,7 +141,7 @@ test('renderTrades: setupy nejdou do počítaných čísel dne, jen se ukazují 
   function run(rows, setups) {
     const dom = domStub();
     const groups = [];
-    const r = loadRenderer([...BASE_NAMES, 'renderTrades'], {
+    const r = loadRenderer([...BASE_NAMES, 'renderTrades', 'activeJournalMode', 'renderDataCheckCount'], { journalProfiles: [], activeJournalId: '',
       settings: SETTINGS, trades: rows, setupRecords: setups, $: dom.$, db: { data: { dayNotes: {} } },
       extraEmptyDays: new Set(),
       dayGroupHTML: (date, dayTrades, daySetups) => { groups.push(plain({ date, dayTrades, daySetups })); return ''; }

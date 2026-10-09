@@ -228,6 +228,10 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .day-flag{position:absolute;top:6px;right:8px;font-size:14px}
 .limitbox{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
 .post-exit-warn{color:var(--yellow)}
+/* Blokující pravidlo ceny cíle / SL (FJContext.blockingIssues). */
+input.input-error{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+.block-note{color:var(--red)}
+.block-note:empty{display:none}
 .pill.incomplete-pill{background:rgba(var(--orange-rgb),.12);color:var(--orange);border:1px dashed rgba(var(--orange-rgb),.6);font-size:11px;padding:1px 7px;cursor:help}
 .setup-row{background:rgba(120,140,255,.10);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
 .setup-row .setup-icon{font-size:18px;line-height:1.2}
@@ -251,6 +255,8 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .sr-rows{display:flex;flex-direction:column;gap:6px}
 .sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr auto;gap:6px;align-items:center}
 .sr-row .sr-warn{grid-column:1/-1;font-size:12px}
+/* ✕ zůstává v posledním sloupci, i když jsou ticky schované (dopočet z ceny). */
+.sr-row .sr-remove{grid-column:4;grid-row:1}
 .sr-actions{display:flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap}
 .sr-actions .btn:disabled{opacity:.4;cursor:default}
 .field .sr-none{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0;cursor:pointer}
@@ -626,6 +632,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
         <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
+        <select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select>
         <span class="include-toggles"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span>
         <input type="date" id="filterDate">
         <input type="date" id="newDayDate" title="Datum dne k přidání">
@@ -831,7 +838,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <label class="settings-check"><input type="radio" name="overviewStartJournal" value="active"> Poslední aktivní deník</label>
           <label class="settings-check"><input type="radio" name="overviewStartJournal" value="all"> Všechny deníky</label>
           <p class="sub" style="margin-top:6px">Filtr „Deník / karta“ v Přehledu účtu jde pak kdykoli přepnout ručně. Uloží se hned.</p>
-          <div class="panel-subtitle">Skrytí a smazání</div>
+          <div class="panel-subtitle">Režim, skrytí a smazání</div>
+          <p class="sub"><b>Režim</b> říká, jaký deník to je. <b>Živý</b>: formulář nenabízí „Naživo bych to vzal?“ (otázka patří jen k backtestu). <b>Backtest</b>: stav naplnění nenabízí „vědomě vynechán“ – v replayi se setup dá vzít vždy. Změna režimu uložené obchody nemění; co novému režimu neodpovídá, najdeš v Deníku přes filtr „Kontrola dat“.</p>
           <p class="sub">Skrytý deník se nikde nezobrazuje ani nezapočítává (výběr deníku, Přehled účtu, Kalendář, Reporty, přesun obchodu). Jeho data zůstávají, jdou do záloh i do AI exportu a deník jde kdykoli znovu zobrazit. Když skryješ aktivní deník, aplikace přepne na naposledy použitý viditelný. Poslední viditelný deník skrýt nejde.</p>
           <div id="journalVisibilityList" style="margin-top:10px"></div>
         </details>
@@ -1043,7 +1051,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   <div class="modalbox" style="max-width:520px">
     <div class="modalhead"><h2 id="journalNameModalTitle">Nový deník</h2><button class="icon" id="closeJournalNameModal">✕</button></div>
     <div class="field"><label id="journalNameLabel">Název deníku</label><input id="journalNameInput" maxlength="60" placeholder="Např. NQ, ES nebo GC"></div>
-    <div class="field"><label style="display:flex;gap:8px;align-items:center;text-transform:none"><input type="checkbox" id="journalBacktest" style="width:auto"> Backtestový deník <span class="sub">— jen označení deníku; štítek „Neúplné“ se zapíná v Nastavení → Obecné pro všechny deníky</span></label></div>
+    <div class="field"><label for="journalMode">Režim deníku</label><select id="journalMode"><option value="LIVE">Živý</option><option value="BACKTEST">Backtest</option></select><div class="sub">Živý: bez „Naživo bych to vzal?“. Backtest: bez stavu „vědomě vynechán“. Jde změnit i v Nastavení → Obecné → Deníky.</div></div>
     <div id="journalNameError" class="alert red"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="btn" id="cancelJournalName">Zrušit</button>
@@ -1188,8 +1196,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <details class="trade-section" data-card="sltp">
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">SL / TP</span><span class="sub trade-section-summary" id="sltpSummary"></span><span class="trade-section-missing" id="sltpMissing"></span></summary>
         <div class="formgrid">
-          <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="derived-readonly" id="slPriceView" style="display:none"><b id="slPriceViewValue"></b> <span class="sub" id="slPriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('slPrice')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="slPriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('slPrice')"></a><div class="sub" id="slPriceHint"></div></div>
-          <div class="field" id="targetLevel1PriceField"><label>Cena targetu <span class="sub">— pro výpočet R</span></label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"><div class="derived-readonly" id="targetLevel1PriceView" style="display:none"><b id="targetLevel1PriceViewValue"></b> <span class="sub" id="targetLevel1PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel1Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel1PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel1Price')"></a></div>
+          <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="derived-readonly" id="slPriceView" style="display:none"><b id="slPriceViewValue"></b> <span class="sub" id="slPriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('slPrice')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="slPriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('slPrice')"></a><div class="sub" id="slPriceHint"></div><div class="sub block-note" id="slPriceBlockNote"></div></div>
+          <div class="field" id="targetLevel1PriceField"><label>Cena targetu <span class="sub">— pro výpočet R</span></label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"><div class="derived-readonly" id="targetLevel1PriceView" style="display:none"><b id="targetLevel1PriceViewValue"></b> <span class="sub" id="targetLevel1PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel1Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel1PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel1Price')"></a><div class="sub block-note" id="targetLevel1PriceBlockNote"></div></div>
           <div class="field" id="targetLevel2PriceField"><label>Cena targetu 2 <span class="sub">— druhý cíl</span></label><input id="targetLevel2Price" type="number" step="any" placeholder="např. 7720"><div class="derived-readonly" id="targetLevel2PriceView" style="display:none"><b id="targetLevel2PriceViewValue"></b> <span class="sub" id="targetLevel2PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel2Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel2PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel2Price')"></a></div>
           <div class="field full sub" id="riskInfo"></div>
         </div>
@@ -1220,7 +1228,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="missedByTicks" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
           <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
-          <div class="field"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
+          <div class="field" id="wouldSkipLiveField"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select></div>
           <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
         </div>
       </details>
@@ -1229,7 +1237,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="formgrid">
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
           <div class="field full"><label>SR proti targetu <span class="sub">— hladiny v cestě k cíli (ve směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srTarget" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srTargetAdd" onclick="appendLevelRow('srTarget')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srTargetNone"> žádná hladina v cestě</label></div></div>
-          <div class="field full"><label>SR proti S/L <span class="sub">— hladiny mezi vstupem a Stop Lossem (proti směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srStopLossAdd" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srStopLossNone"> žádná hladina v cestě</label></div><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
+          <div class="field full"><label>SR proti S/L <span class="sub">— zóny, které chrání Stop Loss (mezi SL a cenou trhu – smí ležet i na vstupu nebo kousek za ním); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srStopLossAdd" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srStopLossNone"> žádná hladina v cestě</label></div><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
           <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
           <div class="field"><label>Cílová hladina 2 <span class="sub">— typ</span></label><select id="targetLevel2Type"></select></div>
@@ -1253,6 +1261,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
 <script src="taxonomy.js"></script>
 <script src="points.js"></script>
+<script src="context.js"></script>
 <script src="journals.js"></script>
 <script>
 const DB_VERSION=1;
@@ -2831,7 +2840,8 @@ function recomputeLevelRow(field,el){
  const {entry,side,tick}=srFormContext();
  const price=el.querySelector('.sr-price'),ticks=el.querySelector('.sr-ticks'),warn=el.querySelector('.sr-warn');
  const blank=v=>String(v??'').trim()==='';
- if(FJPoints.srLinkEnabled(entry,tick)){
+ const linked=FJPoints.srLinkEnabled(entry,tick);
+ if(linked){
   if(el.dataset.anchor==='price'){
    const v=FJPoints.srTicksFromPrice(price.value,entry,tick);
    ticks.value=blank(price.value)||v==null?'':v;
@@ -2840,12 +2850,35 @@ function recomputeLevelRow(field,el){
    price.value=blank(ticks.value)||v==null?'':v;
   }
  }
+ // Se zadanou cenou jsou ticky dopočet (A1.1) – needitují se, ukazují se se
+ // znaménkem pod řádkem (renderSrDistances). Ruční ticky jen bez ceny, nebo
+ // když přepočet nejde (chybí tick / vstup).
+ syncSrTicksLock(el,linked);
  if(warn){
-  const msgs=[];
-  if(FJPoints.srWrongSide(field,side,price.value,entry))msgs.push(field==='srTarget'?'Cena leží proti směru obchodu – SR proti targetu bývá ve směru.':'Cena leží ve směru obchodu – SR proti S/L bývá mezi vstupem a Stop Lossem.');
+  // Stranu volí uživatel a je to význam, ne poloha: zóna chránící SL smí
+  // ležet i na vstupu nebo nad vstupem do longu – ta se nehlásí. Upozornění
+  // (FJContext.srRowNotes) jen informují, uložení neblokují.
+  const msgs=blank(price.value)?[]:FJContext.srRowNotes(field,{price:price.value},srCheckDraft(),tick);
   if(!blank(ticks.value)&&Number(ticks.value)<0)msgs.push('Vzdálenost zadávej kladně, stranu určuje pole.');
   warn.textContent=msgs.join(' ');
  }
+}
+// Se zadanou cenou jsou ticky dopočet (A1.1): pole se schová a ukáže se
+// znaménková vzdálenost pod řádkem. Volá se i z renderSrDistances, protože
+// při otevření obchodu se řádky vykreslí dřív, než formulář zná vstup.
+function syncSrTicksLock(el,linked){
+ const ticks=el.querySelector('.sr-ticks'),price=el.querySelector('.sr-price'); if(!ticks||!price)return;
+ // Jen když je vstupem cena (anchor). Řádek zadaný v ticích si cenu
+ // dopočítá a ticky zůstanou k úpravě – jinak by pole zmizelo pod rukama.
+ const lock=linked&&el.dataset.anchor==='price'&&String(price.value??'').trim()!=='';
+ ticks.readOnly=lock;
+ ticks.style.display=lock?'none':'';
+}
+// Vstup, směr, SL a cíl z formuláře pro dopočty SR řádků (stejné hodnoty, jaké
+// se uloží – včetně SL / cíle dopočtených z výstupu).
+function srCheckDraft(){
+ const d=postExitDraftFromForm();
+ return {side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,targetLevel1:{price:d.targetLevel1?.price}};
 }
 function recomputeAllLevelRows(){
  for(const field of Object.keys(SR_ENUMS))document.querySelectorAll('#'+field+' .sr-row').forEach(el=>recomputeLevelRow(field,el));
@@ -3047,6 +3080,18 @@ function incompleteBadgeHTML(t){
  if(!labels.length)return '';
  return `<span class="pill incomplete-pill" title="Chybí: ${esc(labels.join(', '))}">⚠ Neúplné · ${labels.length}</span>`;
 }
+// Štítek „Kontrola dat“: co má uživatel v záznamu ručně zkontrolovat
+// (FJContext.dataCheckIssues). Režim se bere z deníku, do kterého záznam
+// patří – v přehledu přes všechny deníky to nemusí být aktivní deník.
+function journalModeOf(t){
+ return FJContext.journalMode(journalProfiles.find(j=>j.id===(t?.journalId||activeJournalId)));
+}
+function dataCheckBadgeHTML(t){
+ const issues=FJContext.dataCheckIssues(t,journalModeOf(t));
+ if(!issues.length)return '';
+ const labels=issues.map(i=>FJContext.dataCheckLabel(i.code));
+ return ` <span class="pill incomplete-pill data-check-pill" title="Kontrola dat: ${esc(issues.map(i=>i.message).join(' '))}">⚑ ${esc(labels.join(' · '))}</span>`;
+}
 // Hladiny a order flow – to, co se na kartě sbaluje. Vrací i počet pilulek,
 // protože hlavička sbalené položky říká, kolik jich je pod ní schovaných.
 function levelPillsHTML(t){
@@ -3236,7 +3281,7 @@ function tradeHTML(t){
  // čtyřsloupcová mřížka a obchod bez kontextu má buněk jen tři, jak to bylo
  // vždycky – prázdná buňka by mu posunula zbytek karty o sloupec.
  const ctxPills=contextPillsHTML(t);
- const incompleteBadge=incompleteBadgeHTML(t);
+ const incompleteBadge=incompleteBadgeHTML(t)+(typeof dataCheckBadgeHTML==='function'?dataCheckBadgeHTML(t):'');
  const levelsBlock=tradeLevelsBlockHTML(t);
  const importedBadge=isImported?`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Automaticky naimportováno z konektoru">⚡ Auto import</span>`:'';
  // „Naživo bych nevzal“: štítek nese popisek DŮVODU, ne obecné „nevzal bych“ –
@@ -3318,7 +3363,7 @@ function setupRowHTML(s){
  return `<div class="setup-row" data-setup="${esc(s.id)}">
   <div class="setup-icon" title="Setup bez exekuce – nevstupuje do P/L">◌</div>
   <div class="setup-body">
-   <div><b>${esc(s.instrument||'')}</b> ${esc(side)} ${esc(s.entryTime||'')} · <span class="pill">${esc(FJTaxonomy.labelOf('FILL_STATUS',s.fillStatus))}</span></div>
+   <div><b>${esc(s.instrument||'')}</b> ${esc(side)} ${esc(s.entryTime||'')} · <span class="pill">${esc(FJTaxonomy.labelOf('FILL_STATUS',s.fillStatus))}</span>${typeof dataCheckBadgeHTML==='function'?dataCheckBadgeHTML(s):''}</div>
    ${parts.length?`<div class="sub">${parts.join(' · ')}</div>`:''}
    ${price.length?`<div class="sub">${price.join(' · ')}</div>`:''}
    ${s.reason||s.note?`<div class="sub">${esc([s.reason,s.note].filter(Boolean).join(' — '))}</div>`:''}
@@ -3432,6 +3477,13 @@ async function handleDayShotInputChange(e){
  const el=findDayWrap(date)?.querySelector('.day-thumbs');
  if(el)el.innerHTML=dayThumbsHTML(date);else renderTrades();
 }
+// Počet záznamů ke kontrole přímo v nabídce filtru – ať je vidět i bez
+// přepnutí.
+function renderDataCheckCount(mode){
+ const opt=$('filterDataCheck')?.querySelector?.('option[value="only"]'); if(!opt)return;
+ const n=[...tradeRecords(trades),...setupRecords].filter(t=>FJContext.dataCheckIssues(t,mode).length).length;
+ opt.textContent=`Kontrola dat (${n})`;
+}
 function renderTrades(){
  const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'',sk=$('filterSkipLive')?.value||'',fl=$('filterFill')?.value||'';
  const sideOk=t=>!s||(s==='none'?(t.side!=='long'&&t.side!=='short'):t.side===s);
@@ -3441,7 +3493,13 @@ function renderTrades(){
  // Filtr stavu naplnění: naplněné (i bez uloženého stavu) / no fill / vědomě
  // vynechané. Platí i pro setupy bez vstupu.
  const fillOk=t=>!fl||(fl==='filled'?!hypotheticalGroup(t):hypotheticalGroup(t)===fl);
- const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&skipOk(t)&&fillOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
+ // Kontrola dat: záznamy, které má uživatel ručně zkontrolovat
+ // (FJContext.dataCheckIssues). Nic se neopravuje samo.
+ const dc=$('filterDataCheck')?.value||'';
+ const mode=activeJournalMode();
+ const checkOk=t=>!dc||FJContext.dataCheckIssues(t,mode).length>0;
+ renderDataCheckCount(mode);
+ const list=tradeRecords(trades).filter(t=>(!q||(t.instrument+' '+t.comment+' '+(t.strategy||'')).toLowerCase().includes(q))&&(!r||t.result===r)&&sideOk(t)&&skipOk(t)&&fillOk(t)&&checkOk(t)&&(!d||t.date===d)).sort((a,b)=>(b.date+b.entryTime).localeCompare(a.date+a.entryTime));
  const groups=[];
  for(const t of list){
   const last=groups[groups.length-1];
@@ -3453,7 +3511,7 @@ function renderTrades(){
  if(!r&&sk!=='only'){
   for(const s of setupRecords){
    if(q&&!(String(s.instrument||'')+' '+String(s.note||'')+' '+String(s.reason||'')).toLowerCase().includes(q))continue;
-   if(!sideOk(s)||!fillOk(s)||(d&&s.date!==d))continue;
+   if(!sideOk(s)||!fillOk(s)||!checkOk(s)||(d&&s.date!==d))continue;
    let g=groups.find(x=>x.date===s.date);
    if(!g){g={date:s.date,trades:[]};groups.push(g)}
    (g.setups||(g.setups=[])).push(s);
@@ -3462,7 +3520,7 @@ function renderTrades(){
  }
  // Prázdné dny (jen s poznámkou) se přidávají jen když se nefiltruje – jinak by
  // se objevovaly i u filtru, kterému žádný jejich obchod neodpovídá.
- if(!q&&!r&&!s&&!sk&&!fl){
+ if(!q&&!r&&!s&&!sk&&!fl&&!dc){
   const tradeDates=new Set(groups.map(g=>g.date));
   const extraDates=new Set([...Object.keys(db?.data?.dayNotes||{}),...extraEmptyDays]);
   extraDates.forEach(date=>{
@@ -3573,6 +3631,7 @@ function goToJournalForDate(date){
  if($('filterSide'))$('filterSide').value='';
  if($('filterSkipLive'))$('filterSkipLive').value='';
  if($('filterFill'))$('filterFill').value='';
+ if($('filterDataCheck'))$('filterDataCheck').value='';
  if($('search'))$('search').value='';
  renderTrades();
 }
@@ -3671,6 +3730,7 @@ function openModal(t=null,{title}={}){
  // statistiky i export.
  fillContextSelect('setupCode','SETUP','— nevyplněno —',t&&t.setupCode);
  fillContextSelect('fillStatus','FILL_STATUS','— nevyplněno —',t&&t.fillStatus);
+ restrictFillStatusOptions('fillStatus',t&&t.fillStatus);
  fillContextSelect('wouldSkipReason','SKIP_REASON','— nevyplněno —',t&&t.wouldSkipReason);
  if($('wouldSkipLive'))$('wouldSkipLive').value=isSkipLive(t)?'ano':'ne';
  if($('wouldSkipReason'))$('wouldSkipReason').value=FJTaxonomy.sanitizeSingle('SKIP_REASON',t&&t.wouldSkipReason);
@@ -4154,6 +4214,12 @@ function renderCourseHints(){
 function renderRiskInfo(){
  const out=$('riskInfo'); if(!out)return;
  const d=postExitDraftFromForm();
+ // Cena cíle / SL na špatné straně vstupu se ukáže hned při psaní. Kontroluje
+ // se jen ruční hodnota – pole v režimu dopočtu není vstup.
+ const slEl=$('slPrice'),tgEl=$('targetLevel1Price');
+ markBlockingIssues(FJContext.blockingIssues({...d,
+  slDerived:slEl?.dataset?.derived==='1'||String(slEl?.value??'').trim()==='',
+  targetLevel1PriceDerived:tgEl?.dataset?.derived==='1'}));
  const slPoints=FJPoints.slPointsOf(d.entryPrice,d.slPrice);
  const planned=FJPoints.plannedRMultipleOf(d,[d.targetLevel1?.price,d.targetLevel2?.price]);
  if(slPoints==null){out.textContent='Bez ceny Stop Lossu se R nepočítá.';return}
@@ -4176,10 +4242,22 @@ function renderSrDistances(){
  const d=postExitDraftFromForm();
  const tick=getTickSizeForInstrument(d.instrument);
  const refs={srStopLoss:d.slPrice,srTarget:d.targetLevel1?.price};
+ const draft={side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,targetLevel1:{price:d.targetLevel1?.price}};
+ const linked=FJPoints.srLinkEnabled(d.entryPrice,tick);
  for(const field of Object.keys(SR_ENUMS)){
   document.querySelectorAll('#'+field+' .sr-row').forEach(el=>{
+   syncSrTicksLock(el,linked);
    const box=el.querySelector('.sr-dist'); if(!box)return;
-   box.textContent=srRefDistanceText(field,el.querySelector('.sr-price')?.value,refs[field],tick);
+   const price=el.querySelector('.sr-price')?.value;
+   const parts=[];
+   // Znaménková vzdálenost od vstupu – dopočet z ceny, + k cíli, − k SL.
+   const signed=FJContext.srRowMetrics(field,{price},draft,tick).ticksFromEntrySigned;
+   if(signed!=null)parts.push(`${signed>0?'+':signed<0?'−':''}${Math.abs(signed)} t od vstupu ${signed>0?'k cíli':signed<0?'k SL':''}`.trim()+' — dopočítáno z ceny');
+   const ref=srRefDistanceText(field,price,refs[field],tick);
+   if(ref)parts.push(ref);
+   box.textContent=parts.join(' · ');
+   const warn=el.querySelector('.sr-warn');
+   if(warn&&String(price??'').trim()!=='')warn.textContent=FJContext.srRowNotes(field,{price},draft,tick).join(' ');
   });
  }
 }
@@ -4309,10 +4387,58 @@ function editCourseManually(key){
  renderPostExitHints();
  el.focus?.();el.select?.();
 }
-// Důvod „naživo bych nevzal“ se ukazuje jen tehdy, když příznak platí.
+// Režim aktivního deníku (živý / backtest) – vlastnost deníku, ne obchodu.
+function activeJournalMode(){
+ return FJContext.journalMode(journalProfiles.find(j=>j.id===activeJournalId));
+}
+// „Naživo bych nevzal“ je jen v backtest deníku. Důvod se ukazuje jen tehdy,
+// když příznak platí.
 function syncWouldSkipField(){
+ const allowed=FJContext.skipLiveAllowed(activeJournalMode());
+ const wrap=$('wouldSkipLiveField');
+ if(wrap)wrap.style.display=allowed?'':'none';
  const f=$('wouldSkipReasonField'); if(!f)return;
- f.style.display=$('wouldSkipLive')?.value==='ano'?'':'none';
+ f.style.display=allowed&&$('wouldSkipLive')?.value==='ano'?'':'none';
+}
+// Uložení „naživo bych nevzal“ z formuláře. V živém deníku je pole skryté
+// a NIC se nemění – existující hodnota (z doby, kdy pole bylo všude) zůstává
+// a ukáže se v Kontrole dat.
+function applySkipLiveFromForm(obj,mode,choice,reason){
+ if(!FJContext.skipLiveAllowed(mode))return obj;
+ if(choice==='ano'){
+  obj.wouldSkipLive=true;
+  const r=FJTaxonomy.sanitizeSingle('SKIP_REASON',reason);
+  if(r)obj.wouldSkipReason=r;else delete obj.wouldSkipReason;
+ }else{delete obj.wouldSkipLive;delete obj.wouldSkipReason}
+ return obj;
+}
+// Stav naplnění podle režimu: backtest nenabízí „vědomě vynechán“, pokud ho
+// záznam už nemá (`keep`) – jinak by ho editace tiše zahodila.
+function restrictFillStatusOptions(id,keep){
+ const el=$(id); if(!el)return;
+ const keys=[...el.options].map(o=>o.value).filter(Boolean);
+ const allowed=new Set(FJContext.allowedFillStatus(activeJournalMode(),keys,keep));
+ [...el.options].forEach(o=>{if(o.value&&!allowed.has(o.value))o.remove()});
+}
+// Blokující pravidla ceny cíle a SL (FJContext.blockingIssues): pole se
+// označí a ukáže důvod. Hodnota v poli zůstává.
+function markBlockingIssues(issues){
+ for(const id of ['slPrice','targetLevel1Price']){
+  const el=$(id); if(!el)continue;
+  const issue=(issues||[]).find(i=>i.field===id);
+  el.classList?.toggle('input-error',!!issue);
+  const note=$(id+'BlockNote');
+  if(note)note.textContent=issue?issue.message:'';
+ }
+}
+// Před uložením: chybná hodnota se neuloží, dokud ji uživatel neopraví nebo
+// vědomě nepotvrdí. `confirmFn` je in-app dialog (showConfirm).
+async function confirmBlockingIssues(obj,confirmFn){
+ const issues=FJContext.blockingIssues(obj);
+ markBlockingIssues(issues);
+ if(!issues.length)return true;
+ const msg=issues.map(i=>i.message).join(' ')+' Oprav ji, nebo obchod vědomě ulož – pak se ukáže v seznamu „Kontrola dat“.';
+ return (await confirmFn(msg))===true;
 }
 function useDerivedCourse(key){
  const el=$(key); if(!el)return;
@@ -4536,11 +4662,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   else delete obj.missedByTicks;
   // „Naživo bych nevzal“ je samostatná otázka, NE planFollowed. Bez příznaku
   // se důvod nedrží – visel by u obchodu, který se do výkonu počítá.
-  if($('wouldSkipLive')?.value==='ano'){
-   obj.wouldSkipLive=true;
-   const reason=FJTaxonomy.sanitizeSingle('SKIP_REASON',$('wouldSkipReason')?.value);
-   if(reason)obj.wouldSkipReason=reason;else delete obj.wouldSkipReason;
-  }else{delete obj.wouldSkipLive;delete obj.wouldSkipReason}
+  applySkipLiveFromForm(obj,activeJournalMode(),$('wouldSkipLive')?.value,$('wouldSkipReason')?.value);
   obj.trend=readSingleChipGrid('trend','TREND');
   obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
   obj.srTarget=readLevelRows('srTarget');
@@ -4626,6 +4748,10 @@ $('tradeForm').addEventListener('submit',async e=>{
   // přepočet komisí (recalcUnitCommission). Po ruční editaci se dopočítá znovu,
   // aby u importovaného obchodu nezůstala stará hodnota od konektoru.
   obj.grossPnl=Math.round((Number(obj.pnlRaw||0)+Number(obj.commission||0))*100)/100;
+
+  // Cíl / SL na špatné straně vstupu: neuloží se, dokud ho Adam neopraví
+  // nebo vědomě nepotvrdí (A1.2). Potvrzený obchod se ukáže v Kontrole dat.
+  if(!(await confirmBlockingIssues(obj,msg=>showConfirm(msg,{title:'Zkontroluj cenu',ok:'Uložit i tak',cancel:'Opravit'}))))return;
 
   await commitJournal(journal=>{
    const rows=Array.isArray(journal.trades)?journal.trades:(journal.trades=[]);
@@ -4936,7 +5062,8 @@ function openSetupModal(rec){
  $('sfSide').value=s.side||'';
  fillContextSelect('sfSetup','SETUP','— nevyplněno —',s.setupCode);
  $('sfSetup').value=FJTaxonomy.sanitizeSingle('SETUP',s.setupCode);
- $('sfFill').innerHTML=['NO_FILL','SKIPPED'].map(k=>`<option value="${k}">${esc(FJTaxonomy.labelOf('FILL_STATUS',k))}</option>`).join('');
+ // Backtest deník nenabízí „vědomě vynechán“ (kromě záznamu, který ho už má).
+ $('sfFill').innerHTML=FJContext.allowedFillStatus(activeJournalMode(),['NO_FILL','SKIPPED'],s.fillStatus).map(k=>`<option value="${k}">${esc(FJTaxonomy.labelOf('FILL_STATUS',k))}</option>`).join('');
  $('sfFill').value=s.fillStatus==='SKIPPED'?'SKIPPED':'NO_FILL';
  for(const [id,val] of [['sfPlannedEntry',s.plannedEntryPrice],['sfSl',s.slPrice],['sfMissedBy',s.missedByTicks],['sfMaxFav',s.maxFavorableTicks]])$(id).value=val!=null?val:'';
  const tg=FJTaxonomy.sanitizeTargetLevel(s.targetLevel1);
@@ -5004,7 +5131,7 @@ $('closeModal').onclick=async()=>{
 // Záměrně BEZ zavírání kliknutím mimo okno – u rozdělaného formuláře (Nový/
 // Upravit obchod) by omylem kliknutí mimo mohlo smazat rozepsanou práci.
 // Zavírá se jen křížkem (#closeModal) nahoře.
-['search','filterResult','filterSide','filterSkipLive','filterFill','filterDate'].forEach(id=>$(id)?.addEventListener('input',renderTrades));
+['search','filterResult','filterSide','filterSkipLive','filterFill','filterDataCheck','filterDate'].forEach(id=>$(id)?.addEventListener('input',renderTrades));
 document.querySelectorAll('.include-toggle').forEach(cb=>{const key=cb.dataset.include;cb.checked=currentInclude()[key]===true;cb.addEventListener('change',()=>onIncludeChange(key,cb.checked))});
 $('addEmptyDay').onclick=()=>{
  const date=$('newDayDate').value||new Date().toISOString().slice(0,10);
@@ -5232,7 +5359,9 @@ function renderJournalSelector(){
  select.disabled=false;
  $('renameJournalBtn').disabled=false;
  $('deleteJournalBtn').disabled=false;
- select.innerHTML=visibleJournalProfiles().map(j=>`<option value="${esc(j.id)}">${esc(j.name)}</option>`).join('');
+ // Režim deníku je vidět rovnou ve výběru – backtest deník má jiná pravidla
+ // formuláře (Nastavení → Obecné → Deníky).
+ select.innerHTML=visibleJournalProfiles().map(j=>`<option value="${esc(j.id)}">${esc(j.name)}${FJContext.journalMode(j)==='BACKTEST'?' · backtest':''}</option>`).join('');
  select.value=activeJournalId;
 }
 async function switchJournal(id){
@@ -5250,7 +5379,7 @@ function openJournalNameModal(mode){
  const current=journalProfiles.find(x=>x.id===activeJournalId);
  $('journalNameModalTitle').textContent=mode==='new'?'Nový deník':'Přejmenovat deník';
  $('journalNameInput').value=mode==='rename'&&current?current.name:'';
- $('journalBacktest').checked=mode==='rename'&&current?current.backtest===true:false;
+ $('journalMode').value=mode==='rename'&&current?FJContext.journalMode(current):'LIVE';
  $('journalNameError').textContent='';
  $('journalNameError').style.display='none';
  $('journalNameModal').classList.add('open');
@@ -5264,11 +5393,11 @@ async function saveJournalNameFromModal(){
  if(journalNameMode==='new'){
   if(journalProfiles.some(j=>j.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
   const id='journal_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-  journalProfiles.push({id,name:clean,backtest:$('journalBacktest').checked});rememberPreviousJournal();activeJournalId=id;saveJournalProfiles();closeJournalNameModal();safeReload();
+  journalProfiles.push({id,name:clean,backtest:$('journalMode').value==='BACKTEST'});rememberPreviousJournal();activeJournalId=id;saveJournalProfiles();closeJournalNameModal();safeReload();
  }else{
   const j=journalProfiles.find(x=>x.id===activeJournalId);if(!j)return;
   if(journalProfiles.some(x=>x.id!==j.id&&x.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
-  j.name=clean;j.backtest=$('journalBacktest').checked;saveJournalProfiles();renderJournalSelector();initReports();closeJournalNameModal();renderAll();showToast('Deník byl uložen.');
+  j.name=clean;j.backtest=$('journalMode').value==='BACKTEST';saveJournalProfiles();closeJournalNameModal();journalsChanged();showToast('Deník byl uložen.');
  }
 }
 $('newJournalBtn').onclick=()=>openJournalNameModal('new');
@@ -5340,9 +5469,14 @@ function renderJournalVisibilityList(){
  box.innerHTML=journalProfiles.map(j=>{
   const hidden=FJJournals.isHidden(j);
   const tags=[j.id===activeJournalId?'aktivní':'',hidden?'skrytý':''].filter(Boolean).join(' · ');
+  const mode=FJContext.journalMode(j);
   return `<div class="mapping-row journal-visibility-row" style="grid-template-columns:1fr auto">
    <div><b${hidden?' style="opacity:.6"':''}>${esc(j.name)}</b>${tags?` <span class="sub" style="font-size:11px">${tags}</span>`:''}</div>
-   <div style="display:flex;gap:6px;justify-content:flex-end">
+   <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
+    <select class="journal-mode" data-id="${esc(j.id)}" title="Režim deníku. Živý: bez „naživo bych nevzal“. Backtest: bez stavu „vědomě vynechán“. Uložené obchody se změnou režimu nemění." style="padding:5px 8px;font-size:12px;width:auto">
+     <option value="LIVE"${mode==='LIVE'?' selected':''}>Živý</option>
+     <option value="BACKTEST"${mode==='BACKTEST'?' selected':''}>Backtest</option>
+    </select>
     <button type="button" class="btn journal-toggle-hidden" data-id="${esc(j.id)}" style="padding:5px 9px;font-size:12px">${hidden?'Zobrazit':'Skrýt'}</button>
     <button type="button" class="btn danger journal-delete" data-id="${esc(j.id)}" style="padding:5px 9px;font-size:12px">Smazat</button>
    </div>
@@ -5353,6 +5487,16 @@ function renderJournalVisibilityList(){
   setJournalHidden(btn.dataset.id,!FJJournals.isHidden(j));
  });
  box.querySelectorAll('.journal-delete').forEach(btn=>btn.onclick=()=>deleteJournalById(btn.dataset.id));
+ box.querySelectorAll('.journal-mode').forEach(sel=>sel.onchange=()=>setJournalMode(sel.dataset.id,sel.value));
+}
+// Režim deníku (živý / backtest) – ukládá se do profilu deníku jako dosavadní
+// příznak `backtest`. Data obchodů se nemění; co pravidlům režimu neodpovídá,
+// ukáže Deník → Kontrola dat.
+function setJournalMode(id,mode){
+ const j=journalProfiles.find(x=>x.id===id);if(!j)return;
+ j.backtest=mode==='BACKTEST';
+ saveJournalProfiles();journalsChanged();
+ showToast(`Deník „${j.name}“ je teď ${j.backtest?'backtestový – „vědomě vynechán“ se nenabízí, „naživo bych nevzal“ ano':'živý – „naživo bych nevzal“ se nenabízí'}.`);
 }
 document.querySelectorAll('input[name="overviewStartJournal"]').forEach(r=>{
  r.checked=r.value===overviewStartMode;

@@ -59,6 +59,7 @@ function tradeForm() {
     resetLegRows() {},
     renderSlPriceHint() {},
     fillContextSelect() {},
+    restrictFillStatusOptions() {},
     renderSingleChipGrid() {},
     renderChipGrid() {},
     renderLevelRows() {},

@@ -143,7 +143,7 @@ test('Deník: filtr stavu naplnění včetně setupů bez vstupu', () => {
   const setup = { id: 'su', recordType: 'SETUP_ONLY', date: '2026-10-04', fillStatus: 'NO_FILL' };
   function list(fill) {
     const seen = [];
-    const lr = load(['renderTrades'], {
+    const lr = load(['renderTrades', 'activeJournalMode', 'renderDataCheckCount'], { journalProfiles: [], activeJournalId: '',
       trades: MIXED, setupRecords: [setup], db: { data: { dayNotes: {} } }, extraEmptyDays: new Set(),
       $: (() => {
         const vals = { filterFill: fill };

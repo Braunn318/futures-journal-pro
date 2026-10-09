@@ -2,6 +2,18 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.0 - 2026-10-09
+Context v2, step 2 (docs/ZADANI_KONTEXT.md A1). Stored trades are not changed or migrated; P/L, commission, points and duplicate detection are untouched.
+- Trade form: a target price on the losing side of the entry, or a manual SL price on the winning side, is now caught on save. The field is marked red with the reason (also live while typing) and an in-app dialog offers "Opravit" (nothing is saved, the form stays open) or "Uložit i tak" (saved as is, then listed under "Kontrola dat"). SL / target prices derived from the exit are not checked – a trailed SL at BE+ lies in profit legitimately. Without side or entry nothing is checked.
+- SR zones: the side is meaning, not position. A zone protecting the SL may sit at the entry or above the entry of a long (between SL and market) – the old warning "Cena leží ve směru obchodu" is gone. New soft notes only: SR against target on the losing side of the entry, beyond the target, and an SL zone beyond the SL. Nothing blocks saving.
+- SR rows with a price show the distance from the entry with a sign (+ towards target, − towards SL) and the distance from SL / before target as read-only text "dopočítáno z ceny"; the ticks field is hidden for them and cannot be overridden. Rows entered in ticks only work as before. The stored `ticksFromEntry` is unchanged (positive).
+- New Deník filter "Kontrola dat (N)": trades and setups with a target / SL on the wrong side, "naživo bych nevzal" in a live journal, "vědomě vynechán" in a backtest journal. Each such card carries a ⚑ pill with the reason. Nothing is fixed automatically.
+- Journal mode Živý / Backtest is now visible and switchable in Nastavení → Obecné → Deníky (and in the new / rename dialog, replacing the hidden "Backtestový deník" checkbox; stored as the same `backtest` flag on the journal profile). Backtest journals show "· backtest" in the journal selector.
+  - Live journal: the field "Naživo bych to vzal?" is not offered. Existing values stay and are kept when the trade is saved; they are listed under Kontrola dat.
+  - Backtest journal: the fill state "vědomě vynechán" is not offered (trade form and "Setup bez vstupu"); a record that already has it keeps it.
+- New module app/context.js (FJContext): srRowMetrics (ticksFromEntrySigned, ticksFromStop, beyondStop / beyondTarget / behindEntry), blockingIssues, journalMode, allowedFillStatus, dataCheckIssues. Pure functions, computed on read, nothing written to trades.
+- Tests: tests/context-validation.test.js (A7 tests 1–4 incl. the three wrong-target fixtures and the 9. 10. 17:15 SL-zone fixture, journal mode, Kontrola dat filter, live journal keeps wouldSkipLive), mutation-checked; 326 tests. UI checked in Electron with a temporary data folder (not live data).
+
 ## 4.7.5 - 2026-10-08
 - Trade form: new field "Minuto o (ticků)" (`missedByTicks`, how many ticks the price missed the limit order) in the Setup card, shown when "Stav naplnění" is not "naplněno" (NO_FILL / MISSED / SKIPPED), like in the "Setup bez vstupu" window. Until now an unfilled setup filled in as a trade ("Vyplnit jako obchod"), or a trade saved directly as no fill, had no way to enter or edit it. The form is prefilled from the setup, saved as a positive number, empty = not saved, and dropped when the state is switched to "naplněno". It also shows in the Setup card summary.
 

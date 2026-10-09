@@ -200,7 +200,7 @@ test('Deník: P/L dne bez nich, obchody se ale v seznamu ukazují; filtr na skup
 
   function list(filter) {
     const groups = [];
-    const lr = load(['renderTrades'], {
+    const lr = load(['renderTrades', 'activeJournalMode', 'renderDataCheckCount'], { journalProfiles: [], activeJournalId: '',
       trades: MIXED, setupRecords: [], $: domStub({ filterSkipLive: filter }).$, db: { data: { dayNotes: {} } },
       extraEmptyDays: new Set(),
       dayGroupHTML: (date, dayTrades) => { groups.push(...dayTrades.map(t => t.id)); return ''; }
