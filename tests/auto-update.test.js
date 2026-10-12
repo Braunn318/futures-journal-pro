@@ -16,7 +16,15 @@ const pkg = () => JSON.parse(readRepoFile('package.json'));
 
 // ------------------------------------------------------------ hlavní proces
 
-function fakeUpdater({ checkFails = false, downloadFails = false } = {}) {
+// Chyba přesně ve tvaru, v jakém ji electron-updater hlásí u vydání bez
+// instalátoru (opsáno z chybového protokolu nainstalované 4.8.3).
+function noInstallerError(tag) {
+  const error = new Error(`Cannot find latest.yml in the latest release artifacts (https://github.com/Braunn318/futures-journal-pro/releases/download/${tag}/latest.yml): HttpError: 404 \n"method: GET url: …"`);
+  error.code = 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND';
+  return error;
+}
+
+function fakeUpdater({ checkFails = false, checkError = null, downloadFails = false } = {}) {
   const handlers = {};
   const calls = { check: 0, download: 0, quitAndInstall: [] };
   return {
@@ -25,7 +33,7 @@ function fakeUpdater({ checkFails = false, downloadFails = false } = {}) {
     autoDownload: true,
     autoInstallOnAppQuit: true,
     on(name, fn) { handlers[name] = fn; return this; },
-    async checkForUpdates() { calls.check++; if (checkFails) throw new Error('net::ERR_INTERNET_DISCONNECTED'); },
+    async checkForUpdates() { calls.check++; if (checkError) throw checkError; if (checkFails) throw new Error('net::ERR_INTERNET_DISCONNECTED'); },
     async downloadUpdate() { calls.download++; if (downloadFails) throw new Error('sha512 checksum mismatch'); },
     quitAndInstall(...args) { calls.quitAndInstall.push(args); }
   };
@@ -34,10 +42,13 @@ function fakeUpdater({ checkFails = false, downloadFails = false } = {}) {
 // Stavový automat z main.js s falešným electron-updaterem místo skutečného.
 function updateMachine(updater, initialState) {
   const sent = [];
+  const info = [];
   const m = loadMain(
-    ['isQuitting', 'UPDATE_CHECK_FAILED', 'UPDATE_DOWNLOAD_FAILED', 'autoUpdater', 'updateState',
-      'setUpdateState', 'checkForUpdates', 'downloadUpdate', 'installUpdate'],
+    ['isQuitting', 'UPDATE_REPO', 'UPDATE_CHECK_FAILED', 'UPDATE_NO_INSTALLER_CODE', 'updateNoInstallerLogged', 'UPDATE_DOWNLOAD_FAILED',
+      'autoUpdater', 'updateState', 'setUpdateState', 'compareVersions', 'releaseVersionFromUpdateError',
+      'updateWithoutInstallerMessage', 'checkForUpdates', 'downloadUpdate', 'installUpdate'],
     {
+      logInfo: (context, message) => info.push(message),
       app: { getVersion: () => '4.8.3' },
       mainWindow: { isDestroyed: () => false, webContents: { send: (channel, state) => sent.push({ channel, state }) } },
       refreshTrayMenu: () => {},
@@ -49,14 +60,14 @@ function updateMachine(updater, initialState) {
   const run = code => vm.runInContext(code, m.__context);
   if (updater) run('autoUpdater = __updater');
   if (initialState) run('updateState = { ...updateState, ...__initial }');
-  return { m, sent, state: () => run('updateState'), isQuitting: () => run('isQuitting') };
+  return { m, sent, info, state: () => run('updateState'), isQuitting: () => run('isQuitting') };
 }
 
 function loadInit({ isPackaged, platform = 'win32', requireImpl }) {
   const timers = { timeout: [], interval: [] };
   const logged = [];
   const states = [];
-  const m = loadMain(['UPDATE_FIRST_CHECK_MS', 'UPDATE_CHECK_INTERVAL_MS', 'autoUpdater', 'initAutoUpdate'], {
+  const m = loadMain(['UPDATE_FIRST_CHECK_MS', 'UPDATE_CHECK_INTERVAL_MS', 'UPDATE_NO_INSTALLER_CODE', 'releaseVersionFromUpdateError', 'autoUpdater', 'initAutoUpdate'], {
     app: { isPackaged },
     process: { platform },
     require: requireImpl,
@@ -118,6 +129,82 @@ test('ruční kontrola chybu ukáže', async () => {
   assert.equal(x.state().status, 'error');
   assert.equal(x.state().error, x.m.UPDATE_CHECK_FAILED);
   assert.deepEqual(x.sent.at(-1).channel, 'update:state', 'stav jde do okna');
+});
+
+// Hlášeno 2026-10-12: nainstalovaná 4.8.3, poslední finální vydání v4.7.4
+// ještě bez instalátoru. Internet fungoval, GitHub odpověděl – přesto hláška
+// radila zkontrolovat připojení. Správně: není co aktualizovat.
+test('poslední vydání bez instalátoru, starší nebo stejné: „aktuální verze“, žádná chyba', async () => {
+  for (const tag of ['v4.7.4', 'v4.8.3']) {
+    for (const manual of [true, false]) {
+      const x = updateMachine(fakeUpdater({ checkError: noInstallerError(tag) }), { status: 'idle' });
+      const r = await x.m.checkForUpdates(manual);
+      assert.equal(r.ok, true, `${tag} manual=${manual}`);
+      assert.equal(r.error, undefined);
+      assert.equal(x.state().status, 'none');
+      assert.equal(x.state().error, null);
+    }
+  }
+});
+
+test('poslední vydání bez instalátoru, ale novější: řekne verzi a že se instaluje ručně', async () => {
+  for (const manual of [true, false]) {
+    const x = updateMachine(fakeUpdater({ checkError: noInstallerError('v4.9.0') }), { status: 'idle' });
+    const r = await x.m.checkForUpdates(manual);
+    assert.equal(r.ok, false);
+    assert.equal(x.state().status, 'error');
+    assert.match(x.state().error, /verze 4\.9\.0/);
+    assert.match(x.state().error, /bez instalátoru/);
+    assert.match(x.state().error, /github\.com\/Braunn318\/futures-journal-pro\/releases/);
+    assert.doesNotMatch(x.state().error, /připojení/, 'se sítí to nesouvisí');
+    assert.equal(r.error, x.state().error);
+  }
+});
+
+test('vydání bez instalátoru se do protokolu zapíše jednou za spuštění, ne při každé kontrole', async () => {
+  const x = updateMachine(fakeUpdater({ checkError: noInstallerError('v4.7.4') }), { status: 'idle' });
+  await x.m.checkForUpdates(false);
+  await x.m.checkForUpdates(false);
+  await x.m.checkForUpdates(true);
+  assert.equal(x.info.length, 1);
+  assert.match(x.info[0], /4\.7\.4/);
+
+  // Posluchač chyb ho přeskakuje, ostatní chyby zapisuje jedním řádkem.
+  const updater = fakeUpdater();
+  const { m, logged } = loadInit({ isPackaged: true, requireImpl: () => ({ autoUpdater: updater }) });
+  m.initAutoUpdate();
+  updater.handlers.error(noInstallerError('v4.7.4'));
+  assert.equal(logged.length, 0);
+  updater.handlers.error(new Error('net::ERR_NAME_NOT_RESOLVED\nheaders: …'));
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0].error, 'net::ERR_NAME_NOT_RESOLVED');
+});
+
+test('skutečně nepovedená kontrola: hláška nesvádí vinu jen na internet', async () => {
+  const x = updateMachine(fakeUpdater({ checkFails: true }), { status: 'idle' });
+  await x.m.checkForUpdates(true);
+  assert.match(x.state().error, /GitHub neodpověděl nebo není připojení/);
+  // Stejný kód chyby, ale bez čitelné adresy vydání → nic se nehádá.
+  const odd = new Error('Cannot find latest.yml');
+  odd.code = 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND';
+  const y = updateMachine(fakeUpdater({ checkError: odd }), { status: 'idle' });
+  assert.equal((await y.m.checkForUpdates(true)).ok, false);
+  assert.equal(y.state().status, 'error');
+  assert.equal(y.state().error, y.m.UPDATE_CHECK_FAILED);
+});
+
+test('verze vydání z chyby a porovnání verzí', () => {
+  const { releaseVersionFromUpdateError, compareVersions } = loadMain(['UPDATE_NO_INSTALLER_CODE', 'releaseVersionFromUpdateError', 'compareVersions']);
+  assert.equal(releaseVersionFromUpdateError(noInstallerError('v4.7.4')), '4.7.4');
+  assert.equal(releaseVersionFromUpdateError(noInstallerError('v4.10.0')), '4.10.0');
+  assert.equal(releaseVersionFromUpdateError(new Error('net::ERR_FAILED https://github.com/x/y/releases/download/v4.7.4/latest.yml')), null, 'jiná chyba se stejnou adresou');
+  assert.equal(releaseVersionFromUpdateError(null), null);
+  assert.equal(compareVersions('4.7.4', '4.8.3'), -1);
+  assert.equal(compareVersions('4.8.3', '4.8.3'), 0);
+  assert.equal(compareVersions('v4.8.4', '4.8.3'), 1);
+  assert.equal(compareVersions('4.10.0', '4.9.9'), 1, 'čísla, ne řetězce');
+  assert.equal(compareVersions('5.0.0', '4.99.99'), 1);
+  assert.equal(compareVersions('4.8.3-test', '4.8.3'), 0, 'přípona se nepočítá');
 });
 
 test('kontrola nepřepíše rozběhnuté stahování ani stažený instalátor', async () => {

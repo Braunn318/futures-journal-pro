@@ -2,6 +2,15 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.4 - 2026-10-12
+Feedback on 4.8.3. Stored trades, journals and settings are untouched.
+- Fixed a misleading message from "Zkontrolovat aktualizace". With 4.8.3 installed, the check said "Kontrolu aktualizací se nepodařilo dokončit. Zkontroluj připojení k internetu" although the internet worked: GitHub had answered, but the last final release (v4.7.4) was made before automatic updates and carries no installer. Every failure was reported with the same text.
+  - Last final release without an installer, same or older than the installed version: the check now says "Máš aktuální verzi" – there is nothing to update to. Same for the automatic check; it is no longer treated as an error.
+  - Last final release without an installer but newer than the installed version: "Na GitHubu je verze X, ale bez instalátoru pro automatickou aktualizaci. Stáhni ji ručně ze stránky vydání" (shown in the card; cannot happen with releases made by the current release process).
+  - A check that really failed: "GitHub neodpověděl nebo není připojení k internetu" instead of blaming the connection alone.
+  - Error log: a release without an installer is noted once per app run as information, not as an error line on every check.
+- Tests: 419 (auto-update.test.js 26, mutation-checked). Checked with the real electron-updater against GitHub: the error it returns for v4.7.4 is recognized and read as "release 4.7.4, older than installed".
+
 ## 4.8.3 - 2026-10-12
 Automatic updates from GitHub. Stored trades, journals and settings are untouched.
 - The installed app checks GitHub for a newer final release and offers it: "Je dostupná nová verze X.Y.Z (nainstalovaná je A.B.C)" with the release notes ("Co je nového"), buttons "Aktualizovat teď" / "Později". After confirmation the installer is downloaded, verified (SHA-512), installed silently into the existing folder and the app starts again.

@@ -1905,7 +1905,11 @@ const UPDATE_REPO = { owner: 'Braunn318', repo: 'futures-journal-pro' };
 const UPDATE_FIRST_CHECK_MS = 30 * 1000;
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const UPDATE_NOTES_MAX = 1800;
-const UPDATE_CHECK_FAILED = 'Kontrolu aktualizací se nepodařilo dokončit. Zkontroluj připojení k internetu; podrobnosti jsou v chybovém protokolu.';
+const UPDATE_CHECK_FAILED = 'Kontrolu aktualizací se nepodařilo dokončit – GitHub neodpověděl nebo není připojení k internetu. Podrobnosti jsou v chybovém protokolu.';
+// Kód, kterým electron-updater hlásí, že poslední finální vydání na GitHubu
+// nenese latest.yml, tedy ani instalátor (vydání před 4.8.3 ho neměla).
+const UPDATE_NO_INSTALLER_CODE = 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND';
+let updateNoInstallerLogged = false;
 const UPDATE_DOWNLOAD_FAILED = 'Stažení aktualizace se nezdařilo. Zkontroluj připojení k internetu a zkus to znovu; podrobnosti jsou v chybovém protokolu.';
 let autoUpdater = null;
 // status: unsupported (spuštěno ze zdrojových souborů) | idle | checking |
@@ -1945,6 +1949,29 @@ async function onUpdateAvailable(info) {
   const notes = await fetchReleaseNotes(version);
   setUpdateState({ status: 'available', version, percent: 0, error: null, notes });
 }
+// Porovnání verzí X.Y.Z podle čísel: záporné, když a < b. Přípona za pomlčkou
+// (např. „-test“) se nepočítá.
+function compareVersions(a, b) {
+  const parts = v => String(v || '').trim().replace(/^v/i, '').split(/[-+]/)[0].split('.').map(n => parseInt(n, 10) || 0);
+  const x = parts(a);
+  const y = parts(b);
+  for (let i = 0; i < 3; i++) {
+    const diff = (x[i] || 0) - (y[i] || 0);
+    if (diff) return diff < 0 ? -1 : 1;
+  }
+  return 0;
+}
+// Vydání bez instalátoru není chyba připojení: GitHub odpověděl a adresa
+// v chybě nese verzi posledního finálního vydání. Bez téhle verze (jiná chyba,
+// nečitelná adresa) vrací null a kontrola se bere jako nepovedená.
+function releaseVersionFromUpdateError(error) {
+  if (error?.code !== UPDATE_NO_INSTALLER_CODE) return null;
+  const match = /\/releases\/download\/v?(\d+\.\d+\.\d+[^/]*)\//.exec(String(error?.message || ''));
+  return match ? match[1] : null;
+}
+function updateWithoutInstallerMessage(version) {
+  return `Na GitHubu je verze ${version}, ale bez instalátoru pro automatickou aktualizaci. Stáhni ji ručně ze stránky vydání: github.com/${UPDATE_REPO.owner}/${UPDATE_REPO.repo}/releases`;
+}
 function initAutoUpdate() {
   // Ze zdrojových souborů (npm start) není co aktualizovat a modul se ani
   // nenačítá. Chyba aktualizací nesmí nikdy zabránit startu aplikace.
@@ -1959,8 +1986,12 @@ function initAutoUpdate() {
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.logger = null;
   // Jen první řádek: chyba sítě od GitHubu s sebou nese výpis hlaviček na
-  // desítky řádků a kontrola se opakuje každých pár hodin.
-  autoUpdater.on('error', error => logError('Auto-update', String(error?.message || error).split('\n')[0].slice(0, 300)));
+  // desítky řádků a kontrola se opakuje každých pár hodin. Vydání bez
+  // instalátoru chyba není – to si zapisuje checkForUpdates, jednou.
+  autoUpdater.on('error', error => {
+    if (releaseVersionFromUpdateError(error)) return;
+    logError('Auto-update', String(error?.message || error).split('\n')[0].slice(0, 300));
+  });
   autoUpdater.on('checking-for-update', () => setUpdateState({ status: 'checking', error: null }));
   autoUpdater.on('update-available', info => onUpdateAvailable(info));
   autoUpdater.on('update-not-available', () => setUpdateState({ status: 'none', version: null, percent: 0, notes: '' }));
@@ -1981,6 +2012,22 @@ async function checkForUpdates(manual) {
     await autoUpdater.checkForUpdates();
     return { ok: true };
   } catch (error) {
+    const releaseVersion = releaseVersionFromUpdateError(error);
+    if (releaseVersion) {
+      if (!updateNoInstallerLogged) {
+        updateNoInstallerLogged = true;
+        logInfo('Auto-update', `Poslední finální vydání ${releaseVersion} nenese instalátor pro automatickou aktualizaci (nainstalovaná verze ${updateState.currentVersion}).`);
+      }
+      // Stejné nebo starší vydání než nainstalovaná verze: není co
+      // aktualizovat, ať už instalátor má, nebo ne.
+      if (compareVersions(releaseVersion, updateState.currentVersion) <= 0) {
+        setUpdateState({ status: 'none', version: null, percent: 0, error: null, notes: '' });
+        return { ok: true };
+      }
+      const message = updateWithoutInstallerMessage(releaseVersion);
+      setUpdateState({ status: 'error', version: null, percent: 0, error: message, notes: '' });
+      return { ok: false, error: message };
+    }
     // Automatická kontrola selhává tiše (po startu Windows bez sítě, GitHub
     // nedostupný) – v protokolu je, uživatele neruší a už nalezená verze
     // zůstává v nabídce. Ruční kontrola chybu ukáže.
