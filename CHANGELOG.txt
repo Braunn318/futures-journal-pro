@@ -2,6 +2,25 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.3 - 2026-10-12
+Automatic updates from GitHub. Stored trades, journals and settings are untouched.
+- The installed app checks GitHub for a newer final release and offers it: "Je dostupná nová verze X.Y.Z (nainstalovaná je A.B.C)" with the release notes ("Co je nového"), buttons "Aktualizovat teď" / "Později". After confirmation the installer is downloaded, verified (SHA-512), installed silently into the existing folder and the app starts again.
+  - Only the release marked Latest on GitHub is offered. Test pre-releases are never offered.
+  - Nothing is downloaded or installed without confirmation – the app runs in the background and records executions, so it must not restart by itself.
+  - Checked 30 s after start and then every 6 hours (the app can run in the tray for days). A failed automatic check is silent (error log only); a manual check reports it.
+  - The offer appears only after login and waits until no window (trade form, another confirmation) is open. "Později" holds for that version until the app is closed; a newer version is offered again.
+  - Open position: if the connector currently tracks an open position, a second confirmation warns that executions are not recorded while the app is being updated (about a minute). "Počkat" keeps the downloaded update ready for later.
+  - Nastavení → Obecné → new card "Aktualizace aplikace": installed version, current state, "Zkontrolovat aktualizace", and "Aktualizovat na X.Y.Z" / "Nainstalovat verzi X.Y.Z" when a version is available or already downloaded.
+  - Tray icon menu: "Nainstalovat aktualizaci X.Y.Z…" while a version is available.
+  - Release notes come from the internet and are shown as plain text only.
+  - Started from source files (npm start) there is nothing to update: the card says so and the updater module is not loaded.
+- Release contents: the GitHub release now carries the built installer (Futures-Journal-PRO-Setup-X.Y.Z.exe, its .blockmap and latest.yml) next to the source zip – that is what the app downloads. The .blockmap lets later updates download only the changed parts.
+  - package.json: electron-updater as a runtime dependency, build.publish pointing at the GitHub repository (generates latest.yml and app-update.yml), `npm run dist` builds with `--publish never`.
+  - VYTVORIT_INSTALATOR.bat: FJ_NOPAUSE=1 runs it unattended (no pause, no prompt, no Explorer window); without it the script behaves as before.
+  - CTI_ME_NEJDRIV.txt: points to the ready installer on the release page first; building from the zip stays as the second option. The stale "4.3.0" in it is gone.
+- 4.8.3 itself still has to be installed by hand. The offer first appears with the next release.
+- Tests: 414 (new auto-update.test.js, 21 tests, mutation-checked). UI checked in Electron with a temporary data folder (not live data). The built installer and latest.yml were checked with the real electron-updater against a local server (found, downloaded, checksum verified); the installation step itself and the lookup on GitHub cannot be exercised before a release with an installer exists.
+
 ## 4.8.2 - 2026-10-10
 Feedback on 4.8.1. Stored trades are not migrated; P/L, commission, points and exports are untouched.
 - Day context can be filled in before the first trade of the day. Before, it could only be set in Kalendář → day detail (only days with trades were clickable) or in the morning strip of ⚡ Rychlý kontext (only opens with trades).

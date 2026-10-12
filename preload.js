@@ -58,5 +58,13 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureExportTradingViewConnector: () => ipcRenderer.invoke('capture:exportTradingViewConnector'),
   captureExportTradingViewWorker: () => ipcRenderer.invoke('capture:exportTradingViewWorker'),
   captureOpenConnectorFolder: () => ipcRenderer.invoke('capture:openConnectorFolder'),
-  onCaptureEvent: (callback) => ipcRenderer.on('capture:event', (_event, payload) => callback(payload))
+  onCaptureEvent: (callback) => ipcRenderer.on('capture:event', (_event, payload) => callback(payload)),
+  // Automatické aktualizace z GitHubu – stav drží hlavní proces, renderer ho
+  // jen zobrazuje a posílá rozhodnutí uživatele.
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+  getUpdateState: () => ipcRenderer.invoke('update:getState'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateState: (callback) => ipcRenderer.on('update:state', (_event, state) => callback(state))
 });

@@ -23,6 +23,9 @@ set "LOCK=%WS%\.build-lock"
 set "LOCKED="
 set "PUSHED="
 
+rem FJ_NOPAUSE=1 = beh bez obsluhy (vydani verze): zadne "Stisknete klavesu",
+rem zadne otevirani slozky a zadny dotaz. Vysledek se pozna z navratoveho kodu.
+
 title Futures Journal PRO %APPVER% - vytvoreni instalatoru
 
 echo ==============================================================
@@ -34,14 +37,14 @@ if errorlevel 1 (
   echo CHYBA: Node.js neni nainstalovan.
   echo Nainstalujte Node.js LTS a pote tento soubor spustte znovu.
   echo.
-  pause
+  if not defined FJ_NOPAUSE pause
   exit /b 1
 )
 where npm >nul 2>nul
 if errorlevel 1 (
   echo CHYBA: npm nebyl nalezen.
   echo Preinstalujte Node.js LTS.
-  pause
+  if not defined FJ_NOPAUSE pause
   exit /b 1
 )
 for /f %%t in ('node -e "process.stdout.write(String(Date.now()))"') do set "T0=%%t"
@@ -49,12 +52,12 @@ for /f %%t in ('node -e "process.stdout.write(String(Date.now()))"') do set "T0=
 echo [1/4] Kontrola zdrojovych souboru... (%time:~0,8%)
 if not exist "app\index.html" (
   echo CHYBA: Chybi app\index.html. Instalator nelze vytvorit.
-  pause
+  if not defined FJ_NOPAUSE pause
   exit /b 1
 )
 if not exist "main.js" (
   echo CHYBA: Chybi main.js.
-  pause
+  if not defined FJ_NOPAUSE pause
   exit /b 1
 )
 
@@ -123,8 +126,8 @@ echo  HOTOVO za %SECS% s
 echo  Soubor: dist\Futures-Journal-PRO-Setup-%APPVER%.exe
 echo ==============================================================
 echo.
-start "" "%~dp0dist"
-pause
+if not defined FJ_NOPAUSE start "" "%~dp0dist"
+if not defined FJ_NOPAUSE pause
 endlocal
 exit /b 0
 
@@ -135,6 +138,12 @@ rem sestaveni, proto jde pokracovat rucne.
 echo.
 echo Pracovni slozku prave pouziva jine sestaveni, nebo bylo minule
 echo sestaveni preruseno (zavrene okno).
+if defined FJ_NOPAUSE (
+  echo Beh bez obsluhy: koncim. Pokud zadne jine sestaveni nebezi, smazte
+  echo slozku %LOCK% a spustte znovu.
+  endlocal
+  exit /b 1
+)
 choice /c AN /m "Pokracovat presto? A = ano (zadne jine sestaveni nebezi), N = ne"
 if errorlevel 2 (
   endlocal
@@ -147,7 +156,7 @@ echo.
 echo CHYBA: %FAILMSG%
 if defined FAILHINT echo %FAILHINT%
 call :cleanup
-pause
+if not defined FJ_NOPAUSE pause
 endlocal
 exit /b 1
 

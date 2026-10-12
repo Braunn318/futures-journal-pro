@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, desktopCapturer, screen, shell, clipboard, Tray, Menu, nativeImage, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, desktopCapturer, screen, shell, clipboard, Tray, Menu, nativeImage, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -184,19 +184,22 @@ function focusMainWindow() {
   }
 }
 
-function createTray() {
-  if (tray) return;
-  tray = new Tray(path.join(__dirname, 'app', 'assets', 'bull_bear_icon.ico'));
-  tray.setTitle('Futures Journal PRO');
-  tray.setToolTip('Futures Journal PRO – aplikace běží a automaticky zaznamenává');
-  tray.setContextMenu(Menu.buildFromTemplate([
+// Menu ikony u hodin se skládá znovu při každé změně stavu aktualizace –
+// položka „Nainstalovat aktualizaci“ v něm je jen tehdy, když je co instalovat.
+function trayMenuTemplate(state) {
+  const template = [
     {
       label: 'Otevřít Futures Journal PRO',
       click: () => {
         if (!mainWindow || mainWindow.isDestroyed()) createWindow();
         else focusMainWindow();
       }
-    },
+    }
+  ];
+  if (state && state.version && (state.status === 'available' || state.status === 'downloaded')) {
+    template.push({ label: `Nainstalovat aktualizaci ${state.version}…`, click: () => requestUpdateOffer() });
+  }
+  template.push(
     { type: 'separator' },
     {
       label: 'Ukončit aplikaci a záznam',
@@ -205,7 +208,19 @@ function createTray() {
         app.quit();
       }
     }
-  ]));
+  );
+  return template;
+}
+function refreshTrayMenu() {
+  if (tray) tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate(updateState)));
+}
+
+function createTray() {
+  if (tray) return;
+  tray = new Tray(path.join(__dirname, 'app', 'assets', 'bull_bear_icon.ico'));
+  tray.setTitle('Futures Journal PRO');
+  tray.setToolTip('Futures Journal PRO – aplikace běží a automaticky zaznamenává');
+  refreshTrayMenu();
   if (process.platform === 'win32') {
     try {
       tray.displayBalloon({
@@ -1879,6 +1894,137 @@ ipcMain.handle('capture:testSnapshotRaceSequence', async () => {
   return { ok: true };
 });
 
+// ---------- Automatické aktualizace ----------
+// Aplikace si na GitHubu sama zjistí novou finální verzi (release označený
+// „Latest“ – testovací pre-release se nenabízí) a NABÍDNE ji. Bez potvrzení se
+// nic nestahuje ani neinstaluje: aplikace běží na pozadí a zaznamenává
+// exekuce, restart uprostřed otevřené pozice by je ztratil.
+const UPDATE_REPO = { owner: 'Braunn318', repo: 'futures-journal-pro' };
+// Po startu Windows ještě nemusí běžet síť, proto první kontrola až za chvíli.
+// Další v intervalu – aplikace běží u hodin klidně několik dní bez restartu.
+const UPDATE_FIRST_CHECK_MS = 30 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const UPDATE_NOTES_MAX = 1800;
+const UPDATE_CHECK_FAILED = 'Kontrolu aktualizací se nepodařilo dokončit. Zkontroluj připojení k internetu; podrobnosti jsou v chybovém protokolu.';
+const UPDATE_DOWNLOAD_FAILED = 'Stažení aktualizace se nezdařilo. Zkontroluj připojení k internetu a zkus to znovu; podrobnosti jsou v chybovém protokolu.';
+let autoUpdater = null;
+// status: unsupported (spuštěno ze zdrojových souborů) | idle | checking |
+// none (aktuální verze) | available | downloading | downloaded | error
+let updateState = { status: 'unsupported', currentVersion: app.getVersion(), version: null, percent: 0, error: null, notes: '' };
+
+function setUpdateState(patch) {
+  updateState = { ...updateState, ...patch };
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:state', updateState);
+  refreshTrayMenu();
+}
+// Seznam změn je text stažený z internetu: do okna jde jen jako prostý text
+// (renderer ho vkládá přes textContent) a zkrácený na celé řádky.
+function cleanReleaseNotes(body, max = UPDATE_NOTES_MAX) {
+  const text = String(body || '').replace(/\r\n?/g, '\n').trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastLine = cut.lastIndexOf('\n');
+  return (lastLine > max / 2 ? cut.slice(0, lastLine) : cut).trimEnd() + '\n…';
+}
+// Tělo releasu na GitHubu = odrážky dané verze z CHANGELOG.txt. Když se
+// nenačte, nabídka se ukáže bez seznamu změn.
+async function fetchReleaseNotes(version) {
+  try {
+    const url = `https://api.github.com/repos/${UPDATE_REPO.owner}/${UPDATE_REPO.repo}/releases/tags/v${encodeURIComponent(version)}`;
+    const response = await net.fetch(url, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return '';
+    return cleanReleaseNotes((await response.json())?.body);
+  } catch (error) {
+    logError('Auto-update release notes', error);
+    return '';
+  }
+}
+async function onUpdateAvailable(info) {
+  const version = String(info?.version || '');
+  // Stav se přepne až se seznamem změn, aby ho nabídka měla hned při otevření.
+  const notes = await fetchReleaseNotes(version);
+  setUpdateState({ status: 'available', version, percent: 0, error: null, notes });
+}
+function initAutoUpdate() {
+  // Ze zdrojových souborů (npm start) není co aktualizovat a modul se ani
+  // nenačítá. Chyba aktualizací nesmí nikdy zabránit startu aplikace.
+  if (!app.isPackaged || process.platform !== 'win32') return false;
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+  } catch (error) {
+    logError('Auto-update init', error);
+    return false;
+  }
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.logger = null;
+  // Jen první řádek: chyba sítě od GitHubu s sebou nese výpis hlaviček na
+  // desítky řádků a kontrola se opakuje každých pár hodin.
+  autoUpdater.on('error', error => logError('Auto-update', String(error?.message || error).split('\n')[0].slice(0, 300)));
+  autoUpdater.on('checking-for-update', () => setUpdateState({ status: 'checking', error: null }));
+  autoUpdater.on('update-available', info => onUpdateAvailable(info));
+  autoUpdater.on('update-not-available', () => setUpdateState({ status: 'none', version: null, percent: 0, notes: '' }));
+  autoUpdater.on('download-progress', progress => setUpdateState({ status: 'downloading', percent: Math.round(progress?.percent || 0) }));
+  autoUpdater.on('update-downloaded', () => setUpdateState({ status: 'downloaded', percent: 100, error: null }));
+  setUpdateState({ status: 'idle' });
+  setTimeout(() => checkForUpdates(false), UPDATE_FIRST_CHECK_MS);
+  setInterval(() => checkForUpdates(false), UPDATE_CHECK_INTERVAL_MS);
+  return true;
+}
+async function checkForUpdates(manual) {
+  if (!autoUpdater) return { ok: false, unsupported: true };
+  // Rozběhnutou kontrolu, stahování ani hotový stažený instalátor nová
+  // kontrola nepřepisuje.
+  if (['checking', 'downloading', 'downloaded'].includes(updateState.status)) return { ok: true };
+  const before = updateState.status;
+  try {
+    await autoUpdater.checkForUpdates();
+    return { ok: true };
+  } catch (error) {
+    // Automatická kontrola selhává tiše (po startu Windows bez sítě, GitHub
+    // nedostupný) – v protokolu je, uživatele neruší a už nalezená verze
+    // zůstává v nabídce. Ruční kontrola chybu ukáže.
+    if (manual) setUpdateState({ status: 'error', error: UPDATE_CHECK_FAILED });
+    else setUpdateState({ status: before === 'available' ? 'available' : 'idle', error: null });
+    return { ok: false, error: UPDATE_CHECK_FAILED };
+  }
+}
+async function downloadUpdate() {
+  if (!autoUpdater || updateState.status !== 'available') return { ok: false, error: 'Žádná aktualizace ke stažení.' };
+  setUpdateState({ status: 'downloading', percent: 0, error: null });
+  try {
+    await autoUpdater.downloadUpdate();
+    // Renderer po návratu rovnou instaluje – stav musí být „staženo“ bez
+    // ohledu na to, jestli událost update-downloaded už dorazila.
+    if (updateState.status !== 'downloaded') setUpdateState({ status: 'downloaded', percent: 100, error: null });
+    return { ok: true };
+  } catch (error) {
+    setUpdateState({ status: 'available', percent: 0, error: UPDATE_DOWNLOAD_FAILED });
+    return { ok: false, error: UPDATE_DOWNLOAD_FAILED };
+  }
+}
+function installUpdate() {
+  if (!autoUpdater || updateState.status !== 'downloaded') return { ok: false, error: 'Aktualizace ještě není stažená.' };
+  // Zavření okna ho jinak jen schová (viz 'close' v createWindow) – aplikace
+  // by zůstala běžet a instalátor by ji musel ukončit natvrdo.
+  isQuitting = true;
+  // Tichá instalace do stávající složky, po ní se aplikace sama spustí.
+  setImmediate(() => autoUpdater.quitAndInstall(true, true));
+  return { ok: true };
+}
+// Z menu ikony u hodin: otevře okno a řekne rendereru, ať nabídku ukáže
+// i tehdy, když ji uživatel v tomhle spuštění už odložil.
+function requestUpdateOffer() {
+  if (!mainWindow || mainWindow.isDestroyed()) { createWindow(); return; }
+  focusMainWindow();
+  mainWindow.webContents.send('update:state', { ...updateState, requested: true });
+}
+ipcMain.handle('app:getVersion', () => app.getVersion());
+ipcMain.handle('update:getState', () => updateState);
+ipcMain.handle('update:check', () => checkForUpdates(true));
+ipcMain.handle('update:download', () => downloadUpdate());
+ipcMain.handle('update:install', () => installUpdate());
+
 process.on('uncaughtException', error => {
   logError('Uncaught exception', error);
   dialog.showErrorBox('Futures Journal PRO – chyba', `${error.message}\n\nProtokol: ${logPath()}`);
@@ -1906,6 +2052,7 @@ app.whenReady().then(() => {
   startCaptureServer();
   startRelayPolling();
   createTray();
+  initAutoUpdate();
   return createWindow();
 }).catch(error => {
   logError('Application startup', error);

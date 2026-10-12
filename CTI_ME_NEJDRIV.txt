@@ -1,12 +1,21 @@
-FUTURES JOURNAL PRO 4.3.0 – ČISTÁ INSTALACE
+FUTURES JOURNAL PRO – INSTALACE
 
-Toto je samostatný čistý projekt. Není potřeba instalovat žádnou starší verzi ani spouštět žádnou opravu.
+NEJJEDNODUŠŠÍ CESTA (od verze 4.8.3):
+Na stránce vydání na GitHubu je vedle tohoto ZIPu i hotový instalátor
+Futures-Journal-PRO-Setup-X.Y.Z.exe. Stačí ho stáhnout a spustit – tento ZIP
+se zdrojovými soubory k tomu není potřeba.
+https://github.com/Braunn318/futures-journal-pro/releases/latest
 
-POSTUP:
+Nainstalovaná aplikace (4.8.3 a novější) si pak nové verze hlídá sama a nabídne
+aktualizaci. Ručně: Nastavení → Obecné → Aktualizace aplikace.
+
+SESTAVENÍ ZE ZDROJOVÝCH SOUBORŮ (tento ZIP, vyžaduje Node.js LTS):
 1. Rozbalte celý ZIP přes „Extrahovat vše“.
 2. Ve vzniklé složce spusťte VYTVORIT_INSTALATOR.bat.
 3. Po dokončení otevřete složku dist.
-4. Spusťte Futures-Journal-PRO-Setup-4.3.0.exe.
+4. Spusťte Futures-Journal-PRO-Setup-X.Y.Z.exe.
+
+Není potřeba instalovat žádnou starší verzi ani spouštět žádnou opravu.
 
 Po instalaci:
 - aplikace se spouští automaticky po přihlášení do Windows,

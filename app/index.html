@@ -888,6 +888,13 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
           <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
         </details>
+        <details class="card settings-card" data-card="update">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Aktualizace aplikace</h3></summary>
+          <p class="sub" style="margin-top:0">Aplikace si sama zjišťuje, jestli na GitHubu vyšla nová verze, a nabídne ji. Bez tvého potvrzení se nic nestahuje ani neinstaluje. Deníky, obchody ani nastavení se aktualizací nemění.</p>
+          <div id="updateInfo" class="sub" style="margin-top:10px">Zjišťuji verzi…</div>
+          <button class="btn" id="checkUpdates" style="margin-top:10px">🔄 Zkontrolovat aktualizace</button>
+          <button class="btn primary" id="installUpdate" style="margin-top:10px;margin-left:8px;display:none">Aktualizovat</button>
+        </details>
       </div>
       </div>
 
@@ -6859,6 +6866,152 @@ async function maybeShowConnectorNotice(){
   if(ok)await installNinjaConnector();
  }catch(e){console.error('connector notice',e)}
 }
+// ---------- Automatické aktualizace ----------
+// Stav drží hlavní proces (main.js, sekce „Automatické aktualizace“), tady se
+// jen zobrazuje a nabízí. „Později“ platí do příštího spuštění aplikace –
+// verze pak zůstává dostupná v Nastavení → Obecné a v menu ikony u hodin.
+let updateState=null;
+let updateOfferReady=false;      // až po přihlášení, nabídka nesmí vyskočit dřív
+// sessionStorage: odložení přežije interní znovunačtení stránky (přepnutí
+// deníku), ale ne ukončení aplikace.
+const UPDATE_POSTPONED_KEY='FJ_updatePostponedVersion';
+let updatePostponedVersion=null;
+try{updatePostponedVersion=sessionStorage.getItem(UPDATE_POSTPONED_KEY)}catch(e){}
+let updateOfferOpen=false;
+let updateManualCheck=false;
+let updateInstalling=false;
+function shouldOfferUpdate(state,postponedVersion,requested){
+ if(!state||state.status!=='available'||!state.version)return false;
+ return !!requested||String(postponedVersion??'')!==String(state.version);
+}
+function updateStatusText(state){
+ if(!state)return 'Dostupné jen v desktopové aplikaci.';
+ const head=`Nainstalovaná verze: ${state.currentVersion||'neznámá'}.`;
+ switch(state.status){
+  case 'unsupported':return head+' Aktualizace fungují jen v nainstalované aplikaci, ne při spuštění ze zdrojových souborů.';
+  case 'checking':return head+' Zjišťuji, jestli vyšla nová verze…';
+  case 'none':return head+' Máš aktuální verzi.';
+  case 'available':return head+` Dostupná je verze ${state.version}.`+(state.error?' '+state.error:'');
+  case 'downloading':return head+` Stahuji verzi ${state.version}: ${state.percent||0} %`;
+  case 'downloaded':return head+` Verze ${state.version} je stažená a připravená k instalaci.`;
+  case 'error':return head+' '+(state.error||'Kontrolu aktualizací se nepodařilo dokončit.');
+  default:return head;
+ }
+}
+// Seznam změn (state.notes) je text z GitHubu – showConfirm ho vkládá přes
+// textContent, nikdy jako HTML.
+function updateOfferMessage(state){
+ const lines=[`Je dostupná nová verze ${state.version} (nainstalovaná je ${state.currentVersion}).`];
+ if(state.notes)lines.push('','Co je nového:',state.notes);
+ lines.push('','Aktualizace se stáhne a nainstaluje, aplikace se pak sama znovu spustí. Deníky, obchody i nastavení zůstávají.');
+ return lines.join('\n');
+}
+function renderUpdateCard(){
+ if($('updateInfo'))$('updateInfo').textContent=updateStatusText(updateState);
+ const btn=$('installUpdate');
+ if(btn){
+  const can=!!updateState&&(updateState.status==='available'||updateState.status==='downloaded');
+  btn.style.display=can?'':'none';
+  if(can)btn.textContent=updateState.status==='downloaded'?`Nainstalovat verzi ${updateState.version}`:`Aktualizovat na ${updateState.version}`;
+ }
+ if($('checkUpdates'))$('checkUpdates').disabled=!!updateState&&(updateState.status==='checking'||updateState.status==='downloading');
+}
+async function openCapturePositionCount(){
+ try{return ((await window.desktopAPI.captureStatus())?.openPositions||[]).length}catch(e){return 0}
+}
+async function startUpdate(){
+ if(updateInstalling)return;
+ updateInstalling=true;
+ try{
+  // Během instalace aplikace zhruba minutu neběží a konektor nemá kam
+  // posílat. Ptá se nejvýš jednou – před stažením, nebo až po něm, pokud se
+  // pozice otevřela mezitím.
+  let positionsAsked=false;
+  const positionsOk=async()=>{
+   if(positionsAsked)return true;
+   const count=await openCapturePositionCount();
+   if(!count)return true;
+   positionsAsked=true;
+   return showConfirm(`Konektor právě eviduje otevřenou pozici (${count}). Během aktualizace aplikace zhruba minutu neběží a exekuce z té doby by se do deníku nezaznamenaly.\n\nAktualizovat i tak?`,
+    {title:'Otevřená pozice',ok:'Aktualizovat i tak',cancel:'Počkat'});
+  };
+  if(!(await positionsOk()))return;
+  if(updateState?.status==='available'){
+   showToast('Stahuji aktualizaci…');
+   const r=await window.desktopAPI.downloadUpdate();
+   if(!r?.ok){showToast(r?.error||'Stažení aktualizace se nezdařilo.');return}
+   updateState=await window.desktopAPI.getUpdateState();
+   renderUpdateCard();
+  }
+  if(updateState?.status!=='downloaded')return;
+  // Restart nesmí přijít přes rozdělanou práci (formulář obchodu apod.).
+  await waitForNoOpenModal();
+  if(!(await positionsOk()))return;
+  showToast('Aktualizace je stažená, aplikace se za chvíli restartuje…');
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  const r=await window.desktopAPI.installUpdate();
+  if(!r?.ok)showToast(r?.error||'Instalaci se nepodařilo spustit.');
+ }catch(e){console.error('update',e);showToast('Aktualizace se nezdařila: '+(e?.message||e))}
+ finally{updateInstalling=false}
+}
+async function maybeOfferUpdate(requested=false){
+ if(!updateOfferReady||updateOfferOpen||updateInstalling||!shouldOfferUpdate(updateState,updatePostponedVersion,requested))return;
+ updateOfferOpen=true;
+ try{
+  await waitForNoOpenModal();
+  // Stav se při čekání mohl změnit (novější verze, mezitím spuštěné stahování).
+  const state=updateState;
+  if(!shouldOfferUpdate(state,updatePostponedVersion,requested))return;
+  const ok=await showConfirm(updateOfferMessage(state),{title:'Aktualizace aplikace',ok:'Aktualizovat teď',cancel:'Později'});
+  if(!ok){
+   updatePostponedVersion=state.version;
+   try{sessionStorage.setItem(UPDATE_POSTPONED_KEY,String(state.version))}catch(e){}
+   return;
+  }
+  await startUpdate();
+ }catch(e){console.error('update offer',e)}
+ finally{updateOfferOpen=false}
+}
+// Ruční kontrola z Nastavení dá vždy odpověď (aktuální verze / nabídka);
+// automatická je tichá, dokud není co nabídnout.
+function settleManualUpdateCheck(){
+ if(!updateManualCheck||!updateState)return;
+ if(updateState.status==='checking')return;
+ updateManualCheck=false;
+ if(updateState.status==='none')showToast(`Máš aktuální verzi (${updateState.currentVersion}).`);
+ else if(updateState.status==='available')maybeOfferUpdate(true);
+}
+function applyUpdateState(state){
+ const requested=!!state?.requested;
+ updateState=state||null;
+ renderUpdateCard();
+ if(!updateState)return;
+ if(updateInstalling&&updateState.status==='downloading')showToast(`Stahuji aktualizaci… ${updateState.percent||0} %`);
+ if(updateManualCheck){settleManualUpdateCheck();return}
+ if(requested&&updateState.status==='downloaded'){startUpdate();return}
+ maybeOfferUpdate(requested);
+}
+if($('checkUpdates'))$('checkUpdates').onclick=async()=>{
+ if(!window.desktopAPI?.checkForUpdates){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
+ if(updateState?.status==='downloaded'){startUpdate();return}
+ updateManualCheck=true;
+ const r=await window.desktopAPI.checkForUpdates();
+ if(r?.unsupported){updateManualCheck=false;showToast(updateStatusText(updateState));return}
+ if(!r?.ok){updateManualCheck=false;showToast(r?.error||'Kontrolu aktualizací se nepodařilo dokončit.');return}
+ settleManualUpdateCheck();
+};
+if($('installUpdate'))$('installUpdate').onclick=()=>{
+ if(updateState?.status==='downloaded')startUpdate();
+ else maybeOfferUpdate(true);
+};
+if(window.desktopAPI?.getUpdateState){
+ window.desktopAPI.onUpdateState(applyUpdateState);
+ window.desktopAPI.getUpdateState().then(applyUpdateState).catch(e=>console.error('update state',e));
+}else renderUpdateCard();
+// Nabídka až po přihlášení – verze mohla být zjištěna dřív a okno nesmí
+// vyskočit přes přihlašovací obrazovku. Nezávisí na tom, jestli už existuje
+// deník (load() bez deníku neproběhne).
+window.addEventListener('journal:authenticated',()=>setTimeout(()=>{updateOfferReady=true;maybeOfferUpdate()},1500));
 $('capturePrepareTradingView').onclick=async()=>{
  const r=await window.desktopAPI.capturePrepareTradingViewPine();
  if(r?.ok)showToast('Pine Script je zkopírovaný ve schránce a TradingView se otevřel. V Pine Editoru stiskni Ctrl+V a Přidat do grafu.');
