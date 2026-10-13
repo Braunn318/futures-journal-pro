@@ -26,14 +26,15 @@ function noInstallerError(tag) {
 
 function fakeUpdater({ checkFails = false, checkError = null, downloadFails = false } = {}) {
   const handlers = {};
-  const calls = { check: 0, download: 0, quitAndInstall: [] };
+  // prerelease: hodnota allowPrerelease v okamžiku každé kontroly.
+  const calls = { check: 0, download: 0, quitAndInstall: [], prerelease: [] };
   return {
     handlers,
     calls,
     autoDownload: true,
     autoInstallOnAppQuit: true,
     on(name, fn) { handlers[name] = fn; return this; },
-    async checkForUpdates() { calls.check++; if (checkError) throw checkError; if (checkFails) throw new Error('net::ERR_INTERNET_DISCONNECTED'); },
+    async checkForUpdates() { calls.check++; calls.prerelease.push(this.allowPrerelease); if (checkError) throw checkError; if (checkFails) throw new Error('net::ERR_INTERNET_DISCONNECTED'); },
     async downloadUpdate() { calls.download++; if (downloadFails) throw new Error('sha512 checksum mismatch'); },
     quitAndInstall(...args) { calls.quitAndInstall.push(args); }
   };
@@ -43,12 +44,14 @@ function fakeUpdater({ checkFails = false, checkError = null, downloadFails = fa
 function updateMachine(updater, initialState) {
   const sent = [];
   const info = [];
+  const notesFor = [];
   const m = loadMain(
     ['isQuitting', 'UPDATE_REPO', 'UPDATE_CHECK_FAILED', 'UPDATE_NO_INSTALLER_CODE', 'updateNoInstallerLogged', 'UPDATE_DOWNLOAD_FAILED',
       'autoUpdater', 'updateState', 'setUpdateState', 'compareVersions', 'releaseVersionFromUpdateError',
-      'updateWithoutInstallerMessage', 'checkForUpdates', 'downloadUpdate', 'installUpdate'],
+      'updateWithoutInstallerMessage', 'releaseChannelFromTag', 'onUpdateAvailable', 'checkForUpdates', 'downloadUpdate', 'installUpdate'],
     {
       logInfo: (context, message) => info.push(message),
+      fetchReleaseNotes: async tag => { notesFor.push(tag); return '- změna'; },
       app: { getVersion: () => '4.8.3' },
       mainWindow: { isDestroyed: () => false, webContents: { send: (channel, state) => sent.push({ channel, state }) } },
       refreshTrayMenu: () => {},
@@ -60,7 +63,7 @@ function updateMachine(updater, initialState) {
   const run = code => vm.runInContext(code, m.__context);
   if (updater) run('autoUpdater = __updater');
   if (initialState) run('updateState = { ...updateState, ...__initial }');
-  return { m, sent, info, state: () => run('updateState'), isQuitting: () => run('isQuitting') };
+  return { m, sent, info, notesFor, state: () => run('updateState'), isQuitting: () => run('isQuitting') };
 }
 
 function loadInit({ isPackaged, platform = 'win32', requireImpl }) {
@@ -217,6 +220,73 @@ test('kontrola nepřepíše rozběhnuté stahování ani stažený instalátor',
   }
 });
 
+// ------------------------------------------------- testovací (pre-release) verze
+
+test('testovací verze se hledají jen na vyžádání; každá další kontrola je zase jen finální', async () => {
+  const updater = fakeUpdater();
+  const x = updateMachine(updater, { status: 'idle' });
+  await x.m.checkForUpdates(true, true);
+  await x.m.checkForUpdates(false);
+  await x.m.checkForUpdates(true);
+  assert.deepEqual(updater.calls.prerelease, [true, false, false], 'příznak nesmí po testovací kontrole zůstat zapnutý');
+});
+
+test('kanál nalezené verze se pozná z tagu vydání, ne z toho, čím se hledalo', async () => {
+  const { releaseChannelFromTag } = loadMain(['releaseChannelFromTag']);
+  assert.equal(releaseChannelFromTag('v4.8.6-test'), 'test');
+  assert.equal(releaseChannelFromTag('v4.8.6-test.2'), 'test');
+  assert.equal(releaseChannelFromTag('v4.8.6'), 'stable');
+  assert.equal(releaseChannelFromTag('4.8.6'), 'stable');
+  assert.equal(releaseChannelFromTag(undefined), 'stable');
+
+  const x = updateMachine(fakeUpdater(), { status: 'checking' });
+  await x.m.onUpdateAvailable({ version: '4.8.6', tag: 'v4.8.6-test' });
+  assert.equal(x.state().status, 'available');
+  assert.equal(x.state().version, '4.8.6', 'verze v instalátoru je bez přípony');
+  assert.equal(x.state().channel, 'test');
+  assert.deepEqual(x.notesFor, ['v4.8.6-test'], 'seznam změn patří k testovacímu vydání, tag v4.8.6 ještě neexistuje');
+
+  // Nejnovější vydání vůbec může být finální – pak to není testovací nabídka.
+  const y = updateMachine(fakeUpdater(), { status: 'checking' });
+  await y.m.onUpdateAvailable({ version: '4.8.6', tag: 'v4.8.6' });
+  assert.equal(y.state().channel, 'stable');
+  const z = updateMachine(fakeUpdater(), { status: 'checking' });
+  await z.m.onUpdateAvailable({ version: '4.8.6' });
+  assert.equal(z.state().channel, 'stable');
+  assert.deepEqual(z.notesFor, ['v4.8.6']);
+});
+
+test('automatická kontrola nepřepíše vyžádanou testovací nabídku, ruční ano', async () => {
+  const updater = fakeUpdater();
+  const x = updateMachine(updater, { status: 'available', version: '4.8.6', channel: 'test' });
+  assert.equal((await x.m.checkForUpdates(false)).ok, true);
+  assert.equal(updater.calls.check, 0, 'kontrola na pozadí hledá jen finální verze a nabídku by smazala');
+  assert.equal(x.state().channel, 'test');
+  await x.m.checkForUpdates(true);
+  assert.deepEqual(updater.calls.prerelease, [false], 'ruční běžná kontrola proběhne');
+
+  // Finální nabídku automatická kontrola obnovuje jako dřív.
+  const stable = fakeUpdater();
+  const y = updateMachine(stable, { status: 'available', version: '4.8.6' });
+  await y.m.checkForUpdates(false);
+  assert.equal(stable.calls.check, 1);
+});
+
+test('testovací vydání bez instalátoru: starší nebo stejné = není co nabídnout, novější = ručně', async () => {
+  for (const tag of ['v4.8.2-test', 'v4.8.3-test', 'v4.8.3-test.2']) {
+    const x = updateMachine(fakeUpdater({ checkError: noInstallerError(tag) }), { status: 'idle' });
+    assert.equal((await x.m.checkForUpdates(true, true)).ok, true, tag);
+    assert.equal(x.state().status, 'none');
+    assert.equal(x.state().channel, 'stable');
+  }
+  const y = updateMachine(fakeUpdater({ checkError: noInstallerError('v4.8.4-test') }), { status: 'idle' });
+  const r = await y.m.checkForUpdates(true, true);
+  assert.equal(r.ok, false);
+  assert.match(y.state().error, /verze 4\.8\.4-test/);
+  assert.match(y.state().error, /bez instalátoru/);
+  assert.doesNotMatch(y.info[0], /finální/, 'protokol netvrdí, že šlo o finální vydání');
+});
+
 test('bez nainstalované aplikace kontrola jen řekne, že není podporovaná', async () => {
   const x = updateMachine(null);
   assert.deepEqual({ ...(await x.m.checkForUpdates(true)) }, { ok: false, unsupported: true });
@@ -278,13 +348,14 @@ test('menu ikony u hodin: položka aktualizace jen když je co instalovat', () =
   assert.deepEqual(labels({ status: 'available', version: null }), base);
   for (const status of ['available', 'downloaded']) {
     assert.deepEqual(labels({ status, version: '4.8.4' }), [base[0], 'Nainstalovat aktualizaci 4.8.4…', base[1]], status);
+    assert.deepEqual(labels({ status, version: '4.8.4', channel: 'test' }), [base[0], 'Nainstalovat testovací verzi 4.8.4…', base[1]], status);
   }
 });
 
 // ------------------------------------------------------------------ renderer
 
 test('nabídka: jen dostupná verze; „Později“ platí pro tu verzi do restartu', () => {
-  const { shouldOfferUpdate } = loadRenderer(['shouldOfferUpdate']);
+  const { shouldOfferUpdate } = loadRenderer(['updateOfferKey', 'shouldOfferUpdate']);
   const available = { status: 'available', version: '4.8.4' };
   assert.equal(shouldOfferUpdate(available, null, false), true);
   assert.equal(shouldOfferUpdate(available, '4.8.4', false), false, 'odloženo');
@@ -306,6 +377,55 @@ test('text nabídky: verze, seznam změn jako prostý text, ujištění o datech
   assert.ok(text.includes('- Oprava <b>X</b>'), 'značky se nepřevádějí, okno je vypíše jako text');
   assert.match(text, /zůstávají/);
   assert.doesNotMatch(updateOfferMessage({ ...state, notes: '' }), /Co je nového/);
+});
+
+// Testovací a finální vydání nesou stejné číslo verze.
+test('odložená testovací nabídka neumlčí finální verzi stejného čísla', () => {
+  const { updateOfferKey, shouldOfferUpdate } = loadRenderer(['updateOfferKey', 'shouldOfferUpdate']);
+  const testOffer = { status: 'available', version: '4.8.6', channel: 'test' };
+  const finalOffer = { status: 'available', version: '4.8.6', channel: 'stable' };
+  assert.equal(updateOfferKey(finalOffer), '4.8.6');
+  assert.equal(updateOfferKey({ status: 'available', version: '4.8.6' }), '4.8.6', 'stav ze starší verze bez kanálu');
+  const postponed = updateOfferKey(testOffer);
+  assert.equal(shouldOfferUpdate(testOffer, postponed, false), false, 'odložená testovací nevyskakuje znovu');
+  assert.equal(shouldOfferUpdate(finalOffer, postponed, false), true);
+  assert.equal(shouldOfferUpdate(testOffer, updateOfferKey(finalOffer), false), true);
+});
+
+test('testovací verze: nabídka i karta ji tak pojmenují a nabídka nese upozornění', () => {
+  const { updateOfferMessage, updateStatusText, UPDATE_TEST_WARNING } = loadRenderer(['UPDATE_TEST_WARNING', 'updateOfferMessage', 'updateStatusText']);
+  assert.equal(UPDATE_TEST_WARNING, 'Jedná se o testovací pre-release verze, které můžou obsahovat chyby a můžou být nestabilní. Používej na vlastní riziko.');
+  const state = { status: 'available', version: '4.8.6', currentVersion: '4.8.5', notes: '- změna', channel: 'test', percent: 42 };
+  const text = updateOfferMessage(state);
+  assert.match(text, /Je dostupná testovací verze 4\.8\.6/);
+  assert.ok(text.includes(UPDATE_TEST_WARNING));
+  assert.ok(text.indexOf(UPDATE_TEST_WARNING) < text.indexOf('Co je nového'), 'upozornění před seznamem změn');
+  assert.ok(!updateOfferMessage({ ...state, channel: 'stable' }).includes(UPDATE_TEST_WARNING), 'u finální verze žádné strašení');
+  assert.match(updateStatusText(state), /Dostupná je testovací verze 4\.8\.6/);
+  assert.match(updateStatusText({ ...state, status: 'downloading' }), /Stahuji testovací verzi 4\.8\.6: 42 %/);
+  assert.match(updateStatusText({ ...state, status: 'downloaded' }), /Testovací verze 4\.8\.6 je stažená/);
+});
+
+test('karta v Nastavení: testovací verze jsou výchozí vypnuté a tlačítko je schované', () => {
+  const html = readRepoFile('app/index.html');
+  const card = html.slice(html.indexOf('data-card="update"'), html.indexOf('</details>', html.indexOf('data-card="update"')));
+  assert.match(card, /<input type="checkbox" id="updateTestChannel">/, 'bez atributu checked');
+  assert.match(card, /<div id="updateTestBox" style="display:none">/);
+  const box = card.slice(card.indexOf('id="updateTestBox"'));
+  assert.match(box, /id="checkTestUpdates"[^>]*>.*stroke="var\(--yellow\)".*Zkontrolovat aktualizace Test verze<\/button>/, 'žlutá ikona');
+  assert.match(box, /id="updateTestWarning" style="color:var\(--yellow\)/);
+  assert.ok(card.indexOf('id="checkUpdates"') < card.indexOf('id="updateTestChannel"'), 'běžná kontrola zůstává nahoře a nezávisí na volbě');
+
+  const { inlineScripts, extractDeclaration } = require('./helpers/extract');
+  const script = inlineScripts(html);
+  assert.match(script, /localStorage\.getItem\(UPDATE_TEST_CHANNEL_KEY\)==='1'/, 'zapnuté je jen po výslovném uložení');
+  const render = extractDeclaration(script, 'renderUpdateCard');
+  assert.match(render, /\$\('updateTestBox'\)\.style\.display=updateTestChannel\?'':'none'/);
+  assert.match(render, /\$\('updateTestWarning'\)\.textContent=/);
+  const run = extractDeclaration(script, 'runManualUpdateCheck');
+  assert.match(run, /checkForUpdates\(\{test:!!test\}\)/);
+  assert.match(script, /\$\('checkUpdates'\)\.onclick=\(\)=>runManualUpdateCheck\(false\)/);
+  assert.match(script, /\$\('checkTestUpdates'\)\.onclick=\(\)=>runManualUpdateCheck\(true\)/);
 });
 
 test('nabídka i seznam změn jdou do okna jen přes textContent', () => {
@@ -373,7 +493,19 @@ test('preload vystavuje API aktualizací a hlavní proces obsluhuje každý kan�
   for (const method of ['getAppVersion', 'getUpdateState', 'checkForUpdates', 'downloadUpdate', 'installUpdate', 'onUpdateState']) {
     assert.match(preload, new RegExp(`\\b${method}:`), method);
   }
+  assert.match(preload, /checkForUpdates: \(options\) => ipcRenderer\.invoke\('update:check', options\)/, 'volba testovacích verzí musí dojít do hlavního procesu');
+  assert.match(main, /ipcMain\.handle\('update:check', \(_event, options\) => checkForUpdates\(true, !!options\?\.test\)\)/);
   const channels = [...preload.matchAll(/invoke\('((?:update|app):[A-Za-z]+)'/g)].map(m => m[1]);
   assert.ok(channels.includes('update:install'));
   for (const channel of channels) assert.ok(main.includes(`ipcMain.handle('${channel}'`), channel);
+});
+
+// Kontrola na pozadí přepne stav na „zjišťuji“. Potvrzená aktualizace na ni
+// musí počkat – a když se spustit nedá, říct to.
+test('potvrzená aktualizace počká na doběhnutí kontroly a nezůstane bez odpovědi', () => {
+  const { extractDeclaration, inlineScripts } = require('./helpers/extract');
+  const start = extractDeclaration(inlineScripts(readRepoFile('app/index.html')), 'startUpdate');
+  assert.ok(start.indexOf("updateState?.status==='checking'") >= 0, 'čeká se, dokud běží kontrola');
+  assert.ok(start.indexOf("updateState?.status==='checking'") < start.indexOf('downloadUpdate()'), 'před stažením');
+  assert.match(start, /if\(updateState\?\.status!=='downloaded'\)\{showToast\(/, 'nespuštěná aktualizace se ohlásí');
 });

@@ -154,7 +154,7 @@ function targetForm(values, datasets, legs) {
     names.push('readLegRows', 'classifyResult');
   }
   const r = loadRenderer(names, { document, settings: SETTINGS,
-    renderRiskInfo() {}, renderSrDistances() {}, renderTradeSections() {} });
+    renderRiskInfo() {}, renderLevelDistances() {}, renderTradeSections() {} });
   r.renderPostExitHints();
   return { r, get: id => document.getElementById(id) };
 }
@@ -207,20 +207,24 @@ test('formulář s druhým cílem: TP2 → target 2; stejná cena → target 2 z
   assert.ok(shown(same.get('targetLevel2Price')));
 });
 
-// -------------------------------------------- vzdálenost SR od SL / targetu
+// ------------------------------- vzdálenosti hladiny od vstupu, SL a cíle
 
-test('SR: vzdálenost od SL a před targetem v ticích', () => {
-  const r = loadRenderer(['srRefDistanceText']);
-  assert.equal(r.srRefDistanceText('srStopLoss', 7745, 7746, 0.25), '4 t od SL');
-  assert.equal(r.srRefDistanceText('srTarget', 7739, 7737.75, 0.25), '5 t před targetem');
-  assert.equal(r.srRefDistanceText('srStopLoss', 7745, null, 0.25), '', 'bez ceny SL nic');
-  assert.equal(r.srRefDistanceText('srStopLoss', '', 7746, 0.25), '', 'bez ceny hladiny nic');
+test('hladina v blízkosti: vzdálenosti od vstupu, od SL a do cíle v ticích', () => {
+  const FJContext = require('../app/context.js');
+  const trade = { side: 'short', entryPrice: 7742.25, slPrice: 7746, targetLevel1: { price: 7737.75 } };
+  const text = (price, t = trade) => FJContext.levelDistanceText(FJContext.levelGeometry({ price }, t, 0.25));
+  assert.equal(text(7745), '−11 t od vstupu · 4 t od SL · 29 t do cíle');
+  assert.equal(text(7739), '+13 t od vstupu · 28 t od SL · 5 t do cíle');
+  assert.equal(text(7742.25), '0 t od vstupu · 15 t od SL · 18 t do cíle');
+  assert.equal(text(7745, { ...trade, slPrice: null }), '−11 t od vstupu · 29 t do cíle', 'bez ceny SL jen to, co spočítat jde');
+  assert.equal(text(''), '', 'bez ceny hladiny nic');
 });
 
 // --------------------------------------------- hlavičky karet: co kde chybí
 
 test('chybějící pole se rozdělí do karet; cílová hladina 1 podle toho, co chybí', () => {
-  // Od 4.7.2 rozhoduje FJTaxonomy.missingContextByCard (typ cíle je v Hladinách).
+  // Rozhoduje FJTaxonomy.missingContextByCard: typ cíle je v Hladinách, cena
+  // v SL / TP (tam se plánovaný cíl ručně přepisuje).
   const r = { missingBySection: d => FJTaxonomy.missingContextByCard(d) };
   const base = {
     setupCode: 'M2_OF', fillStatus: 'FILLED', trend: 'SHORT', trendHtf: 'DOWN', grade: 'B', entryLevels: ['VPOC_DAY'],
@@ -234,5 +238,5 @@ test('chybějící pole se rozdělí do karet; cílová hladina 1 podle toho, co
   const m = r.missingBySection({ ...base, slPrice: '', maeTicks: '', trend: '', targetLevel1: { type: 'VPOC_1M', price: 7737.75 } });
   eq(m.sltp, ['Cena Stop Lossu']);
   eq(m.course, ['MAE']);
-  eq(m.setup, ['Trend']);
+  eq(m.setup, ['Trend 1m']);
 });

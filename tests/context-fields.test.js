@@ -145,14 +145,14 @@ test('popis polí drží kardinalitu, na které stojí pravidla slučování', (
   assert.equal(byKey.setupCode.cardinality, 'single');
   assert.equal(byKey.trend.cardinality, 'single');
   assert.equal(byKey.entryLevels.cardinality, 'multi');
-  // SR kolonky jsou od 4.7.0 řádky { level, price, ticksFromEntry }.
-  assert.equal(byKey.srTarget.cardinality, 'levelRows');
-  assert.equal(byKey.srStopLoss.cardinality, 'levelRows');
+  // Hladiny v blízkosti jsou řádky { level, price, testState? } (kontext v3).
+  assert.equal(byKey.nearLevels.cardinality, 'levelRows');
+  assert.equal(byKey.nearLevelsNone.noneFor, 'nearLevels');
   assert.equal(byKey.ofConfirm.cardinality, 'multi');
   assert.equal(byKey.fillStatus.cardinality, 'single');
   assert.equal(byKey.slPrice.cardinality, 'number');
   // Každé pole s číselníkem musí mít použitelný seznam voleb. U odvozené
-  // skupiny (SR kolonky) vlastní enum neexistuje – volby se berou ze zdrojové
+  // skupiny (Hladiny v blízkosti) vlastní enum neexistuje – volby se berou ze zdrojové
   // skupiny, takže se kontroluje přes vocabularyOf.
   for (const field of FJTaxonomy.TRADE_CONTEXT_FIELDS) {
     if (!field.enumName) continue;
@@ -170,28 +170,26 @@ test('Trend má tři stavy a je single-select', () => {
   assert.equal(FJTaxonomy.sanitizeSingle('TREND', 'BOKEM'), '', 'neznámý stav se zahodí');
 });
 
-test('SR kolonky sdílejí seznam hladin se vstupem', () => {
-  // Hladina je hladina, ať je to místo vstupu nebo překážka před targetem.
+test('Hladiny v blízkosti sdílejí seznam hladin se vstupem', () => {
+  // Hladina je hladina, ať je to místo vstupu nebo hladina v blízkosti obchodu.
   // Díky sdílení se nová hladina přidává jen jednou.
-  assert.deepEqual(FJTaxonomy.allKeys('SR_TARGET'), FJTaxonomy.allKeys('ENTRY_LEVEL'));
-  assert.deepEqual(FJTaxonomy.allKeys('SR_SL'), FJTaxonomy.allKeys('ENTRY_LEVEL'));
-  assert.equal(FJTaxonomy.vocabularyOf('SR_TARGET'), 'ENTRY_LEVEL');
+  assert.deepEqual(FJTaxonomy.allKeys('NEAR_LEVEL'), FJTaxonomy.allKeys('ENTRY_LEVEL'));
+  assert.equal(FJTaxonomy.vocabularyOf('NEAR_LEVEL'), 'ENTRY_LEVEL');
   assert.equal(FJTaxonomy.vocabularyOf('ENTRY_LEVEL'), 'ENTRY_LEVEL', 'zdrojová skupina je sama sobě zdrojem');
 });
 
 test('nové kontextové kolonky přežijí sloučení víc cílů', () => {
   const r = renderer();
-  const tp1 = contextTrade({ exitTime: '16:05', exitPrice: 7703, trend: 'LONG', srTarget: ['VAH'], srStopLoss: ['VWAP'] });
-  const tp2 = contextTrade({ exitTime: '16:09', exitPrice: 7705, points: 5, pnlRaw: 23.1, pnl: 23.1, srTarget: ['LIQUIDITY'] });
+  const tp1 = contextTrade({ exitTime: '16:05', exitPrice: 7703, trend: 'LONG', nearLevels: [{ level: 'VAH', price: 7712.5 }, { level: 'VWAP', price: 7698 }] });
+  const tp2 = contextTrade({ exitTime: '16:09', exitPrice: 7705, points: 5, pnlRaw: 23.1, pnl: 23.1, nearLevels: [{ level: 'LIQUIDITY', price: 7708 }, { level: 'VAH', price: 7712.5 }] });
 
   const merged = r.combineTradeObjects([tp1, tp2]);
 
   assert.equal(merged.trend, 'LONG', 'single-select bere první neprázdný');
-  // Starý tvar (klíče) se při sloučení převede na řádky a sjednotí.
   const plainRows = rows => JSON.parse(JSON.stringify(rows));
-  assert.deepEqual(plainRows(merged.srTarget), [
-    { level: 'VAH', price: null, ticksFromEntry: null },
-    { level: 'LIQUIDITY', price: null, ticksFromEntry: null }
-  ], 'SR řádky se sjednocují');
-  assert.deepEqual(plainRows(merged.srStopLoss), [{ level: 'VWAP', price: null, ticksFromEntry: null }]);
+  assert.deepEqual(plainRows(merged.nearLevels), [
+    { level: 'VAH', price: 7712.5 },
+    { level: 'VWAP', price: 7698 },
+    { level: 'LIQUIDITY', price: 7708 }
+  ], 'řádky hladin se sjednocují, shodný řádek jen jednou');
 });

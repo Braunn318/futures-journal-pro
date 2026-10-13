@@ -13,11 +13,11 @@ const assert = require('node:assert/strict');
 const { loadRenderer } = require('./helpers/extract');
 
 const plain = v => JSON.parse(JSON.stringify(v));
-const r = () => loadRenderer(['SR_ENUMS', 'isSetupRecord', 'tradeRecords', 'quickBatch', 'QC_GROUPS', 'quickDraftFrom', 'quickContextApply'], {});
+const r = () => loadRenderer(['contextFieldShown', 'isSetupRecord', 'tradeRecords', 'quickMissingKeys', 'quickBatch', 'QC_GROUPS', 'quickGroups', 'quickDraftFrom', 'quickContextApply'], {});
 
 const complete = {
   setupCode: 'M2_OF', fillStatus: 'FILLED', trend: 'SHORT', trendHtf: 'DOWN', grade: 'A',
-  entryLevels: ['VPOC_DAY'], srTargetNone: true, srStopLossNone: true, ofConfirm: ['ABS_ASK'],
+  entryLevels: ['VPOC_DAY'], nearLevels: [], nearLevelsNone: true, ofConfirm: ['ABS_ASK'],
   targetLevel1: { type: 'VPOC_1M', price: 7737.75 }, slPrice: 7746, mfeTicks: 18, maeTicks: 2,
   postExitFavorableTicks: 1, postExitAdverseTicks: 30
 };
@@ -42,13 +42,13 @@ const stored = {
   id: 't1', instrument: 'MES', date: '2026-10-09', entryTime: '17:00', side: 'long', entryPrice: 7800,
   exitPrice: 7804, result: 'target', pnl: 18.1, pnlRaw: 18.1, commission: 1.9, contracts: 1,
   setupCode: 'M2_OF', fillStatus: 'FILLED', trend: '', entryLevels: ['VAH'], ofConfirm: [],
-  srTarget: [{ level: 'VWAP', price: 7802, ticksFromEntry: 8 }], srStopLoss: [],
+  nearLevels: [{ level: 'VWAP', price: 7802 }],
   targetLevel1: { type: 'VAH', price: 7804 }, slPrice: 7798, slDerived: false, mfeTicks: 16, mfeTicksSource: 'nt8'
 };
 
 test('zápis: neupravený obchod zůstane přesně stejný', () => {
   const q = r();
-  const out = q.quickContextApply(stored, q.quickDraftFrom(stored), '2026-10-10T08:00:00.000Z', 0.25);
+  const out = q.quickContextApply(stored, q.quickDraftFrom(stored), '2026-10-10T08:00:00.000Z');
   assert.deepEqual(plain(out), plain(stored));
 });
 
@@ -58,26 +58,30 @@ test('zápis: změní se jen to, co uživatel změnil; P/L, ceny ani komise se n
   d.trendHtf = 'UP';
   d.grade = 'B';
   d.entryLevels = ['VAH', 'VPOC_30M'];
-  d.entryLevelTests = { VPOC_30M: 'UNTESTED' };
-  d.srStopLoss.push({ level: 'VAL', price: 7799, ticksFromEntry: null, testState: 'TESTED' });
-  const out = plain(q.quickContextApply(stored, d, '2026-10-10T08:00:00.000Z', 0.25));
+  d.nearLevels.push({ level: 'VAL', price: 7799, testState: 'TESTED' });
+  const out = plain(q.quickContextApply(stored, d, '2026-10-10T08:00:00.000Z'));
   const changed = Object.keys({ ...out, ...stored }).filter(k => JSON.stringify(out[k]) !== JSON.stringify(stored[k])).sort();
-  assert.deepEqual(changed, ['confluenceCount', 'entryLevelTests', 'entryLevels', 'grade', 'gradeSetAt', 'srStopLoss', 'trendHtf']);
+  assert.deepEqual(changed, ['confluenceCount', 'entryLevels', 'grade', 'gradeSetAt', 'nearLevels', 'trendHtf']);
   assert.equal(out.gradeSetAt, '2026-10-10T08:00:00.000Z');
-  assert.deepEqual(out.srStopLoss, [{ level: 'VAL', price: 7799, ticksFromEntry: 4, testState: 'TESTED' }], 'ticky z ceny jako v plném formuláři');
+  assert.deepEqual(out.nearLevels, [{ level: 'VWAP', price: 7802 }, { level: 'VAL', price: 7799, testState: 'TESTED' }],
+    'jen typ, cena a test / netest – vzdálenosti se neukládají');
   assert.equal(out.confluenceCount, 2);
 });
 
 test('zápis: „žádná hladina" jen bez řádků; přepsané MFE ruší zdroj z konektoru', () => {
   const q = r();
   const d = q.quickDraftFrom(stored);
-  d.srStopLossNone = true;
-  d.srTargetNone = true;
+  d.nearLevelsNone = true;
   d.mfeTicks = '20'; d.touched.mfeTicks = true;
   d.slPrice = '7797'; d.touched.slPrice = true;
-  const out = plain(q.quickContextApply(stored, d, 'x', 0.25));
-  assert.equal(out.srStopLossNone, true);
-  assert.equal(out.srTargetNone, undefined, 'SR→TG má řádek, „žádná" neplatí');
+  const out = plain(q.quickContextApply(stored, d, 'x'));
+  assert.equal(out.nearLevelsNone, undefined, 'obchod má řádek hladiny, „žádná" neplatí');
+  const cleared = q.quickDraftFrom(stored);
+  cleared.nearLevels = [];
+  cleared.nearLevelsNone = true;
+  const none = plain(q.quickContextApply(stored, cleared, 'x'));
+  assert.equal(none.nearLevelsNone, true);
+  assert.deepEqual(none.nearLevels, []);
   assert.equal(out.mfeTicks, 20);
   assert.equal(out.mfeTicksSource, undefined);
   assert.equal(out.slPrice, 7797);
@@ -87,5 +91,57 @@ test('zápis: „žádná hladina" jen bez řádků; přepsané MFE ruší zdroj
 test('zápis: starý obchod bez kontextových klíčů nedostane prázdné hodnoty navíc', () => {
   const q = r();
   const old = { id: 'o1', instrument: 'MES', date: '2026-08-10', entryTime: '17:24', side: 'long', entryPrice: 7700, exitPrice: 7697.5, result: 'stoploss', pnlRaw: -43.2 };
-  assert.deepEqual(plain(q.quickContextApply(old, q.quickDraftFrom(old), 'x', 0.25)), plain(old));
+  assert.deepEqual(plain(q.quickContextApply(old, q.quickDraftFrom(old), 'x')), plain(old));
+});
+
+test('zápis: obchod ve starém tvaru (dva seznamy SR) zůstane bez zásahu stejný; úprava hladin ho převede', () => {
+  const q = r();
+  const old = { ...stored, nearLevels: undefined, srTarget: [{ level: 'VWAP', price: 7802, ticksFromEntry: 8 }], srStopLoss: [], srStopLossNone: true };
+  delete old.nearLevels;
+  assert.deepEqual(plain(q.quickContextApply(old, q.quickDraftFrom(old), 'x')), plain(old), 'neupravený obchod bajt po bajtu stejný');
+  const d = q.quickDraftFrom(old);
+  d.nearLevels.push({ level: 'VAL', price: 7799 });
+  const out = plain(q.quickContextApply(old, d, 'x'));
+  assert.deepEqual(out.nearLevels, [{ level: 'VWAP', price: 7802 }, { level: 'VAL', price: 7799 }]);
+  for (const key of ['srTarget', 'srStopLoss', 'srTargetNone', 'srStopLossNone']) assert.equal(key in out, false, key + ' po úpravě v obchodu nezůstává');
+});
+
+test('skupiny rychlého formuláře: jeden seznam hladin, zrušená pole nejsou', () => {
+  const keys = plain(r().quickGroups().map(g => g.key));
+  assert.deepEqual(keys, ['setupCode', 'fillStatus', 'trend', 'trendHtf', 'grade', 'entryTestNo', 'entryLevels', 'nearLevels', 'ofConfirm', 'absLocation', 'targetLevel1Type']);
+});
+
+// Obchod, kterému chybí jen něco, co rychlý formulář nenabízí (cena cíle –
+// tady se volí jen typ –, ticky po výstupu), by z dávky nikdy nezmizel.
+test('dávka: nabízí se jen obchody, kterým chybí něco, co tu jde doplnit', () => {
+  const q = r();
+  assert.deepEqual(plain(q.quickMissingKeys({ ...complete, targetLevel1: { type: 'VPOC_1M', price: null } })), [], 'cena cíle se doplňuje v plném formuláři');
+  assert.deepEqual(plain(q.quickMissingKeys({ ...complete, postExitFavorableTicks: undefined, postExitAdverseTicks: undefined })), [], 'ticky po výstupu také');
+  assert.deepEqual(plain(q.quickMissingKeys({ ...complete, targetLevel1: { type: '', price: 7737.75 } })), ['targetLevel1'], 'typ cíle tu doplnit jde');
+  assert.deepEqual(plain(q.quickMissingKeys({ ...complete, slPrice: undefined, trend: '' })), ['trend', 'slPrice']);
+  const rows = [{ id: 'p', date: '2026-10-09', entryTime: '15:31', ...complete, targetLevel1: { type: 'VPOC_1M', price: null } }, { id: 'a', date: '2026-10-09', entryTime: '16:00' }];
+  assert.deepEqual(plain(q.quickBatch(rows).map(t => t.id)), ['a']);
+});
+
+test('zápis: klíč, který číselník deníku nezná, zůstane, dokud na něj uživatel nesáhne', () => {
+  const q = r();
+  const moved = { ...stored, setupCode: 'CUSTOM_Z_JINEHO_DENIKU', targetLevel1: { type: 'CUSTOM_CIL', price: 7804 } };
+  assert.deepEqual(plain(q.quickContextApply(moved, q.quickDraftFrom(moved), 'x')), plain(moved), 'neupravený obchod bajt po bajtu stejný');
+  const d = q.quickDraftFrom(moved);
+  d.trendHtf = 'UP';
+  const out = plain(q.quickContextApply(moved, d, 'x'));
+  assert.equal(out.trendHtf, 'UP');
+  assert.equal(out.setupCode, 'CUSTOM_Z_JINEHO_DENIKU', 'setup z jiného deníku se doplněním trendu nesmaže');
+  assert.deepEqual(out.targetLevel1, { type: 'CUSTOM_CIL', price: 7804 });
+  d.setupCode = 'M2_PA';
+  assert.equal(q.quickContextApply(moved, d, 'x').setupCode, 'M2_PA', 'výslovná změna se zapíše');
+});
+
+test('uložení: druhý Enter během zápisu ani podržená klávesa dávku neposunou', () => {
+  const { extractDeclaration, inlineScripts, readRepoFile } = require('./helpers/extract');
+  const script = inlineScripts(readRepoFile('app/index.html'));
+  const save = extractDeclaration(script, 'saveQuickContext');
+  assert.ok(save.indexOf('if(qc.saving)return') >= 0 && save.indexOf('if(qc.saving)return') < save.indexOf('quickTrade()'), 'rozběhnuté uložení další nepustí');
+  assert.match(save, /finally\{qc\.saving=false\}/, 'příznak se uvolní i po chybě nebo zrušeném potvrzení');
+  assert.match(script, /if\(!e\.repeat\)saveQuickContext\(\)/, 'opakování klávesy neukládá');
 });

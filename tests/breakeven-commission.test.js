@@ -33,7 +33,8 @@ test('main.js: uzavření pozice na vstupní ceně dá záporný čistý výsled
   const state = { positions: {}, executionIds: [] };
 
   const main = loadMain(
-    ['signedExecutionQuantity', 'positionKey', 'openPositionFromExecution', 'excursionTicks', 'processExecution'],
+    ['POSITION_MISSING_GRACE_MS', 'SNAPSHOT_RACE_WINDOW_MS', 'positionIsMissing',
+      'signedExecutionQuantity', 'positionKey', 'lotKeyOf', 'positionLots', 'applyLots', 'takeFromLots', 'openPositionFromExecution', 'excursionTicks', 'processExecution'],
     {
       // Stuby okolí: stav pozic v paměti, žádné screenshoty, žádný disk.
       readCaptureState: () => state,

@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureReadScreenshot: (filePath) => ipcRenderer.invoke('capture:readScreenshot', filePath),
   captureTestExecutionSequence: () => ipcRenderer.invoke('capture:testExecutionSequence'),
   captureTestMultiTargetSequence: () => ipcRenderer.invoke('capture:testMultiTargetSequence'),
+  captureTestScaleInSequence: () => ipcRenderer.invoke('capture:testScaleInSequence'),
   captureTestCTraderSequence: () => ipcRenderer.invoke('capture:testCTraderSequence'),
   captureTestSnapshotRaceSequence: () => ipcRenderer.invoke('capture:testSnapshotRaceSequence'),
   captureInstallCTraderConnector: () => ipcRenderer.invoke('capture:installCTraderConnector'),
@@ -63,7 +64,8 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // jen zobrazuje a posílá rozhodnutí uživatele.
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getUpdateState: () => ipcRenderer.invoke('update:getState'),
-  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  // options.test = true: hledat i mezi testovacími pre-release (jen ručně).
+  checkForUpdates: (options) => ipcRenderer.invoke('update:check', options),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   onUpdateState: (callback) => ipcRenderer.on('update:state', (_event, state) => callback(state))

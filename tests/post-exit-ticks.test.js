@@ -32,7 +32,7 @@ const NAMES = [
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
   'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'combineTradeObjects',
   'sideMeta', 'reportSigned', 'postExitApplies',
-  'srCsvHeader', 'srCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
+  'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
 ];
 
 function renderer(settings = SETTINGS) {
@@ -311,7 +311,7 @@ function formStub(values) {
 
 // Hlavičky karet, řádek s R a vzdálenosti SR jsou jen zobrazení – testují se
 // zvlášť (tests/incomplete-trade.test.js), tady by jen táhly půlku formuláře.
-const DISPLAY_STUBS = { renderRiskInfo() {}, renderSrDistances() {}, renderTradeSections() {} };
+const DISPLAY_STUBS = { renderRiskInfo() {}, renderLevelDistances() {}, renderTradeSections() {} };
 
 function postExitForm(values) {
   const dom = formStub(values);

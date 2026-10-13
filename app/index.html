@@ -181,9 +181,10 @@ canvas{width:100%;height:100%}
 .template-row input,.template-row select{padding:8px}
 input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--input-bg);border:1px solid var(--line);border-radius:8px}
 @media(max-width:900px){.template-row{grid-template-columns:1fr 1fr}}
-.leg-row{display:grid;grid-template-columns:0.7fr 0.9fr 0.9fr 0.9fr 0.7fr 0.9fr 0.8fr 0.6fr auto;gap:6px;align-items:center;margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:10px;background:rgba(var(--tint-rgb),.02)}
+.leg-row{display:grid;grid-template-columns:0.7fr 0.8fr 0.9fr 0.9fr 0.9fr 0.7fr 0.9fr 0.8fr 0.6fr auto;gap:6px;align-items:center;margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:10px;background:rgba(var(--tint-rgb),.02)}
 .leg-row input,.leg-row select{padding:7px;font-size:13px}
 .leg-row .leg-tag{font-size:11px;color:var(--muted);font-weight:700}
+.leg-row.no-entry{grid-template-columns:0.7fr 0.9fr 0.9fr 0.9fr 0.7fr 0.9fr 0.8fr 0.6fr auto}
 @media(max-width:900px){.leg-row{grid-template-columns:1fr 1fr}}
 .thumbs{display:flex;gap:7px}.thumbs img{width:64px;height:48px;object-fit:cover;border-radius:7px;border:1px solid var(--line)}
 .comment{color:var(--text2);font-size:14px;line-height:1.45}
@@ -255,14 +256,11 @@ input.input-error{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
 .pill.hypo-pill{font-size:10px;padding:1px 6px;background:rgba(120,140,255,.16);color:#9fb0ff;border:1px solid rgba(120,140,255,.4)}
 .day-header .stat-excluded{font-size:12px;font-weight:600;color:var(--muted);margin-right:8px;opacity:.85}
 .sr-rows{display:flex;flex-direction:column;gap:6px}
-.sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr 1fr minmax(90px,.8fr) auto;gap:6px;align-items:center}
-.sr-row .sr-warn{grid-column:1/-1;font-size:12px}
-/* ✕ zůstává v posledním sloupci, i když jsou ticky schované (dopočet z ceny). */
-.sr-row .sr-remove{grid-column:5;grid-row:1}
-/* Netest / test (kontext v2, A2.2) – pevně ve 4. sloupci i se schovanými ticky. */
-.sr-row .sr-test{grid-column:4;grid-row:1}
-.level-tests{display:flex;flex-direction:column;gap:6px;margin-top:6px}
-.level-test-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+/* Řádek hladiny v blízkosti: typ · cena · test / netest · ✕ (kontext v3). */
+.sr-row{display:grid;grid-template-columns:minmax(140px,2fr) 1fr minmax(90px,.8fr) auto;gap:6px;align-items:center}
+/* ✕ zůstává v posledním sloupci, i když je test / netest skrytý (Pole kontextu). */
+.sr-row .sr-remove{grid-column:4;grid-row:1}
+.sr-row .sr-test{grid-column:3;grid-row:1}
 .level-test-name{min-width:140px;font-size:13px;font-weight:700}
 /* Rychlý kontextový formulář (§6.2): skupina dlaždic = jedna zastávka Tabu. */
 .qc-trade{margin:0 0 10px;font-size:14px}
@@ -660,7 +658,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
         <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
-        <button class="btn" id="dayContextBtn" type="button" title="Kontext dne (otevření vs value, očekávaný typ dne, zprávy …) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button>
+        <button class="btn" id="dayContextBtn" data-ctx-field="dayContext" type="button" title="Kontext dne (otevření vs value, očekávaný typ dne, zprávy …) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button>
         <button class="btn" id="quickContextBtn" type="button" title="Doplnit kontext obchodům z aktuálního výběru, které ho nemají úplný – celé na klávesnici">⚡ Rychlý kontext</button>
         <select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select>
         <button class="btn" id="clearSkipLiveBtn" type="button" style="display:none" title="Živý deník: odebere chybné „naživo bych nevzal“ (i s důvodem) u všech takových záznamů aktivního deníku. Nic jiného se nemění.">Odebrat „naživo bych nevzal“</button>
@@ -698,7 +696,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="card" style="margin-top:16px">
         <h3>Obchody vybraného dne</h3>
         <div id="dayRiskNote" class="alert"></div>
-        <div id="dayContextBox"></div>
+        <div id="dayContextBox" data-ctx-field="dayContext"></div>
         <div id="dayTrades" class="trade-list"><div class="sub">Klikni v kalendáři na den – i bez obchodů, kontext dne jde vyplnit předem.</div></div>
       </div>
     </section>
@@ -774,6 +772,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn primary" id="captureRefresh">Obnovit stav</button>
           <button class="btn" id="captureTestSequence">Otestovat vstup a výstup</button>
           <button class="btn" id="captureTestMultiTarget" title="Nasimuluje pozici uzavřenou přes TP1, Break Even a TP2 (pro test slučování)">Otestovat TP1/BE/TP2</button>
+          <button class="btn" id="captureTestScaleIn" title="Nasimuluje dokup do otevřené pozice a výstup, který zavře původní i dokoupený kontrakt">Otestovat dokup</button>
           <button class="btn" id="captureImport">Importovat nyní</button>
           <button class="btn" id="captureOpenConnectors">Otevřít složku konektorů</button>
           <button class="btn" id="captureNewKey">Nový API klíč</button>
@@ -894,6 +893,13 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="updateInfo" class="sub" style="margin-top:10px">Zjišťuji verzi…</div>
           <button class="btn" id="checkUpdates" style="margin-top:10px">🔄 Zkontrolovat aktualizace</button>
           <button class="btn primary" id="installUpdate" style="margin-top:10px;margin-left:8px;display:none">Aktualizovat</button>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+            <label class="settings-check"><input type="checkbox" id="updateTestChannel"> Povolit testovací (pre-release) verze</label>
+            <div id="updateTestBox" style="display:none">
+              <button class="btn" id="checkTestUpdates" style="margin-top:10px;border:1px solid rgba(var(--yellow-rgb),.6)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--yellow)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Zkontrolovat aktualizace Test verze</button>
+              <p class="sub" id="updateTestWarning" style="color:var(--yellow);margin-top:8px"></p>
+            </div>
+          </div>
         </details>
       </div>
       </div>
@@ -950,7 +956,16 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Karty obchodu</h3></summary>
           <p class="sub">Které karty se ukazují ve formuláři obchodu a u obchodu v Deníku, a u kterých upozorňovat na nevyplněná pole (štítek „⚠ Neúplné“ na kartě obchodu a „chybí N“ v hlavičce karty). Skrytá karta jen zmizí – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí karty se zase ukážou.</p>
           <div id="tradeCardSettings" style="margin-top:10px"></div>
-          <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend; <b>Hladiny</b> – hladina vstupu, SR proti targetu a proti S/L (hladina, nebo „žádná hladina v cestě“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují.</p>
+          <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend 1m, trend 30m, známka; <b>Hladiny</b> – hladina vstupu, hladiny v blízkosti (hladina, nebo „žádná hladina v blízkosti“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují.</p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
+        <details class="card settings-card" data-card="contextFields">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Pole kontextu</h3></summary>
+          <p class="sub">Jednotlivá pole kontextu obchodu jdou skrýt a u každého zvlášť zapnout upozornění na nevyplněné. Skryté pole zmizí z formuláře obchodu, z rychlého kontextu, z karty obchodu i dne a nepočítá se do štítku „⚠ Neúplné“ – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí pole se zase ukážou.</p>
+          <div id="contextFieldSettings" style="margin-top:10px"></div>
+          <div class="field" style="margin-top:14px;max-width:560px"><label>Známka – „doplněno zpětně“ až po <span class="sub">— minut od uložení obchodu do deníku</span></label><input type="number" id="gradeRetroGraceMinutes" min="0" step="1" placeholder="30"></div>
+          <p class="sub">Známka zadaná do téhle lhůty od uložení obchodu (u pozice s víc cíli od posledního výstupu) se nepovažuje za doplněnou zpětně – importovanému obchodu ji dřív zadat nejde. Výchozí je 30 minut, 0 = hned po uložení. Platí pro aktivní deník, uloží se hned a stejně počítá i export (CSV, AI export). V backtest deníku se „doplněno zpětně“ neurčuje.</p>
+          <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
       </div>
@@ -1291,10 +1306,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
           <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
           <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="missedByTicks" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
-          <div class="field full"><label>Trend</label><div id="trend" class="chip-grid"></div></div>
-          <div class="field full"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
-          <div class="field full"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
-          <div class="field full"><label>Vybraná likvidita před vstupem <span class="sub">— past na retail</span></label><div id="liquiditySwept" class="chip-grid"></div></div>
+          <div class="field full"><label>Trend 1m <span class="sub">— trend na 1min grafu</span></label><div id="trend" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="trendHtf"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="grade"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
+          <div class="field full" data-ctx-field="entryTestNo"><label>Kolikátý test vstupní hladiny <span class="sub">— v seanci (1. test = netest)</span></label><div id="entryTestNo" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <div class="field" id="wouldSkipLiveField"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select><div class="sub" id="wouldSkipLiveNote"></div></div>
           <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
@@ -1304,16 +1319,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Hladiny</span><span class="sub trade-section-summary" id="levelsSummary"></span><span class="trade-section-missing" id="levelsMissing"></span></summary>
         <div class="formgrid">
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
-          <div class="field full" id="entryLevelTestsField" style="display:none"><label>Hladina vstupu – netest / test <span class="sub">— netest = cena se jí v seanci ještě nedotkla</span></label><div id="entryLevelTests" class="level-tests"></div></div>
-          <div class="field full"><label>Kolikátý test vstupní hladiny <span class="sub">— v seanci</span></label><div id="entryTestNo" class="chip-grid"></div></div>
-          <div class="field full"><label>SR proti targetu <span class="sub">— hladiny v cestě k cíli (ve směru obchodu); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srTarget" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srTargetAdd" onclick="appendLevelRow('srTarget')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srTargetNone"> žádná hladina v cestě</label></div></div>
-          <div class="field full"><label>Profil cesty k cíli <span class="sub">— co leží ve volume profilu mezi vstupem a cílem</span></label><div id="pathProfile" class="chip-grid"></div></div>
-          <div class="field full"><label>SR proti S/L <span class="sub">— zóny, které chrání Stop Loss (mezi SL a cenou trhu – smí ležet i na vstupu nebo kousek za ním); cena, nebo vzdálenost od vstupu v ticích</span></label><div id="srStopLoss" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="srStopLossAdd" onclick="appendLevelRow('srStopLoss')">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="srStopLossNone"> žádná hladina v cestě</label></div><div class="sub" id="srLinkNote" style="margin-top:6px"></div></div>
+          <div class="field full"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label><div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
-          <div class="field full"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
           <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
           <div class="field"><label>Cílová hladina 2 <span class="sub">— typ</span></label><select id="targetLevel2Type"></select></div>
-          <div class="field full sub" id="contextDerived" title="Dopočítáno z cen hladin, vstupu, SL a cíle – needituje se a do obchodu se neukládá."></div>
+          <div class="field full sub" id="contextDerived" data-ctx-field="derivedRow" title="Dopočítáno z cen hladin, vstupu, SL a cíle – needituje se a do obchodu se neukládá."></div>
         </div>
       </details>
       <details class="trade-section" data-card="comments">
@@ -1414,7 +1425,7 @@ function tradeFormSnapshot(){
  // Dlaždice (trend, známka, hladiny…) drží stav jen v DOM – bez nich by
  // změna dlaždice nebyla „neuložená změna".
  const chips=[...$('tradeForm').querySelectorAll('.chip.on')].map(c=>(c.parentElement?.id||'')+':'+c.dataset.key);
- return JSON.stringify(vals)+'|'+JSON.stringify(chips)+'|'+JSON.stringify(formLevelTests)+'|'+JSON.stringify(editImages);
+ return JSON.stringify(vals)+'|'+JSON.stringify(chips)+'|'+JSON.stringify(editImages);
 }
 
 async function openDB(){
@@ -1742,6 +1753,40 @@ function applyTradeCardVisibility(){
   card.style.display=tradeCardShown(card.dataset.card)?'':'none';
  });
 }
+// Pole kontextu (Nastavení → Přizpůsobení, kontext v3 A4): jednotlivá pole jdou
+// skrýt a u každého zvlášť zapnout „Upozorňovat na nevyplněné" – stejný vzor
+// jako karty obchodu, jen o úroveň níž. Platí pro celou aplikaci a pamatuje se.
+// Výchozí: vše zobrazené; upozornění jen u trendu 30m a známky (jako dřív).
+const CONTEXT_FIELDS_KEY='FJ_contextFields';
+function readContextFieldConfig(){
+ try{return FJTaxonomy.normalizeFieldConfig(JSON.parse(localStorage.getItem(CONTEXT_FIELDS_KEY)||'{}'))}
+ catch{return FJTaxonomy.normalizeFieldConfig({})}
+}
+let contextFieldConfig=readContextFieldConfig();
+function setContextFieldConfig(next){
+ contextFieldConfig=FJTaxonomy.normalizeFieldConfig(next);
+ try{localStorage.setItem(CONTEXT_FIELDS_KEY,JSON.stringify(contextFieldConfig))}catch{}
+ applyContextFieldVisibility();
+ renderContextFieldSettings();
+ renderAll();
+}
+function contextFieldShown(key){return typeof contextFieldConfig==='undefined'||FJTaxonomy.fieldShown(contextFieldConfig,key)}
+// Skryté pole jen zmizí (display) – jeho prvky dál drží načtené hodnoty, takže
+// uložení obchodu data skrytého pole nesmaže. Prvek se k poli hlásí atributem
+// data-ctx-field (formulář obchodu, řádky hladin, tlačítko a box kontextu dne).
+function applyContextFieldVisibility(){
+ if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
+ document.querySelectorAll('[data-ctx-field]').forEach(el=>{
+  el.style.display=contextFieldShown(el.dataset.ctxField)?'':'none';
+ });
+}
+// Chybí dni obchodu ranní kontext dne? Jen u obchodu aktivního deníku – denní
+// poznámky jiného deníku (Přehled, Reporty) tu nejsou.
+function dayContextMissingFor(t){
+ if(!t?.date||(t.journalId&&t.journalId!==activeJournalId)||typeof getDayNote!=='function')return false;
+ const dc=getDayNote(t.date).dayContext||{};
+ return FJContext.DAY_CONTEXT_MORNING.some(k=>!dc[k]);
+}
 // Co ukáže Přehled účtu po startu (Nastavení → Deníky): jen poslední aktivní
 // deník (výchozí), nebo všechny viditelné. Platí pro celou aplikaci.
 const OVERVIEW_START_KEY='FJ_overviewStartJournal';
@@ -2004,6 +2049,45 @@ async function runSrLevelsMigration(){
  });
  return {changed:patches.size};
 }
+// Kontext v3 (docs/ZADANI_KONTEXT_V3.md A1 + A2), jednou za deník – hlídá
+// značka `contextVersion` (main.js readJournal ji musí propustit):
+//  1) smazat zrušená pole (vybraná likvidita, profil cesty, netest/test
+//     vstupní hladiny) ze všech záznamů,
+//  2) dva seznamy SR (proti targetu / proti S/L) převést na jeden seznam
+//     „Hladiny v blízkosti" a stejně upravit číselníky deníku.
+// Před každým z obou zápisů je ZÁLOHA souboru deníku; když se nepovede,
+// nezapíše se nic a převod se zkusí při dalším otevření. Pravidla převodu
+// jsou v app/taxonomy.js (stripRemovedV3, convertLegacyNear, migrateConfigV3)
+// – stejná používá čtení nepřevedeného deníku i exporty. Úprava se počítá
+// znovu až v zápisu nad aktuálním stavem: mezi zálohou a zápisem mohl přijít
+// import z konektoru.
+async function runContextV3Migration(){
+ const data=await ensureActiveJournalData();
+ if(Number(data.contextVersion||0)>=FJContext.CONTEXT_VERSION)return {skipped:true};
+ const backup=async reason=>{
+  const r=await window.desktopAPI?.backupJournal?.(activeJournalId,reason);
+  if(!r||r.ok!==true)throw new Error(r?.error||'Zálohu deníku před převodem nelze vytvořit.');
+ };
+ const tradesOf=journal=>Array.isArray(journal.trades)?journal.trades:[];
+ const mainSettings=journal=>(Array.isArray(journal.settings)?journal.settings:[]).find(s=>s?.key==='main');
+ const removed=tradesOf(data).filter(t=>FJTaxonomy.stripRemovedV3(t)!==t).length;
+ if(removed){
+  await backup('pred-odebranim-poli-v3');
+  await commitJournal(journal=>{journal.trades=tradesOf(journal).map(t=>FJTaxonomy.stripRemovedV3(t))});
+ }
+ const current=await ensureActiveJournalData();
+ const converted=tradesOf(current).filter(t=>FJTaxonomy.convertLegacyNear(t)!==t).length;
+ const taxonomy=mainSettings(current)?.value?.taxonomy;
+ const configChanged=!!taxonomy&&FJTaxonomy.migrateConfigV3(taxonomy)!==taxonomy;
+ if(converted||configChanged)await backup('pred-sloucenim-sr-hladin');
+ await commitJournal(journal=>{
+  journal.trades=tradesOf(journal).map(t=>FJTaxonomy.convertLegacyNear(t));
+  const main=mainSettings(journal);
+  if(main?.value?.taxonomy)main.value.taxonomy=FJTaxonomy.migrateConfigV3(main.value.taxonomy);
+  journal.contextVersion=FJContext.CONTEXT_VERSION;
+ });
+ return {removed,converted};
+}
 async function load(){
  setRecords(await getAll('trades'));
  calendarAllTrades=null;
@@ -2026,6 +2110,7 @@ function fillSettings(){
  $('startingBalance').value=settings.startingBalance;$('currency').value='USD';$('usdCzkRate').value=settings.usdCzkRate||23;
  $('breakEvenEnabled').value=settings.breakEvenEnabled?'ano':'ne';
  $('breakEvenThreshold').value=settings.breakEvenThreshold||0;
+ if($('gradeRetroGraceMinutes'))$('gradeRetroGraceMinutes').value=FJContext.gradeRetroGrace(settings.gradeRetroGraceMinutes);
  $('autoMergeLegs').value=settings.autoMergeLegs===false?'ne':'ano';
  const r=settings.risk||{};
  $('riskMaxDailyDrawdown').value=r.maxDailyDrawdown||'';
@@ -2688,11 +2773,15 @@ function resultMeta(result){
  if(result==='target')return {label:'TARGET',cls:'win',moneyCls:'pos',sign:'+'};
  return {label:'STOP LOSS',cls:'loss',moneyCls:'neg',sign:'−'};
 }
-function legPillHTML(l,i){
+// `t` = obchod, ke kterému noha patří. Noha s vlastní vstupní cenou zavírá
+// dokoupené kontrakty: její body se počítají od ceny dokupu, ne od vstupu
+// obchodu, a pilulka to říká.
+function legPillHTML(l,i,t){
  const m=resultMeta(l.result);
- const label=l.label||(l.result==='breakeven'?'BE':`Cíl ${i+1}`);
- const detail=`${label}: ${l.exitTime||'?'} @ ${l.exitPrice??'?'} · ${l.contracts||0} ks · ${m.sign}${Math.abs(Number(l.pnl||0)).toFixed(2)}`;
- return `<span class="leg-pill ${m.moneyCls}" title="${esc(detail)}" style="cursor:pointer" onclick="showToast(${esc(JSON.stringify(detail))})">${esc(label)}: ${m.sign}${Math.abs(Number(l.points||0))}b</span>`;
+ const scaleIn=!!t&&FJPoints.legIsScaleIn(l,t);
+ const label=(l.label||(l.result==='breakeven'?'BE':`Cíl ${i+1}`))+(scaleIn?' · dokup':'');
+ const detail=`${label}: ${scaleIn?`vstup ${l.entryTime?l.entryTime+' ':''}@ ${FJPoints.roundPoints(l.entryPrice)} → `:''}${l.exitTime||'?'} @ ${l.exitPrice??'?'} · ${l.contracts||0} ks · ${m.sign}${Math.abs(Number(l.pnl||0)).toFixed(2)}`;
+ return `<span class="leg-pill ${m.moneyCls}" title="${esc(detail)}" style="cursor:pointer" onclick="showToast(${esc(JSON.stringify(detail))})">${esc(label)}: ${m.sign}${FJPoints.roundPoints(Math.abs(Number(l.points||0)))}b</span>`;
 }
 // Uložené "points" u jednoho cíle jsou vždy jen pohyb ceny (magnituda za
 // JEDEN kontrakt), bez ohledu na to, kolik kontraktů se v tom cíli zavíralo.
@@ -2935,36 +3024,16 @@ function fillContextSelect(id,enumName,emptyLabel,selected){
 }
 // Nová single-select pole kontextu v2 (A4): id prvku = klíč v obchodu.
 // Známka (grade) jde zvlášť přes FJContext.applyGrade.
-const NEW_SINGLE_FIELDS=[['trendHtf','TREND_HTF'],['entryTestNo','ENTRY_TEST_NO'],['absLocation','ABS_LOCATION'],['liquiditySwept','LIQUIDITY_SWEPT'],['pathProfile','PATH_PROFILE']];
-// Netest / test u hladin vstupu – stav formuláře (mapa klíč → stav). Ukládá
-// se jen pro hladiny, které jsou vybrané (FJTaxonomy.sanitizeLevelTests).
-let formLevelTests={};
-function renderEntryLevelTests(){
- const host=$('entryLevelTests'),field=$('entryLevelTestsField'); if(!host)return;
- const levels=readChipGrid('entryLevels','ENTRY_LEVEL').filter(k=>k!=='NONE');
- if(field)field.style.display=levels.length?'':'none';
- host.innerHTML=levels.map(k=>{
-  const cur=formLevelTests[k]||'';
-  const btn=(v,label)=>`<span class="chip${cur===v?' on':''}" data-level="${esc(k)}" data-state="${v}" role="button" tabindex="0">${label}</span>`;
-  return `<div class="level-test-row"><span class="level-test-name">${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',k))}</span>${btn('UNTESTED','netest')}${btn('TESTED','test')}</div>`;
- }).join('');
- host.querySelectorAll('.chip').forEach(chip=>{
-  const pick=()=>{
-   const k=chip.dataset.level,v=chip.dataset.state;
-   if(formLevelTests[k]===v)delete formLevelTests[k];else formLevelTests[k]=v;
-   renderEntryLevelTests();
-  };
-  chip.onclick=pick;
-  chip.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();pick()}};
- });
-}
+const NEW_SINGLE_FIELDS=[['trendHtf','TREND_HTF'],['entryTestNo','ENTRY_TEST_NO'],['absLocation','ABS_LOCATION']];
 // Pod známkou: kdy byla zadaná a jestli se dodatečně měnila / doplnila zpětně.
 function renderGradeNote(t){
  const el=$('gradeNote'); if(!el)return;
  const parts=[];
  if(t?.gradeSetAt){const d=new Date(t.gradeSetAt);if(!isNaN(d))parts.push('zadáno '+d.toLocaleString('cs-CZ',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}))}
  if(t?.gradeEdited===true)parts.push('změněno dodatečně');
- if(t&&FJContext.gradeRetro(t,journalModeOf(t))===true)parts.push('doplněno zpětně (po výstupu)');
+ // „Doplněno zpětně" až po lhůtě od uložení obchodu (nastavení deníku, výchozí
+ // 30 min) – importovanému obchodu dřív známku zadat nejde.
+ if(t&&FJContext.gradeRetro(t,journalModeOf(t),settings.gradeRetroGraceMinutes)===true)parts.push('doplněno zpětně (víc než '+FJContext.gradeRetroGrace(settings.gradeRetroGraceMinutes)+' min po uložení obchodu)');
  el.textContent=parts.join(' · ');
 }
 // Mřížka dlaždic pro multi-select. Stav drží samotný DOM (class "on"), ať
@@ -3011,141 +3080,89 @@ function readChipGrid(id,enumName){
  const el=$(id); if(!el)return [];
  return FJTaxonomy.sanitizeMulti(enumName,[...el.querySelectorAll('.chip.on')].map(c=>c.dataset.key));
 }
-// ---- SR hladiny: řádky { level, price, ticksFromEntry } ----
-// Zadání ceny dopočítá vzdálenost od vstupu a naopak. Vzdálenost je vždy
-// kladná, stranu nese pole (srTarget ve směru obchodu, srStopLoss proti) a
-// směr obchodu. Když chybí velikost ticku nebo cena vstupu (u ceny z ticků
-// i směr), přepočet je VYPNUTÝ a obě pole se ukládají, jak je uživatel zadal –
-// nic se nedosazuje odhadem.
+// ---- Hladiny v blízkosti: řádky { level, price, testState? } ----
+// Uživatel zadává jen typ, cenu a test / netest. Stranu ani roli nevolí –
+// polohu vůči vstupu, Stop Lossu a cíli dopočítá FJContext.levelGeometry a
+// pod řádkem se ukáže jen jako vzdálenosti v ticích. Nic z toho se neukládá.
 //
-// Řádek si v dataset.anchor pamatuje, co uživatel zadal naposled; změna
-// vstupu, směru nebo instrumentu přepočítá tu druhou hodnotu. Otevření
-// obchodu nepřepočítává nic (stejně jako u P/L).
-const SR_ENUMS={srTarget:'SR_TARGET',srStopLoss:'SR_SL'};
-function srFormContext(){
- return {entry:$('entryPrice')?.value,side:$('side')?.value||'',tick:getTickSizeForInstrument($('instrument')?.value)};
+// Řádek bez ceny převzatý ze staršího zápisu (dva seznamy proti targetu /
+// proti S/L) si v dataset pamatuje původní stranu a ticky; doplněním ceny
+// o ně přijde (FJTaxonomy.sanitizeNearLevels) – cena je jediný zdroj pravdy.
+const NEAR_LEVELS_ID='nearLevels';
+function formatLevelRow(r,geometry){
+ const test=r.testState&&contextFieldShown('levelTestState')?' ('+FJTaxonomy.TEST_STATE[r.testState]+')':'';
+ const dist=FJContext.levelDistanceText(geometry);
+ return FJTaxonomy.labelOf('NEAR_LEVEL',r.level)+(r.price!=null?' @ '+r.price:'')+test+(dist?' · '+dist:'');
 }
-function formatLevelRow(enumName,r){
- return FJTaxonomy.labelOf(enumName,r.level)+(r.price!=null?' @ '+r.price:'')+(r.ticksFromEntry!=null?' · '+r.ticksFromEntry+' t':'');
-}
-function recomputeLevelRow(field,el){
- const {entry,side,tick}=srFormContext();
- const price=el.querySelector('.sr-price'),ticks=el.querySelector('.sr-ticks'),warn=el.querySelector('.sr-warn');
- const blank=v=>String(v??'').trim()==='';
- const linked=FJPoints.srLinkEnabled(entry,tick);
- if(linked){
-  if(el.dataset.anchor==='price'){
-   const v=FJPoints.srTicksFromPrice(price.value,entry,tick);
-   ticks.value=blank(price.value)||v==null?'':v;
-  }else if(el.dataset.anchor==='ticks'&&FJPoints.directionOf(side)!=null){
-   const v=FJPoints.srPriceFromTicks(field,side,ticks.value,entry,tick);
-   price.value=blank(ticks.value)||v==null?'':v;
-  }
- }
- // Se zadanou cenou jsou ticky dopočet (A1.1) – needitují se, ukazují se se
- // znaménkem pod řádkem (renderSrDistances). Ruční ticky jen bez ceny, nebo
- // když přepočet nejde (chybí tick / vstup).
- syncSrTicksLock(el,linked);
- if(warn){
-  // Stranu volí uživatel a je to význam, ne poloha: zóna chránící SL smí
-  // ležet i na vstupu nebo nad vstupem do longu – ta se nehlásí. Upozornění
-  // (FJContext.srRowNotes) jen informují, uložení neblokují.
-  const msgs=blank(price.value)?[]:FJContext.srRowNotes(field,{price:price.value},srCheckDraft(),tick);
-  if(!blank(ticks.value)&&Number(ticks.value)<0)msgs.push('Vzdálenost zadávej kladně, stranu určuje pole.');
-  warn.textContent=msgs.join(' ');
- }
-}
-// Se zadanou cenou jsou ticky dopočet (A1.1): pole se schová a ukáže se
-// znaménková vzdálenost pod řádkem. Volá se i z renderSrDistances, protože
-// při otevření obchodu se řádky vykreslí dřív, než formulář zná vstup.
-function syncSrTicksLock(el,linked){
- const ticks=el.querySelector('.sr-ticks'),price=el.querySelector('.sr-price'); if(!ticks||!price)return;
- // Jen když je vstupem cena (anchor). Řádek zadaný v ticích si cenu
- // dopočítá a ticky zůstanou k úpravě – jinak by pole zmizelo pod rukama.
- const lock=linked&&el.dataset.anchor==='price'&&String(price.value??'').trim()!=='';
- ticks.readOnly=lock;
- ticks.style.display=lock?'none':'';
-}
-// Vstup, směr, SL a cíl z formuláře pro dopočty SR řádků (stejné hodnoty, jaké
+// Vstup, směr, SL a cíl z formuláře pro dopočty hladin (stejné hodnoty, jaké
 // se uloží – včetně SL / cíle dopočtených z výstupu).
-function srCheckDraft(){
+function levelsDraft(){
  const d=postExitDraftFromForm();
- return {side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,targetLevel1:{price:d.targetLevel1?.price}};
+ return {instrument:d.instrument,side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,targetLevel1:{price:d.targetLevel1?.price}};
 }
-function recomputeAllLevelRows(){
- for(const field of Object.keys(SR_ENUMS))document.querySelectorAll('#'+field+' .sr-row').forEach(el=>recomputeLevelRow(field,el));
- renderSrLinkNote();
- updateLevelsSummary();
+function rowFromElement(el){
+ const row={
+  level:el.querySelector('.sr-level')?.value||'',
+  price:el.querySelector('.sr-price')?.value,
+  testState:el.querySelector('.sr-test')?.value||''
+ };
+ if(el.dataset?.legacySide){row.legacySide=el.dataset.legacySide;row.ticksFromEntry=el.dataset.legacyTicks}
+ return row;
 }
-function renderSrLinkNote(){
- const note=$('srLinkNote'); if(!note)return;
- const {entry,side,tick}=srFormContext();
- if(!(Number(tick)>0))note.textContent='Přepočet cena ↔ ticky je vypnutý: instrument nemá velikost ticku (doplň ji v šabloně instrumentu). Cena i ticky se uloží, jak je zadáš.';
- else if(String(entry??'').trim()===''||!Number.isFinite(Number(entry)))note.textContent='Přepočet cena ↔ ticky je vypnutý: chybí cena vstupu. Cena i ticky se uloží, jak je zadáš.';
- else if(FJPoints.directionOf(side)==null)note.textContent='Bez směru obchodu se z ticků cena nedopočítá (nejde určit stranu). Z ceny se ticky dopočítají.';
- else note.textContent='';
-}
-window.appendLevelRow=(field,row={})=>{
- const host=$(field),enumName=SR_ENUMS[field]; if(!host||!enumName)return null;
+window.appendLevelRow=(row={})=>{
+ const host=$(NEAR_LEVELS_ID); if(!host)return null;
  const el=document.createElement('div');
  el.className='sr-row';
- const options=FJTaxonomy.visibleOptions(enumName,row.level?[row.level]:[]);
+ const options=FJTaxonomy.visibleOptions('NEAR_LEVEL',row.level?[row.level]:[]).filter(o=>o.key!=='NONE');
  el.innerHTML=`<select class="sr-level" aria-label="Typ hladiny"><option value="">— hladina —</option>${options.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('')}</select>`
   +'<input class="sr-price" type="number" step="any" placeholder="cena" aria-label="Cena hladiny">'
-  +'<input class="sr-ticks" type="number" step="any" min="0" placeholder="ticky od vstupu" aria-label="Vzdálenost od vstupu v ticích">'
-  +'<select class="sr-test" aria-label="Netest / test" title="Netest = cena se hladiny v seanci ještě nedotkla"><option value="">— test? —</option><option value="UNTESTED">netest</option><option value="TESTED">test</option></select>'
-  +'<button type="button" class="icon sr-remove" title="Odebrat hladinu">✕</button><div class="sub sr-dist"></div><div class="sub post-exit-warn sr-warn"></div>';
+  +'<select class="sr-test" data-ctx-field="levelTestState" aria-label="Netest / test" title="Netest = cena se hladiny v seanci ještě nedotkla"><option value="">— test? —</option><option value="UNTESTED">netest</option><option value="TESTED">test</option></select>'
+  +'<button type="button" class="icon sr-remove" title="Odebrat hladinu">✕</button><div class="sub sr-dist"></div>';
  el.querySelector('.sr-level').value=row.level||'';
  el.querySelector('.sr-price').value=row.price!=null?row.price:'';
- el.querySelector('.sr-ticks').value=row.ticksFromEntry!=null?row.ticksFromEntry:'';
  el.querySelector('.sr-test').value=row.testState||'';
- el.dataset.anchor=row.price!=null?'price':(row.ticksFromEntry!=null?'ticks':'');
+ if(row.price==null&&row.legacySide){
+  el.dataset.legacySide=row.legacySide;
+  el.dataset.legacyTicks=row.ticksFromEntry!=null?row.ticksFromEntry:'';
+ }
  el.querySelector('.sr-level').addEventListener('change',()=>updateLevelsSummary());
- el.querySelector('.sr-price').addEventListener('input',()=>{el.dataset.anchor='price';recomputeLevelRow(field,el);updateLevelsSummary()});
- el.querySelector('.sr-ticks').addEventListener('input',()=>{el.dataset.anchor='ticks';recomputeLevelRow(field,el);updateLevelsSummary()});
+ el.querySelector('.sr-price').addEventListener('input',()=>{renderLevelDistances();updateLevelsSummary()});
+ el.querySelector('.sr-test').addEventListener('change',()=>updateLevelsSummary());
  el.querySelector('.sr-remove').addEventListener('click',()=>{el.remove();updateLevelsSummary()});
  host.appendChild(el);
- syncSrNoneControls();
+ if(typeof applyContextFieldVisibility==='function')applyContextFieldVisibility();
+ syncNearNoneControls();
  return el;
 };
-// „Žádná hladina v cestě" odlišuje „nic tam nebylo" od „nevyplněno" (štítek
-// Neúplné). Se zadanými řádky si odporuje, proto:
+// „Žádná hladina v blízkosti" odlišuje „nic tam nebylo" od „nevyplněno"
+// (štítek Neúplné). Se zadanými řádky si odporuje, proto:
 //  - dokud jsou řádky, zaškrtnout nejde (a případné zaškrtnutí se zruší),
 //  - zaškrtnuté pole zneaktivní „Přidat hladinu".
 // Řádky se nikdy nemažou kvůli zaškrtnutí – vyplněná data se neztratí.
-function syncSrNoneControls(){
- for(const field of Object.keys(SR_ENUMS)){
-  const box=$(field+'None'); if(!box)continue;
-  const hasRows=!!$(field)?.querySelector?.('.sr-row');
-  if(hasRows)box.checked=false;
-  box.disabled=hasRows;
-  const label=box.closest?.('.sr-none');
-  if(label){
-   label.classList.toggle('is-disabled',hasRows);
-   label.title=hasRows?'Nejdřív odeber zadané hladiny.':'Zaškrtni, když mezi vstupem a cílem / Stop Lossem žádná hladina nebyla.';
-  }
-  const add=$(field+'Add');
-  if(add)add.disabled=box.checked;
+function syncNearNoneControls(){
+ const box=$(NEAR_LEVELS_ID+'None'); if(!box)return;
+ const hasRows=!!$(NEAR_LEVELS_ID)?.querySelector?.('.sr-row');
+ if(hasRows)box.checked=false;
+ box.disabled=hasRows;
+ const label=box.closest?.('.sr-none');
+ if(label){
+  label.classList.toggle('is-disabled',hasRows);
+  label.title=hasRows?'Nejdřív odeber zadané hladiny.':'Zaškrtni, když v blízkosti obchodu (mezi Stop Lossem a cílem ani těsně za nimi) žádná hladina nebyla.';
  }
+ const add=$(NEAR_LEVELS_ID+'Add');
+ if(add)add.disabled=box.checked;
 }
-function readSrNone(field){
- return $(field+'None')?.checked===true&&readLevelRows(field).length===0;
+function readNearNone(){
+ return $(NEAR_LEVELS_ID+'None')?.checked===true&&readLevelRows().length===0;
 }
-function renderLevelRows(field,rows){
- const host=$(field); if(!host)return;
+function renderLevelRows(rows){
+ const host=$(NEAR_LEVELS_ID); if(!host)return;
  host.innerHTML='';
- for(const r of FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],rows))appendLevelRow(field,r);
- renderSrLinkNote();
+ for(const r of FJTaxonomy.sanitizeNearLevels('NEAR_LEVEL',rows))appendLevelRow(r);
 }
-function readLevelRows(field){
- const host=$(field); if(!host)return [];
- const rows=[...host.querySelectorAll('.sr-row')].map(el=>({
-  level:el.querySelector('.sr-level')?.value||'',
-  price:el.querySelector('.sr-price')?.value,
-  ticksFromEntry:el.querySelector('.sr-ticks')?.value,
-  testState:el.querySelector('.sr-test')?.value||''
- }));
- return FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],rows);
+function readLevelRows(){
+ const host=$(NEAR_LEVELS_ID); if(!host)return [];
+ return FJTaxonomy.sanitizeNearLevels('NEAR_LEVEL',[...host.querySelectorAll('.sr-row')].map(rowFromElement));
 }
 // Počet hladin v konfluenci se NEEDITUJE ručně – dopočítává se z vybraných
 // hladin, aby nemohl uletět od skutečnosti.
@@ -3157,19 +3174,18 @@ function updateConfluenceHint(){
 // Shrnutí vybraných hladin do hlavičky sbalené položky. Bez něj by sbalení
 // schovalo i to, co u obchodu vyplněné je, a při editaci by nebylo poznat,
 // jestli tam něco je, bez rozkliknutí.
-const LEVEL_FIELDS=[['entryLevels','ENTRY_LEVEL','Vstup'],['srTarget','SR_TARGET','SR→TG'],['srStopLoss','SR_SL','SR→SL'],['ofConfirm','OF_CONFIRM','OF']];
+const LEVEL_FIELDS=[['entryLevels','ENTRY_LEVEL','Vstup'],[NEAR_LEVELS_ID,'NEAR_LEVEL','Hladiny'],['ofConfirm','OF_CONFIRM','OF']];
 function updateLevelsSummary(){
- syncSrNoneControls();
- if(typeof renderEntryLevelTests==='function')renderEntryLevelTests();
+ syncNearNoneControls();
  if(typeof renderContextDerived==='function')renderContextDerived();
  const out=$('levelsSummary'); if(!out)return;
  const parts=[];
  for(const [id,enumName,label] of LEVEL_FIELDS){
-  // SR pole jsou řádky s cenou / vzdáleností, ostatní dlaždice.
-  if(SR_ENUMS[id]){
-   const rows=readLevelRows(id);
-   if(rows.length)parts.push(label+': '+rows.map(r=>formatLevelRow(enumName,r)).join(', '));
-   else if(readSrNone(id))parts.push(label+': žádná');
+  // Hladiny v blízkosti jsou řádky s cenou, ostatní dlaždice.
+  if(id===NEAR_LEVELS_ID){
+   const rows=readLevelRows();
+   if(rows.length)parts.push(label+': '+rows.map(r=>formatLevelRow(r)).join(', '));
+   else if(readNearNone())parts.push(label+': žádná');
    continue;
   }
   const keys=readChipGrid(id,enumName);
@@ -3195,18 +3211,11 @@ function mergeContextFields(list){
  const lastExitSource=byExitDesc.find(t=>lastExitKeys.some(k=>hasValue(t,k)))||null;
  for(const field of FJTaxonomy.TRADE_CONTEXT_FIELDS){
   if(field.cardinality==='levelRows'){
-   // SR hladiny: sjednocení ŘÁDKŮ všech nohou. Identické řádky se sloučí,
-   // hodnoty se nepřepočítávají (sanitizeLevelRows).
-   const rows=FJTaxonomy.sanitizeLevelRows(field.enumName,list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]));
+   // Hladiny v blízkosti: sjednocení ŘÁDKŮ všech nohou. Shodné řádky (typ +
+   // cena) se sloučí, nic se nepřepočítává (sanitizeNearLevels). Noha ve
+   // starém tvaru (dva seznamy) se čte stejným převodem jako při migraci.
+   const rows=FJTaxonomy.sanitizeNearLevels(field.enumName,list.flatMap(t=>FJTaxonomy.nearLevelsOf(t)));
    if(rows.length)out[field.key]=rows;
-  }else if(field.cardinality==='levelTests'){
-   // Netest / test hladin vstupu: sjednocení map přes nohy (první vyplněný
-   // stav hladiny vyhrává), jen pro hladiny, které sloučený obchod má.
-   const union={};
-   for(const t of list)for(const [k,v] of Object.entries(t?.[field.key]&&typeof t[field.key]==='object'?t[field.key]:{}))if(!union[k])union[k]=v;
-   const levels=FJTaxonomy.sanitizeMulti(field.enumName,list.flatMap(t=>Array.isArray(t?.entryLevels)?t.entryLevels:[]));
-   const clean=FJTaxonomy.sanitizeLevelTests(levels,union);
-   if(clean)out[field.key]=clean;
   }else if(field.merge==='min'){
    // Nejdřívější hodnota (čas prvního zadání známky).
    const vals=list.map(t=>t?.[field.key]).filter(v=>v!==undefined&&v!==null&&v!=='').sort();
@@ -3216,7 +3225,7 @@ function mergeContextFields(list){
   }else if(field.noneFor){
    // „Žádná hladina" platí za celou pozici, jen když ji tvrdí všechny nohy
    // a žádná noha hladinu nezadala (řádky jsou v TRADE_CONTEXT_FIELDS dřív).
-   if(list.length&&list.every(t=>t?.[field.key]===true)&&!out[field.noneFor])out[field.key]=true;
+   if(list.length&&list.every(t=>FJTaxonomy.nearLevelsNoneOf(t))&&!out[field.noneFor])out[field.key]=true;
   }else if(field.cardinality==='multi'){
    const union=list.flatMap(t=>Array.isArray(t?.[field.key])?t[field.key]:[]);
    const clean=FJTaxonomy.sanitizeMulti(field.enumName,union);
@@ -3278,13 +3287,14 @@ function contextPillsHTML(t){
  // Skrytá karta Setup (Nastavení → Přizpůsobení) schová i své pilulky.
  if(typeof tradeCardShown==='function'&&!tradeCardShown('setup'))return parts.join(' ');
  if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
- if(t.trend)parts.push(`<span class="pill context-pill" title="Trend">${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
- if(t.trendHtf)parts.push(`<span class="pill context-pill" title="Trend 30m">30m: ${esc(FJTaxonomy.labelOf('TREND_HTF',t.trendHtf))}</span>`);
- if(t.grade){
-  const flags=[t.gradeEdited===true?'změněno dodatečně':'',FJContext.gradeRetro(t,typeof journalModeOf==='function'?journalModeOf(t):'LIVE')===true?'doplněno zpětně':''].filter(Boolean);
+ if(t.trend)parts.push(`<span class="pill context-pill" title="Trend 1m">1m: ${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
+ // Skryté pole kontextu (Nastavení → Přizpůsobení → Pole kontextu) schová
+ // i svou pilulku; data u obchodu zůstávají.
+ if(t.trendHtf&&contextFieldShown('trendHtf'))parts.push(`<span class="pill context-pill" title="Trend 30m">30m: ${esc(FJTaxonomy.labelOf('TREND_HTF',t.trendHtf))}</span>`);
+ if(t.grade&&contextFieldShown('grade')){
+  const flags=[t.gradeEdited===true?'změněno dodatečně':'',FJContext.gradeRetro(t,typeof journalModeOf==='function'?journalModeOf(t):'LIVE',typeof settings==='undefined'?undefined:settings?.gradeRetroGraceMinutes)===true?'doplněno zpětně':''].filter(Boolean);
   parts.push(`<span class="pill context-pill${flags.length?' grade-flag':''}" title="Známka${flags.length?' – '+esc(flags.join(', ')):''}">Známka ${esc(FJTaxonomy.labelOf('GRADE',t.grade))}${flags.length?' *':''}</span>`);
  }
- if(t.liquiditySwept)parts.push(`<span class="pill context-pill" title="Vybraná likvidita před vstupem">Likvidita: ${esc(FJTaxonomy.labelOf('LIQUIDITY_SWEPT',t.liquiditySwept))}</span>`);
  if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
  return parts.join(' ');
 }
@@ -3293,7 +3303,9 @@ function contextPillsHTML(t){
 // kompaktní. Počítají se jen karty, které jsou zobrazené a mají zapnuté
 // „Upozorňovat na nevyplněné" (Nastavení → Přizpůsobení, tradeCardConfig).
 function incompleteBadgeHTML(t){
- const labels=FJTaxonomy.missingForCards(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig);
+ const labels=FJTaxonomy.missingForCards(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig,undefined,
+  typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig,
+  {dayContextMissing:typeof dayContextMissingFor==='function'&&dayContextMissingFor(t)});
  if(!labels.length)return '';
  return `<span class="pill incomplete-pill" title="Chybí: ${esc(labels.join(', '))}">⚠ Neúplné · ${labels.length}</span>`;
 }
@@ -3323,27 +3335,20 @@ function cachedDayOrder(rows){
 }
 function tradeDerived(t){
  const own=!t?.journalId||t.journalId===activeJournalId;
- return FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(t?.instrument),dayOrder:own?cachedDayOrder(trades):null,mode:journalModeOf(t)});
+ return FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(t?.instrument),dayOrder:own?cachedDayOrder(trades):null,mode:journalModeOf(t),gradeRetroGraceMin:settings.gradeRetroGraceMinutes});
 }
 function levelPillsHTML(t){
  const parts=[];
  const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
- const levelTests=t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{};
- const levelName=k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)+(levelTests[k]?' ('+FJTaxonomy.TEST_STATE[levelTests[k]]+')':'');
- if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(levelName).join(' + '))}${t.entryTestNo?' · '+esc(FJTaxonomy.labelOf('ENTRY_TEST_NO',t.entryTestNo)):''}</span>`);
- const srT=FJTaxonomy.sanitizeLevelRows('SR_TARGET',t.srTarget);
- // Vzdálenost od SL / před targetem se k řádku připíše jen pro zobrazení
- // (z uložené ceny SL a ceny targetu 1), uložená je jen ta od vstupu.
- const tick=getTickSizeForInstrument(t.instrument);
- const withDist=(field,enumName,r)=>{
-  const dist=srRefDistanceText(field,r.price,field==='srStopLoss'?t.slPrice:t.targetLevel1?.price,tick);
-  return formatLevelRow(enumName,r)+(dist?' · '+dist:'');
- };
- if(srT.length)parts.push(`<span class="pill context-pill" title="SR proti targetu (cena · vzdálenost od vstupu v ticích · před targetem)">SR→TG: ${esc(srT.map(r=>withDist('srTarget','SR_TARGET',r)).join(', '))}</span>`);
- else if(t.srTargetNone===true)parts.push('<span class="pill context-pill" title="SR proti targetu: žádná hladina v cestě">SR→TG: žádná</span>');
- const srS=FJTaxonomy.sanitizeLevelRows('SR_SL',t.srStopLoss);
- if(srS.length)parts.push(`<span class="pill context-pill" title="SR proti S/L (cena · vzdálenost od vstupu v ticích · od SL)">SR→SL: ${esc(srS.map(r=>withDist('srStopLoss','SR_SL',r)).join(', '))}</span>`);
- else if(t.srStopLossNone===true)parts.push('<span class="pill context-pill" title="SR proti S/L: žádná hladina v cestě">SR→SL: žádná</span>');
+ const testNo=t.entryTestNo&&contextFieldShown('entryTestNo')?' · '+FJTaxonomy.labelOf('ENTRY_TEST_NO',t.entryTestNo):'';
+ if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + ')+testNo)}</span>`);
+ // Hladiny v blízkosti: typ @ cena (test) · vzdálenosti v ticích. Vzdálenosti
+ // jsou dopočet z cen (FJContext.levelGeometry) – nic z nich se neukládá
+ // a žádná hladina tu nedostává roli. Obchod ve starém tvaru se čte převodem.
+ const d=typeof tradeDerived==='function'?tradeDerived(t):FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(t.instrument)});
+ const near=FJTaxonomy.nearLevelsOf(t);
+ if(near.length)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti (cena · od vstupu · od SL · do cíle, v ticích)">Hladiny: ${esc(near.map((r,i)=>formatLevelRow(r,d.nearLevels[i])).join(', '))}</span>`);
+ else if(FJTaxonomy.nearLevelsNoneOf(t))parts.push('<span class="pill context-pill" title="Hladiny v blízkosti: žádná">Hladiny: žádná</span>');
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
   if(!target)continue;
@@ -3352,12 +3357,11 @@ function levelPillsHTML(t){
  }
  const of=FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm);
  if(of.length)parts.push(`<span class="pill context-pill" title="Order flow potvrzení">OF: ${esc(of.map(k=>FJTaxonomy.labelOf('OF_CONFIRM',k)).join(', '))}</span>`);
- if(t.absLocation)parts.push(`<span class="pill context-pill" title="Absorpce – kde">Absorpce: ${esc(FJTaxonomy.labelOf('ABS_LOCATION',t.absLocation))}</span>`);
- if(t.pathProfile)parts.push(`<span class="pill context-pill" title="Profil cesty k cíli">Cesta: ${esc(FJTaxonomy.labelOf('PATH_PROFILE',t.pathProfile))}</span>`);
- // Dopočty se přidávají jen k vyplněným hladinám a do počtu se nepočítají –
+ if(t.absLocation&&contextFieldShown('absLocation'))parts.push(`<span class="pill context-pill" title="Absorpce – kde">Absorpce: ${esc(FJTaxonomy.labelOf('ABS_LOCATION',t.absLocation))}</span>`);
+ // Řádek dopočtů se přidává jen k vyplněným hladinám a do počtu se nepočítá –
  // počet říká, jestli má obchod co rozbalovat.
  const count=parts.length;
- const derived=count&&typeof tradeDerived==='function'?FJContext.derivedSummaryParts(tradeDerived(t)):[];
+ const derived=count&&contextFieldShown('derivedRow')?FJContext.derivedSummaryParts(d,{levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',near[i]?.level)}):[];
  if(derived.length)parts.push(`<span class="pill context-pill derived-pill" title="Dopočítáno z cen – needituje se">${esc(derived.join(' · '))}</span>`);
  return {html:parts.join(' '),count};
 }
@@ -3533,6 +3537,10 @@ function tradeHTML(t){
  // štítek, že je ve výchozím stavu mimo P/L.
  const hypo=hypotheticalGroup(t);
  const hypoBadge=hypo?`<span class="pill hypo-pill" title="Hypotetický obchod – co by to udělalo. Ve výchozím stavu mimo P/L a statistiky výkonu (přepínač „${hypo==='noFill'?'včetně no fill obchodů':'včetně vědomě vynechaných'}“).">hypoteticky</span>`:'';
+ // Dokup: pozice má víc vstupů. Počítá se z nohou (FJPoints.entriesOf), nic
+ // dalšího se neukládá; skrýt jde v Přizpůsobení → Pole kontextu.
+ const entries=(typeof contextFieldShown!=='function'||contextFieldShown('entries'))?FJPoints.entriesOf(t):[];
+ const entriesRow=entries.length>1?`<div class="sub" style="margin-top:2px" title="Vstupy pozice. Cíl označený „dokup“ zavírá dokoupené kontrakty a jeho body se počítají od ceny dokupu.">Vstupy: ${entries.map((e,i)=>`${i?'dokup ':''}${e.contracts} @ ${FJPoints.roundPoints(e.price)}${i&&e.time?` (${esc(e.time)})`:''}`).join(' · ')}</div>`:'';
  const setupInfo=[];
  if(t.missedByTicks!=null&&t.missedByTicks!=='')setupInfo.push(`minuto o ${esc(t.missedByTicks)} t`);
  if(t.setupMaxFavorableTicks!=null&&t.setupMaxFavorableTicks!=='')setupInfo.push(`max ${esc(t.setupMaxFavorableTicks)} t ve směru`);
@@ -3544,7 +3552,8 @@ function tradeHTML(t){
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
  ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}${t.plannedRMultiple!=null&&shown('sltp')?` · <span title="Plánované R: nejvzdálenější target ÷ riziko">plán R <b>${Number(t.plannedRMultiple).toFixed(2)}</b></span>`:''}</div>`:''}
  ${setupInfo.length?`<div class="sub" style="margin-top:2px" title="Ze záznamu setupu bez vstupu">${setupInfo.join(' · ')}</div>`:''}
- ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map(legPillHTML).join('')}</div>`:''}
+ ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map((l,i)=>legPillHTML(l,i,t)).join('')}</div>`:''}
+ ${entriesRow}
  </div>
  ${(ctxPills||levelsBlock)?`<div>${ctxPills?`<div class="trade-legs" style="margin-top:6px">${ctxPills}</div>`:''}${levelsBlock}</div>`:''}
  <div><div class="meta">Kontrakty: ${t.contracts}</div>${shown('setup')?`<div class="meta">Plán: ${t.planFollowed==='ano'?'dodržen':'nedodržen'}</div>`:''}</div>
@@ -3637,7 +3646,7 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span>${note.dayContext?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
+ <span class="date">${date}</span>${note.dayContext&&contextFieldShown('dayContext')?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
  <div class="spacer"></div>
  ${levelsBtn}
  ${excludedHTML}
@@ -3862,7 +3871,7 @@ function renderCalendar(){
   const flagCls=violations.length?'risk':(achievements.length?'goal':'');
   const title=[...violations,...achievements].join(' | ');
   // ☀ = den má kontext dne (jen aktivní deník – kontext patří deníku).
-  const ctxSummary=!scope&&typeof getDayNote==='function'?dayContextSummary(getDayNote(date).dayContext):'';
+  const ctxSummary=!scope&&typeof getDayNote==='function'&&contextFieldShown('dayContext')?dayContextSummary(getDayNote(date).dayContext):'';
   html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" onclick="showDay('${date}')" ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}${ctxSummary?`<div class="day-ctx-flag" title="Kontext dne: ${esc(ctxSummary)}">☀</div>`:''}</div>`;
   weekPnl+=p;weekCount+=ts.length;
   cellsInRow++;
@@ -3918,7 +3927,8 @@ function goToJournalForDate(date){
 function dayContextSummary(dc){
  if(!dc)return '';
  const parts=[];
- for(const k of Object.keys(FJContext.DAY_CONTEXT))if(dc[k])parts.push(FJContext.DAY_CONTEXT[k][dc[k]]);
+ // Popisek z číselníku deníku (Nastavení → Číselníky → Kontext dne).
+ for(const k of FJContext.DAY_CONTEXT_FIELDS)if(dc[k])parts.push(FJContext.dayContextLabel(k,dc[k]));
  return parts.join(' · ');
 }
 // Týž renderer slouží i oknu „☀ Kontext dne“ v Deníku (box + onSaved) – tam
@@ -3930,8 +3940,8 @@ function renderDayContextBox(date,box=$('dayContextBox'),opts={}){
  if(scope){box.innerHTML='<div class="sub" style="margin-bottom:10px">Kontext dne jde upravit jen u aktivního deníku (výběr „Aktivní deník“).</div>';return}
  if(!date){box.innerHTML='<div class="sub">Vyber datum.</div>';return}
  const dc=getDayNote(date).dayContext||{};
- const group=k=>`<div class="day-context-group${FJContext.DAY_CONTEXT_EVENING.includes(k)?' evening':''}" data-key="${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}${FJContext.DAY_CONTEXT_EVENING.includes(k)?' <span class="sub">— večer</span>':' <span class="sub">— ráno</span>'}</div><div class="chip-grid">${Object.entries(FJContext.DAY_CONTEXT[k]).map(([v,label])=>`<span class="chip${dc[k]===v?' on':''}" data-value="${esc(v)}" role="button" tabindex="0">${esc(label)}</span>`).join('')}</div></div>`;
- box.innerHTML=`<div class="day-context-card"><div class="day-context-title">Kontext dne ${esc(date)} <span class="sub">— platí pro všechny obchody dne, kliknutím se uloží</span></div>${Object.keys(FJContext.DAY_CONTEXT).map(group).join('')}</div>`;
+ const group=k=>`<div class="day-context-group${FJContext.DAY_CONTEXT_EVENING.includes(k)?' evening':''}" data-key="${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}${FJContext.DAY_CONTEXT_EVENING.includes(k)?' <span class="sub">— večer</span>':' <span class="sub">— ráno</span>'}</div><div class="chip-grid">${FJContext.dayContextOptions(k,dc[k]).map(o=>`<span class="chip${dc[k]===o.key?' on':''}" data-value="${esc(o.key)}" role="button" tabindex="0">${esc(o.label)}${o.hidden?' (skrytá)':''}</span>`).join('')}</div></div>`;
+ box.innerHTML=`<div class="day-context-card"><div class="day-context-title">Kontext dne ${esc(date)} <span class="sub">— platí pro všechny obchody dne, kliknutím se uloží</span></div>${FJContext.DAY_CONTEXT_FIELDS.map(group).join('')}</div>`;
  box.querySelectorAll('.day-context-group').forEach(g=>{
   const key=g.dataset.key;
   g.querySelectorAll('.chip').forEach(chip=>{
@@ -3984,7 +3994,7 @@ function renderDayContextModal(focusFirst){
  if(!focusFirst||!date)return;
  // Fokus na první nevyplněnou skupinu – nejdřív ranní, pak večerní.
  const dc=getDayNote(date).dayContext||{};
- const key=FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k])||Object.keys(FJContext.DAY_CONTEXT).find(k=>!dc[k])||FJContext.DAY_CONTEXT_MORNING[0];
+ const key=FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k])||FJContext.DAY_CONTEXT_FIELDS.find(k=>!dc[k])||FJContext.DAY_CONTEXT_MORNING[0];
  const g=box.querySelector(`.day-context-group[data-key="${key}"]`);
  (g?.querySelector('.chip.on')||g?.querySelector('.chip'))?.focus();
 }
@@ -4135,19 +4145,20 @@ function openModal(t=null,{title}={}){
  if(typeof NEW_SINGLE_FIELDS!=='undefined'){
   for(const [id,group] of NEW_SINGLE_FIELDS)renderSingleChipGrid(id,group,t&&t[id]);
   renderSingleChipGrid('grade','GRADE',t&&t.grade);
-  formLevelTests={...(t&&t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{})};
   renderGradeNote(t);
  }
  renderChipGrid('entryLevels','ENTRY_LEVEL',t&&t.entryLevels);
- renderLevelRows('srTarget',t&&t.srTarget);
- renderLevelRows('srStopLoss',t&&t.srStopLoss);
- // Zaškrtnutí až po řádcích: syncSrNoneControls ho u obchodu s řádky zruší.
- for(const field of Object.keys(SR_ENUMS))if($(field+'None'))$(field+'None').checked=!!(t&&t[field+'None']===true);
+ // Hladiny v blízkosti – obchod ve starém tvaru (dva seznamy SR) se načte
+ // stejným převodem jako při migraci deníku.
+ renderLevelRows(FJTaxonomy.nearLevelsOf(t));
+ // Zaškrtnutí až po řádcích: syncNearNoneControls ho u obchodu s řádky zruší.
+ if($(NEAR_LEVELS_ID+'None'))$(NEAR_LEVELS_ID+'None').checked=FJTaxonomy.nearLevelsNoneOf(t);
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
  updateConfluenceHint();
  // Karty formuláře se otevřou tak, jak je uživatel naposledy nechal.
  applyTradeSectionsOpenState();
  if(typeof applyTradeCardVisibility==='function')applyTradeCardVisibility();
+ if(typeof applyContextFieldVisibility==='function')applyContextFieldVisibility();
  updateLevelsSummary();
  if($('extraLegsField'))$('extraLegsField').style.display='';
  if(t){
@@ -4177,6 +4188,12 @@ function openModal(t=null,{title}={}){
    legs.slice(1).forEach(l=>{
     const row=appendBlankLegRow();
     row.querySelector('.leg-label').value=l.label||'';
+    // Vlastní vstup jen u dokupu; čas dokupu a výstupní exekuce se formulářem
+    // needitují, jen se přenesou do uloženého cíle.
+    const scaleIn=FJPoints.legIsScaleIn(l,t);
+    row.querySelector('.leg-entryPrice').value=scaleIn?l.entryPrice:'';
+    row.dataset.entryTime=scaleIn?(l.entryTime||''):'';
+    row.dataset.exitExecutionId=l.exitExecutionId||'';
     row.querySelector('.leg-exitTime').value=l.exitTime||'';
     row.querySelector('.leg-exitPrice').value=l.exitPrice??'';
     row.querySelector('.leg-result').value=l.result||'target';
@@ -4215,6 +4232,7 @@ function legRowHTML(id){
  legRowSeq++;
  return `<div class="leg-row" data-leg-id="${id}">
   <input class="leg-label" placeholder="TP${legRowSeq+1}" value="TP${legRowSeq+1}">
+  <input class="leg-entryPrice" type="number" step="any" placeholder="Vstup" data-ctx-field="entries" title="Vstupní cena tohoto cíle – vyplň jen u dokoupených kontraktů (dokup). Prázdné = vstupní cena obchodu.">
   <input class="leg-exitTime" type="time" title="Čas výstupu">
   <input class="leg-exitPrice" type="number" step="any" placeholder="Cena výstupu">
   <span class="pill leg-result-badge" title="Výsledek cíle se dopočítá ze zisku/ztráty">—</span><input type="hidden" class="leg-result" value="">
@@ -4228,8 +4246,11 @@ function legRowHTML(id){
 // Cíl (leg) sdílí s obchodem vstupní cenu a směr, vlastní má cenu výstupu,
 // počet kontraktů a komisi. Znaménko hrubého výsledku plyne ze směru a cen,
 // ne z ručně vybraného výsledku – ten je naopak odvozený z čisté částky.
+// Výjimka je cíl, který zavírá dokoupené kontrakty: ten má v poli „Vstup"
+// cenu dokupu a body se počítají od ní.
 function recomputeLegRow(row){
- const entryVal=$('entryPrice').value;
+ const ownEntry=row.querySelector('.leg-entryPrice')?.value??'';
+ const entryVal=ownEntry!==''?ownEntry:$('entryPrice').value;
  const exitVal=row.querySelector('.leg-exitPrice').value;
  if(entryVal!==''&&exitVal!==''){
   const e=Number(entryVal), x=Number(exitVal);
@@ -4260,6 +4281,7 @@ function wireLegRow(row){
  // přidání i odebrání cíle je musí překreslit – viz postExitDraftFromForm.
  row.querySelector('.remove-leg').onclick=()=>{row.remove();renderPostExitHints()};
  row.querySelector('.leg-exitPrice').addEventListener('input',()=>recomputeLegRow(row));
+ row.querySelector('.leg-entryPrice').addEventListener('input',()=>recomputeLegRow(row));
  row.querySelector('.leg-points').addEventListener('input',()=>recomputeLegRow(row));
  row.querySelector('.leg-contracts').addEventListener('input',()=>{applyTemplateCommissionToLegRow(row);recomputeLegRow(row)});
  row.querySelector('.leg-commission').addEventListener('input',()=>recomputeLegRow(row));
@@ -4278,6 +4300,10 @@ function appendBlankLegRow(){
  const id=crypto.randomUUID();
  $('extraLegsList').insertAdjacentHTML('beforeend', legRowHTML(id));
  const row=$('extraLegsList').querySelector(`[data-leg-id="${id}"]`);
+ // Skryté pole „Vstupy a dokupy": pole zmizí, hodnota v něm zůstává a uloží se.
+ const showEntry=contextFieldShown('entries');
+ row.classList.toggle('no-entry',!showEntry);
+ row.querySelector('.leg-entryPrice').style.display=showEntry?'':'none';
  wireLegRow(row);
  return row;
 }
@@ -4291,6 +4317,9 @@ function resetLegRows(){ if($('extraLegsList'))$('extraLegsList').innerHTML=''; 
 function readLegRows(){
  return [...document.querySelectorAll('#extraLegsList .leg-row')].map((row,i)=>({
   label:row.querySelector('.leg-label').value.trim()||`TP${i+2}`,
+  entryPrice:(v=>v===undefined||v===null||v===''||!Number.isFinite(Number(v))?null:Number(v))(row.querySelector('.leg-entryPrice')?.value),
+  entryTime:row.dataset?.entryTime||'',
+  exitExecutionId:row.dataset?.exitExecutionId||'',
   exitTime:row.querySelector('.leg-exitTime').value,
   exitPrice:Number(row.querySelector('.leg-exitPrice').value)||0,
   result:row.querySelector('.leg-result').value,
@@ -4506,7 +4535,7 @@ function renderPostExitHints(){
  }
  renderCourseHints();
  renderRiskInfo();
- renderSrDistances();
+ renderLevelDistances();
  renderTradeSections();
 }
 // Pohyb ceny (MFE, MAE, ticky po výstupu) a jejich dopočty.
@@ -4582,60 +4611,65 @@ function renderRiskInfo(){
  if(slPoints==null){out.textContent='Bez ceny Stop Lossu se R nepočítá.';return}
  out.textContent=`Riziko ${slPoints} b na kontrakt`+(planned!=null?` · plánované R ${planned}`:' · plánované R: doplň cenu targetu');
 }
-// Vzdálenost SR hladiny od SL (SR proti S/L) a před targetem (SR proti
-// targetu) v ticích – jen zobrazení. Uložená vzdálenost zůstává od vstupu
-// (ticksFromEntry), na ní stojí analýza v Backtest Labu.
-function srRefDistanceText(field,price,ref,tick){
- const n=FJPoints.srTicksFromPrice(price,ref,tick);
- if(n==null)return '';
- return field==='srStopLoss'?`${n} t od SL`:`${n} t před targetem`;
-}
-function renderSrDistances(){
+// Vzdálenosti hladiny pod řádkem ve formuláři: od vstupu, od Stop Lossu a do
+// cíle, v ticích – čistá geometrie z cen (FJContext.levelGeometry), žádný
+// štítek role ani varování. Jen zobrazení, nic se neukládá. Řádek bez ceny ze
+// staršího zápisu ukáže, co o něm deník ví (strana a ticky od vstupu).
+function renderLevelDistances(){
  if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
- // Poznámka o přepočtu cena ↔ ticky: openModal vykresluje SR řádky dřív, než
- // vyplní instrument a vstup, takže by po otevření obchodu tvrdila, že tick
- // chybí. Obnovuje se proto s každým dopočtem.
- renderSrLinkNote();
- const d=postExitDraftFromForm();
- const tick=getTickSizeForInstrument(d.instrument);
- const refs={srStopLoss:d.slPrice,srTarget:d.targetLevel1?.price};
- const draft={side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,targetLevel1:{price:d.targetLevel1?.price}};
- const linked=FJPoints.srLinkEnabled(d.entryPrice,tick);
- for(const field of Object.keys(SR_ENUMS)){
-  document.querySelectorAll('#'+field+' .sr-row').forEach(el=>{
-   syncSrTicksLock(el,linked);
-   const box=el.querySelector('.sr-dist'); if(!box)return;
-   const price=el.querySelector('.sr-price')?.value;
-   const parts=[];
-   // Znaménková vzdálenost od vstupu – dopočet z ceny, + k cíli, − k SL.
-   const signed=FJContext.srRowMetrics(field,{price},draft,tick).ticksFromEntrySigned;
-   if(signed!=null)parts.push(`${signed>0?'+':signed<0?'−':''}${Math.abs(signed)} t od vstupu ${signed>0?'k cíli':signed<0?'k SL':''}`.trim()+' — dopočítáno z ceny');
-   const ref=srRefDistanceText(field,price,refs[field],tick);
-   if(ref)parts.push(ref);
-   box.textContent=parts.join(' · ');
-   const warn=el.querySelector('.sr-warn');
-   if(warn&&String(price??'').trim()!=='')warn.textContent=FJContext.srRowNotes(field,{price},draft,tick).join(' ');
-  });
+ const draft=levelsDraft();
+ const tick=getTickSizeForInstrument(draft.instrument);
+ document.querySelectorAll('#'+NEAR_LEVELS_ID+' .sr-row').forEach(el=>{
+  const box=el.querySelector('.sr-dist'); if(!box)return;
+  const row=rowFromElement(el);
+  const hasPrice=String(row.price??'').trim()!=='';
+  const text=FJContext.levelDistanceText(FJContext.levelGeometry(hasPrice?{price:row.price}:row,draft,tick));
+  const legacy=!hasPrice&&row.legacySide?'starší zápis bez ceny ('+(row.legacySide==='TG'?'směrem k cíli':'směrem k SL')+') – doplň cenu':'';
+  box.textContent=[text,legacy].filter(Boolean).join(' · ');
+ });
+ // Proč se vzdálenosti nepočítají – jednou pod seznamem, ne u každého řádku.
+ const note=$('nearLevelsNote');
+ if(note){
+  const hasRows=!!$(NEAR_LEVELS_ID)?.querySelector?.('.sr-row');
+  if(!hasRows)note.textContent='';
+  else if(!(Number(tick)>0))note.textContent='Vzdálenosti se nepočítají: instrument nemá velikost ticku (doplň ji v šabloně instrumentu).';
+  else if(String(draft.entryPrice??'').trim()===''||!Number.isFinite(Number(draft.entryPrice)))note.textContent='Vzdálenosti se nepočítají: chybí cena vstupu.';
+  else if(FJPoints.directionOf(draft.side)==null)note.textContent='Vzdálenosti se nepočítají: chybí směr obchodu.';
+  else note.textContent='';
  }
  renderContextDerived();
 }
-// Dopočty kontextu (A3) z toho, co je právě ve formuláři: cesta k cíli, zóny
-// chránící SL, pořadí obchodu v dni, seance. Jen zobrazení, nic se neukládá.
+// Pořadí v dni pro obchod otevřený ve formuláři – s datem a časem vstupu
+// z formuláře, jen u uloženého obchodu (nový ještě v deníku není). Počítá se
+// nad celým deníkem, proto jen když se změní deník, obchod, datum nebo čas
+// vstupu; řádek dopočtů se jinak překresluje s každým stiskem klávesy.
+let formDayOrder={rows:null,key:'',order:null};
+function formDayOrderFor(id,date,entryTime){
+ if(!id||!Array.isArray(trades))return null;
+ const key=id+'|'+date+'|'+entryTime;
+ if(formDayOrder.rows!==trades||formDayOrder.key!==key){
+  formDayOrder={rows:trades,key,order:FJContext.dayOrder(trades.map(x=>x.id===id?{...x,date,entryTime}:x))};
+ }
+ return formDayOrder.order;
+}
+// Řádek dopočtů (A3) z toho, co je právě ve formuláři: nejbližší hladina ve
+// směru obchodu, SL za hladinou, počty hladin v úsecích, pořadí obchodu
+// v dni, seance. Jen zobrazení, nic se neukládá.
 function renderContextDerived(){
  const box=$('contextDerived'); if(!box)return;
  const d=postExitDraftFromForm();
  const id=$('tradeId')?.value||'';
+ const rows=readLevelRows();
  const t={
   id,side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,
   date:$('date')?.value||'',entryTime:$('entryTime')?.value||'',
-  srTarget:readLevelRows('srTarget'),srStopLoss:readLevelRows('srStopLoss'),
-  srTargetNone:readSrNone('srTarget'),srStopLossNone:readSrNone('srStopLoss'),
+  nearLevels:rows,nearLevelsNone:readNearNone(),
   targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price},
   targetLevel1PriceDerived:$('targetLevel1Price')?.dataset?.derived==='1'
  };
- // Pořadí v dni jen u uloženého obchodu – nový ještě v deníku není.
- const order=id&&Array.isArray(trades)?FJContext.dayOrder(trades.map(x=>x.id===id?{...x,date:t.date,entryTime:t.entryTime}:x)):null;
- const parts=FJContext.derivedSummaryParts(FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(d.instrument),dayOrder:order}));
+ const order=formDayOrderFor(id,t.date,t.entryTime);
+ const derived=FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(d.instrument),dayOrder:order});
+ const parts=FJContext.derivedSummaryParts(derived,{levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',rows[i]?.level)});
  box.textContent=parts.length?'Dopočet: '+parts.join(' · '):'';
 }
 // ---- Karty formuláře obchodu (SL / TP, Pohyb ceny, Setup, Hladiny, Komentáře) ----
@@ -4655,13 +4689,12 @@ function applyTradeSectionsOpenState(){
 // karet. Stejná kontrola jako štítek „Neúplné" (FJTaxonomy.missingContextKeys).
 function formContextDraft(){
  const d=postExitDraftFromForm();
- const srNone=field=>typeof readSrNone==='function'&&readSrNone(field);
  return {...d,
   setupCode:$('setupCode')?.value||'',fillStatus:$('fillStatus')?.value||'',missedByTicks:$('missedByTicks')?.value??'',
   trend:readSingleChipGrid('trend','TREND'),entryLevels:readChipGrid('entryLevels','ENTRY_LEVEL'),
-  srTarget:readLevelRows('srTarget'),srStopLoss:readLevelRows('srStopLoss'),
-  srTargetNone:srNone('srTarget'),srStopLossNone:srNone('srStopLoss'),
+  nearLevels:readLevelRows(),nearLevelsNone:readNearNone(),
   ofConfirm:readChipGrid('ofConfirm','OF_CONFIRM'),
+  entryTestNo:readSingleChipGrid('entryTestNo','ENTRY_TEST_NO'),absLocation:readSingleChipGrid('absLocation','ABS_LOCATION'),
   trendHtf:readSingleChipGrid('trendHtf','TREND_HTF'),grade:readSingleChipGrid('grade','GRADE'),
   targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price}
  };
@@ -4690,7 +4723,7 @@ function renderTradeSections(){
  if(d.setupCode)setup.push(FJTaxonomy.labelOf('SETUP',d.setupCode));
  if(d.fillStatus&&d.fillStatus!=='FILLED')setup.push(FJTaxonomy.labelOf('FILL_STATUS',d.fillStatus));
  if(missedByApplies(d.fillStatus)&&val(d.missedByTicks))setup.push('minuto o '+d.missedByTicks+' t');
- if(d.trend)setup.push('trend '+FJTaxonomy.labelOf('TREND',d.trend));
+ if(d.trend)setup.push('trend 1m '+FJTaxonomy.labelOf('TREND',d.trend));
  if($('setupSummary'))$('setupSummary').textContent=setup.length?'— '+setup.join(' · '):'';
  const texts=['tradePlanSetup','tradePlanPsychology','tradePlanNote','comment'].filter(id=>val($(id)?.value)).length;
  const shots=typeof editImages!=='undefined'&&Array.isArray(editImages)?editImages.length:0;
@@ -4702,7 +4735,7 @@ function renderTradeSections(){
  // (Upozorňovat na nevyplněné, Nastavení → Přizpůsobení). Kam pole patří,
  // rozhoduje FJTaxonomy.missingContextByCard.
  const cfg=typeof tradeCardConfig==='undefined'?{}:tradeCardConfig;
- const missing=FJTaxonomy.missingContextByCard(d);
+ const missing=FJTaxonomy.missingContextByCard(d,undefined,typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig);
  for(const card of Object.keys(missing)){
   const el=$(card+'Missing'); if(!el)continue;
   const list=FJTaxonomy.cardWarns(cfg,card)?missing[card]:[];
@@ -4851,7 +4884,7 @@ function useDerivedCourse(key){
 let tradeSectionsFrame=0;
 const scheduleTradeSections=()=>{
  if(tradeSectionsFrame)return;
- tradeSectionsFrame=requestAnimationFrame(()=>{tradeSectionsFrame=0;renderSrDistances();renderTradeSections()});
+ tradeSectionsFrame=requestAnimationFrame(()=>{tradeSectionsFrame=0;renderLevelDistances();renderTradeSections()});
 };
 ['input','change','click'].forEach(ev=>$('tradeForm')?.addEventListener(ev,scheduleTradeSections));
 document.querySelectorAll('#tradeForm details.trade-section').forEach(card=>card.addEventListener('toggle',()=>{
@@ -4869,16 +4902,16 @@ document.querySelectorAll('#tradeForm details.trade-section').forEach(card=>card
 // sem, po jeho vlastním přepočtu) – výsledek nohy určuje odvozenou cenu SL.
 $('extraLegsList')?.addEventListener('input',renderPostExitHints);
 $('instrument')?.addEventListener('change',renderPostExitHints);
-// SR řádky: změna vstupu, směru nebo instrumentu přepočítá druhou hodnotu
-// u řádků, kde ji uživatel nezadal sám.
-['entryPrice','instrument'].forEach(id=>$(id)?.addEventListener('input',recomputeAllLevelRows));
-['side','instrument'].forEach(id=>$(id)?.addEventListener('change',recomputeAllLevelRows));
+// Hladiny v blízkosti: změna vstupu, směru nebo instrumentu mění jen dopočtené
+// vzdálenosti pod řádky – uložené hodnoty řádků (typ, cena, test) ne.
+['entryPrice','instrument'].forEach(id=>$(id)?.addEventListener('input',renderLevelDistances));
+['side','instrument'].forEach(id=>$(id)?.addEventListener('change',renderLevelDistances));
 $('wouldSkipLive')?.addEventListener('change',syncWouldSkipField);
 ['targetLevel1Type','targetLevel1Price','targetLevel2Type','targetLevel2Price'].forEach(id=>{
  $(id)?.addEventListener('input',()=>updateLevelsSummary());
  $(id)?.addEventListener('change',()=>updateLevelsSummary());
 });
-['srTargetNone','srStopLossNone'].forEach(id=>$(id)?.addEventListener('change',()=>updateLevelsSummary()));
+$(NEAR_LEVELS_ID+'None')?.addEventListener('change',()=>updateLevelsSummary());
 
 $('instrument').addEventListener('change',()=>{
  const tpl=findTemplate($('instrument').value);
@@ -5000,16 +5033,25 @@ $('tradeForm').addEventListener('submit',async e=>{
 
   const legRows=readLegRows();
   if(legRows.length){
+   // Vstup cíle se ukládá jen tam, kde se liší od vstupu obchodu (dokup) –
+   // ostatní cíle patří ke vstupu obchodu a jdou s ním, když ho uživatel změní.
+   // První cíl je v hlavních polích formuláře a vlastní pole „Vstup" nemá;
+   // jeho údaje se jen přenesou z uloženého obchodu.
+   const leg0=Array.isArray(existing?.legs)?existing.legs[0]:null;
    const leg1={
     label:'TP1', exitTime:obj.exitTime, exitPrice:Number(obj.exitPrice)||0,
     points:obj.points, pnl:obj.pnl, pnlRaw:obj.pnlRaw,
-    contracts:obj.contracts||1, result:obj.result, commission:obj.commission
+    contracts:obj.contracts||1, result:obj.result, commission:obj.commission,
+    ...(leg0&&FJPoints.legIsScaleIn(leg0,existing)?{entryPrice:leg0.entryPrice,...(leg0.entryTime?{entryTime:leg0.entryTime}:{})}:{}),
+    ...(leg0?.exitExecutionId?{exitExecutionId:leg0.exitExecutionId}:{})
    };
    const otherLegs=legRows.map(r=>({
     label:r.label, exitTime:r.exitTime||obj.exitTime, exitPrice:r.exitPrice||0,
     points:r.points, pnl:Math.abs(r.pnlTyped),
     pnlRaw:r.pnlTyped,
-    contracts:r.contracts, result:classifyResult(r.pnlTyped), commission:r.commission
+    contracts:r.contracts, result:classifyResult(r.pnlTyped), commission:r.commission,
+    ...(r.entryPrice!=null?{entryPrice:r.entryPrice,...(r.entryTime?{entryTime:r.entryTime}:{})}:{}),
+    ...(r.exitExecutionId?{exitExecutionId:r.exitExecutionId}:{})
    }));
    const legs=[leg1,...otherLegs];
    const totalPnlRaw=legs.reduce((a,l)=>a+(Number(l.pnlRaw)||0),0);
@@ -5053,12 +5095,10 @@ $('tradeForm').addEventListener('submit',async e=>{
   applySkipLiveFromForm(obj,activeJournalMode(),$('wouldSkipLive')?.value,$('wouldSkipReason')?.value,skipLiveFieldShown(activeJournalMode(),formHadSkipLive));
   obj.trend=readSingleChipGrid('trend','TREND');
   obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
-  obj.srTarget=readLevelRows('srTarget');
-  obj.srStopLoss=readLevelRows('srStopLoss');
-  // „Žádná hladina v cestě" – ukládá se jen true a jen bez řádků.
-  for(const field of Object.keys(SR_ENUMS)){
-   if(readSrNone(field))obj[field+'None']=true;else delete obj[field+'None'];
-  }
+  // Hladiny v blízkosti: jeden seznam řádků; „žádná hladina v blízkosti" se
+  // ukládá jen true a jen bez řádků. Starý tvar (dva seznamy SR) se tím
+  // z obchodu odstraní.
+  FJTaxonomy.setNearLevels(obj,readLevelRows(),readNearNone());
   obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
   obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
   // Kontext v2 (A4): prázdné = nevyplněno, neukládá se nic.
@@ -5066,8 +5106,8 @@ $('tradeForm').addEventListener('submit',async e=>{
    const v=readSingleChipGrid(key,group);
    if(v)obj[key]=v;else delete obj[key];
   }
-  const levelTests=FJTaxonomy.sanitizeLevelTests(obj.entryLevels,formLevelTests);
-  if(levelTests)obj.entryLevelTests=levelTests;else delete obj.entryLevelTests;
+  // Pole zrušená v kontextu v3 se s uložením z obchodu odstraní.
+  for(const key of FJTaxonomy.V3_REMOVED_KEYS)delete obj[key];
   // Známka: čas prvního zadání a příznak dodatečné změny (A4).
   FJContext.applyGrade(obj,existing,readSingleChipGrid('grade','GRADE'),new Date().toISOString());
 
@@ -5172,59 +5212,74 @@ $('tradeForm').addEventListener('submit',async e=>{
 // Ukládá JEN kontextová pole, a jen ta, která se změnila – ostatní pole
 // obchodu (P/L, ceny, komise) se nedotknou.
 let journalVisibleTrades=null;
+// Která kontextová pole obchodu ještě chybí A jdou tady doplnit. Obchod, kterému
+// chybí jen něco, co rychlý formulář nenabízí, by z dávky nikdy nezmizel:
+//  - pole skrytá v Nastavení → Přizpůsobení → Pole kontextu,
+//  - cena cíle 1 (tady se volí jen typ) a ticky po výstupu – ty se doplňují
+//    v plném formuláři; štítek „Neúplné" na kartě obchodu je hlásí dál.
+function quickMissingKeys(t){
+ const fillable=new Set([...QC_GROUPS.map(g=>g.key),'slPrice','mfeTicks','maeTicks']);
+ return FJTaxonomy.missingContextKeys(t).filter(k=>{
+  if(k==='targetLevel1')return !FJTaxonomy.sanitizeSingle('TARGET_LEVEL',t?.targetLevel1?.type);
+  if(!fillable.has(k))return false;
+  return !FJTaxonomy.CONTEXT_FIELDS.some(f=>f.key===k)||contextFieldShown(k);
+ });
+}
 // Dávka: obchody chronologicky; bez startu jen ty s nevyplněným kontextem,
 // se startem od daného obchodu dál (ten vždy, další jen nevyplněné).
 function quickBatch(list,startId){
  const rows=tradeRecords(list).slice().sort((a,b)=>(String(a.date||'')+String(a.entryTime||'')).localeCompare(String(b.date||'')+String(b.entryTime||'')));
- const incomplete=t=>FJTaxonomy.missingContextKeys(t).length>0;
+ const incomplete=t=>quickMissingKeys(t).length>0;
  if(!startId)return rows.filter(incomplete);
  const i=rows.findIndex(t=>t.id===startId);
  if(i<0)return [];
  return [rows[i],...rows.slice(i+1).filter(incomplete)];
 }
-// Skupiny dlaždic v pořadí formuláře. type: single / multi / rows (SR řádky).
+// Skupiny dlaždic v pořadí formuláře (karta Setup, pak Hladiny). type: single /
+// multi / rows (řádky hladin v blízkosti). `field` = pole kontextu, které jde
+// skrýt (Nastavení → Přizpůsobení); skrytá skupina se nenabízí, její hodnota
+// v obchodu zůstává.
 const QC_GROUPS=[
  {key:'setupCode',group:'SETUP',label:'Setup',type:'single'},
  {key:'fillStatus',group:'FILL_STATUS',label:'Stav naplnění',type:'single'},
- {key:'trend',group:'TREND',label:'Trend',type:'single'},
- {key:'trendHtf',group:'TREND_HTF',label:'Trend 30m',type:'single'},
+ {key:'trend',group:'TREND',label:'Trend 1m',type:'single'},
+ {key:'trendHtf',group:'TREND_HTF',label:'Trend 30m',type:'single',field:'trendHtf'},
+ {key:'grade',group:'GRADE',label:'Známka (před vstupem)',type:'single',field:'grade'},
+ {key:'entryTestNo',group:'ENTRY_TEST_NO',label:'Kolikátý test vstupu',type:'single',field:'entryTestNo'},
  {key:'entryLevels',group:'ENTRY_LEVEL',label:'Hladina vstupu',type:'multi'},
- {key:'entryTestNo',group:'ENTRY_TEST_NO',label:'Kolikátý test vstupu',type:'single'},
- {key:'srTarget',group:'SR_TARGET',label:'SR proti targetu',type:'rows'},
- {key:'pathProfile',group:'PATH_PROFILE',label:'Profil cesty k cíli',type:'single'},
- {key:'srStopLoss',group:'SR_SL',label:'SR proti S/L',type:'rows'},
+ {key:'nearLevels',group:'NEAR_LEVEL',label:'Hladiny v blízkosti',type:'rows'},
  {key:'ofConfirm',group:'OF_CONFIRM',label:'Order flow',type:'multi'},
- {key:'absLocation',group:'ABS_LOCATION',label:'Absorpce – kde',type:'single'},
- {key:'liquiditySwept',group:'LIQUIDITY_SWEPT',label:'Vybraná likvidita',type:'single'},
- {key:'grade',group:'GRADE',label:'Známka (před vstupem)',type:'single'},
+ {key:'absLocation',group:'ABS_LOCATION',label:'Absorpce – kde',type:'single',field:'absLocation'},
  {key:'targetLevel1Type',group:'TARGET_LEVEL',label:'Typ cíle 1',type:'single'}
 ];
+function quickGroups(){return QC_GROUPS.filter(g=>!g.field||contextFieldShown(g.field))}
 const QC_KEYS='123456789abcdefghijklmnopqrstuvwxyz';
-// Pracovní kopie kontextu obchodu pro formulář.
+// Pracovní kopie kontextu obchodu pro formulář. Hladiny v blízkosti se čtou
+// i ze starého tvaru (dva seznamy SR) – stejným převodem jako při migraci.
 function quickDraftFrom(t){
- const rows=field=>FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],t[field]).map(r=>({...r}));
  return {
   setupCode:t.setupCode||'',fillStatus:t.fillStatus||'',trend:t.trend||'',trendHtf:t.trendHtf||'',
-  entryLevels:FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels),
-  entryLevelTests:{...(t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{})},
-  entryTestNo:t.entryTestNo||'',srTarget:rows('srTarget'),srStopLoss:rows('srStopLoss'),
-  srTargetNone:t.srTargetNone===true,srStopLossNone:t.srStopLossNone===true,
-  pathProfile:t.pathProfile||'',ofConfirm:FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm),
-  absLocation:t.absLocation||'',liquiditySwept:t.liquiditySwept||'',grade:t.grade||'',
+  entryLevels:FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels),entryTestNo:t.entryTestNo||'',
+  nearLevels:FJTaxonomy.sanitizeNearLevels('NEAR_LEVEL',FJTaxonomy.nearLevelsOf(t)).map(r=>({...r})),
+  nearLevelsNone:FJTaxonomy.nearLevelsNoneOf(t),
+  ofConfirm:FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm),
+  absLocation:t.absLocation||'',grade:t.grade||'',
   targetLevel1Type:t.targetLevel1?.type||'',
   slPrice:t.slPrice??'',mfeTicks:t.mfeTicks??'',maeTicks:t.maeTicks??'',touched:{}
  };
 }
 // Změny z rychlého formuláře do obchodu. Mění se jen pole, jejichž hodnota je
 // jiná než uložená – neupravený obchod zůstane bajt po bajtu stejný.
-// tickSize dopočítá kladné ticky SR řádku z jeho ceny (jako plný formulář).
-function quickContextApply(existing,d,nowIso,tickSize){
+function quickContextApply(existing,d,nowIso){
  const obj={...existing};
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  for(const g of QC_GROUPS){
   if(g.type!=='single'||g.key==='grade'||g.key==='targetLevel1Type')continue;
+  // Porovnává se to, co je ve formuláři, s tím, co je uložené – ne očištěná
+  // hodnota: klíč, který číselník aktivního deníku nezná (obchod přesunutý
+  // z jiného deníku), by se jinak smazal, aniž na něj uživatel sáhl.
+  if((d[g.key]||'')===(existing[g.key]||''))continue;
   const v=FJTaxonomy.sanitizeSingle(g.group,d[g.key]);
-  if(v===(existing[g.key]||''))continue;
   if(v)obj[g.key]=v;else if(g.key==='setupCode'||g.key==='fillStatus'||g.key==='trend')obj[g.key]='';else delete obj[g.key];
  }
  for(const [key,group] of [['entryLevels','ENTRY_LEVEL'],['ofConfirm','OF_CONFIRM']]){
@@ -5232,19 +5287,15 @@ function quickContextApply(existing,d,nowIso,tickSize){
   if(!same(v,FJTaxonomy.sanitizeMulti(group,existing[key])))obj[key]=v;
  }
  if(!same(obj.entryLevels,existing.entryLevels))obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
- const tests=FJTaxonomy.sanitizeLevelTests(obj.entryLevels,d.entryLevelTests);
- if(!same(tests,existing.entryLevelTests??null)){if(tests)obj.entryLevelTests=tests;else delete obj.entryLevelTests}
- for(const field of Object.keys(SR_ENUMS)){
-  const rows=FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],(d[field]||[]).map(r=>{
-   const t=r.price!=null&&String(r.price).trim()!==''?FJPoints.srTicksFromPrice(r.price,existing.entryPrice,tickSize):null;
-   return {...r,ticksFromEntry:t!=null?t:r.ticksFromEntry};
-  }));
-  if(!same(rows,FJTaxonomy.sanitizeLevelRows(SR_ENUMS[field],existing[field])))obj[field]=rows;
-  const none=d[field+'None']===true&&!rows.length;
-  if(none!==(existing[field+'None']===true)){if(none)obj[field+'None']=true;else delete obj[field+'None']}
+ // Hladiny v blízkosti: zapisují se vcelku v novém tvaru (starý se tím
+ // z obchodu odstraní), ale jen když se řádky nebo „žádná" opravdu změnily.
+ const rows=FJTaxonomy.sanitizeNearLevels('NEAR_LEVEL',d.nearLevels);
+ const none=d.nearLevelsNone===true&&!rows.length;
+ if(!same(rows,FJTaxonomy.sanitizeNearLevels('NEAR_LEVEL',FJTaxonomy.nearLevelsOf(existing)))||none!==FJTaxonomy.nearLevelsNoneOf(existing)){
+  FJTaxonomy.setNearLevels(obj,rows,none);
  }
- const type=FJTaxonomy.sanitizeSingle('TARGET_LEVEL',d.targetLevel1Type);
- if(type!==(existing.targetLevel1?.type||'')){
+ if((d.targetLevel1Type||'')!==(existing.targetLevel1?.type||'')){
+  const type=FJTaxonomy.sanitizeSingle('TARGET_LEVEL',d.targetLevel1Type);
   const target=FJTaxonomy.sanitizeTargetLevel({type,price:existing.targetLevel1?.price});
   if(target)obj.targetLevel1=target;else delete obj.targetLevel1;
  }
@@ -5279,13 +5330,15 @@ function loadQuickTrade(){
  const t=quickTrade(); if(!t){closeQuickContext();return}
  qc.draft=quickDraftFrom(t);
  const dc=getDayNote(t.date).dayContext||{};
- // Ranní pruh kontextu dne jen u dne, kterému ranní kontext chybí.
- qc.dayShown=!!t.date&&FJContext.DAY_CONTEXT_MORNING.some(k=>!dc[k]);
+ // Ranní pruh kontextu dne jen u dne, kterému ranní kontext chybí (a jen
+ // když pole „Kontext dne" není skryté).
+ qc.dayShown=contextFieldShown('dayContext')&&!!t.date&&FJContext.DAY_CONTEXT_MORNING.some(k=>!dc[k]);
  qc.dayDraft={...dc};
  qc.focusKey='';
  $('qcAlert').classList.remove('show');
  renderQuickContext();
- const first=QC_GROUPS.find(g=>FJTaxonomy.missingContextKeys(t).includes(g.key==='targetLevel1Type'?'targetLevel1':g.key))?.key||QC_GROUPS[0].key;
+ const missing=quickMissingKeys(t);
+ const first=quickGroups().find(g=>missing.includes(g.key==='targetLevel1Type'?'targetLevel1':g.key))?.key||QC_GROUPS[0].key;
  focusQuickGroup(qc.dayShown?'day.'+FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k]):first);
 }
 function closeQuickContext(){$('quickContextModal').classList.remove('open');qc.batch=[];renderTrades()}
@@ -5304,7 +5357,7 @@ function quickOptions(g){
   const allowed=FJContext.allowedFillStatus(activeJournalMode(),opts.map(o=>o.key),qc.draft.fillStatus);
   opts=opts.filter(o=>allowed.includes(o.key));
  }
- if(g.type==='rows')opts=[{key:'__NONE',label:'Žádná hladina v cestě'},...opts.filter(o=>o.key!=='NONE')];
+ if(g.type==='rows')opts=[{key:'__NONE',label:'Žádná hladina v blízkosti'},...opts.filter(o=>o.key!=='NONE')];
  return opts;
 }
 function renderQuickContext(){
@@ -5315,19 +5368,18 @@ function renderQuickContext(){
  $('qcTrade').innerHTML=`<b>${esc(t.instrument||'')}</b> ${esc(side)} · ${esc(t.date||'')} ${esc(t.entryTime||'')} · vstup ${esc(t.entryPrice??'')} · ${esc(({target:"Target",stoploss:"Stop Loss",breakeven:"Break Even"})[t.result]||t.result||"")} ${esc(money(signed(t)))}`;
  // Ranní pruh kontextu dne.
  $('qcDay').innerHTML=qc.dayShown?`<div class="qc-day"><div class="qc-day-title">Kontext dne ${esc(t.date)} <span class="sub">— ráno, jednou za den</span></div>${FJContext.DAY_CONTEXT_MORNING.map(k=>{
-  const opts=Object.entries(FJContext.DAY_CONTEXT[k]);
-  return `<div class="qc-group" tabindex="0" data-key="day.${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}</div><div class="chip-grid">${opts.map(([v,label],i)=>quickChip(label,qc.dayDraft[k]===v,i)).join('')}</div></div>`;
+  const opts=FJContext.dayContextOptions(k,qc.dayDraft[k]);
+  return `<div class="qc-group" tabindex="0" data-key="day.${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}</div><div class="chip-grid">${opts.map((o,i)=>quickChip(o.label+(o.hidden?' ·':''),qc.dayDraft[k]===o.key,i)).join('')}</div></div>`;
  }).join('')}</div>`:'';
- $('qcGroups').innerHTML=QC_GROUPS.map(g=>{
+ const showTest=contextFieldShown('levelTestState');
+ $('qcGroups').innerHTML=quickGroups().map(g=>{
   const opts=quickOptions(g);
   const isOn=o=>g.type==='single'?d[g.key]===o.key:(g.type==='multi'?d[g.key].includes(o.key):(o.key==='__NONE'&&d[g.key+'None']));
   let extra='';
-  if(g.key==='entryLevels'){
-   const levels=d.entryLevels.filter(k=>k!=='NONE');
-   extra=levels.length?`<div class="level-tests">${levels.map(k=>`<div class="level-test-row"><span class="level-test-name">${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',k))}</span>${['UNTESTED','TESTED'].map(s=>`<span class="chip qc-test${d.entryLevelTests[k]===s?' on':''}" data-level="${esc(k)}" data-state="${s}" role="button" tabindex="0">${FJTaxonomy.TEST_STATE[s]}</span>`).join('')}</div>`).join('')}</div>`:'';
-  }
   if(g.type==='rows'){
-   extra=d[g.key].length?`<div class="qc-rows">${d[g.key].map((r,i)=>`<div class="qc-row" data-field="${g.key}" data-row="${i}"><span class="level-test-name">${esc(FJTaxonomy.labelOf(g.group,r.level))}</span><input class="qc-row-price" type="number" step="any" placeholder="cena (nepovinné)" value="${esc(r.price??'')}"><select class="qc-row-test"><option value="">— test? —</option><option value="UNTESTED"${r.testState==='UNTESTED'?' selected':''}>netest</option><option value="TESTED"${r.testState==='TESTED'?' selected':''}>test</option></select>${r.price==null&&r.ticksFromEntry!=null?`<span class="sub">${esc(r.ticksFromEntry)} t</span>`:''}<button type="button" class="icon qc-row-remove" title="Odebrat">✕</button></div>`).join('')}</div>`:'';
+   // Řádek hladiny: typ (dlaždicí), cena a test / netest. Stranu ani roli
+   // uživatel nevolí. Starší řádek bez ceny ukáže, co o něm deník ví.
+   extra=d[g.key].length?`<div class="qc-rows">${d[g.key].map((r,i)=>`<div class="qc-row" data-field="${g.key}" data-row="${i}"><span class="level-test-name">${esc(FJTaxonomy.labelOf(g.group,r.level))}</span><input class="qc-row-price" type="number" step="any" placeholder="cena" value="${esc(r.price??'')}">${showTest?`<select class="qc-row-test"><option value="">— test? —</option><option value="UNTESTED"${r.testState==='UNTESTED'?' selected':''}>netest</option><option value="TESTED"${r.testState==='TESTED'?' selected':''}>test</option></select>`:''}${r.price==null&&r.legacySide?`<span class="sub">starší zápis bez ceny (${r.legacySide==='TG'?'k cíli':'k SL'}${r.ticksFromEntry!=null?', '+esc(r.ticksFromEntry)+' t':''})</span>`:''}<button type="button" class="icon qc-row-remove" title="Odebrat">✕</button></div>`).join('')}</div>`:'';
   }
   return `<div class="qc-group" tabindex="0" data-key="${g.key}"><div class="qc-label">${esc(g.label)}${g.type==='multi'?' <span class="sub">— víc voleb</span>':''}</div><div class="chip-grid">${opts.map((o,i)=>quickChip(o.label+(o.hidden?' ·':''),isOn(o),i,` data-key="${esc(o.key)}"`)).join('')}</div>${extra}</div>`;
  }).join('');
@@ -5346,7 +5398,7 @@ function renderQuickContext(){
 // výběru – pak se focus posune na další skupinu.
 function quickPick(key,index){
  if(key.startsWith('day.')){
-  const k=key.slice(4),v=Object.keys(FJContext.DAY_CONTEXT[k])[index]; if(v===undefined)return false;
+  const k=key.slice(4),v=FJContext.dayContextOptions(k,qc.dayDraft[k])[index]?.key; if(v===undefined)return false;
   qc.dayDraft[k]=qc.dayDraft[k]===v?'':v;
   return true;
  }
@@ -5360,7 +5412,7 @@ function quickPick(key,index){
   d[key+'None']=!d[key+'None'];return true;
  }
  d[key+'None']=false;
- d[key].push({level:o.key,price:null,ticksFromEntry:null});
+ d[key].push({level:o.key,price:null});
  qc.focusRow={field:key,row:d[key].length-1};
  return false;
 }
@@ -5382,19 +5434,12 @@ function wireQuickContext(){
    chip.onclick=()=>quickAfterPick(key,quickPick(key,Number(chip.dataset.index)));
   });
  });
- document.querySelectorAll('#quickContextModal .qc-test').forEach(chip=>{
-  const pick=()=>{
-   const k=chip.dataset.level,s=chip.dataset.state,tests=qc.draft.entryLevelTests;
-   if(tests[k]===s)delete tests[k];else tests[k]=s;
-   quickAfterPick('entryLevels',false);
-  };
-  chip.onclick=pick;
-  chip.onkeydown=e=>{if(e.key===' '){e.preventDefault();e.stopPropagation();pick()}};
- });
  document.querySelectorAll('#quickContextModal .qc-row').forEach(rowEl=>{
   const field=rowEl.dataset.field,i=Number(rowEl.dataset.row),row=qc.draft[field][i];
   rowEl.querySelector('.qc-row-price').oninput=e=>{const v=e.target.value;row.price=String(v).trim()===''?null:Number(v)};
-  rowEl.querySelector('.qc-row-test').onchange=e=>{if(e.target.value)row.testState=e.target.value;else delete row.testState};
+  // Výběr test / netest v řádku není, když je pole skryté – hodnota řádku zůstává.
+  const testEl=rowEl.querySelector('.qc-row-test');
+  if(testEl)testEl.onchange=e=>{if(e.target.value)row.testState=e.target.value;else delete row.testState};
   rowEl.querySelector('.qc-row-remove').onclick=()=>{qc.draft[field].splice(i,1);quickAfterPick(field,false)};
  });
  for(const [id,key] of [['qcSlPrice','slPrice'],['qcMfeTicks','mfeTicks'],['qcMaeTicks','maeTicks']]){
@@ -5405,13 +5450,14 @@ if($('quickContextModal'))$('quickContextModal').addEventListener('keydown',e=>{
  if(confirmResolver)return;
  const target=e.target;
  if(e.key==='Escape'){e.preventDefault();closeQuickContext();return}
- // V ceně SR řádku Enter vrátí focus na skupinu (neukládá).
+ // V ceně řádku hladiny Enter vrátí focus na skupinu (neukládá).
  if(target.classList?.contains('qc-row-price')&&e.key==='Enter'){
   e.preventDefault();
   focusQuickGroup(target.closest('.qc-row')?.dataset.field||'');
   return;
  }
- if(e.key==='Enter'&&!target.classList?.contains('qc-test')&&target.tagName!=='BUTTON'&&target.tagName!=='SELECT'){e.preventDefault();saveQuickContext();return}
+ // Podržený Enter (opakování klávesy) neukládá – jinak by proletěl dávkou.
+ if(e.key==='Enter'&&target.tagName!=='BUTTON'&&target.tagName!=='SELECT'){e.preventDefault();if(!e.repeat)saveQuickContext();return}
  if(!target.classList?.contains('qc-group')||e.ctrlKey||e.metaKey||e.altKey)return;
  const index=QC_KEYS.indexOf(String(e.key).toLowerCase());
  if(index<0)return;
@@ -5420,13 +5466,18 @@ if($('quickContextModal'))$('quickContextModal').addEventListener('keydown',e=>{
  quickAfterPick(key,quickPick(key,index));
 });
 async function saveQuickContext(){
+ // Jedno uložení naráz: druhý Enter (dvojí stisk, podržená klávesa) by během
+ // zápisu uložil tentýž obchod znovu a pak posunul dávku ještě jednou – další
+ // nevyplněný obchod by se přeskočil, aniž se ukázal.
+ if(qc.saving)return;
  const t=quickTrade(); if(!t)return;
  const a=$('qcAlert');a.classList.remove('show');a.textContent='';
+ qc.saving=true;
  try{
   const data=await ensureActiveJournalData();
   const existing=(Array.isArray(data.trades)?data.trades:[]).find(x=>x.id===t.id);
   if(!existing)throw new Error('Obchod v deníku už není.');
-  const obj=quickContextApply(existing,qc.draft,new Date().toISOString(),getTickSizeForInstrument(existing.instrument));
+  const obj=quickContextApply(existing,qc.draft,new Date().toISOString());
   const numbersChanged=['slPrice','slDerived','mfeTicks','maeTicks','targetLevel1','fillStatus'].some(k=>JSON.stringify(obj[k])!==JSON.stringify(existing[k]));
   if(numbersChanged){
    // Stejné dopočty jako plný formulář: prázdná cena SL se odvodí z výstupu,
@@ -5456,13 +5507,13 @@ async function saveQuickContext(){
  }catch(err){
   a.textContent='Uložení se nepodařilo: '+(err?.message||err);
   a.classList.add('show');
- }
+ }finally{qc.saving=false}
 }
 // Další NEVYPLNĚNÝ obchod v dávce; na konci se formulář zavře.
 function quickNext(){
  for(let i=qc.index+1;i<qc.batch.length;i++){
   const t=trades.find(x=>x.id===qc.batch[i]);
-  if(t&&FJTaxonomy.missingContextKeys(t).length){qc.index=i;loadQuickTrade();return}
+  if(t&&quickMissingKeys(t).length){qc.index=i;loadQuickTrade();return}
  }
  closeQuickContext();
  showToast('Dávka hotová – žádný další obchod s nevyplněným kontextem.');
@@ -5470,7 +5521,7 @@ function quickNext(){
 if($('quickContextBtn'))$('quickContextBtn').onclick=()=>openQuickContext();
 if($('closeQuickContext'))$('closeQuickContext').onclick=closeQuickContext;
 if($('qcSave'))$('qcSave').onclick=saveQuickContext;
-if($('qcSkip'))$('qcSkip').onclick=quickNext;
+if($('qcSkip'))$('qcSkip').onclick=()=>{if(!qc.saving)quickNext()};
 
 let pendingMoveTrade=null;
 window.openMoveTrade=async(id,sourceJournalId)=>{
@@ -5527,6 +5578,9 @@ function legFromTrade(t,label){
  return {
   id:t.id,
   label:label||t.legLabel||'',
+  // Vstup nohy: u dokupu se liší od vstupu sloučeného obchodu (FJPoints.entriesOf).
+  entryTime:t.entryTime,
+  entryPrice:t.entryPrice,
   exitTime:t.exitTime,
   exitPrice:t.exitPrice,
   points:Number(t.points||0),
@@ -5535,6 +5589,9 @@ function legFromTrade(t,label){
   contracts:Number(t.contracts||0),
   commission:Number(t.commission||0),
   result:t.result,
+  // Výstupní exekuce, ze které noha vznikla: výstup, který zavřel kontrakty ze
+  // dvou vstupů, jsou dvě nohy téhož cíle (labelLegs).
+  ...(t.exitExecutionId?{exitExecutionId:t.exitExecutionId}:{}),
   sourceEventId:t.sourceEventId,
   sourceEventIds:Array.isArray(t.sourceEventIds)&&t.sourceEventIds.length?t.sourceEventIds:(t.sourceEventId?[t.sourceEventId]:[])
  };
@@ -5545,11 +5602,21 @@ function legFromTrade(t,label){
 // jako JEDEN cíl se sečteným počtem kontraktů, ne jako dva/tři samostatné
 // – jinak vzniká matoucí zobrazení (víc "TPX" pilulek se stejnou cenou) a
 // zdánlivě "chybějící" kontrakt v přehledu.
+// Slučují se jen nohy ze STEJNÉHO vstupu: noha dokoupených kontraktů má na
+// stejné výstupní ceně jiné body a zůstává samostatná. Noha bez vstupní ceny
+// (starší data, ruční zadání) se sloučí jako dřív.
 function mergeSamePriceLegs(legs){
  const merged=[];
+ const noEntry=l=>l.entryPrice===undefined||l.entryPrice===null||l.entryPrice==='';
+ const sameEntry=(a,b)=>noEntry(a)||noEntry(b)||Math.abs(Number(a.entryPrice)-Number(b.entryPrice))<1e-6;
  for(const leg of legs){
-  const existing=merged.find(m=>m.result===leg.result&&Math.abs(Number(m.exitPrice)-Number(leg.exitPrice))<1e-6);
+  const existing=merged.find(m=>m.result===leg.result&&Math.abs(Number(m.exitPrice)-Number(leg.exitPrice))<1e-6&&sameEntry(m,leg));
   if(existing){
+   // Body jsou na kontrakt: když se liší, platí vážený průměr, jinak by
+   // celkové body sloučené nohy neseděly na její zisk.
+   const pe=Math.abs(Number(existing.points)||0), pl=Math.abs(Number(leg.points)||0);
+   const ce=Number(existing.contracts)||0, cl=Number(leg.contracts)||0;
+   if(Math.abs(pe-pl)>1e-9&&ce+cl>0)existing.points=(pe*ce+pl*cl)/(ce+cl);
    existing.contracts=(Number(existing.contracts)||0)+(Number(leg.contracts)||0);
    existing.pnl=(Number(existing.pnl)||0)+(Number(leg.pnl)||0);
    existing.pnlRaw=(Number(existing.pnlRaw)||0)+(Number(leg.pnlRaw)||0);
@@ -5564,10 +5631,13 @@ function mergeSamePriceLegs(legs){
  }
  return merged;
 }
+// Nohy ze stejné výstupní exekuce (výstup dělený podle vstupu) jsou jeden cíl:
+// v číslování se počítají jednou, takže obě dostanou stejné TP.
 function labelLegs(legs){
  legs.forEach((l,i)=>{
   if(l.label)return;
-  l.label=l.result==='breakeven'?'BE':`TP${legs.slice(0,i+1).filter(x=>x.result!=='breakeven').length}`;
+  const exits=new Set(legs.slice(0,i+1).filter(x=>x.result!=='breakeven').map((x,j)=>x.exitExecutionId||`leg-${j}`));
+  l.label=l.result==='breakeven'?'BE':`TP${exits.size}`;
  });
  return legs;
 }
@@ -5627,7 +5697,9 @@ function combineTradeObjects(list,src=settings){
   // takže i jednocílový automatický import měl v Deníku větu, kterou
   // nikdo nenapsal a která o obchodu nic neříkala.
   comment:comments.join(' | '),
-  images:list.flatMap(t=>t.images||[]).slice(0,3),
+  // Bez opakování: nohy téže pozice nesou stejný screenshot vstupu a nohy téhož
+  // výstupu i stejný screenshot výstupu (odkaz je daný obsahem souboru).
+  images:[...new Set(list.flatMap(t=>t.images||[]))].slice(0,3),
   createdAt:list.reduce((min,t)=>Math.min(min,t.createdAt||Date.now()),Date.now()),
   updatedAt:Date.now(),
   legs,
@@ -5657,7 +5729,7 @@ function openMergePreview(selected){
  $('mergeSummary').innerHTML=`<b>Výsledek po sloučení:</b> <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}">${sm.label}</span>`:''}
   <div style="margin-top:8px">${esc(merged.instrument||'—')} · ${merged.entryTime} @ ${merged.entryPrice} → ${merged.exitTime} @ ${merged.exitPrice}</div>
   <div style="margin-top:6px;font-weight:800" class="${m.moneyCls}">${Math.abs(merged.points)} bodů · ${dualMoney(merged.pnlRaw,true)}</div>
-  <div class="trade-legs" style="margin-top:8px">${merged.legs.map(legPillHTML).join('')}</div>${sideWarn}`;
+  <div class="trade-legs" style="margin-top:8px">${merged.legs.map((l,i)=>legPillHTML(l,i,merged)).join('')}</div>${sideWarn}`;
  $('mergeError').textContent='';$('mergeError').classList.remove('show');
  $('mergeTradeModal').classList.add('open');
 }
@@ -5750,8 +5822,45 @@ function renderTradeCardSettings(){
   showToast(`${card?.label||el.dataset.card}: upozornění na nevyplněné ${el.checked?'zapnuto':'vypnuto'}.`);
  });
 }
+// Nastavení → Přizpůsobení → Pole kontextu: u každého pole „Zobrazit"
+// a „Upozorňovat na nevyplněné" (stejný vzor jako karty obchodu). Upozornění
+// skrytého pole nejde zapnout – skryté pole se nekontroluje.
+function renderContextFieldSettings(){
+ const box=$('contextFieldSettings');if(!box)return;
+ const cfg=contextFieldConfig;
+ box.innerHTML=FJTaxonomy.CONTEXT_FIELDS.map(field=>{
+  const c=cfg[field.key];
+  const warn=field.checks===false
+   ?'<span class="sub">— nic se nekontroluje</span>'
+   :`<label class="settings-check" style="margin:0${c.show?'':';opacity:.45'}"><input type="checkbox" class="context-field-warn" data-field="${esc(field.key)}"${c.warn?' checked':''}${c.show?'':' disabled'}> Upozorňovat na nevyplněné</label>`;
+  return `<div class="mapping-row context-field-row" style="grid-template-columns:minmax(120px,1fr) auto minmax(220px,1.4fr)">
+   <div><b>${esc(field.label)}</b></div>
+   <label class="settings-check" style="margin:0"><input type="checkbox" class="context-field-show" data-field="${esc(field.key)}"${c.show?' checked':''}> Zobrazit</label>
+   <div>${warn}</div>
+  </div>`;
+ }).join('');
+ const labelOf=key=>FJTaxonomy.CONTEXT_FIELDS.find(x=>x.key===key)?.label||key;
+ box.querySelectorAll('.context-field-show').forEach(el=>el.onchange=()=>{
+  setContextFieldConfig({...contextFieldConfig,[el.dataset.field]:{...contextFieldConfig[el.dataset.field],show:el.checked}});
+  showToast(`Pole „${labelOf(el.dataset.field)}“ je ${el.checked?'zobrazené':'skryté'}.`);
+ });
+ box.querySelectorAll('.context-field-warn').forEach(el=>el.onchange=()=>{
+  setContextFieldConfig({...contextFieldConfig,[el.dataset.field]:{...contextFieldConfig[el.dataset.field],warn:el.checked}});
+  showToast(`${labelOf(el.dataset.field)}: upozornění na nevyplněné ${el.checked?'zapnuto':'vypnuto'}.`);
+ });
+}
 renderTradeCardSettings();
 applyTradeCardVisibility();
+renderContextFieldSettings();
+applyContextFieldVisibility();
+// Lhůta „doplněno zpětně" u známky: nastavení aktivního deníku (ne celé
+// aplikace) – čte ho i hlavní proces při AI exportu. Neplatná hodnota = výchozí.
+if($('gradeRetroGraceMinutes'))$('gradeRetroGraceMinutes').onchange=async e=>{
+ const minutes=FJContext.gradeRetroGrace(e.target.value);
+ e.target.value=minutes;
+ await persistSettings({gradeRetroGraceMinutes:minutes});
+ showToast(`Známka: „doplněno zpětně“ až po ${minutes} min od uložení obchodu.`);
+};
 $('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
 $('addTradeBtn').onclick=()=>openModal();
 // ---- Setup bez exekuce (recordType SETUP_ONLY) ----
@@ -5945,80 +6054,76 @@ function firstTradeIdPerDate(rows){
 // Sloupce CSV exportu deníku. Hlavička a řádek jsou schválně vedle sebe
 // v jedné funkci každá – když se přidá sloupec jen do jedné z nich, posunou
 // se všechna následující data o jednu buňku a v exportu to není vidět.
-// SR hladiny jsou v CSV jako bloky sloupců „SR→TG n hladina / cena / ticky",
-// jeden blok na řádek hladiny. Počet bloků = nejvíc řádků v exportovaných
-// obchodech (aspoň 1); spočítá ho srCsvCounts a dostane ho hlavička i řádek,
-// aby se nerozešly. Typ se neověřuje proti číselníku aktivní karty – export
-// Reportů bere obchody z víc deníků a každý má vlastní číselník.
-function srCsvCounts(rows){
- const max=field=>Math.max(1,...(Array.isArray(rows)?rows:[]).map(t=>FJTaxonomy.sanitizeLevelRows(null,t?.[field]).length));
- return {tg:max('srTarget'),sl:max('srStopLoss')};
+// Hladiny v blízkosti jsou v CSV jako bloky sloupců „Hladina n typ / cena /
+// test / od vstupu / od SL / do cíle / poloha", jeden blok na řádek hladiny.
+// Počet bloků = nejvíc řádků v exportovaných obchodech (aspoň 1); spočítá ho
+// levelCsvCount a dostane ho hlavička i řádek, aby se nerozešly. Vzdálenosti
+// a poloha jsou dopočet z cen (FJContext.levelGeometry) – v hlavičce mají
+// „(dopočet)" a potřebují velikost ticku instrumentu. Typ se neověřuje proti
+// číselníku aktivní karty – export Reportů bere obchody z víc deníků a každý
+// má vlastní číselník. Obchod ve starém tvaru (deník, který od aktualizace
+// ještě nebyl otevřen) se čte stejným převodem jako při migraci.
+function levelCsvCount(rows){
+ return Math.max(1,...(Array.isArray(rows)?rows:[]).map(t=>FJTaxonomy.nearLevelsOf(t).length));
 }
-function srCsvHeader(counts){
+function levelCsvHeader(count=1){
  const out=[];
- for(const [k,label] of [['tg','SR→TG'],['sl','SR→SL']])for(let i=1;i<=counts[k];i++)out.push(`${label} ${i} hladina`,`${label} ${i} cena`,`${label} ${i} ticky`);
+ for(let i=1;i<=count;i++)out.push(`Hladina ${i} typ`,`Hladina ${i} cena`,`Hladina ${i} test`,`Hladina ${i} od vstupu (dopočet)`,`Hladina ${i} od SL (dopočet)`,`Hladina ${i} do cíle (dopočet)`,`Hladina ${i} poloha (dopočet)`);
  return out;
 }
-function srCsvCells(t,counts){
+function levelCsvCells(t,count=1,tickSize){
+ const rows=FJTaxonomy.nearLevelsOf(t);
  const out=[];
- for(const [k,field] of [['tg','srTarget'],['sl','srStopLoss']]){
-  const rows=FJTaxonomy.sanitizeLevelRows(null,t?.[field]);
-  for(let i=0;i<counts[k];i++){const r=rows[i];out.push(r?r.level:'',r?.price??'',r?.ticksFromEntry??'')}
+ for(let i=0;i<count;i++){
+  const r=rows[i];
+  if(!r){out.push('','','','','','','');continue}
+  const g=FJContext.levelGeometry(r,t,tickSize);
+  out.push(r.level,r.price??'',r.testState||'',g.fromEntry??'',g.fromStop??'',g.toTarget??'',g.position||'');
  }
  return out;
 }
-function tradeCsvHeader(counts={tg:1,sl:1}){
- return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+function tradeCsvHeader(count=1){
+ return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
-function tradeCsvRow(t,dn,counts={tg:1,sl:1}){
+function tradeCsvRow(t,dn,count=1,tickSize){
  const p=t.dailyPlan||{};
- return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
-// Kontext v2 (A6): nové sloupce se přidávají ZA konec původního řádku, takže
-// každá dosavadní buňka zůstává na svém místě i se svým obsahem (test
-// csv-export-compat). Dopočty mají v hlavičce „(dopočet)". Klíče, ne popisky.
-// Kontext dne jde na KAŽDÝ řádek dne (původní „Den: …" dál jen na první).
+// Kontext v2 (A6): sloupce kontextu jdou ZA konec základního řádku. Dopočty
+// mají v hlavičce „(dopočet)". Klíče, ne popisky. Kontext dne jde na KAŽDÝ
+// řádek dne (původní „Den: …" dál jen na první).
+// Kontext v3: sloupce zrušených polí (likvidita, profil cesty, netest/test
+// vstupní hladiny) a dopočtů s prahem zmizely; ostatní sloupce stávajících
+// obchodů se nemění (test csv-export-compat).
 const CONTEXT_CSV_MANUAL=[
  ['Trend 30m','trendHtf'],['Absorpce – kde','absLocation'],['Kolikátý test vstupu','entryTestNo'],
- ['Vybraná likvidita','liquiditySwept'],['Profil cesty k cíli','pathProfile'],['Známka','grade'],['Známka zadána','gradeSetAt']
+ ['Známka','grade'],['Známka zadána','gradeSetAt']
 ];
 const CONTEXT_CSV_DERIVED=[
- ['Ticky k cíli','targetTicks'],['Cíl na hladině','targetOnLevel'],['První překážka – ticky','firstObstacleTicks'],
- ['Cesta k cíli','pathState'],['Volná cesta R','freePathR'],['SL za zónou – ticky','slBufferTicks'],
- ['Zón chránících SL','slZoneCount'],['Obchod dne č.','tradeNoInDay'],['Předchozí výsledek dne','prevResultInDay'],
+ ['Ticky k cíli','targetTicks'],['Cíl na hladině','targetOnLevel'],
+ ['Nejbližší hladina ve směru – ticky','nearestAheadTicks'],['Nejbližší hladina ve směru – R','nearestAheadR'],
+ ['SL za hladinou – ticky','stopBehindTicks'],['Hladin mezi SL a vstupem','levelsStopToEntry'],['Hladin před cílem','levelsEntryToTarget'],
+ ['Obchod dne č.','tradeNoInDay'],['Předchozí výsledek dne','prevResultInDay'],
  ['P/L dne před obchodem','dayPnlBefore'],['Seance','session'],['Známka doplněná zpětně','gradeRetro']
 ];
 const CONTEXT_CSV_DAY=[['Open vůči value','openVsValue'],['Typ dne očekávaný','dayTypeExpected'],['Typ dne skutečný','dayTypeActual'],['Migrace value','valueMigration'],['Zprávy','newsEvent']];
 function csvBool(v){return v==null?'':(v?'ano':'ne')}
-function contextCsvHeader(counts={tg:1,sl:1}){
+function contextCsvHeader(){
  const out=CONTEXT_CSV_MANUAL.map(([h])=>h);
- out.push('Známka změněna dodatečně','Hladina vstupu – netest/test');
- for(let i=1;i<=counts.tg;i++)out.push(`SR→TG ${i} test`,`SR→TG ${i} ticky ± (dopočet)`,`SR→TG ${i} za cílem (dopočet)`,`SR→TG ${i} na ztrátové straně (dopočet)`);
- for(let i=1;i<=counts.sl;i++)out.push(`SR→SL ${i} test`,`SR→SL ${i} ticky ± (dopočet)`,`SR→SL ${i} ticky od SL (dopočet)`,`SR→SL ${i} za SL (dopočet)`);
+ out.push('Známka změněna dodatečně','Žádná hladina v blízkosti');
  for(const [h] of CONTEXT_CSV_DERIVED)out.push(h+' (dopočet)');
  for(const [h] of CONTEXT_CSV_DAY)out.push('Den: '+h);
  return out;
 }
 // ctx: { tickSize, config (číselníky deníku), dayOrder (FJContext.dayOrder
-// nad celým deníkem), mode (režim deníku), dayContext (kontext dne) }.
-function contextCsvCells(t,ctx={},counts={tg:1,sl:1}){
- const d=FJContext.derivedFields(t,{tickSize:ctx.tickSize,config:ctx.config,dayOrder:ctx.dayOrder,mode:ctx.mode});
+// nad celým deníkem), mode (režim deníku), gradeRetroGraceMin (lhůta „doplněno
+// zpětně" z nastavení deníku), dayContext (kontext dne) }.
+function contextCsvCells(t,ctx={}){
+ const d=FJContext.derivedFields(t,{tickSize:ctx.tickSize,config:ctx.config,dayOrder:ctx.dayOrder,mode:ctx.mode,gradeRetroGraceMin:ctx.gradeRetroGraceMin});
  const out=CONTEXT_CSV_MANUAL.map(([,k])=>t[k]??'');
  out.push(t.grade||t.gradeSetAt?csvBool(t.gradeEdited===true):'');
- const tests=t.entryLevelTests&&typeof t.entryLevelTests==='object'?t.entryLevelTests:{};
- out.push(Object.entries(tests).map(([k,v])=>k+':'+v).join('|'));
- // SR řádky ve stejném pořadí jako bloky „SR→TG n hladina / cena / ticky".
- for(const [field,n] of [['srTarget',counts.tg],['srStopLoss',counts.sl]]){
-  const rows=FJTaxonomy.sanitizeLevelRows(null,t?.[field]);
-  for(let i=0;i<n;i++){
-   const r=rows[i];
-   if(!r){out.push('','','','');continue}
-   const m=FJContext.srRowMetrics(field,r,t,ctx.tickSize);
-   out.push(r.testState||'',m.ticksFromEntrySigned??'');
-   if(field==='srTarget')out.push(csvBool(m.beyondTarget),csvBool(m.behindEntry));
-   else out.push(m.ticksFromStop??'',csvBool(m.beyondStop));
-  }
- }
+ // „ano" jen u výslovné volby; prázdné = nevyplněno nebo jsou zadané hladiny.
+ out.push(FJTaxonomy.nearLevelsNoneOf(t)?'ano':'');
  for(const [,k] of CONTEXT_CSV_DERIVED){
   const v=d[k];
   out.push(typeof v==='boolean'?csvBool(v):(v??''));
@@ -6028,17 +6133,19 @@ function contextCsvCells(t,ctx={},counts={tg:1,sl:1}){
  return out;
 }
 // Celá tabulka exportu Deníku (hlavička + řádky). dayNoteOf(date) vrací
-// denní poznámku nebo null; opts: { tickSizeOf(instrument), config, mode }.
+// denní poznámku nebo null; opts: { tickSizeOf(instrument), config, mode,
+// gradeRetroGraceMin }.
 function journalCsvTable(rows,dayNoteOf,opts={}){
- const counts=srCsvCounts(rows);
+ const count=levelCsvCount(rows);
  const firstIdByDate=firstTradeIdPerDate(rows);
  const order=FJContext.dayOrder(rows);
- const out=[[...tradeCsvHeader(counts),...contextCsvHeader(counts)]];
+ const out=[[...tradeCsvHeader(count),...contextCsvHeader()]];
  for(const t of rows){
   const note=t.date?dayNoteOf(t.date):null;
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?(note||emptyDayNoteCells()):null;
-  out.push([...tradeCsvRow(t,dn,counts),...contextCsvCells(t,{tickSize:opts.tickSizeOf?.(t.instrument),config:opts.config,dayOrder:order,mode:opts.mode,dayContext:note?.dayContext},counts)]);
+  const tickSize=opts.tickSizeOf?.(t.instrument);
+  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext})]);
  }
  return out;
 }
@@ -6046,25 +6153,26 @@ function emptyDayNoteCells(){return {comment:'',preview:'',notes:''}}
 // Export Reportů přes víc deníků. Pořadí v dni se počítá nad CELÝM deníkem
 // (allRows), ne nad vyfiltrovanými řádky – jinak by filtr data nebo
 // instrumentu změnil „kolikátý obchod dne". journals: { id: { mode, config,
-// templates } }; dayNoteOf('journalId|datum').
+// templates, gradeRetroGraceMin } }; dayNoteOf('journalId|datum').
 function reportCsvTable(rows,allRows,dayNoteOf,journals={}){
- const counts=srCsvCounts(rows);
+ const count=levelCsvCount(rows);
  const first={};
  rows.forEach(t=>{if(t.date){const k=t.journalId+'|'+t.date;const cur=first[k];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)first[k]=t}});
  const orders={};
  for(const id of new Set(rows.map(t=>t.journalId)))orders[id]=FJContext.dayOrder((allRows||rows).filter(t=>t.journalId===id));
- const out=[[...reportCsvHeader(counts),...contextCsvHeader(counts)]];
+ const out=[[...reportCsvHeader(count),...contextCsvHeader()]];
  for(const t of rows){
   const key=t.journalId+'|'+t.date;
   const note=t.date?dayNoteOf(key):null;
   const dn=t.date&&first[key]===t?(note||{}):null;
   const j=journals[t.journalId]||{};
-  out.push([...reportCsvRow(t,dn,counts),...contextCsvCells(t,{tickSize:FJPoints.tickSizeFor(t.instrument,j.templates),config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,dayContext:note?.dayContext},counts)]);
+  const tickSize=FJPoints.tickSizeFor(t.instrument,j.templates);
+  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext})]);
  }
  return out;
 }
 $('exportCsv').onclick=async()=>{
- const table=journalCsvTable(trades,date=>(db?.data?.dayNotes||{})[date]||null,{tickSizeOf:i=>getTickSizeForInstrument(i),config:FJTaxonomy.getConfig(),mode:activeJournalMode()});
+ const table=journalCsvTable(trades,date=>(db?.data?.dayNotes||{})[date]||null,{tickSizeOf:i=>getTickSizeForInstrument(i),config:FJTaxonomy.getConfig(),mode:activeJournalMode(),gradeRetroGraceMin:settings.gradeRetroGraceMinutes});
  const csv=table.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
  if(window.desktopAPI?.exportBackupOnce){
@@ -6087,7 +6195,7 @@ $('exportJson').onclick=async()=>{
  }
  download(new Blob([JSON.stringify({settings,trades:[...trades,...setupRecords]},null,2)],{type:'application/json'}),'futures-journal-zaloha.json');
 };
-$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const t of data.trades){if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
+$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const raw of data.trades){const t=FJTaxonomy.convertLegacyNear(FJTaxonomy.stripRemovedV3(raw));if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings.taxonomy?{...data.settings,taxonomy:FJTaxonomy.migrateConfigV3(data.settings.taxonomy)}:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
 $('clearAll').onclick=async()=>{if(await showConfirm('Tato akce smaže všechny obchody a nastavení pouze v aktuálním deníku. Pokračovat?')){await clearStore('trades');await clearStore('settings');safeReload()}};
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 
@@ -6535,12 +6643,12 @@ $('generateReport').onclick=()=>generateReportView();
 $('reportPrint').onclick=()=>window.print();
 // Sloupce CSV exportu Reportů (přes deníky). Stejný důvod pro dvě funkce
 // jako u exportu deníku: hlavička a řádek se nesmí rozejít.
-function reportCsvHeader(counts={tg:1,sl:1}){
- return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...srCsvHeader(counts),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+function reportCsvHeader(count=1){
+ return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
-function reportCsvRow(t,dn,counts={tg:1,sl:1}){
+function reportCsvRow(t,dn,count=1,tickSize){
  const p=t.dailyPlan||{};
- return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...srCsvCells(t,counts),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('reportCsv').onclick=async()=>{
  // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()
@@ -6551,7 +6659,7 @@ $('reportCsv').onclick=async()=>{
  for(const p of visibleJournalProfiles()){
   const r=await window.desktopAPI.readJournal(p.id);
   const main=(Array.isArray(r?.data?.settings)?r.data.settings:[]).find(s=>s?.key==='main')?.value||{};
-  journals[p.id]={mode:FJContext.journalMode(p),config:main.taxonomy||{},templates:main.templates||[]};
+  journals[p.id]={mode:FJContext.journalMode(p),config:main.taxonomy||{},templates:main.templates||[],gradeRetroGraceMin:main.gradeRetroGraceMinutes};
  }
  const table=reportCsvTable(reportRows,await collectReportRows(),k=>allDayNotes[k]||null,journals);
  const csv=table.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
@@ -6721,6 +6829,7 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   grossPnl,
   side:e.side||'',
   positionId:e.positionId||'',
+  ...(e.sourceExecutionId?{exitExecutionId:String(e.sourceExecutionId)}:{}),
   // MFE/MAE naměřené konektorem (u NinjaTraderu Execution.MaxPrice/MinPrice
   // vstupů, viz excursionTicks v main.js). Příznak Source odliší měření od
   // ručního zadání i od dopočtu z výstupní ceny; bez hodnoty se pole vůbec
@@ -6825,6 +6934,11 @@ $('captureTestMultiTarget').onclick=async()=>{
  await refreshCaptureStatus();
  showToast('Vytvořena testovací pozice se 3 kontrakty uzavřenými přes TP1, Break Even a TP2. Spusť import (nebo počkej na automatický) a zkontroluj Deník – měl by se objevit jeden sloučený obchod se třemi legy.');
 };
+$('captureTestScaleIn').onclick=async()=>{
+ await window.desktopAPI.captureTestScaleInSequence();
+ await refreshCaptureStatus();
+ showToast('Vytvořena testovací pozice s dokupem: vstup 2 ks, TP1, dokup 1 ks, TP2 zavře zbytek. Spusť import (nebo počkej na automatický) – v Deníku má být jeden obchod s cíli TP1, TP2 a „TP2 · dokup“ a s řádkem Vstupy.');
+};
 $('captureImport').onclick=()=>importCapturedTrades(false);
 async function installNinjaConnector(){
  const r=await window.desktopAPI.captureInstallNinjaConnector();
@@ -6878,22 +6992,34 @@ const UPDATE_POSTPONED_KEY='FJ_updatePostponedVersion';
 let updatePostponedVersion=null;
 try{updatePostponedVersion=sessionStorage.getItem(UPDATE_POSTPONED_KEY)}catch(e){}
 let updateOfferOpen=false;
-let updateManualCheck=false;
+let updateManualCheck=false;     // false | 'stable' | 'test' – čím se ručně hledá
 let updateInstalling=false;
+// Testovací pre-release se hledají jen tlačítkem, které se ukáže až po
+// zapnutí téhle volby (jen toto zařízení, výchozí vypnuto).
+const UPDATE_TEST_CHANNEL_KEY='FJ_updateTestChannel';
+const UPDATE_TEST_WARNING='Jedná se o testovací pre-release verze, které můžou obsahovat chyby a můžou být nestabilní. Používej na vlastní riziko.';
+let updateTestChannel=false;
+try{updateTestChannel=localStorage.getItem(UPDATE_TEST_CHANNEL_KEY)==='1'}catch(e){}
+// Testovací a finální vydání nesou stejné číslo verze – odložená testovací
+// nabídka proto nesmí umlčet pozdější nabídku finální verze téhož čísla.
+function updateOfferKey(state){
+ return (state?.channel==='test'?'test:':'')+String(state?.version??'');
+}
 function shouldOfferUpdate(state,postponedVersion,requested){
  if(!state||state.status!=='available'||!state.version)return false;
- return !!requested||String(postponedVersion??'')!==String(state.version);
+ return !!requested||String(postponedVersion??'')!==updateOfferKey(state);
 }
 function updateStatusText(state){
  if(!state)return 'Dostupné jen v desktopové aplikaci.';
  const head=`Nainstalovaná verze: ${state.currentVersion||'neznámá'}.`;
+ const test=state.channel==='test';
  switch(state.status){
   case 'unsupported':return head+' Aktualizace fungují jen v nainstalované aplikaci, ne při spuštění ze zdrojových souborů.';
   case 'checking':return head+' Zjišťuji, jestli vyšla nová verze…';
   case 'none':return head+' Máš aktuální verzi.';
-  case 'available':return head+` Dostupná je verze ${state.version}.`+(state.error?' '+state.error:'');
-  case 'downloading':return head+` Stahuji verzi ${state.version}: ${state.percent||0} %`;
-  case 'downloaded':return head+` Verze ${state.version} je stažená a připravená k instalaci.`;
+  case 'available':return head+` Dostupná je ${test?'testovací verze':'verze'} ${state.version}.`+(state.error?' '+state.error:'');
+  case 'downloading':return head+` Stahuji ${test?'testovací verzi':'verzi'} ${state.version}: ${state.percent||0} %`;
+  case 'downloaded':return head+` ${test?'Testovací verze':'Verze'} ${state.version} je stažená a připravená k instalaci.`;
   case 'error':return head+' '+(state.error||'Kontrolu aktualizací se nepodařilo dokončit.');
   default:return head;
  }
@@ -6901,7 +7027,9 @@ function updateStatusText(state){
 // Seznam změn (state.notes) je text z GitHubu – showConfirm ho vkládá přes
 // textContent, nikdy jako HTML.
 function updateOfferMessage(state){
- const lines=[`Je dostupná nová verze ${state.version} (nainstalovaná je ${state.currentVersion}).`];
+ const test=state.channel==='test';
+ const lines=[`Je dostupná ${test?'testovací':'nová'} verze ${state.version} (nainstalovaná je ${state.currentVersion}).`];
+ if(test)lines.push('','⚠️ '+UPDATE_TEST_WARNING);
  if(state.notes)lines.push('','Co je nového:',state.notes);
  lines.push('','Aktualizace se stáhne a nainstaluje, aplikace se pak sama znovu spustí. Deníky, obchody i nastavení zůstávají.');
  return lines.join('\n');
@@ -6912,9 +7040,15 @@ function renderUpdateCard(){
  if(btn){
   const can=!!updateState&&(updateState.status==='available'||updateState.status==='downloaded');
   btn.style.display=can?'':'none';
-  if(can)btn.textContent=updateState.status==='downloaded'?`Nainstalovat verzi ${updateState.version}`:`Aktualizovat na ${updateState.version}`;
+  const test=updateState?.channel==='test';
+  if(can)btn.textContent=updateState.status==='downloaded'?`Nainstalovat ${test?'testovací verzi':'verzi'} ${updateState.version}`:`Aktualizovat na ${test?'testovací verzi ':''}${updateState.version}`;
  }
- if($('checkUpdates'))$('checkUpdates').disabled=!!updateState&&(updateState.status==='checking'||updateState.status==='downloading');
+ const busy=!!updateState&&(updateState.status==='checking'||updateState.status==='downloading');
+ if($('checkUpdates'))$('checkUpdates').disabled=busy;
+ if($('checkTestUpdates'))$('checkTestUpdates').disabled=busy;
+ if($('updateTestChannel'))$('updateTestChannel').checked=updateTestChannel;
+ if($('updateTestBox'))$('updateTestBox').style.display=updateTestChannel?'':'none';
+ if($('updateTestWarning'))$('updateTestWarning').textContent='⚠️ '+UPDATE_TEST_WARNING;
 }
 async function openCapturePositionCount(){
  try{return ((await window.desktopAPI.captureStatus())?.openPositions||[]).length}catch(e){return 0}
@@ -6936,6 +7070,14 @@ async function startUpdate(){
     {title:'Otevřená pozice',ok:'Aktualizovat i tak',cancel:'Počkat'});
   };
   if(!(await positionsOk()))return;
+  // Kontrola na pozadí (každých pár hodin) stav na chvíli přepne na
+  // „zjišťuji“ – počkat, až doběhne, jinak by se potvrzená aktualizace
+  // nespustila a nic by to neřeklo.
+  for(let i=0;i<40&&updateState?.status==='checking';i++){
+   await new Promise(resolve=>setTimeout(resolve,500));
+   updateState=await window.desktopAPI.getUpdateState();
+  }
+  renderUpdateCard();
   if(updateState?.status==='available'){
    showToast('Stahuji aktualizaci…');
    const r=await window.desktopAPI.downloadUpdate();
@@ -6943,7 +7085,7 @@ async function startUpdate(){
    updateState=await window.desktopAPI.getUpdateState();
    renderUpdateCard();
   }
-  if(updateState?.status!=='downloaded')return;
+  if(updateState?.status!=='downloaded'){showToast('Aktualizaci teď nejde spustit. '+updateStatusText(updateState));return}
   // Restart nesmí přijít přes rozdělanou práci (formulář obchodu apod.).
   await waitForNoOpenModal();
   if(!(await positionsOk()))return;
@@ -6962,10 +7104,10 @@ async function maybeOfferUpdate(requested=false){
   // Stav se při čekání mohl změnit (novější verze, mezitím spuštěné stahování).
   const state=updateState;
   if(!shouldOfferUpdate(state,updatePostponedVersion,requested))return;
-  const ok=await showConfirm(updateOfferMessage(state),{title:'Aktualizace aplikace',ok:'Aktualizovat teď',cancel:'Později'});
+  const ok=await showConfirm(updateOfferMessage(state),{title:state.channel==='test'?'Testovací verze aplikace':'Aktualizace aplikace',ok:'Aktualizovat teď',cancel:'Později'});
   if(!ok){
-   updatePostponedVersion=state.version;
-   try{sessionStorage.setItem(UPDATE_POSTPONED_KEY,String(state.version))}catch(e){}
+   updatePostponedVersion=updateOfferKey(state);
+   try{sessionStorage.setItem(UPDATE_POSTPONED_KEY,updatePostponedVersion)}catch(e){}
    return;
   }
   await startUpdate();
@@ -6977,8 +7119,9 @@ async function maybeOfferUpdate(requested=false){
 function settleManualUpdateCheck(){
  if(!updateManualCheck||!updateState)return;
  if(updateState.status==='checking')return;
+ const test=updateManualCheck==='test';
  updateManualCheck=false;
- if(updateState.status==='none')showToast(`Máš aktuální verzi (${updateState.currentVersion}).`);
+ if(updateState.status==='none')showToast(test?`Žádná novější testovací verze není (máš ${updateState.currentVersion}).`:`Máš aktuální verzi (${updateState.currentVersion}).`);
  else if(updateState.status==='available')maybeOfferUpdate(true);
 }
 function applyUpdateState(state){
@@ -6991,14 +7134,24 @@ function applyUpdateState(state){
  if(requested&&updateState.status==='downloaded'){startUpdate();return}
  maybeOfferUpdate(requested);
 }
-if($('checkUpdates'))$('checkUpdates').onclick=async()=>{
+// test=true: i testovací pre-release (hlavní proces pak bere nejnovější
+// vydání vůbec). Jinak stejný průběh jako u běžné kontroly.
+async function runManualUpdateCheck(test){
  if(!window.desktopAPI?.checkForUpdates){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
  if(updateState?.status==='downloaded'){startUpdate();return}
- updateManualCheck=true;
- const r=await window.desktopAPI.checkForUpdates();
+ updateManualCheck=test?'test':'stable';
+ const r=await window.desktopAPI.checkForUpdates({test:!!test});
  if(r?.unsupported){updateManualCheck=false;showToast(updateStatusText(updateState));return}
  if(!r?.ok){updateManualCheck=false;showToast(r?.error||'Kontrolu aktualizací se nepodařilo dokončit.');return}
  settleManualUpdateCheck();
+}
+if($('checkUpdates'))$('checkUpdates').onclick=()=>runManualUpdateCheck(false);
+if($('checkTestUpdates'))$('checkTestUpdates').onclick=()=>runManualUpdateCheck(true);
+if($('updateTestChannel'))$('updateTestChannel').onchange=event=>{
+ updateTestChannel=!!event.target.checked;
+ try{localStorage.setItem(UPDATE_TEST_CHANNEL_KEY,updateTestChannel?'1':'0')}catch(e){}
+ renderUpdateCard();
+ showToast(updateTestChannel?'Testovací verze jsou povolené. Hledají se jen tlačítkem „Zkontrolovat aktualizace Test verze“.':'Testovací verze jsou vypnuté.');
 };
 if($('installUpdate'))$('installUpdate').onclick=()=>{
  if(updateState?.status==='downloaded')startUpdate();
@@ -7202,6 +7355,18 @@ async function startJournalApplication(){
    const r=await runSrLevelsMigration();
    if(r&&r.changed)showToast(`SR hladiny u ${r.changed} obchodů převedeny na řádky (cena a vzdálenost zatím prázdné). Záloha deníku je v safety-backups.`);
   }catch(e){showToast('Převod SR hladin se nepodařil: '+e.message)}
+  // Kontext v3: běží až po starším převodu SR hladin (ten dělá z klíčů řádky).
+  // Když selže, deník zůstane ve starém tvaru – čtení ho umí a převod se
+  // zkusí při dalším otevření.
+  try{
+   const r=await runContextV3Migration();
+   if(r&&(r.removed||r.converted)){
+    const parts=[];
+    if(r.converted)parts.push(`hladiny u ${r.converted} záznamů sloučeny do jednoho seznamu „Hladiny v blízkosti“`);
+    if(r.removed)parts.push(`zrušená pole (vybraná likvidita, profil cesty, netest/test vstupní hladiny) odebrána u ${r.removed} záznamů`);
+    showToast('Kontext v3: '+parts.join('; ')+'. Zálohy deníku jsou v safety-backups.');
+   }
+  }catch(e){showToast('Převod na kontext v3 se nepodařil, deník zůstal beze změny: '+e.message)}
   await load();
  }
  catch(e){journalAppStarted=false;showToast('Databázi se nepodařilo otevřít: '+e.message)}

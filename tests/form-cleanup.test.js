@@ -95,16 +95,24 @@ const sectionOf = card => {
 
 test('formulář: pole jsou ve správných kartách', () => {
   const expected = {
+    // Cena targetu patří k ceně SL: tady se plánovaný cíl ručně přepisuje
+    // (obchod zavřený ručně mimo plán). Přesun do Hladin byl chyba (13. 10.).
     sltp: ['slPrice', 'targetLevel1Price', 'targetLevel2Price'],
     course: ['mfeTicks', 'maeTicks', 'observedMinutes', 'postExitFavorableTicks', 'postExitAdverseTicks', 'postExitAdverseFirst'],
-    setup: ['setupCode', 'fillStatus', 'missedByTicks', 'trend', 'planFollowed', 'wouldSkipLive'],
-    // Od 4.7.2 samostatná karta Hladiny (jde skrýt a hlídat zvlášť).
-    levels: ['entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm', 'targetLevel1Type', 'targetLevel2Type', 'levelsSummary'],
+    // Kontext v3 (A5): kolikátý test vstupu patří k setupu.
+    setup: ['setupCode', 'fillStatus', 'missedByTicks', 'trend', 'trendHtf', 'grade', 'entryTestNo', 'planFollowed', 'wouldSkipLive'],
+    // Od 4.7.2 samostatná karta Hladiny (jde skrýt a hlídat zvlášť). Od 4.8.5
+    // jeden seznam „Hladiny v blízkosti"; z cíle je tu jen typ.
+    levels: ['entryLevels', 'nearLevels', 'nearLevelsNone', 'ofConfirm', 'absLocation', 'targetLevel1Type',
+      'targetLevel2Type', 'contextDerived', 'levelsSummary'],
     comments: ['tradePlanSetup', 'tradePlanPsychology', 'tradePlanNote', 'comment', 'screenshots']
   };
   for (const [card, ids] of Object.entries(expected)) {
     const inside = sectionOf(card);
     for (const id of ids) assert.ok(inside.includes(`id="${id}"`), `${id} patří do karty ${card}`);
+  }
+  for (const id of ['targetLevel1Price', 'targetLevel2Price']) {
+    assert.ok(!sectionOf('levels').includes(`id="${id}"`), id + ' nesmí být v kartě Hladiny');
   }
   // Základ (ceny, zisk, další cíle) se nesbaluje.
   const firstCard = HTML.indexOf('<details class="trade-section"');
@@ -115,25 +123,26 @@ test('formulář: pole jsou ve správných kartách', () => {
 });
 
 // Mřížka dlaždic pro `readChipGrid`: uzel s vybranými klíči.
-// SR kolonky jsou od 4.7.0 řádky (typ + cena + ticky) pro `readLevelRows`;
-// v zadání testu stačí klíč, nebo celý řádek.
+// Hladiny v blízkosti jsou řádky (typ + cena + test / netest) pro
+// `readLevelRows`; v zadání testu stačí klíč, nebo celý řádek.
 function chipDom(selection) {
   const node = keys => ({
     querySelectorAll: () => keys.map(key => ({ dataset: { key } }))
   });
   const srNode = rows => ({
+    querySelector: () => null,
     querySelectorAll: () => rows.map(r => (typeof r === 'string' ? { level: r } : r)).map(r => ({
+      dataset: {},
       querySelector: sel => ({
         '.sr-level': { value: r.level },
         '.sr-price': { value: r.price ?? '' },
-        '.sr-ticks': { value: r.ticksFromEntry ?? '' }
+        '.sr-test': { value: r.testState ?? '' }
       })[sel]
     }))
   });
   const nodes = {
     entryLevels: node(selection.entryLevels || []),
-    srTarget: srNode(selection.srTarget || []),
-    srStopLoss: srNode(selection.srStopLoss || []),
+    nearLevels: srNode(selection.nearLevels || []),
     ofConfirm: node(selection.ofConfirm || []),
     levelsSummary: { id: 'levelsSummary', textContent: '' }
   };
@@ -145,7 +154,8 @@ function chipDom(selection) {
 
 function summaryOf(selection) {
   const dom = chipDom(selection);
-  const r = loadRenderer(['$', 'readChipGrid', 'SR_ENUMS', 'readLevelRows', 'formatLevelRow', 'LEVEL_FIELDS', 'syncSrNoneControls', 'readSrNone', 'updateLevelsSummary'],
+  const r = loadRenderer(['$', 'readChipGrid', 'NEAR_LEVELS_ID', 'rowFromElement', 'readLevelRows', 'contextFieldShown', 'formatLevelRow', 'LEVEL_FIELDS',
+    'syncNearNoneControls', 'readNearNone', 'updateLevelsSummary'],
     { document: dom.document, FJTaxonomy });
   r.updateLevelsSummary();
   return dom.nodes.levelsSummary.textContent;
@@ -154,19 +164,17 @@ function summaryOf(selection) {
 test('sbalená položka ukazuje, co je vybrané – sbalení nic neschová', () => {
   // Pořadí je pořadí číselníku, ne pořadí klikání – `readChipGrid` hodnoty
   // očišťuje přes `sanitizeMulti`, která je řadí stabilně.
-  const summary = summaryOf({ entryLevels: ['VWAP', 'VAH'], srTarget: ['VAL'] });
+  const summary = summaryOf({ entryLevels: ['VWAP', 'VAH'], nearLevels: ['VAL'] });
   assert.match(summary, /Vstup: VAH \+ VWAP/);
-  assert.match(summary, /SR→TG: VAL/);
-  assert.doesNotMatch(summary, /SR→SL/, 'nevyplněná kolonka se v hlavičce nepřipomíná');
+  assert.match(summary, /Hladiny: VAL/);
+  assert.doesNotMatch(summary, /OF:/, 'nevyplněná kolonka se v hlavičce nepřipomíná');
 });
 
-test('shrnutí u SR hladiny ukáže cenu i vzdálenost od vstupu', () => {
+test('shrnutí u hladiny v blízkosti ukáže cenu a test / netest', () => {
   const summary = summaryOf({
-    srTarget: [{ level: 'VAH', price: 7712.5, ticksFromEntry: 10 }],
-    srStopLoss: [{ level: 'VWAP', ticksFromEntry: 6 }]
+    nearLevels: [{ level: 'VAH', price: 7712.5, testState: 'UNTESTED' }, { level: 'VWAP' }]
   });
-  assert.match(summary, /SR→TG: VAH @ 7712\.5 · 10 t/);
-  assert.match(summary, /SR→SL: VWAP · 6 t/);
+  assert.match(summary, /Hladiny: VAH @ 7712\.5 \(netest\), VWAP/);
 });
 
 test('sbalená položka u prázdného obchodu řekne, že je prázdná', () => {
@@ -192,14 +200,14 @@ test('shrnutí počítá i s order flow, které je ve stejné položce', () => {
 
 function pills() {
   return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML',
-    'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'srRefDistanceText'],
+    'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown'],
     { FJTaxonomy, settings: { templates: [] } });
 }
 
 function contextTrade(overrides) {
   return {
     id: 'card-1', setupCode: 'M2_OF', trend: 'LONG', fillStatus: 'FILLED',
-    entryLevels: ['VPOC_IB'], srTarget: ['VPOC_1M'], srStopLoss: ['VWAP'],
+    entryLevels: ['VPOC_IB'], nearLevels: [{ level: 'VPOC_1M', price: 7712.5 }, { level: 'VWAP', price: 7698 }],
     ofConfirm: ['CLOSE_VS_VPOC_OK'],
     ...overrides
   };
@@ -210,7 +218,7 @@ test('na kartě zůstává vidět Setup a Trend, hladiny se sbalují', () => {
   const visible = r.contextPillsHTML(contextTrade());
   assert.match(visible, /M2 \+ Order Flow/, 'Setup zůstává vidět');
   assert.match(visible, /Long/, 'Trend zůstává vidět');
-  for (const hidden of ['VPOC IB', 'SR→TG', 'SR→SL', 'OF:']) {
+  for (const hidden of ['VPOC IB', 'Hladiny:', 'OF:']) {
     assert.ok(!visible.includes(hidden), hidden + ' patří do sbalené části');
   }
   // Stav naplnění se pořád ukazuje jen tehdy, když obchod naplněný NENÍ.
@@ -218,22 +226,30 @@ test('na kartě zůstává vidět Setup a Trend, hladiny se sbalují', () => {
   assert.match(r.contextPillsHTML(contextTrade({ fillStatus: 'NO_FILL' })), /limitka se nenaplnila/);
 });
 
-test('sbalená část nese všechny čtyři skupiny a svůj počet', () => {
+test('sbalená část nese všechny tři skupiny a svůj počet', () => {
   const { html, count } = pills().levelPillsHTML(contextTrade());
-  assert.equal(count, 4, 'hladina vstupu, obě SR kolonky a order flow');
+  assert.equal(count, 3, 'hladina vstupu, hladiny v blízkosti a order flow');
   assert.match(html, /VPOC IB/, 'popisky z číselníku, ne uložené klíče');
-  assert.match(html, /SR→TG: VPOC 1M/);
-  assert.match(html, /SR→SL: VWAP/);
+  assert.match(html, /Hladiny: VPOC 1M @ 7712\.5, VWAP @ 7698/);
   assert.match(html, /OF: Uzavření vůči VPOC v pořádku/);
+  assert.doesNotMatch(html, /SR→/, 'dvě kolonky SR už nejsou');
 });
 
-test('karta ukáže u SR hladiny cenu i vzdálenost; starý tvar (klíče) funguje dál', () => {
+test('karta ukáže u hladiny cenu, test / netest a vzdálenosti – bez štítku role', () => {
   const { html } = pills().levelPillsHTML(contextTrade({
-    srTarget: [{ level: 'VAH', price: 7712.5, ticksFromEntry: 10 }, { level: 'VWAP', price: null, ticksFromEntry: 6 }],
-    srStopLoss: ['VWAP']
+    instrument: 'MES', side: 'long', entryPrice: 7700, slPrice: 7696, targetLevel1: { type: 'VAH', price: 7720 },
+    nearLevels: [{ level: 'VAH', price: 7712.5, testState: 'UNTESTED' }, { level: 'VAL', price: 7699 }]
   }));
-  assert.match(html, /SR→TG: VAH @ 7712\.5 · 10 t, VWAP · 6 t/);
-  assert.match(html, /SR→SL: VWAP</);
+  assert.match(html, /Hladiny: VAH @ 7712\.5 \(netest\) · \+50 t od vstupu · 66 t od SL · 30 t do cíle, VAL @ 7699 · −4 t od vstupu · 12 t od SL · 84 t do cíle/);
+  assert.match(html, /Nejbližší hladina ve směru: \+50 t \(3,13 R\) · SL 12 t za VAL · mezi SL a vstupem 1, před cílem 1/, 'řádek dopočtů');
+  assert.doesNotMatch(html, /v cestě|chrání|překážk/i, 'deník hladinám nepřisuzuje roli');
+});
+
+test('karta přečte i starý tvar (dva seznamy SR) – stejným převodem jako migrace', () => {
+  const old = contextTrade({ srTarget: [{ level: 'VAH', price: 7712.5, ticksFromEntry: 10 }], srStopLoss: ['VWAP'] });
+  delete old.nearLevels;
+  const { html } = pills().levelPillsHTML(old);
+  assert.match(html, /Hladiny: VAH @ 7712\.5, VWAP</);
 });
 
 test('obchod bez hladin sbalitelnou položku nedostane', () => {
@@ -257,7 +273,7 @@ test('rozbalený stav se pamatuje podle id obchodu, ne v DOM', () => {
 });
 
 test('hlavička sbalené položky říká, kolik pilulek skrývá', () => {
-  assert.match(pills().tradeLevelsBlockHTML(contextTrade()), /Hladiny <span class="sub">\(4\)<\/span>/);
+  assert.match(pills().tradeLevelsBlockHTML(contextTrade()), /Hladiny <span class="sub">\(3\)<\/span>/);
 });
 
 test('tlačítko dne nesmí zavřít celý den', () => {

@@ -39,8 +39,15 @@ test('A2.1: všechny klíče ze zadání jsou v obou slovnících, existující 
 });
 
 test('A7/13: uživatelské položky Phidias 1 zůstanou beze změny – počet, klíče, popisky', () => {
-  const after = roundTrip(PHIDIAS);
-  for (const group of Object.keys(PHIDIAS)) {
+  // Kontext v3: dvě kolonky SR se při převodu deníku stanou jednou („Hladiny
+  // v blízkosti"); slovník hladin a cílů se tím nemění.
+  const migrated = FJTaxonomy.migrateConfigV3(PHIDIAS);
+  assert.deepEqual(Object.keys(migrated).sort(), ['ENTRY_LEVEL', 'NEAR_LEVEL', 'TARGET_LEVEL']);
+  assert.deepEqual(migrated.NEAR_LEVEL.hidden, ['PDH_PDL', 'ONH_ONL'], 'skryté jen to, co bylo skryté u obou kolonek SR');
+  assert.equal(FJTaxonomy.migrateConfigV3(migrated), migrated, 'převod číselníků je idempotentní');
+  const after = roundTrip(migrated);
+  assert.deepEqual(after.NEAR_LEVEL.hidden, ['PDH_PDL', 'ONH_ONL'], 'nastavení nové kolonky přežije uložení');
+  for (const group of ['ENTRY_LEVEL', 'TARGET_LEVEL']) {
     const custom = PHIDIAS[group].custom || {};
     assert.deepEqual(after[group]?.custom || {}, custom, group + ': vlastní volby');
     for (const [key, label] of Object.entries(custom)) assert.equal(FJTaxonomy.labelOf(group, key, after), label);
@@ -49,7 +56,7 @@ test('A7/13: uživatelské položky Phidias 1 zůstanou beze změny – počet, 
 });
 
 test('A7/13: smazaná (skrytá) výchozí položka se po restartu nevrátí', () => {
-  let cfg = roundTrip(PHIDIAS);
+  let cfg = roundTrip(FJTaxonomy.migrateConfigV3(PHIDIAS));
   assert.ok(visible('ENTRY_LEVEL', cfg).includes('HVN'), 'nová výchozí položka je nabídnutá');
   cfg.ENTRY_LEVEL.hidden = [...cfg.ENTRY_LEVEL.hidden, 'HVN'];
   // „restart" = uložení do nastavení deníku a nové načtení
@@ -79,4 +86,31 @@ test('A2.1: „je to hladina“ přežije uložení; výchozí ne u ručního v�
   assert.deepEqual(cfg.TARGET_LEVEL.isLevel, { CUSTOM_FIX_RRR: true, VAH: false }, 'jen známé klíče a jen true/false');
   assert.equal(FJTaxonomy.isLevelKey('CUSTOM_FIX_RRR', cfg), true);
   assert.equal(FJTaxonomy.isLevelKey('VAH', cfg), false);
+});
+
+// High / Low dne (HOD_LOD): výchozí položka ze zadání v2, kterou uživatel
+// nepoužívá a jejíž zkratka mu nic neříkala (zpětná vazba 13. 10.). Dostala
+// srozumitelný popisek a je ve výchozím stavu skrytá – všude, kde se hladiny
+// nabízejí. Klíč zůstává platný a zapnout ji jde tlačítkem „Zobrazit".
+test('High / Low dne: srozumitelný popisek, výchozí skrytá u vstupu, hladin v blízkosti i cílů', () => {
+  for (const group of ['ENTRY_LEVEL', 'NEAR_LEVEL', 'TARGET_LEVEL']) {
+    assert.equal(FJTaxonomy.labelOf(group, 'HOD_LOD', {}), 'High / Low dne', group);
+    assert.ok(FJTaxonomy.isValidKey(group, 'HOD_LOD', {}), group + ': klíč zůstává platný');
+    assert.ok(!visible(group, {}).includes('HOD_LOD'), group + ': ve výchozím stavu se nenabízí');
+    assert.ok(visible(group, {}).includes('VAH'), group + ': ostatní hladiny se nabízejí dál');
+    assert.ok(FJTaxonomy.visibleOptions(group, ['HOD_LOD'], {}).some(o => o.key === 'HOD_LOD'), group + ': obchod, který ji má, o ni editací nepřijde');
+  }
+  // S nastavením deníku (Phidias 1 po převodu na kontext v3) platí totéž.
+  const cfg = roundTrip(FJTaxonomy.migrateConfigV3(PHIDIAS));
+  for (const group of ['ENTRY_LEVEL', 'NEAR_LEVEL', 'TARGET_LEVEL']) assert.ok(!visible(group, cfg).includes('HOD_LOD'), group + ' s nastavením deníku');
+});
+
+test('High / Low dne: uživatel si ji zapne (Zobrazit) – v kolonce, kde ji chce', () => {
+  const shown = { ENTRY_LEVEL: { visible: ['HOD_LOD'] } };
+  assert.ok(visible('ENTRY_LEVEL', shown).includes('HOD_LOD'));
+  assert.ok(visible('NEAR_LEVEL', shown).includes('HOD_LOD'), 'kolonka bez vlastního nastavení dědí ze vstupu');
+  assert.ok(!visible('TARGET_LEVEL', shown).includes('HOD_LOD'), 'cíle mají vlastní slovník');
+  const nearOnly = { NEAR_LEVEL: { hidden: [], visible: ['HOD_LOD'] } };
+  assert.ok(visible('NEAR_LEVEL', nearOnly).includes('HOD_LOD'));
+  assert.ok(!visible('ENTRY_LEVEL', nearOnly).includes('HOD_LOD'));
 });

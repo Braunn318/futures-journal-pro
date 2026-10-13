@@ -49,7 +49,7 @@ function stubDocument() {
 // ostatní vykreslování je zastoupené prázdnými funkcemi.
 function tradeForm() {
   const dom = stubDocument();
-  const r = loadRenderer(['$', 'openModal', 'SR_ENUMS'], {
+  const r = loadRenderer(['$', 'openModal', 'NEAR_LEVELS_ID'], {
     document: dom.document,
     window: {},
     FJTaxonomy,

@@ -69,6 +69,22 @@ function journalSources() {
   return [];
 }
 
+// Záznamy exekucí konektoru k přehrání (tests/capture-log-replay.test.js):
+// záznam živé aplikace a, když existuje, záznam uložený k rozboru v
+// Troubleshooting/. Jen se čtou. FJ_EVENTS je přepíše (víc souborů oddělit
+// středníkem).
+function captureLogSources() {
+  if (process.env.FJ_EVENTS) return process.env.FJ_EVENTS.split(path.delimiter).map(f => f.trim()).filter(Boolean);
+  const files = [];
+  for (const root of dataRoots()) {
+    const live = path.join(root, 'trade-capture', 'events.json');
+    if (exists(live)) { files.push(live); break; }
+  }
+  const shared = path.join(DEV_ROOT, 'Troubleshooting', 'events.json');
+  if (exists(shared)) files.push(shared);
+  return files;
+}
+
 const OUTPUT_DIR = path.join(REPO_ROOT, 'tests', 'output');
 
-module.exports = { REPO_ROOT, DEV_ROOT, REPORT_CSV, SETTINGS_JSON, OUTPUT_DIR, exists, isDir, dataRoots, journalSources };
+module.exports = { REPO_ROOT, DEV_ROOT, REPORT_CSV, SETTINGS_JSON, OUTPUT_DIR, exists, isDir, dataRoots, journalSources, captureLogSources };

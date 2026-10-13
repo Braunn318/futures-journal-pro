@@ -43,8 +43,6 @@ test('A4: nová ruční pole jsou single-select číselníky s klíči ze zadán
     trendHtf: ['TREND_HTF', ['UP', 'DOWN', 'RANGE']],
     absLocation: ['ABS_LOCATION', ['EXTREME', 'MIDDLE', 'NONE']],
     entryTestNo: ['ENTRY_TEST_NO', ['1', '2', '3+']],
-    liquiditySwept: ['LIQUIDITY_SWEPT', ['YES', 'NO']],
-    pathProfile: ['PATH_PROFILE', ['LVN', 'HVN', 'MIXED', 'UNKNOWN']],
     grade: ['GRADE', ['A', 'B', 'C']]
   };
   const byKey = Object.fromEntries(FJTaxonomy.TRADE_CONTEXT_FIELDS.map(f => [f.key, f]));
@@ -55,25 +53,29 @@ test('A4: nová ruční pole jsou single-select číselníky s klíči ze zadán
     assert.equal(FJTaxonomy.sanitizeSingle(group, 'PREKLEP'), '', group + ': překlep se zahodí');
   }
   assert.equal(FJTaxonomy.labelOf('TREND', 'LONG'), 'Long', 'existující trend beze změny');
+  // Trend 30m se čte stejně jako trend 1m (zpětná vazba 13. 10.): Long / Short /
+  // Range. Mění se jen popisky – klíče UP / DOWN / RANGE jsou v uložených
+  // obchodech i v exportu a zůstávají.
+  assert.deepEqual(FJTaxonomy.allKeys('TREND_HTF').map(k => FJTaxonomy.labelOf('TREND_HTF', k)), ['Long', 'Short', 'Range']);
+  assert.deepEqual(FJTaxonomy.allKeys('TREND_HTF').map(k => FJTaxonomy.labelOf('TREND_HTF', k)),
+    FJTaxonomy.allKeys('TREND').map(k => FJTaxonomy.labelOf('TREND', k)), 'stejné popisky jako trend 1m');
+  assert.equal(FJTaxonomy.sanitizeSingle('TREND_HTF', 'UP'), 'UP', 'uložený klíč zůstává platný');
+  // Kontext v3: vybraná likvidita a profil cesty jsou zrušené i jako číselníky.
+  for (const gone of ['LIQUIDITY_SWEPT', 'PATH_PROFILE']) assert.equal(FJTaxonomy[gone], undefined, gone);
+  for (const gone of ['liquiditySwept', 'pathProfile', 'entryLevelTests']) assert.equal(byKey[gone], undefined, gone);
 });
 
-test('A2.2: netest/test na SR řádku přežije očistu, jen když je vyplněný – starý tvar řádku se nemění', () => {
-  const rows = FJTaxonomy.sanitizeLevelRows('SR_TARGET', [
-    { level: 'VPOC_30M', price: 7801, ticksFromEntry: 4, testState: 'UNTESTED' },
-    { level: 'VAH', price: 7803, ticksFromEntry: 12 },
-    { level: 'VAL', price: 7799, ticksFromEntry: 4, testState: 'NESMYSL' }
+test('A2.2: netest/test na řádku hladiny přežije očistu, jen když je vyplněný', () => {
+  const rows = FJTaxonomy.sanitizeNearLevels('NEAR_LEVEL', [
+    { level: 'VPOC_30M', price: 7801, testState: 'UNTESTED' },
+    { level: 'VAH', price: 7803 },
+    { level: 'VAL', price: 7799, testState: 'NESMYSL' }
   ]);
   assert.deepEqual(plain(rows), [
-    { level: 'VPOC_30M', price: 7801, ticksFromEntry: 4, testState: 'UNTESTED' },
-    { level: 'VAH', price: 7803, ticksFromEntry: 12 },
-    { level: 'VAL', price: 7799, ticksFromEntry: 4 }
+    { level: 'VPOC_30M', price: 7801, testState: 'UNTESTED' },
+    { level: 'VAH', price: 7803 },
+    { level: 'VAL', price: 7799 }
   ]);
-});
-
-test('A2.2: netest/test u hladin vstupu – mapa jen pro vybrané hladiny', () => {
-  assert.deepEqual(plain(FJTaxonomy.sanitizeLevelTests(['VPOC_30M', 'VAH'], { VPOC_30M: 'UNTESTED', VAH: 'TESTED', VAL: 'TESTED', VWAP: 'X' })),
-    { VPOC_30M: 'UNTESTED', VAH: 'TESTED' });
-  assert.equal(FJTaxonomy.sanitizeLevelTests(['VAH'], {}), null, 'nic vyplněno = null, ne prázdný objekt');
 });
 
 // ------------------------------------------------- 9. známka – gradeEdited
@@ -101,21 +103,75 @@ test('A7/9: gradeEdited se nastaví až při druhé změně, ne při první', ()
 });
 
 // ------------------------------------------------- 15. gradeRetro
+// „Doplněno zpětně" = známka zadaná až po LHŮTĚ od uložení obchodu do deníku
+// (zpětná vazba 13. 10.). Importovaný obchod v deníku vznikne až výstupem, takže
+// známku dřív zadat nejde – pravidlo „po čase výstupu" označilo každý. Uložení
+// je createdAt; u pozice s víc cíli pozdější z createdAt a posledního výstupu.
+// Lhůta je nastavení deníku (gradeRetroGraceMinutes), výchozí 30 minut.
 
-test('A7/15: gradeRetro – známka zadaná po čase výstupu (živý deník)', () => {
-  // 2026-10-09 17:02 Berlín = 15:02 UTC.
-  const t = { date: '2026-10-09', entryTime: '17:01', exitTime: '17:02', grade: 'A' };
-  assert.equal(FJContext.gradeRetro({ ...t, gradeSetAt: '2026-10-09T14:59:00.000Z' }, 'LIVE'), false, 'před vstupem');
-  assert.equal(FJContext.gradeRetro({ ...t, gradeSetAt: '2026-10-09T15:10:00.000Z' }, 'LIVE'), true, 'po výstupu');
-  assert.equal(FJContext.gradeRetro({ ...t, gradeSetAt: '2026-10-11T08:00:00.000Z' }, 'LIVE'), true, 'zpětně o dva dny');
-  assert.equal(FJContext.gradeRetro({ date: '2026-10-09', exitTime: '17:02' }, 'LIVE'), null, 'bez známky null');
+// 2026-10-09 17:02 Berlín = 15:02 UTC. Import proběhne pár vteřin po výstupu.
+const IMPORTED = { date: '2026-10-09', entryTime: '17:01', exitTime: '17:02', grade: 'A', createdAt: Date.parse('2026-10-09T15:02:20.000Z') };
+const retro = (extra, mode = 'LIVE', grace) => FJContext.gradeRetro({ ...IMPORTED, ...extra }, mode, grace);
+
+test('A7/15: známka zadaná do 30 minut od uložení obchodu NENÍ doplněná zpětně', () => {
+  assert.equal(FJContext.GRADE_RETRO_GRACE_MIN, 30);
+  assert.equal(retro({ gradeSetAt: '2026-10-09T15:06:00.000Z' }), false, '4 minuty po importu – dřív to nešlo');
+  assert.equal(retro({ gradeSetAt: '2026-10-09T15:32:20.000Z' }), false, 'přesně na konci lhůty');
+  assert.equal(retro({ gradeSetAt: '2026-10-09T14:59:00.000Z' }), false, 'před vstupem');
 });
 
-test('A7/15: v backtest deníku gradeRetro nejde ověřit (čas výstupu je čas replaye) → null, nikdy false', () => {
-  const t = { date: '2026-03-02', exitTime: '17:02', grade: 'A', gradeSetAt: '2026-10-09T15:10:00.000Z' };
+test('A7/15: známka zadaná po lhůtě JE doplněná zpětně', () => {
+  assert.equal(retro({ gradeSetAt: '2026-10-09T15:32:21.000Z' }), true, 'vteřinu po lhůtě');
+  assert.equal(retro({ gradeSetAt: '2026-10-11T08:00:00.000Z' }), true, 'o dva dny později');
+});
+
+test('A7/15: lhůta běží od uložení (createdAt), ne od času výstupu', () => {
+  // Ručně zapsaný obchod: výstup 17:02, do deníku uložen až 19:00 (17:00 UTC).
+  const manual = { createdAt: Date.parse('2026-10-09T17:00:00.000Z') };
+  assert.equal(retro({ ...manual, gradeSetAt: '2026-10-09T17:20:00.000Z' }), false, '20 minut po uložení');
+  assert.equal(retro({ ...manual, gradeSetAt: '2026-10-09T17:31:00.000Z' }), true, '31 minut po uložení');
+});
+
+test('A7/15: pozice s víc cíli – createdAt je první cíl, lhůta běží od posledního výstupu', () => {
+  // První cíl importován 15:02 UTC, poslední výstup až 18:10 Berlín (16:10 UTC).
+  const merged = { exitTime: '18:10' };
+  assert.equal(retro({ ...merged, gradeSetAt: '2026-10-09T16:25:00.000Z' }), false, '15 minut po posledním výstupu');
+  assert.equal(retro({ ...merged, gradeSetAt: '2026-10-09T16:45:00.000Z' }), true, '35 minut po posledním výstupu');
+});
+
+test('A7/15: lhůta je nastavitelná; 0 = přísně hned po uložení; nesmysl = výchozích 30', () => {
+  const at = '2026-10-09T15:12:20.000Z'; // 10 minut po importu
+  assert.equal(retro({ gradeSetAt: at }, 'LIVE', 5), true);
+  assert.equal(retro({ gradeSetAt: at }, 'LIVE', 15), false);
+  assert.equal(retro({ gradeSetAt: at }, 'LIVE', 0), true);
+  assert.equal(retro({ gradeSetAt: at }, 'LIVE', '120'), false, 'číslo jako text z pole formuláře');
+  for (const bad of [undefined, null, '', 'abc', -5, NaN]) assert.equal(retro({ gradeSetAt: at }, 'LIVE', bad), false, String(bad) + ' → výchozí lhůta');
+  assert.equal(FJContext.gradeRetroGrace(45), 45);
+  assert.equal(FJContext.gradeRetroGrace(''), 30);
+  assert.equal(FJContext.gradeRetroGrace(-1), 30);
+});
+
+test('A7/15: obchod bez createdAt (starší data) – lhůta od času výstupu; bez časů nebo známky null', () => {
+  const old = { createdAt: undefined };
+  assert.equal(retro({ ...old, gradeSetAt: '2026-10-09T15:20:00.000Z' }), false, '18 minut po výstupu');
+  assert.equal(retro({ ...old, gradeSetAt: '2026-10-09T15:40:00.000Z' }), true, '38 minut po výstupu');
+  assert.equal(FJContext.gradeRetro({ grade: 'A', gradeSetAt: '2026-10-09T15:40:00.000Z' }, 'LIVE'), null, 'bez uložení i výstupu nejde určit');
+  assert.equal(FJContext.gradeRetro({ date: '2026-10-09', exitTime: '17:02', createdAt: 1 }, 'LIVE'), null, 'bez známky null');
+  assert.equal(retro({ gradeSetAt: 'nesmysl' }), null);
+});
+
+test('A7/15: v backtest deníku gradeRetro nejde ověřit → null, nikdy false (beze změny)', () => {
+  const t = { ...IMPORTED, date: '2026-03-02', gradeSetAt: '2026-10-11T08:00:00.000Z' };
   assert.equal(FJContext.gradeRetro(t, 'BACKTEST'), null);
+  assert.equal(FJContext.gradeRetro({ ...t, gradeSetAt: '2026-10-09T15:06:00.000Z' }, 'BACKTEST'), null);
   assert.equal(FJContext.derivedFields(t, { mode: 'BACKTEST' }).gradeRetro, null);
   assert.equal(FJContext.derivedFields(t, { mode: 'LIVE' }).gradeRetro, true);
+});
+
+test('A7/15: derivedFields bere lhůtu z nastavení deníku (gradeRetroGraceMin)', () => {
+  const t = { ...IMPORTED, gradeSetAt: '2026-10-09T15:12:20.000Z' };
+  assert.equal(FJContext.derivedFields(t, { mode: 'LIVE' }).gradeRetro, false, 'výchozí lhůta 30 minut');
+  assert.equal(FJContext.derivedFields(t, { mode: 'LIVE', gradeRetroGraceMin: 5 }).gradeRetro, true);
 });
 
 // ------------------------------------------------- 10. merge nese všechna nová pole
@@ -124,27 +180,27 @@ test('A7/10: sloučený obchod nese všechna nová pole', () => {
   const r = loadRenderer(NAMES, { settings: SETTINGS, Date });
   const tp1 = leg({
     exitTime: '16:05', trendHtf: 'UP', absLocation: 'EXTREME', grade: 'A', gradeSetAt: '2026-10-09T14:00:00.000Z',
-    entryLevels: ['VPOC_30M'], entryLevelTests: { VPOC_30M: 'UNTESTED' },
-    srTarget: [{ level: 'VAH', price: 7704, ticksFromEntry: 16, testState: 'TESTED' }]
+    entryLevels: ['VPOC_30M'],
+    nearLevels: [{ level: 'VAH', price: 7704, testState: 'TESTED' }]
   });
   const tp2 = leg({
     exitTime: '16:09', exitPrice: 7705, points: 5, pnlRaw: 23.1, pnl: 23.1,
-    entryTestNo: '2', liquiditySwept: 'YES', pathProfile: 'LVN', gradeSetAt: '2026-10-09T13:00:00.000Z', gradeEdited: true,
-    entryLevels: ['VAH'], entryLevelTests: { VAH: 'TESTED' },
-    srStopLoss: [{ level: 'VAL', price: 7699, ticksFromEntry: 4, testState: 'UNTESTED' }]
+    entryTestNo: '2', gradeSetAt: '2026-10-09T13:00:00.000Z', gradeEdited: true,
+    entryLevels: ['VAH'],
+    // Zrušená pole (kontext v3) u nohy ze starší verze se sloučením nepřenášejí.
+    liquiditySwept: 'YES', pathProfile: 'LVN', entryLevelTests: { VAH: 'TESTED' },
+    nearLevels: [{ level: 'VAL', price: 7699, testState: 'UNTESTED' }]
   });
   const m = plain(r.combineTradeObjects([tp1, tp2]));
   assert.equal(m.trendHtf, 'UP');
   assert.equal(m.absLocation, 'EXTREME');
   assert.equal(m.entryTestNo, '2');
-  assert.equal(m.liquiditySwept, 'YES');
-  assert.equal(m.pathProfile, 'LVN');
   assert.equal(m.grade, 'A');
   assert.equal(m.gradeSetAt, '2026-10-09T13:00:00.000Z', 'nejdřívější zadání');
   assert.equal(m.gradeEdited, true, 'změněno u kterékoli nohy');
-  assert.deepEqual(m.entryLevelTests, { VPOC_30M: 'UNTESTED', VAH: 'TESTED' });
-  assert.equal(m.srTarget[0].testState, 'TESTED');
-  assert.equal(m.srStopLoss[0].testState, 'UNTESTED');
+  assert.deepEqual(m.entryLevels, ['VPOC_30M', 'VAH']);
+  assert.deepEqual(m.nearLevels, [{ level: 'VAH', price: 7704, testState: 'TESTED' }, { level: 'VAL', price: 7699, testState: 'UNTESTED' }]);
+  for (const gone of ['liquiditySwept', 'pathProfile', 'entryLevelTests', 'srTarget', 'srStopLoss']) assert.equal(gone in m, false, gone);
 });
 
 // ------------------------------------------------- 12. duplicate detection
@@ -168,7 +224,7 @@ const exitEvent = (id, extra) => ({
 
 test('A7/12: duplicate detection stojí jen na ID události – nová pole do klíče nevstupují', async () => {
   const withContext = { id: 't1', sourceEventId: 'e1', positionId: 'p-e1', instrument: 'MES', date: '2026-10-09', entryTime: '16:00', side: 'long',
-    entryPrice: 7700, exitPrice: 7703, result: 'target', grade: 'A', gradeSetAt: '2026-10-09T13:00:00.000Z', trendHtf: 'UP', pathProfile: 'LVN', entryLevelTests: { VAH: 'TESTED' } };
+    entryPrice: 7700, exitPrice: 7703, result: 'target', grade: 'A', gradeSetAt: '2026-10-09T13:00:00.000Z', trendHtf: 'UP', absLocation: 'EXTREME', nearLevels: [{ level: 'VAH', price: 7704, testState: 'TESTED' }] };
   const imp = importer({ trades: [withContext], settings: [{ key: 'main', value: { ...SETTINGS } }] });
   assert.equal(imp.r.tradeHasSourceEventId(withContext, 'e1'), true);
   assert.equal(await imp.r.appendOrMergeCapturedTrade('j', exitEvent('e1')), false, 'tatáž událost podruhé = duplicita');
@@ -198,7 +254,7 @@ test('A4: do „Neúplné“ přibývá trend 30m a známka, ostatní nová pole
   const missing = FJTaxonomy.missingContextKeys({ fillStatus: 'FILLED' });
   assert.ok(missing.includes('trendHtf'));
   assert.ok(missing.includes('grade'));
-  for (const key of ['absLocation', 'entryTestNo', 'liquiditySwept', 'pathProfile']) assert.ok(!missing.includes(key), key);
+  for (const key of ['absLocation', 'entryTestNo']) assert.ok(!missing.includes(key), key);
   const done = FJTaxonomy.missingContextKeys({ fillStatus: 'FILLED', trendHtf: 'UP', grade: 'C' });
   assert.ok(!done.includes('trendHtf') && !done.includes('grade'));
 });

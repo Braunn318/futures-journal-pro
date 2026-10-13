@@ -197,7 +197,8 @@ function trayMenuTemplate(state) {
     }
   ];
   if (state && state.version && (state.status === 'available' || state.status === 'downloaded')) {
-    template.push({ label: `Nainstalovat aktualizaci ${state.version}…`, click: () => requestUpdateOffer() });
+    const label = state.channel === 'test' ? `Nainstalovat testovací verzi ${state.version}…` : `Nainstalovat aktualizaci ${state.version}…`;
+    template.push({ label, click: () => requestUpdateOffer() });
   }
   template.push(
     { type: 'separator' },
@@ -338,7 +339,11 @@ function readJournal(id) {
     // Značka migrace tiků / MFE / MAE (runTickFieldsMigration v rendereru).
     // Dokud tu chyběla, zahodila se při každém čtení a migrace se spouštěla
     // (a celý deník zapisovala) při každém startu.
-    tickFieldsVersion: Number(parsed.tickFieldsVersion) || 0
+    tickFieldsVersion: Number(parsed.tickFieldsVersion) || 0,
+    // Značka převodu na kontext v3 (runContextV3Migration v rendereru): jeden
+    // seznam hladin místo dvou a odebraná pole. Bez ní by se převod spouštěl
+    // při každém otevření deníku.
+    contextVersion: Number(parsed.contextVersion) || 0
   };
   // Jednorázový přesun starých base64 obrázků do souborů. Proběhne při prvním
   // otevření deníku po aktualizaci a pak už nikdy (podruhé nenajde co
@@ -533,7 +538,8 @@ function aiExportModeOf(id) {
 function aiDerivedFields(rawTrades, main, mode) {
   const order = FJContext.dayOrder(rawTrades);
   const templates = Array.isArray(main?.templates) ? main.templates : [];
-  return t => FJContext.derivedFields(t, { tickSize: FJPoints.tickSizeFor(t?.instrument, templates), config: main?.taxonomy || {}, dayOrder: order, mode });
+  // Lhůta „doplněno zpětně“ je nastavení deníku – export počítá stejně jako aplikace.
+  return t => FJContext.derivedFields(t, { tickSize: FJPoints.tickSizeFor(t?.instrument, templates), config: main?.taxonomy || {}, dayOrder: order, mode, gradeRetroGraceMin: main?.gradeRetroGraceMinutes });
 }
 function writeAiExportMirror(id, data) {
   try {
@@ -541,13 +547,22 @@ function writeAiExportMirror(id, data) {
     const rawTrades = Array.isArray(data?.trades) ? data.trades : [];
     const mainSettings = (Array.isArray(data?.settings) ? data.settings : []).find(s => s?.key === 'main')?.value || {};
     const derivedOf = aiDerivedFields(rawTrades, mainSettings, aiExportModeOf(id));
-    const trades = rawTrades.map(t => ({ ...stripImages(t), derived: derivedOf(t) }));
+    // Kontext v3: export nese vždy nový tvar (nearLevels, bez odebraných
+    // polí) – i u deníku, který od aktualizace ještě nebyl otevřen a na disku
+    // má starý zápis. Převod je tentýž jako při migraci deníku.
+    const exportTrade = t => FJContext.convertLegacyNear(FJContext.stripRemovedV3(stripImages(t)));
+    // Dokup: vstupy pozice dopočítané z nohou (FJPoints.entriesOf). Jen
+    // u obchodu, který víc vstupů opravdu má.
+    const entriesOf = t => { const entries = FJPoints.entriesOf(t); return entries.length > 1 ? { entries } : {}; };
+    const trades = rawTrades.map(t => ({ ...exportTrade(t), derived: { ...derivedOf(t), ...entriesOf(t) } }));
     const dayNotes = {};
     for (const date in (data?.dayNotes || {})) dayNotes[date] = stripDayNote(data.dayNotes[date]);
     // Úprava číselníků deníku (vlastní volby, přejmenování) – bez ní by
     // nástroj čtoucí export neznal klíče typu CUSTOM_… a jejich popisky.
-    const settings = Array.isArray(data?.settings) ? data.settings : [];
-    const taxonomy = settings.find(s => s?.key === 'main')?.value?.taxonomy || {};
+    // Stejně jako obchody jde ven vždy v novém tvaru (kontext v3): u deníku,
+    // který ještě nebyl otevřen, by jinak export nesl kolonky SR proti targetu
+    // / S/L vedle obchodů s „Hladinami v blízkosti".
+    const taxonomy = FJContext.migrateConfigV3(mainSettings.taxonomy || {});
     const temp = `${aiExportPath(id)}.tmp`;
     fs.writeFileSync(temp, JSON.stringify({ journalId: id, updatedAt: new Date().toISOString(), taxonomy, trades, dayNotes }, null, 2), 'utf8');
     fs.renameSync(temp, aiExportPath(id));
@@ -916,6 +931,24 @@ function writeCaptureState(state) {
   const safe = { positions: state.positions || {}, executionIds: (state.executionIds || []).slice(-10000) };
   fs.writeFileSync(captureStatePath(), JSON.stringify(safe, null, 2), 'utf8');
 }
+// Pozice, která ve snímku pozic z NinjaTraderu chybí, se nemaže hned – jen se
+// odloží (missingSince) a ještě chvíli čeká na svou exekuci. Konektor posílá
+// exekuci a snímek pozic jako dvě nezávislé zprávy a plochý snímek občas
+// dorazí DŘÍV než výstupní exekuce, která ho způsobila. Když snímek pozici
+// smazal, výstup neměl co uzavřít, zapsal se jako otevření opačné pozice
+// a obchod se do deníku nedostal (2026-09-22 a 2026-10-12, 2 pozice z 211).
+// Odložená pozice se nikde neukazuje jako otevřená.
+const POSITION_MISSING_GRACE_MS = 10 * 60 * 1000;
+// O kolik smí snímek předběhnout exekuci, aby se změna počtu kontraktů ve
+// snímku brala jako táž změna, kterou nese exekuce (stejné okno jako u vstupu,
+// viz adoptSnapshot v processExecution).
+const SNAPSHOT_RACE_WINDOW_MS = 15000;
+function positionIsMissing(position) {
+  return Number(position?.missingSince) > 0;
+}
+function openCapturePositions(state) {
+  return Object.values(state?.positions || {}).filter(position => !positionIsMissing(position));
+}
 // persist=false: událost se jen pošle do okna (živé obnovení přehledu otevřených
 // pozic), ale neuloží se do historie. Používá se pro snímky pozic – ty chodí
 // zhruba jednou za sekundu na každý účet a jejich ukládáním se z historie
@@ -1037,7 +1070,8 @@ async function openPositionFromExecution(state, key, payload, { delta, price, co
     strategy,
     positionId,
     fromSnapshot: false,
-    executionsApplied: true
+    executionsApplied: true,
+    lots: [{ key: lotKeyOf(payload, executionId), time, price, qty: Math.abs(delta), commission }]
   };
   return appendCaptureEvent({
     type: 'trade_opened',
@@ -1081,6 +1115,60 @@ function excursionTicks(payload, side, avgPrice, exitPrice) {
   if (!Number.isFinite(mfeTicks) || !Number.isFinite(maeTicks)) return {};
   return { mfeTicks, maeTicks };
 }
+// ---- Loty pozice (FIFO) ----
+// Pozice si vede vstupy zvlášť: jeden lot na vstupní příkaz (dílčí plnění téhož
+// příkazu se sčítají do jednoho lotu s váženou cenou, jinak by se běžný vstup
+// na dvě plnění rozpadl na dvě nohy). Výstup loty spotřebovává od nejstaršího,
+// stejně jako NinjaTrader páruje obchody v Trade Performance.
+//
+// Dřív měla pozice jen jednu průměrnou cenu ze dvou zdrojů: vlastní vážený
+// průměr při přikoupení a Position.AveragePrice ze snímku pozic. NinjaTrader ale
+// po částečném výstupu vede průměr ZBYTKU (FIFO), takže po dokupu a částečném
+// výstupu snímek průměr přepsal jinou hodnotou a další výstup se počítal od ní.
+// Součet přes cíle pak neseděl na peněžní tok (2026-10-13, MNQ 7 kontraktů:
+// 148 b místo 155 b). Loty vede jen processExecution, snímek na ně nesahá
+// a výsledek výstupu už se z avgPrice nepočítá.
+function lotKeyOf(payload, executionId) {
+  return String(payload?.orderId || executionId || '');
+}
+// Loty, ze kterých se má počítat. Když jejich součet nesedí na počet kontraktů
+// pozice (pozice známá jen ze snímku, stav ze starší verze, zmeškaná exekuce),
+// platí jeden náhradní lot z toho, co o pozici víme – tedy chování před loty.
+function positionLots(position) {
+  const lots = Array.isArray(position.lots) ? position.lots.filter(l => l && Number(l.qty) > 0) : [];
+  const qty = Math.abs(Number(position.qty) || 0);
+  if (lots.length && lots.reduce((a, l) => a + Number(l.qty), 0) === qty) return lots;
+  return [{ key: '', time: position.openedAt, price: Number(position.avgPrice) || 0, qty, commission: Number(position.entryCommission) || 0 }];
+}
+// Zapíše loty zpět na pozici i s tím, co se z nich odvozuje: průměrnou vstupní
+// cenu zbytku (pro tabulku otevřených pozic) a zbývající vstupní komisi.
+function applyLots(position, lots) {
+  position.lots = lots;
+  const qty = lots.reduce((a, l) => a + l.qty, 0);
+  if (lots.length === 1) position.avgPrice = lots[0].price;
+  else if (qty > 0) position.avgPrice = lots.reduce((a, l) => a + l.price * l.qty, 0) / qty;
+  position.entryCommission = lots.reduce((a, l) => a + l.commission, 0);
+}
+// Odebere z lotů `closeQty` kontraktů od nejstaršího a vrátí úseky podle
+// vstupní ceny: výstup, který zavírá kontrakty ze dvou vstupů, jsou dvě nohy.
+// Vstupní komise jde s kontrakty, ke kterým patří.
+function takeFromLots(lots, closeQty) {
+  const chunks = [];
+  let left = closeQty;
+  while (left > 0 && lots.length) {
+    const lot = lots[0];
+    const take = Math.min(lot.qty, left);
+    const fee = lot.qty ? lot.commission * (take / lot.qty) : 0;
+    const last = chunks[chunks.length - 1];
+    if (last && last.price === lot.price) { last.qty += take; last.commission += fee; }
+    else chunks.push({ price: lot.price, time: lot.time, qty: take, commission: fee });
+    lot.qty -= take;
+    lot.commission = Math.max(0, lot.commission - fee);
+    left -= take;
+    if (lot.qty === 0) lots.shift();
+  }
+  return chunks;
+}
 async function processExecution(payload) {
   const executionId = String(payload.executionId || '');
   const state = readCaptureState();
@@ -1099,10 +1187,70 @@ async function processExecution(payload) {
   const rate = Number(payload.rate || 1) || 1;
   const pointValue = Number(payload.pointValue || 1) || 1;
   const time = payload.time || new Date().toISOString();
-  const current = state.positions[key] || null;
+  let current = state.positions[key] || null;
   const derived = [];
 
   const opts = { delta, price, commission, rate, pointValue, time, executionId };
+
+  // Konektor posílá s každou exekucí pozici účtu PO ní (positionAfter, se
+  // znaménkem). Pozice PŘED exekucí je tedy údaj přímo z NinjaTraderu, ne
+  // odhad – podle něj se pozná, jestli exekuce patří k pozici, kterou mezitím
+  // odložil nebo upravil snímek pozic. Bez positionAfter (testovací sekvence,
+  // jiný zdroj) se nic z toho nepoužije.
+  const positionAfter = (payload.positionAfter === undefined || payload.positionAfter === null || payload.positionAfter === '')
+    ? NaN : Number(payload.positionAfter);
+  const qtyBefore = Number.isFinite(positionAfter) ? positionAfter - delta : null;
+
+  // Snímek krátce předtím změnil počet kontraktů ve stejném směru, v jakém
+  // pozici hlásí NinjaTrader před touhle exekucí – tedy ji nejspíš předběhl.
+  // Opačný směr (nebo nula) by znamenal jinou pozici.
+  const snapshotOutranExecution = position => qtyBefore !== null
+    && position.qty !== qtyBefore
+    && Math.sign(position.qty) === Math.sign(qtyBefore)
+    && (Date.now() - Number(position.qtySnapshotAt)) <= SNAPSHOT_RACE_WINDOW_MS;
+
+  if (current && positionIsMissing(current)) {
+    const stillWaiting = Date.now() - Number(current.missingSince) <= POSITION_MISSING_GRACE_MS;
+    // Odložená pozice patří k exekuci, když sedí počet kontraktů – nebo když ho
+    // těsně před plochým snímkem stihl změnit ještě jeden snímek (dva cíle
+    // naráz: snímek s 1 kontraktem, hned po něm plochý, a teprve pak obě
+    // exekuce). Počet pak vrátí blok níž.
+    if (stillWaiting && qtyBefore !== null && qtyBefore !== 0 && (qtyBefore === current.qty || snapshotOutranExecution(current))) {
+      // Snímek předběhl tuhle exekuci: pozice se vrací a zpracuje se běžně.
+      delete current.missingSince;
+      logInfo('Capture', `Exekuce ${executionId || '(bez ID)'} patří k pozici ${key}, kterou předtím odložil snímek pozic – pozice vzata zpět.`);
+    } else {
+      delete state.positions[key];
+      current = null;
+    }
+  }
+
+  // Částečný výstup nebo přikoupení, které snímek předběhl: snímek už počet
+  // kontraktů změnil a exekuce by tutéž změnu započítala podruhé (u výstupu by
+  // pozice zmizela a další cíl by neměl co uzavřít). Krátce po takovém snímku
+  // proto platí počet kontraktů před exekucí, jak ho hlásí NinjaTrader.
+  // S počtem se vrací i průměrná vstupní cena z doby před snímkem: snímek po
+  // přikoupení už nese průměr VČETNĚ téhle exekuce a ta by se do něj jinak
+  // započítala podruhé (100 + přikoupení na 110 → 107,5 místo 105).
+  if (current && snapshotOutranExecution(current)) {
+    logInfo('Capture', `Snímek pozic předběhl exekuci ${executionId || '(bez ID)'} na ${key}: počet kontraktů vrácen z ${current.qty} na ${qtyBefore}.`);
+    current.qty = qtyBefore;
+    const avgBefore = Number(current.avgPriceBeforeSnapshot);
+    if (Number.isFinite(avgBefore) && avgBefore !== 0) current.avgPrice = avgBefore;
+  }
+  if (current) {
+    delete current.qtySnapshotAt;
+    delete current.avgPriceBeforeSnapshot;
+  }
+
+  // Po téhle exekuci je účet na instrumentu plochý a žádnou pozici k uzavření
+  // neznáme: není co otevřít. Dřív z toho vznikla falešná opačná pozice.
+  if ((!current || current.qty === 0) && positionAfter === 0) {
+    logInfo('Capture', `Výstupní exekuce ${executionId || '(bez ID)'} na ${key} (${payload.orderAction || ''} ${Math.abs(delta)} @ ${price}) bez známé otevřené pozice – obchod nelze sestavit.`);
+    if (current) delete state.positions[key];
+    writeCaptureState(state);
+    return derived;
+  }
 
   if (!current || current.qty === 0) {
     derived.push(await openPositionFromExecution(state, key, payload, { ...opts, positionId: crypto.randomUUID() }));
@@ -1130,13 +1278,24 @@ async function processExecution(payload) {
     return derived;
   }
 
+  const lots = positionLots(current);
+
   if (sameDirection) {
-    const oldAbs = Math.abs(current.qty);
+    // Přikoupení: další plnění téhož vstupního příkazu rozšíří jeho lot,
+    // nový příkaz (dokup) založí vlastní.
     const addAbs = Math.abs(delta);
-    current.avgPrice = ((current.avgPrice * oldAbs) + (price * addAbs)) / (oldAbs + addAbs);
+    const lotKey = lotKeyOf(payload, executionId);
+    const sameOrder = lotKey ? lots.find(l => l.key === lotKey) : null;
+    if (sameOrder) {
+      sameOrder.price = ((sameOrder.price * sameOrder.qty) + (price * addAbs)) / (sameOrder.qty + addAbs);
+      sameOrder.qty += addAbs;
+      sameOrder.commission += commission;
+    } else {
+      lots.push({ key: lotKey, time, price, qty: addAbs, commission });
+    }
+    applyLots(current, lots);
     current.currentPrice = price;
     current.qty += delta;
-    current.entryCommission += commission;
     current.maxQuantity = Math.max(current.maxQuantity || 0, Math.abs(current.qty));
     current.executionsApplied = true;
     state.positions[key] = current;
@@ -1147,44 +1306,49 @@ async function processExecution(payload) {
   const previousQty = current.qty;
   const closeQty = Math.min(Math.abs(previousQty), Math.abs(delta));
   const direction = Math.sign(previousQty);
-  const pointsSigned = (price - current.avgPrice) * direction;
-  const grossPnl = pointsSigned * pointValue * closeQty * rate;
-  const entryCommissionShare = Math.abs(previousQty) ? current.entryCommission * (closeQty / Math.abs(previousQty)) : 0;
+  // MFE / MAE se měří od vstupní ceny pozice, tedy od jejího prvního vstupu –
+  // od téže ceny, kterou ponese sloučený obchod. Platí pro všechny výstupy
+  // pozice, i ty, které zavírají až dokoupené kontrakty.
+  if (!(Number(current.entryRefPrice) > 0)) current.entryRefPrice = lots[0].price;
   const exitCommissionShare = commission * (closeQty / Math.abs(delta));
-  const netPnl = grossPnl - entryCommissionShare - exitCommissionShare;
   const exitImages = await takeScreenshots('exit');
 
-  const closed = appendCaptureEvent({
-    type: 'trade_closed',
-    account: current.account,
-    instrument: current.instrument,
-    instrumentFull: current.instrumentFull,
-    side: current.side,
-    entryTime: current.openedAt,
-    exitTime: time,
-    entryPrice: current.avgPrice,
-    exitPrice: price,
-    quantity: closeQty,
-    contracts: closeQty,
-    points: Math.abs(pointsSigned),
-    grossPnl,
-    commission: entryCommissionShare + exitCommissionShare,
-    pnl: netPnl,
-    result: netPnl >= 0 ? 'target' : 'stoploss',
-    pointValue,
-    strategy: current.strategy || payload.strategy || payload.orderName || '',
-    screenshotPaths: [...(current.entryImages || []), ...exitImages],
-    sourceExecutionId: executionId,
-    positionId: current.positionId || '',
-    ...excursionTicks(payload, current.side, current.avgPrice, price)
-  }, 'ninjatrader');
-  derived.push(closed);
+  for (const chunk of takeFromLots(lots, closeQty)) {
+    const pointsSigned = (price - chunk.price) * direction;
+    const grossPnl = pointsSigned * pointValue * chunk.qty * rate;
+    const chunkCommission = chunk.commission + exitCommissionShare * (chunk.qty / closeQty);
+    const netPnl = grossPnl - chunkCommission;
+    derived.push(appendCaptureEvent({
+      type: 'trade_closed',
+      account: current.account,
+      instrument: current.instrument,
+      instrumentFull: current.instrumentFull,
+      side: current.side,
+      entryTime: chunk.time || current.openedAt,
+      exitTime: time,
+      entryPrice: chunk.price,
+      exitPrice: price,
+      quantity: chunk.qty,
+      contracts: chunk.qty,
+      points: Math.abs(pointsSigned),
+      grossPnl,
+      commission: chunkCommission,
+      pnl: netPnl,
+      result: netPnl >= 0 ? 'target' : 'stoploss',
+      pointValue,
+      strategy: current.strategy || payload.strategy || payload.orderName || '',
+      screenshotPaths: [...(current.entryImages || []), ...exitImages],
+      sourceExecutionId: executionId,
+      positionId: current.positionId || '',
+      ...excursionTicks(payload, current.side, current.entryRefPrice, price)
+    }, 'ninjatrader'));
+  }
 
   const remainingOld = Math.abs(previousQty) - closeQty;
   const excessNew = Math.abs(delta) - closeQty;
   if (remainingOld > 0) {
     current.qty = direction * remainingOld;
-    current.entryCommission = Math.max(0, current.entryCommission - entryCommissionShare);
+    applyLots(current, lots);
     current.executionsApplied = true;
     state.positions[key] = current;
   } else if (excessNew > 0) {
@@ -1251,8 +1415,13 @@ function processPositionSnapshot(payload) {
     const normalized = normalizeSnapshotPosition(item, account, snapshotTime);
     if (normalized) authoritative[normalized.key] = normalized.value;
   }
+  const now = Date.now();
   for (const [key, position] of Object.entries(state.positions || {})) {
-    if (String(position.account || '') === account && !authoritative[key]) delete state.positions[key];
+    if (String(position.account || '') !== account || authoritative[key]) continue;
+    // Chybějící pozice se jen odloží, viz POSITION_MISSING_GRACE_MS. Smaže se,
+    // až když si pro ni do té doby žádná exekuce nepřišla.
+    if (!positionIsMissing(position)) position.missingSince = now;
+    else if (now - Number(position.missingSince) > POSITION_MISSING_GRACE_MS) delete state.positions[key];
   }
   // Snímek je autoritativní jen pro to, co opravdu obsahuje: počet kontraktů,
   // průměrnou a aktuální cenu. Zbytek pozice pochází z exekucí a snímek ho
@@ -1260,7 +1429,24 @@ function processPositionSnapshot(payload) {
   // nasčítanou vstupní komisi a smazal název vstupního příkazu, takže uzavřený
   // obchod měl jen výstupní komisi a jako strategii název stop/target příkazu.
   for (const [key, position] of Object.entries(authoritative)) {
-    const existing = state.positions[key];
+    let existing = state.positions[key];
+    // Odložená pozice, která se ve snímku vrátila se stejným počtem kontraktů,
+    // je táž pozice (výpadek na straně NinjaTraderu). S jiným počtem jde
+    // o novou pozici a stará se zahodí.
+    if (existing && positionIsMissing(existing)) {
+      if (existing.qty === position.qty) delete existing.missingSince;
+      else existing = undefined;
+    }
+    // Snímek, který mění počet kontraktů, mohl předběhnout exekuci, která tu
+    // změnu způsobila – processExecution podle toho pozná, že ji nemá započítat
+    // podruhé. K tomu si pozice pamatuje průměrnou vstupní cenu z doby PŘED
+    // snímkem (snímek ji níž přepíše průměrem po exekuci); když počet změní víc
+    // snímků po sobě dřív, než exekuce dorazí, platí cena před prvním z nich.
+    const raceOpen = existing && existing.avgPriceBeforeSnapshot !== undefined
+      && (now - Number(existing.qtySnapshotAt)) <= SNAPSHOT_RACE_WINDOW_MS;
+    const qtyChange = existing && existing.qty !== position.qty
+      ? { qtySnapshotAt: now, avgPriceBeforeSnapshot: raceOpen ? existing.avgPriceBeforeSnapshot : existing.avgPrice }
+      : {};
     state.positions[key] = existing ? {
       ...existing,
       ...position,
@@ -1271,7 +1457,8 @@ function processPositionSnapshot(payload) {
       strategy: existing.strategy || position.strategy,
       maxQuantity: Math.max(Number(existing.maxQuantity) || 0, Math.abs(position.qty)),
       fromSnapshot: existing.fromSnapshot === true,
-      snapshotSeenAt: existing.snapshotSeenAt || position.snapshotSeenAt
+      snapshotSeenAt: existing.snapshotSeenAt || position.snapshotSeenAt,
+      ...qtyChange
     } : position;
   }
   writeCaptureState(state);
@@ -1343,7 +1530,7 @@ async function processIncomingPayload(payload, source='external') {
     const account = String(payload.account || '');
     const price = Number(payload.price ?? payload.lastPrice ?? payload.last);
     if (instrument && Number.isFinite(price)) {
-      for (const position of Object.values(state.positions || {})) {
+      for (const position of openCapturePositions(state)) {
         const sameInstrument = position.instrumentFull === instrument || position.instrument === instrument;
         const sameAccount = !account || position.account === account;
         if (sameInstrument && sameAccount) position.currentPrice = price;
@@ -1464,7 +1651,7 @@ ipcMain.handle('capture:status', async () => {
     relayToken: settings.relayToken,
     pending: events.filter(e => !e.imported && e.type === 'trade_closed').length,
     accounts,
-    openPositions: Object.values(state.positions || {})
+    openPositions: openCapturePositions(state)
   };
 });
 ipcMain.handle('capture:events', async (_event, includeImported=false) => {
@@ -1859,6 +2046,20 @@ ipcMain.handle('capture:testMultiTargetSequence', async () => {
   await processIncomingPayload({ ...common, executionId:`test-mt-tp2-${base}`, time:new Date(base+300000).toISOString(), price:20022, quantity:1, orderAction:'Sell', commission:2.5 }, 'ninjatrader');
   return { ok: true };
 });
+// Simuluje dokup: vstup 2 kontrakty, TP1 jeden, dokup jednoho kontraktu výš
+// a TP2, který zavře zbytek – tedy jeden kontrakt z původního vstupu a jeden
+// dokoupený. V deníku má vzniknout jeden obchod: TP1 +10 b, TP2 +30 b
+// a „TP2 · dokup" +15 b, s řádkem „Vstupy: 2 @ 20000 · dokup 1 @ 20015".
+ipcMain.handle('capture:testScaleInSequence', async () => {
+  const base = Date.now();
+  const common = { source:'ninjatrader', type:'execution', account:'SIM101', instrument:'NQ', instrumentFull:'NQ 09-26', pointValue:20, rate:1 };
+  const step = (name, offset, fields) => processIncomingPayload({ ...common, executionId:`test-si-${name}-${base}`, orderId:`test-si-order-${name}-${base}`, time:new Date(base+offset).toISOString(), ...fields }, 'ninjatrader');
+  await step('entry', 0, { price:20000, quantity:2, orderAction:'Buy', orderName:'Entry', positionAfter:2, commission:5 });
+  await step('tp1', 60000, { price:20010, quantity:1, orderAction:'Sell', orderName:'Target1', positionAfter:1, commission:2.5 });
+  await step('dokup', 120000, { price:20015, quantity:1, orderAction:'Buy', orderName:'Entry', positionAfter:2, commission:2.5 });
+  await step('tp2', 300000, { price:20030, quantity:2, orderAction:'Sell', orderName:'Target2', positionAfter:0, commission:5 });
+  return { ok: true };
+});
 // Simuluje cTrader pozici uzavřenou přes dva cíle (TP1 a TP2) se stejným
 // positionId – ověří, že se konektor/merge chová stejně jako u NinjaTraderu.
 ipcMain.handle('capture:testCTraderSequence', async () => {
@@ -1896,9 +2097,11 @@ ipcMain.handle('capture:testSnapshotRaceSequence', async () => {
 
 // ---------- Automatické aktualizace ----------
 // Aplikace si na GitHubu sama zjistí novou finální verzi (release označený
-// „Latest“ – testovací pre-release se nenabízí) a NABÍDNE ji. Bez potvrzení se
-// nic nestahuje ani neinstaluje: aplikace běží na pozadí a zaznamenává
-// exekuce, restart uprostřed otevřené pozice by je ztratil.
+// „Latest“ – testovací pre-release se sama nenabízí) a NABÍDNE ji. Bez
+// potvrzení se nic nestahuje ani neinstaluje: aplikace běží na pozadí a
+// zaznamenává exekuce, restart uprostřed otevřené pozice by je ztratil.
+// Testovací pre-release (větev test) se hledá jen ručně, tlačítkem, které si
+// uživatel musí v Nastavení sám zapnout – viz checkForUpdates(manual, test).
 const UPDATE_REPO = { owner: 'Braunn318', repo: 'futures-journal-pro' };
 // Po startu Windows ještě nemusí běžet síť, proto první kontrola až za chvíli.
 // Další v intervalu – aplikace běží u hodin klidně několik dní bez restartu.
@@ -1914,7 +2117,8 @@ const UPDATE_DOWNLOAD_FAILED = 'Stažení aktualizace se nezdařilo. Zkontroluj 
 let autoUpdater = null;
 // status: unsupported (spuštěno ze zdrojových souborů) | idle | checking |
 // none (aktuální verze) | available | downloading | downloaded | error
-let updateState = { status: 'unsupported', currentVersion: app.getVersion(), version: null, percent: 0, error: null, notes: '' };
+// channel: jaké vydání je nalezené – 'stable' (finální) | 'test' (pre-release).
+let updateState = { status: 'unsupported', currentVersion: app.getVersion(), version: null, percent: 0, error: null, notes: '', channel: 'stable' };
 
 function setUpdateState(patch) {
   updateState = { ...updateState, ...patch };
@@ -1932,9 +2136,9 @@ function cleanReleaseNotes(body, max = UPDATE_NOTES_MAX) {
 }
 // Tělo releasu na GitHubu = odrážky dané verze z CHANGELOG.txt. Když se
 // nenačte, nabídka se ukáže bez seznamu změn.
-async function fetchReleaseNotes(version) {
+async function fetchReleaseNotes(tag) {
   try {
-    const url = `https://api.github.com/repos/${UPDATE_REPO.owner}/${UPDATE_REPO.repo}/releases/tags/v${encodeURIComponent(version)}`;
+    const url = `https://api.github.com/repos/${UPDATE_REPO.owner}/${UPDATE_REPO.repo}/releases/tags/${encodeURIComponent(tag)}`;
     const response = await net.fetch(url, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
     if (!response.ok) return '';
     return cleanReleaseNotes((await response.json())?.body);
@@ -1943,11 +2147,20 @@ async function fetchReleaseNotes(version) {
     return '';
   }
 }
+// Testovací vydání má tag s příponou (v4.8.6-test, v4.8.6-test.2), finální
+// jen číslo. Verze v instalátoru je u obou stejná X.Y.Z, pozná se to jen z tagu.
+function releaseChannelFromTag(tag) {
+  const prerelease = /^v?\d+\.\d+\.\d+-/.test(String(tag || ''));
+  return prerelease ? 'test' : 'stable';
+}
 async function onUpdateAvailable(info) {
   const version = String(info?.version || '');
+  // Kontrola testovacích verzí bere nejnovější vydání vůbec – může to být
+  // i finální. Kanál proto říká, co se našlo, ne čím se hledalo.
+  const tag = String(info?.tag || `v${version}`);
   // Stav se přepne až se seznamem změn, aby ho nabídka měla hned při otevření.
-  const notes = await fetchReleaseNotes(version);
-  setUpdateState({ status: 'available', version, percent: 0, error: null, notes });
+  const notes = await fetchReleaseNotes(tag);
+  setUpdateState({ status: 'available', version, percent: 0, error: null, notes, channel: releaseChannelFromTag(tag) });
 }
 // Porovnání verzí X.Y.Z podle čísel: záporné, když a < b. Přípona za pomlčkou
 // (např. „-test“) se nepočítá.
@@ -1994,7 +2207,7 @@ function initAutoUpdate() {
   });
   autoUpdater.on('checking-for-update', () => setUpdateState({ status: 'checking', error: null }));
   autoUpdater.on('update-available', info => onUpdateAvailable(info));
-  autoUpdater.on('update-not-available', () => setUpdateState({ status: 'none', version: null, percent: 0, notes: '' }));
+  autoUpdater.on('update-not-available', () => setUpdateState({ status: 'none', version: null, percent: 0, notes: '', channel: 'stable' }));
   autoUpdater.on('download-progress', progress => setUpdateState({ status: 'downloading', percent: Math.round(progress?.percent || 0) }));
   autoUpdater.on('update-downloaded', () => setUpdateState({ status: 'downloaded', percent: 100, error: null }));
   setUpdateState({ status: 'idle' });
@@ -2002,13 +2215,20 @@ function initAutoUpdate() {
   setInterval(() => checkForUpdates(false), UPDATE_CHECK_INTERVAL_MS);
   return true;
 }
-async function checkForUpdates(manual) {
+// test = true: hledá se i mezi testovacími pre-release (jen ručně, z tlačítka
+// v Nastavení). Bez něj jen finální vydání – tak běží i každá automatická
+// kontrola, bez ohledu na to, co se hledalo naposledy.
+async function checkForUpdates(manual, test = false) {
   if (!autoUpdater) return { ok: false, unsupported: true };
   // Rozběhnutou kontrolu, stahování ani hotový stažený instalátor nová
   // kontrola nepřepisuje.
   if (['checking', 'downloading', 'downloaded'].includes(updateState.status)) return { ok: true };
+  // Automatická kontrola hledá jen finální verze a testovací nabídku, kterou
+  // si uživatel před chvílí sám vyžádal, by přepsala na „máš aktuální verzi“.
+  if (!manual && updateState.status === 'available' && updateState.channel === 'test') return { ok: true };
   const before = updateState.status;
   try {
+    autoUpdater.allowPrerelease = !!test;
     await autoUpdater.checkForUpdates();
     return { ok: true };
   } catch (error) {
@@ -2016,16 +2236,16 @@ async function checkForUpdates(manual) {
     if (releaseVersion) {
       if (!updateNoInstallerLogged) {
         updateNoInstallerLogged = true;
-        logInfo('Auto-update', `Poslední finální vydání ${releaseVersion} nenese instalátor pro automatickou aktualizaci (nainstalovaná verze ${updateState.currentVersion}).`);
+        logInfo('Auto-update', `Poslední ${test ? 'vydání (včetně testovacích)' : 'finální vydání'} ${releaseVersion} nenese instalátor pro automatickou aktualizaci (nainstalovaná verze ${updateState.currentVersion}).`);
       }
       // Stejné nebo starší vydání než nainstalovaná verze: není co
       // aktualizovat, ať už instalátor má, nebo ne.
       if (compareVersions(releaseVersion, updateState.currentVersion) <= 0) {
-        setUpdateState({ status: 'none', version: null, percent: 0, error: null, notes: '' });
+        setUpdateState({ status: 'none', version: null, percent: 0, error: null, notes: '', channel: 'stable' });
         return { ok: true };
       }
       const message = updateWithoutInstallerMessage(releaseVersion);
-      setUpdateState({ status: 'error', version: null, percent: 0, error: message, notes: '' });
+      setUpdateState({ status: 'error', version: null, percent: 0, error: message, notes: '', channel: 'stable' });
       return { ok: false, error: message };
     }
     // Automatická kontrola selhává tiše (po startu Windows bez sítě, GitHub
@@ -2068,7 +2288,7 @@ function requestUpdateOffer() {
 }
 ipcMain.handle('app:getVersion', () => app.getVersion());
 ipcMain.handle('update:getState', () => updateState);
-ipcMain.handle('update:check', () => checkForUpdates(true));
+ipcMain.handle('update:check', (_event, options) => checkForUpdates(true, !!options?.test));
 ipcMain.handle('update:download', () => downloadUpdate());
 ipcMain.handle('update:install', () => installUpdate());
 

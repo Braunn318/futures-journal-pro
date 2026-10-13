@@ -1,14 +1,16 @@
 'use strict';
-// Kontext obchodu v2 (docs/ZADANI_KONTEXT.md, část A): dopočty a kontroly nad
-// tím, co v obchodu už je. Čisté funkce – NIC se nezapisuje do obchodu, vše se
-// počítá při čtení. Chybějící vstup = null, nikdy 0.
+// Kontext obchodu (docs/ZADANI_KONTEXT.md část A, revize ZADANI_KONTEXT_V3.md):
+// dopočty a kontroly nad tím, co v obchodu už je. Čisté funkce – NIC se
+// nezapisuje do obchodu, vše se počítá při čtení. Chybějící vstup = null,
+// nikdy 0.
 //
-// SR ŘÁDKY. Stranu (srTarget / srStopLoss) volí Adam a je to VÝZNAM, ne poloha:
-// zóna chránící SL leží mezi SL a cenou trhu, takže smí stát i na vstupu nebo
-// nad vstupem do longu (cena kolem ní osciluje a limitka se plní právě při
-// jejím testu). Proto se strana z ceny nedopočítává ani nehlásí jako chyba.
-// Uložené `ticksFromEntry` zůstává kladné, jak bylo; znaménková vzdálenost je
-// dopočet `ticksFromEntrySigned` a jde jen z ceny řádku.
+// HLADINY V BLÍZKOSTI (v3). Deník o hladinách nic NEPOSUZUJE, jen měří. Jeden
+// seznam řádků { level, price, testState? }; stranu ani roli uživatel nevolí.
+// Dopočty jsou čistá geometrie v ticích (kladný směr = směr obchodu): žádná
+// tolerance, žádné pásmo, žádná konstanta. Co hladina v obchodu dělá (chrání
+// SL, brzdí cenu, kolik ticků nad vstupem ještě „patří ke vstupu"), má vyjít
+// statisticky v Backtest Labu, ne z pravidla tady. Tvar řádků a převod starého
+// zápisu (dva seznamy proti targetu / proti S/L) drží app/taxonomy.js.
 //
 // BLOKUJE se jen cíl nebo SL na špatné straně vstupu, a jen hodnota zadaná
 // ručně – dopočet z výstupu (slDerived, targetLevel1PriceDerived) není vstup;
@@ -43,47 +45,6 @@
 
   function targetPriceOf(trade) {
     return num(trade?.targetLevel1?.price);
-  }
-
-  // ---------------------------------------------------------------- SR řádky
-
-  // Dopočty k jednomu SR řádku. `field` je 'srTarget' nebo 'srStopLoss'.
-  //   ticksFromEntrySigned  (cena − vstup) × směr / tick: + k cíli, − k SL
-  //   ticksFromStop         |cena − SL| / tick, jen u srStopLoss
-  //   beyondStop            srStopLoss leží za SL – SL ho nechrání
-  //   beyondTarget          srTarget leží za cílem
-  //   behindEntry           srTarget leží na ztrátové straně vstupu
-  // Příznaky jsou null, když je nejde určit (chybí cena, směr, SL, cíl).
-  function srRowMetrics(field, row, trade, tickSize) {
-    const price = num(row?.price);
-    const entry = num(trade?.entryPrice);
-    const dir = dirOf(trade?.side);
-    const sl = num(trade?.slPrice);
-    const target = targetPriceOf(trade);
-    const out = { ticksFromEntrySigned: null, ticksFromStop: null, beyondStop: null, beyondTarget: null, behindEntry: null };
-    if (price == null) return out;
-    if (entry != null && dir != null) {
-      out.ticksFromEntrySigned = FJPoints.ticksOf((price - entry) * dir, tickSize);
-    }
-    if (field === 'srStopLoss') {
-      if (sl != null) out.ticksFromStop = FJPoints.ticksOf(Math.abs(price - sl), tickSize);
-      if (sl != null && dir != null) out.beyondStop = (price - sl) * dir < 0;
-    } else if (field === 'srTarget') {
-      if (entry != null && dir != null) out.behindEntry = (price - entry) * dir < 0;
-      if (target != null && dir != null) out.beyondTarget = (price - target) * dir > 0;
-    }
-    return out;
-  }
-
-  // Upozornění k řádku ve formuláři. Nic z toho neblokuje uložení.
-  // Zóna chránící SL na vstupu nebo nad vstupem do longu se NEHLÁSÍ.
-  function srRowNotes(field, row, trade, tickSize) {
-    const m = srRowMetrics(field, row, trade, tickSize);
-    const notes = [];
-    if (m.behindEntry) notes.push('Leží na ztrátové straně vstupu – do cesty k cíli nepatří.');
-    if (m.beyondTarget) notes.push('Leží až za cílem.');
-    if (m.beyondStop) notes.push('Leží za Stop Lossem – SL ji nechrání.');
-    return notes;
   }
 
   // ------------------------------------------------------- dopočty (A3)
@@ -123,61 +84,83 @@
     return tax.isLevelKey(type, config);
   }
 
-  // Cesta k cíli z řádků SR proti targetu (jen řádky s cenou):
-  //   FREE             výslovně „žádná hladina", nebo všechny řádky leží
-  //                    mimo cestu (za cílem / na ztrátové straně)
-  //   BLOCKED          v cestě je hladina dál než 1 t před cílem
-  //   TARGET_IS_LEVEL  jediné, co v cestě je, leží do 1 t od cíle
-  //   UNKNOWN          nevyplněno, nebo to bez cen nejde určit
-  // UNKNOWN nikdy není FREE – proto se u něj ani nepočítá volná cesta v R.
-  function pathMetrics(trade, tickSize) {
-    const out = { firstObstacleTicks: null, pathState: 'UNKNOWN', freePathR: null };
-    const rows = (Array.isArray(trade?.srTarget) ? trade.srTarget : []).filter(r => r && r.level);
-    const tgt = targetTicks(trade, tickSize);
-    if (!rows.length) {
-      if (trade?.srTargetNone === true) {
-        out.pathState = 'FREE';
-        out.freePathR = ratio(tgt, slTicks(trade, tickSize));
-      }
-      return out;
+  // ------------------------------------------- hladiny v blízkosti (v3 A3)
+  // Jen geometrie. Kladný směr = směr obchodu (k cíli).
+
+  // Poloha ceny vůči vstupu v ticích, + ve směru obchodu. Null bez ceny,
+  // vstupu, směru nebo velikosti ticku. (`+ 0` srovná zápornou nulu.)
+  function offsetFromEntry(price, trade, tickSize) {
+    const p = num(price), entry = num(trade?.entryPrice), dir = dirOf(trade?.side);
+    if (p == null || entry == null || dir == null) return null;
+    const ticks = FJPoints.ticksOf((p - entry) * dir, tickSize);
+    return ticks == null ? null : ticks + 0;
+  }
+
+  function roundTicks(n) {
+    return Math.round(n * 10000) / 10000 + 0;
+  }
+
+  // Geometrie jednoho řádku hladiny:
+  //   fromEntry  vzdálenost od vstupu, + ve směru obchodu. Řádek bez ceny
+  //              (starší zápis): ±ticksFromEntry podle legacySide
+  //   fromStop   vzdálenost od SL, + na straně vstupu, − za SL
+  //   toTarget   vzdálenost do cíle 1, + před cílem, − za ním
+  //   position   úsek, ve kterém hladina leží – čistě podle ceny. Hladina
+  //              přesně na ceně SL nebo cíle patří ještě dovnitř úseku,
+  //              AT_ENTRY je jen přesná nula.
+  // Co nejde určit (chybí cena i ticky, směr, tick, SL resp. cíl), je null.
+  const POSITIONS = ['BEYOND_STOP', 'STOP_TO_ENTRY', 'AT_ENTRY', 'ENTRY_TO_TARGET', 'BEYOND_TARGET'];
+
+  function levelGeometry(row, trade, tickSize) {
+    const out = { fromEntry: null, fromStop: null, toTarget: null, position: null };
+    let fromEntry = null;
+    if (num(row?.price) != null) {
+      fromEntry = offsetFromEntry(row.price, trade, tickSize);
+    } else {
+      const ticks = num(row?.ticksFromEntry);
+      if (ticks != null && row.legacySide === 'TG') fromEntry = Math.abs(ticks);
+      else if (ticks != null && row.legacySide === 'SL') fromEntry = -Math.abs(ticks) + 0;
     }
-    if (tgt == null) return out;
-    let unpriced = false, nearTarget = false;
-    const obstacles = [];
-    for (const row of rows) {
-      const m = srRowMetrics('srTarget', row, trade, tickSize);
-      if (m.ticksFromEntrySigned == null) { unpriced = true; continue; }
-      if (m.behindEntry || m.beyondTarget) continue;
-      if (m.ticksFromEntrySigned < tgt - 1) obstacles.push(m.ticksFromEntrySigned);
-      else nearTarget = true;
-    }
-    if (obstacles.length) {
-      out.firstObstacleTicks = Math.min(...obstacles);
-      out.pathState = 'BLOCKED';
-    } else if (nearTarget) out.pathState = 'TARGET_IS_LEVEL';
-    else if (!unpriced) out.pathState = 'FREE';
-    if (out.pathState !== 'UNKNOWN') out.freePathR = ratio(out.firstObstacleTicks ?? tgt, slTicks(trade, tickSize));
+    if (fromEntry == null) return out;
+    const stop = offsetFromEntry(trade?.slPrice, trade, tickSize);
+    const target = offsetFromEntry(targetPriceOf(trade), trade, tickSize);
+    out.fromEntry = fromEntry;
+    if (stop != null) out.fromStop = roundTicks(fromEntry - stop);
+    if (target != null) out.toTarget = roundTicks(target - fromEntry);
+    if (fromEntry === 0) out.position = 'AT_ENTRY';
+    else if (fromEntry > 0) out.position = out.toTarget == null ? null : (out.toTarget < 0 ? 'BEYOND_TARGET' : 'ENTRY_TO_TARGET');
+    else out.position = out.fromStop == null ? null : (out.fromStop < 0 ? 'BEYOND_STOP' : 'STOP_TO_ENTRY');
     return out;
   }
 
-  // Zóny chránící SL (jen řádky s cenou, bez těch za SL):
-  //   slBufferTicks  o kolik ticků leží SL za nejbližší zónou
-  //   slZoneCount    kolik vrstev ochrany je mezi SL a trhem
-  // Zóna nad vstupem do longu se počítá stejně jako pod ním. Výslovně
-  // „žádná" = 0 zón; nevyplněno nebo bez cen = null.
-  function slZoneMetrics(trade, tickSize) {
-    const rows = (Array.isArray(trade?.srStopLoss) ? trade.srStopLoss : []).filter(r => r && r.level);
-    if (!rows.length) return { slBufferTicks: null, slZoneCount: trade?.srStopLossNone === true ? 0 : null };
-    const valid = [];
-    let priced = 0;
-    for (const row of rows) {
-      const m = srRowMetrics('srStopLoss', row, trade, tickSize);
-      if (m.ticksFromStop == null || m.beyondStop == null) continue;
-      priced++;
-      if (!m.beyondStop) valid.push(m.ticksFromStop);
+  // Dopočty z hladin na obchodu (`geometry` = levelGeometry všech řádků):
+  //   nearestAheadTicks    nejbližší hladina ve směru obchodu před cílem
+  //   nearestAheadR        totéž v násobcích rizika (slTicks)
+  //   stopBehindTicks      o kolik ticků je SL za nejbližší hladinou mezi SL
+  //                        a cílem – počítá se i hladina nad vstupem do longu
+  //   levelsStopToEntry, levelsEntryToTarget   počty řádků v úseku
+  // Vzdálenosti se berou z řádků, které polohu mají. Počty jsou null, když
+  // hladiny nejsou vyplněné NEBO některý řádek polohu nemá (nejde tvrdit,
+  // kolik jich kde je); výslovné „žádná hladina v blízkosti" = 0.
+  const BETWEEN_STOP_AND_TARGET = ['STOP_TO_ENTRY', 'AT_ENTRY', 'ENTRY_TO_TARGET'];
+
+  function nearLevelMetrics(trade, tickSize, geometry) {
+    const tax = FJTaxonomy();
+    const rows = Array.isArray(geometry) ? geometry : tax.nearLevelsOf(trade).map(r => levelGeometry(r, trade, tickSize));
+    const out = { nearestAheadTicks: null, nearestAheadR: null, stopBehindTicks: null, levelsStopToEntry: null, levelsEntryToTarget: null };
+    if (!rows.length) {
+      if (tax.nearLevelsNoneOf(trade)) out.levelsStopToEntry = out.levelsEntryToTarget = 0;
+      return out;
     }
-    if (!priced) return { slBufferTicks: null, slZoneCount: null };
-    return { slBufferTicks: valid.length ? Math.min(...valid) : null, slZoneCount: valid.length };
+    const min = list => (list.length ? Math.min(...list) : null);
+    out.nearestAheadTicks = min(rows.filter(g => g.position === 'ENTRY_TO_TARGET').map(g => g.fromEntry));
+    out.nearestAheadR = ratio(out.nearestAheadTicks, slTicks(trade, tickSize));
+    out.stopBehindTicks = min(rows.filter(g => BETWEEN_STOP_AND_TARGET.includes(g.position) && g.fromStop > 0).map(g => g.fromStop));
+    if (rows.every(g => g.position != null)) {
+      out.levelsStopToEntry = rows.filter(g => g.position === 'STOP_TO_ENTRY').length;
+      out.levelsEntryToTarget = rows.filter(g => g.position === 'ENTRY_TO_TARGET').length;
+    }
+    return out;
   }
 
   // Pořadí obchodu v rámci deníku a dne. Počítá se při čtení nad celým
@@ -270,23 +253,24 @@
   //   config    úprava číselníků deníku (isLevel)
   //   dayOrder  výsledek dayOrder() nad celým deníkem (bez něj null)
   //   mode      režim deníku (gradeRetro)
+  //   gradeRetroGraceMin  lhůta „doplněno zpětně“ z nastavení deníku (výchozí 30)
   function derivedFields(trade, opts = {}) {
     const tick = opts.tickSize;
     const order = opts.dayOrder && trade ? opts.dayOrder.get(trade.id) : null;
-    const rowsOf = field => (Array.isArray(trade?.[field]) ? trade[field] : []).map(r => srRowMetrics(field, r, trade, tick));
+    // Geometrie řádků ve stejném pořadí jako nearLevels obchodu (starý tvar
+    // se čte přes stejný převod jako při migraci).
+    const levels = FJTaxonomy().nearLevelsOf(trade).map(r => levelGeometry(r, trade, tick));
     return {
       targetTicks: targetTicks(trade, tick),
       slTicks: slTicks(trade, tick),
       targetOnLevel: targetOnLevel(trade, opts.config),
-      ...pathMetrics(trade, tick),
-      ...slZoneMetrics(trade, tick),
+      ...nearLevelMetrics(trade, tick, levels),
       tradeNoInDay: order ? order.tradeNoInDay : null,
       prevResultInDay: order ? order.prevResultInDay : null,
       dayPnlBefore: order ? order.dayPnlBefore : null,
       session: sessionOf(trade?.date, trade?.entryTime),
-      gradeRetro: gradeRetro(trade, opts.mode),
-      srTarget: rowsOf('srTarget'),
-      srStopLoss: rowsOf('srStopLoss')
+      gradeRetro: gradeRetro(trade, opts.mode, opts.gradeRetroGraceMin),
+      nearLevels: levels
     };
   }
 
@@ -294,7 +278,7 @@
   // Deník neumí ověřit, že známka vznikla před vstupem. Proto:
   //   gradeSetAt   čas PRVNÍHO zadání (ISO), dál se nemění
   //   gradeEdited  true při každé další změně (i smazání) – „změněno dodatečně"
-  //   gradeRetro   dopočet: zadáno až po výstupu (viz gradeRetro níž)
+  //   gradeRetro   dopočet: zadáno až po lhůtě od uložení obchodu (viz gradeRetro níž)
   // `obj` je ukládaný obchod, `existing` jeho dosavadní stav. Vrací `obj`.
   function applyGrade(obj, existing, grade, nowIso) {
     const prev = existing?.grade || '';
@@ -311,32 +295,50 @@
     return obj;
   }
 
-  // Známka doplněná zpětně: zadaná až po čase výstupu. V backtest deníku je čas
-  // výstupu čas REPLAYE (minulost), takže by vyšla „zpětně" pokaždé – tam se
-  // nedá ověřit nic a výsledek je null („nejde ověřit"), nikdy false.
-  function gradeRetro(trade, mode) {
+  // Známka doplněná zpětně: zadaná až po LHŮTĚ od uložení obchodu do deníku.
+  // Importovaný obchod v deníku vznikne teprve výstupem, takže známku dřív
+  // zadat nejde – pravidlo „po čase výstupu" označilo každý takový obchod.
+  //   uložení  createdAt (import / první ruční uložení). U pozice s víc cíli je
+  //            createdAt čas PRVNÍHO cíle, proto se bere pozdější z createdAt
+  //            a času posledního výstupu. Bez createdAt (starší data) jen výstup.
+  //   lhůta    nastavení deníku gradeRetroGraceMinutes, výchozí 30 minut;
+  //            0 = hned po uložení.
+  // V backtest deníku je čas výstupu čas REPLAYE (minulost) – tam se nedá
+  // ověřit nic a výsledek je null („nejde ověřit"), nikdy false.
+  const GRADE_RETRO_GRACE_MIN = 30;
+
+  function gradeRetroGrace(value) {
+    const n = num(value);
+    return n != null && n >= 0 ? n : GRADE_RETRO_GRACE_MIN;
+  }
+
+  function gradeRetro(trade, mode, graceMinutes) {
     if (mode === MODES.BACKTEST || !trade?.grade || !trade?.gradeSetAt) return null;
     const set = Date.parse(trade.gradeSetAt);
     const exit = berlinInstant(trade.date, trade.exitTime || trade.entryTime);
-    if (!Number.isFinite(set) || exit == null) return null;
-    return set > exit;
+    const created = num(trade.createdAt);
+    const saved = Math.max(created != null && created > 0 ? created : -Infinity, exit != null ? exit : -Infinity);
+    if (!Number.isFinite(set) || !Number.isFinite(saved)) return null;
+    return set > saved + gradeRetroGrace(graceMinutes) * 60000;
   }
 
   // ------------------------------------------------------- kontext dne (A5)
   // Jednou za den a deník, uložený v dayNotes[date].dayContext (ne jako nová
   // top-level entita – readJournal() je whitelist). Ranní pole se vyplňují
   // před obchodováním, večerní po něm / po replayi.
-  const DAY_TYPE = {
-    TREND_UP: 'Trend nahoru', TREND_DOWN: 'Trend dolů', BALANCE_D: 'Balance (D)', P: 'P profil', b: 'b profil',
-    DOUBLE_DIST: 'Dvojitá distribuce', UNKNOWN: 'Nevím'
+  //
+  // Volby polí jsou číselníky deníku (app/taxonomy.js, Nastavení → Číselníky):
+  // uživatel je přejmenuje, skryje, přeřadí a přidá vlastní. Očekávaný
+  // i skutečný typ dne berou z jednoho seznamu. V datech je vždy klíč.
+  const DAY_CONTEXT_GROUPS = {
+    openVsValue: 'DAY_OPEN', dayTypeExpected: 'DAY_TYPE', dayTypeActual: 'DAY_TYPE',
+    valueMigration: 'DAY_VALUE_MIGRATION', newsEvent: 'DAY_NEWS'
   };
-  const DAY_CONTEXT = {
-    openVsValue: { IN_VA: 'Open ve value', ABOVE_VAH: 'Open nad VAH', BELOW_VAL: 'Open pod VAL', GAP_UP: 'Gap nahoru', GAP_DOWN: 'Gap dolů' },
-    dayTypeExpected: DAY_TYPE,
-    dayTypeActual: DAY_TYPE,
-    valueMigration: { HIGHER: 'Výš', LOWER: 'Níž', OVERLAP: 'Překryv' },
-    newsEvent: { NONE: 'Bez zpráv', CPI: 'CPI', FOMC: 'FOMC', NFP: 'NFP', OTHER: 'Jiné zprávy' }
-  };
+  const DAY_CONTEXT_FIELDS = Object.keys(DAY_CONTEXT_GROUPS);
+  // VÝCHOZÍ volby polí (klíč → popisek), bez úprav uživatele. Co je platné
+  // a jak se to jmenuje v konkrétním deníku, říkají dayContextOptions /
+  // dayContextLabel.
+  const DAY_CONTEXT = Object.fromEntries(DAY_CONTEXT_FIELDS.map(field => [field, FJTaxonomy().DEFAULT_ENUMS[DAY_CONTEXT_GROUPS[field]]]));
   const DAY_CONTEXT_LABELS = {
     openVsValue: 'Open vůči value', dayTypeExpected: 'Typ dne – očekávaný', dayTypeActual: 'Typ dne – skutečný',
     valueMigration: 'Migrace value', newsEvent: 'Zprávy'
@@ -344,12 +346,25 @@
   const DAY_CONTEXT_MORNING = ['openVsValue', 'dayTypeExpected', 'newsEvent'];
   const DAY_CONTEXT_EVENING = ['dayTypeActual', 'valueMigration'];
 
-  // Jen známá pole se známou hodnotou; nic vyplněno = null.
-  function sanitizeDayContext(value) {
+  // Nabídka pole: [{ key, label, hidden }] podle číselníku deníku. Skrytá volba
+  // se nenabízí, leda by ji den už měl uloženou (`selected`).
+  function dayContextOptions(field, selected, config) {
+    const group = DAY_CONTEXT_GROUPS[field];
+    return group ? FJTaxonomy().visibleOptions(group, selected, config) : [];
+  }
+
+  function dayContextLabel(field, key, config) {
+    const group = DAY_CONTEXT_GROUPS[field];
+    return group && key ? FJTaxonomy().labelOf(group, key, config) : '';
+  }
+
+  // Jen známá pole s hodnotou, kterou číselník deníku zná (i skrytou nebo
+  // vlastní); nic vyplněno = null.
+  function sanitizeDayContext(value, config) {
     const out = {};
-    for (const key of Object.keys(DAY_CONTEXT)) {
-      const v = value && typeof value === 'object' ? value[key] : undefined;
-      if (typeof v === 'string' && Object.prototype.hasOwnProperty.call(DAY_CONTEXT[key], v)) out[key] = v;
+    for (const field of DAY_CONTEXT_FIELDS) {
+      const v = value && typeof value === 'object' ? value[field] : undefined;
+      if (typeof v === 'string' && v && FJTaxonomy().isValidKey(DAY_CONTEXT_GROUPS[field], v, config)) out[field] = v;
     }
     return Object.keys(out).length ? out : null;
   }
@@ -357,22 +372,46 @@
   const SESSION_LABELS = {
     EU_MORNING: 'EU dopoledne', US_OPEN: 'US open', US_MID: 'US poledne', US_CLOSE: 'US závěr', EVENING_OTHER: 'mimo hlavní seance'
   };
-  const PATH_LABELS = {
-    FREE: 'cesta k cíli volná', BLOCKED: 'v cestě hladina', TARGET_IS_LEVEL: 'cíl je jediná hladina v cestě', UNKNOWN: 'cesta nezadaná'
-  };
+  // Čísla česky (desetinná čárka) a se znaménkem: + jen na přání, − vždy.
+  function cz(n) {
+    return String(n).replace('.', ',');
+  }
+  function signedTicks(n, plus) {
+    return (n > 0 && plus ? '+' : n < 0 ? '−' : '') + cz(Math.abs(n));
+  }
 
-  // Krátké shrnutí dopočtů pro formulář a kartu obchodu. Co nejde spočítat,
-  // se vynechá – nic se nedoplňuje odhadem.
-  function derivedSummaryParts(d) {
+  // Vzdálenosti jednoho řádku hladiny pro formulář a kartu obchodu, např.
+  // „+5 t od vstupu · 3 t od SL · 11 t do cíle". Jen čísla – žádný štítek role.
+  function levelDistanceText(g) {
+    if (!g) return '';
+    const parts = [];
+    if (g.fromEntry != null) parts.push(signedTicks(g.fromEntry, true) + ' t od vstupu');
+    if (g.fromStop != null) parts.push(signedTicks(g.fromStop) + ' t od SL');
+    if (g.toTarget != null) parts.push(signedTicks(g.toTarget) + ' t do cíle');
+    return parts.join(' · ');
+  }
+
+  // Jeden řádek dopočtů pro formulář a kartu obchodu, např. „Nejbližší hladina
+  // ve směru: +5 t (0,5 R) · SL 3 t za VAL · mezi SL a vstupem 2, před cílem 1".
+  // Co nejde spočítat, se vynechá – nic se nedoplňuje odhadem.
+  // `opts.levelName(i)` vrací popisek i-tého řádku hladin (číselník zná volající).
+  function derivedSummaryParts(d, opts = {}) {
     if (!d) return [];
     const parts = [];
-    if (d.pathState === 'BLOCKED') parts.push(`${PATH_LABELS.BLOCKED} ${d.firstObstacleTicks} t od vstupu`);
-    else if (d.pathState && d.pathState !== 'UNKNOWN') parts.push(PATH_LABELS[d.pathState]);
-    if (d.freePathR != null) parts.push(`volná cesta ${d.freePathR} R`);
+    const rows = Array.isArray(d.nearLevels) ? d.nearLevels : [];
+    if (d.nearestAheadTicks != null) {
+      parts.push('Nejbližší hladina ve směru: ' + signedTicks(d.nearestAheadTicks, true) + ' t' + (d.nearestAheadR != null ? ' (' + cz(d.nearestAheadR) + ' R)' : ''));
+    }
+    if (d.stopBehindTicks != null) {
+      const i = rows.findIndex(g => g.fromStop === d.stopBehindTicks && BETWEEN_STOP_AND_TARGET.includes(g.position));
+      const name = i >= 0 && typeof opts.levelName === 'function' ? opts.levelName(i) : '';
+      parts.push('SL ' + cz(d.stopBehindTicks) + ' t za ' + (name || 'nejbližší hladinou'));
+    }
+    if (d.levelsStopToEntry != null && d.levelsEntryToTarget != null) {
+      parts.push(rows.length ? 'mezi SL a vstupem ' + d.levelsStopToEntry + ', před cílem ' + d.levelsEntryToTarget : 'žádná hladina v blízkosti');
+    }
     if (d.targetOnLevel === false) parts.push('cíl není hladina');
-    if (d.slZoneCount === 0) parts.push('SL bez chránící zóny');
-    else if (d.slBufferTicks != null) parts.push(`SL ${d.slBufferTicks} t za zónou` + (d.slZoneCount > 1 ? ` (${d.slZoneCount} zóny)` : ''));
-    if (d.tradeNoInDay != null) parts.push(`${d.tradeNoInDay}. obchod dne`);
+    if (d.tradeNoInDay != null) parts.push(d.tradeNoInDay + '. obchod dne');
     if (d.session) parts.push(SESSION_LABELS[d.session] || d.session);
     return parts;
   }
@@ -502,13 +541,24 @@
     return `${count}× neplatné v ${INCLUDE_VALID_MODE[key] === MODES.BACKTEST ? 'živém' : 'backtest'} deníku`;
   }
 
+  // Tvar hladin a převod starého zápisu drží app/taxonomy.js; tady jsou jen
+  // přeposlané, ať má doménová vrstva kontextu jedno rozhraní (main.js, testy).
+  const viaTaxonomy = name => (...args) => FJTaxonomy()[name](...args);
+  const CONTEXT_VERSION = 3;
+
   return {
-    MODES, dirOf,
-    srRowMetrics, srRowNotes, blockingIssues,
-    targetTicks, slTicks, targetOnLevel, pathMetrics, slZoneMetrics,
+    MODES, dirOf, CONTEXT_VERSION,
+    blockingIssues,
+    targetTicks, slTicks, targetOnLevel,
+    POSITIONS, levelGeometry, nearLevelMetrics, levelDistanceText,
+    nearLevelsFromLegacy: viaTaxonomy('nearLevelsFromLegacy'), nearLevelsOf: viaTaxonomy('nearLevelsOf'),
+    nearLevelsNoneOf: viaTaxonomy('nearLevelsNoneOf'), setNearLevels: viaTaxonomy('setNearLevels'),
+    convertLegacyNear: viaTaxonomy('convertLegacyNear'), stripRemovedV3: viaTaxonomy('stripRemovedV3'),
+    migrateConfigV3: viaTaxonomy('migrateConfigV3'),
     countsInDay, signedPnl, dayOrder, SESSIONS, sessionOf, berlinInstant, derivedFields,
-    SESSION_LABELS, PATH_LABELS, derivedSummaryParts, applyGrade, gradeRetro,
-    DAY_CONTEXT, DAY_CONTEXT_LABELS, DAY_CONTEXT_MORNING, DAY_CONTEXT_EVENING, sanitizeDayContext,
+    SESSION_LABELS, derivedSummaryParts, applyGrade, gradeRetro, gradeRetroGrace, GRADE_RETRO_GRACE_MIN,
+    DAY_CONTEXT, DAY_CONTEXT_GROUPS, DAY_CONTEXT_FIELDS, DAY_CONTEXT_LABELS, DAY_CONTEXT_MORNING, DAY_CONTEXT_EVENING,
+    dayContextOptions, dayContextLabel, sanitizeDayContext,
     journalMode, skipLiveAllowed, allowedFillStatus,
     dataCheckIssues, dataCheckLabel, DATA_CHECK_LABELS, clearSkipLiveInLive,
     includeToggleState, includeInvalidNote

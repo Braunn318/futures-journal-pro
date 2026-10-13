@@ -105,7 +105,7 @@ function calendarGrid(trades, dayNotes = {}, scope = '') {
   const r = loadRenderer([
     'isSetupRecord', 'tradeRecords', 'signed', 'INCLUDE_SKIP_LIVE_KEY', 'isSkipLive', 'readIncludeSkipLive', 'includeSkipLive', 'INCLUDE_NO_FILL_KEY', 'INCLUDE_SKIPPED_KEY', 'hypotheticalGroup', 'readIncludeFlag', 'includeNoFill', 'includeSkipped', 'currentInclude', 'performanceRecords',
     'computeDrawdownByDate', 'evaluateDayRisk', 'getCalendarRows', 'computeOverallStats', 'renderCalendar', 'renderCalendarMonthSummary',
-    'emptyDayNote', 'getDayNote', 'dayContextSummary'
+    'emptyDayNote', 'getDayNote', 'dayContextSummary', 'contextFieldShown'
   ], {
     settings: { startingBalance: 10000, usdCzkRate: 23, risk: {}, templates: [] }, trades, calendarAllTrades: [], calendarDate: new Date(2026, 9, 1),
     db: { data: { dayNotes } }, FJContext, visibleJournalProfiles: () => [],
@@ -187,6 +187,26 @@ test('4.8.2: tlačítko ☀ Kontext dne ukáže ✓, když má dnešek ranní ko
 
 test('4.8.2: Deník má tlačítko a okno kontextu dne s nativním datem', () => {
   const html = readRepoFile('app/index.html');
-  assert.match(html, /<button class="btn" id="dayContextBtn" type="button"[^>]*>☀ Kontext dne<\/button>/);
+  assert.match(html, /<button class="btn" id="dayContextBtn" data-ctx-field="dayContext" type="button"[^>]*>☀ Kontext dne<\/button>/);
   assert.match(html, /<div class="modal" id="dayContextModal">[\s\S]*?<input type="date" id="dayContextDate">[\s\S]*?<div id="dayContextModalBox"><\/div>/);
+});
+
+// Volby kontextu dne nejsou natvrdo v kódu: jsou to číselníky deníku
+// (Nastavení → Číselníky) jako všechny ostatní – přejmenovat, skrýt, přidat.
+test('volby kontextu dne jsou číselníky deníku: přejmenovat, skrýt, přidat vlastní', () => {
+  const FJTaxonomy = require('../app/taxonomy.js');
+  for (const group of Object.values(FJContext.DAY_CONTEXT_GROUPS)) assert.ok(FJTaxonomy.GROUP_BY_NAME[group], group + ' je v editoru číselníků');
+  assert.equal(FJContext.DAY_CONTEXT_GROUPS.dayTypeExpected, FJContext.DAY_CONTEXT_GROUPS.dayTypeActual, 'očekávaný i skutečný typ dne berou z jednoho seznamu');
+
+  const config = { DAY_NEWS: { custom: { CUSTOM_PCE: 'PCE' }, labels: { OTHER: 'Ostatní' }, hidden: ['NFP'] } };
+  assert.deepEqual(FJContext.dayContextOptions('newsEvent', null, config).map(o => o.key), ['NONE', 'CPI', 'FOMC', 'OTHER', 'CUSTOM_PCE']);
+  assert.equal(FJContext.dayContextLabel('newsEvent', 'OTHER', config), 'Ostatní');
+  assert.equal(FJContext.dayContextLabel('newsEvent', 'CUSTOM_PCE', config), 'PCE');
+  assert.ok(FJContext.dayContextOptions('newsEvent', 'NFP', config).some(o => o.key === 'NFP' && o.hidden), 'den, který skrytou volbu má, ji vidí dál');
+
+  assert.deepEqual(FJContext.sanitizeDayContext({ newsEvent: 'CUSTOM_PCE' }, config), { newsEvent: 'CUSTOM_PCE' });
+  assert.deepEqual(FJContext.sanitizeDayContext({ newsEvent: 'NFP' }, config), { newsEvent: 'NFP' }, 'skrytá volba je dál platná');
+  assert.equal(FJContext.sanitizeDayContext({ newsEvent: 'CUSTOM_PCE' }), null, 'bez vlastní volby v číselníku klíč neplatí');
+  // Bez úprav se nic nemění: výchozí klíče i popisky jako dřív.
+  assert.deepEqual(FJContext.dayContextOptions('openVsValue').map(o => o.label), Object.values(FJContext.DAY_CONTEXT.openVsValue));
 });

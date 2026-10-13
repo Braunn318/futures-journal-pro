@@ -31,7 +31,7 @@ const NAMES = [
   'classifyResult', 'signed', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal',
   'weightedExitFields', 'legFromTrade', 'mergeSamePriceLegs', 'labelLegs',
   'mergeContextFields', 'combineTradeObjects', 'sideMeta', 'reportSigned',
-  'srCsvHeader', 'srCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
+  'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
 ];
 
 const renderer = () => loadRenderer(NAMES, { settings: SETTINGS, Date });
@@ -421,7 +421,7 @@ function courseForm(values, datasets, legs) {
   // Hlavičky karet, řádek s R a vzdálenosti SR jsou jen zobrazení (testy
   // v incomplete-trade.test.js).
   const r = loadRenderer(names, { document, settings: SETTINGS,
-    renderRiskInfo() {}, renderSrDistances() {}, renderTradeSections() {} });
+    renderRiskInfo() {}, renderLevelDistances() {}, renderTradeSections() {} });
   r.renderPostExitHints();
   return { r, get: id => document.getElementById(id) };
 }

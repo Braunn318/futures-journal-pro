@@ -2,11 +2,13 @@
 // Kontext obchodu v2, krok 2 (docs/ZADANI_KONTEXT.md A1, A7 testy 1–4) a režim
 // deníku (živý / backtest).
 //
-// Strana SR řádku je VÝZNAM, ne poloha: zóna chránící SL leží mezi SL a cenou
-// trhu, takže může stát i na vstupu nebo nad vstupem do longu. Deník stranu
-// nepřepočítává, jen dopočítá znaménkové ticky a příznaky. Blokuje se jen cíl
-// nebo SL na špatné straně vstupu – a i to jen u hodnoty zadané ručně, ne
-// u dopočtu z výstupu.
+// Blokuje se jen cíl nebo SL na špatné straně vstupu – a i to jen u hodnoty
+// zadané ručně, ne u dopočtu z výstupu.
+//
+// Hladiny v blízkosti se NEVALIDUJÍ vůbec (kontext v3): deník o nich nic
+// neposuzuje, jen měří polohu. Hladina na vstupu, nad vstupem do longu, za
+// Stop Lossem i za cílem je platný zápis bez varování – geometrii hlídá
+// tests/context-v3.test.js.
 //
 // Fixtury jsou syntetické a nesou jen ceny (bez P/L a účtu). Odpovídají třem
 // obchodům s cílem na ztrátové straně z tabulky A1.2 a obchodu 9. 10. 17:15.
@@ -22,31 +24,6 @@ const TICK = 0.25;
 const trade = overrides => ({
   instrument: 'MES', date: '2026-10-09', entryTime: '17:00', side: 'long', entryPrice: 7800,
   slPrice: 7798, targetLevel1: { type: 'VAH', price: 7804 }, ...overrides
-});
-
-// ------------------------------------------------- 1. znaménkové ticky
-
-test('A7/1: ticksFromEntrySigned – kladné k cíli, záporné k SL, u longu i shortu', () => {
-  const long = trade();
-  assert.equal(FJContext.srRowMetrics('srTarget', { level: 'VAH', price: 7801.5 }, long, TICK).ticksFromEntrySigned, 6);
-  assert.equal(FJContext.srRowMetrics('srStopLoss', { level: 'VAL', price: 7799.5 }, long, TICK).ticksFromEntrySigned, -2);
-
-  const short = trade({ side: 'short', slPrice: 7802, targetLevel1: { type: 'VAL', price: 7796 } });
-  assert.equal(FJContext.srRowMetrics('srTarget', { level: 'VAL', price: 7798.5 }, short, TICK).ticksFromEntrySigned, 6, 'short: pod vstupem = k cíli');
-  assert.equal(FJContext.srRowMetrics('srStopLoss', { level: 'VAH', price: 7800.5 }, short, TICK).ticksFromEntrySigned, -2, 'short: nad vstupem = k SL');
-});
-
-test('A7/1: ticksFromStop sedí na cenu SL; bez ceny řádku nic nedopočítává (null, ne 0)', () => {
-  const long = trade();
-  const m = FJContext.srRowMetrics('srStopLoss', { level: 'VAL', price: 7799.5 }, long, TICK);
-  assert.equal(m.ticksFromStop, 6, '7799.5 − 7798 = 1.5 b = 6 t');
-  assert.equal(FJContext.srRowMetrics('srTarget', { level: 'VAH', price: 7801 }, long, TICK).ticksFromStop, null, 'u SR proti targetu se od SL neměří');
-
-  const bare = FJContext.srRowMetrics('srStopLoss', { level: 'VAL', price: null, ticksFromEntry: 4 }, long, TICK);
-  assert.equal(bare.ticksFromEntrySigned, null, 'bez ceny se znaménko nedopočítává');
-  assert.equal(bare.ticksFromStop, null);
-  assert.equal(FJContext.srRowMetrics('srStopLoss', { level: 'VAL', price: 7799.5 }, trade({ slPrice: null }), TICK).ticksFromStop, null, 'bez SL null');
-  assert.equal(FJContext.srRowMetrics('srTarget', { level: 'VAH', price: 7801 }, long, null).ticksFromEntrySigned, null, 'bez velikosti ticku null');
 });
 
 // ------------------------------------------------- 2. blokace cíle / SL
@@ -89,47 +66,29 @@ test('A7/2: chybná hodnota se neuloží, dokud ji Adam vědomě nepotvrdí', as
   assert.equal(called, false);
 });
 
-// ------------------------------------------------- 3. zóna chránící SL na / nad vstupem
+// ------------------------------------------------- 3. hladiny se nevalidují
 
-test('A7/3: fixtura 9. 10. 17:15 – zóna u SL na vstupu i „nad" vstupem se uloží bez varování', () => {
+test('A7/3: fixtura 9. 10. 17:15 – hladina na vstupu i „za" vstupem je platný zápis bez varování', () => {
   const t = trade({
     side: 'short', entryPrice: 7847.25, slPrice: 7849.25, targetLevel1: { type: 'CUSTOM_FIX_RRR', price: 7843.25 },
-    srStopLoss: [{ level: 'M2_EDGE', price: 7847.75, ticksFromEntry: 2 }, { level: 'CUSTOM_GAMMA', price: 7847, ticksFromEntry: 1 }]
+    nearLevels: [{ level: 'M2_EDGE', price: 7847.75 }, { level: 'CUSTOM_GAMMA', price: 7847 }]
   });
   assert.deepEqual(FJContext.blockingIssues(t), []);
-  for (const row of t.srStopLoss) {
-    const m = FJContext.srRowMetrics('srStopLoss', row, t, TICK);
-    assert.equal(m.beyondStop, false, row.level);
-    assert.deepEqual(FJContext.srRowNotes('srStopLoss', row, t, TICK), [], row.level + ': žádné varování');
-  }
-  assert.equal(FJContext.srRowMetrics('srStopLoss', t.srStopLoss[1], t, TICK).ticksFromEntrySigned, 1, 'GAMMA leží 1 t směrem k cíli – platné');
+  assert.deepEqual(FJContext.dataCheckIssues(t, 'LIVE'), []);
+  const rows = FJContext.derivedFields(t, { tickSize: TICK }).nearLevels;
+  assert.equal(rows[0].position, 'STOP_TO_ENTRY');
+  assert.equal(rows[1].fromEntry, 1, 'GAMMA leží 1 t směrem k cíli – platné');
+  assert.equal(rows[1].position, 'ENTRY_TO_TARGET');
 
-  const long = trade({ srStopLoss: [{ level: 'VAH', price: 7800 }, { level: 'LTA_LEVEL', price: 7800.5 }] });
-  for (const row of long.srStopLoss) {
-    assert.deepEqual(FJContext.srRowNotes('srStopLoss', row, long, TICK), [], 'long: zóna na vstupu (0 t) i 2 t nad vstupem');
-    assert.equal(FJContext.srRowMetrics('srStopLoss', row, long, TICK).beyondStop, false);
-  }
-  assert.deepEqual(FJContext.dataCheckIssues(long, 'BACKTEST'), []);
+  const long = trade({ nearLevels: [{ level: 'VAH', price: 7800 }, { level: 'LTA_LEVEL', price: 7800.5 }] });
+  assert.deepEqual(FJContext.dataCheckIssues(long, 'BACKTEST'), [], 'long: hladina na vstupu (0 t) i 2 t nad vstupem');
 });
 
-test('A7/3: zóna za SL dostane beyondStop (jen informace, neblokuje)', () => {
-  const t = trade({ srStopLoss: [{ level: 'VAL', price: 7797 }] });
-  assert.equal(FJContext.srRowMetrics('srStopLoss', t.srStopLoss[0], t, TICK).beyondStop, true);
+test('A7/3: hladina za SL nebo za cílem se jen změří (poloha), nic se nehlásí ani neblokuje', () => {
+  const t = trade({ nearLevels: [{ level: 'VAL', price: 7797 }, { level: 'VWAP', price: 7806 }] });
   assert.deepEqual(FJContext.blockingIssues(t), []);
-});
-
-// ------------------------------------------------- 4. SR proti targetu za vstupem
-
-test('A7/4: SR proti targetu na ztrátové straně → behindEntry, uloží se', () => {
-  const t = trade({ srTarget: [{ level: 'VWAP', price: 7799 }] });
-  const m = FJContext.srRowMetrics('srTarget', t.srTarget[0], t, TICK);
-  assert.equal(m.behindEntry, true);
-  assert.equal(m.ticksFromEntrySigned, -4);
-  assert.deepEqual(FJContext.blockingIssues(t), []);
-  assert.equal(FJContext.srRowNotes('srTarget', t.srTarget[0], t, TICK).length, 1, 'jemné upozornění');
-  assert.equal(FJContext.srRowMetrics('srTarget', { level: 'VWAP', price: 7802 }, t, TICK).behindEntry, false);
-  assert.equal(FJContext.srRowMetrics('srTarget', { level: 'VWAP', price: 7806 }, t, TICK).beyondTarget, true, 'za cílem 7804');
-  assert.equal(FJContext.srRowMetrics('srTarget', { level: 'VWAP', price: 7803 }, t, TICK).beyondTarget, false);
+  assert.deepEqual(FJContext.dataCheckIssues(t, 'LIVE'), []);
+  assert.deepEqual(FJContext.derivedFields(t, { tickSize: TICK }).nearLevels.map(g => g.position), ['BEYOND_STOP', 'BEYOND_TARGET']);
 });
 
 // ------------------------------------------------- režim deníku

@@ -399,3 +399,13 @@ test('důvod „naživo bych nevzal“ je editovatelný číselník jako ostatn�
   assert.ok(!FJTaxonomy.visibleOptions('SKIP_REASON').some(o => o.key === 'OTHER'), 'skrytý se novým obchodům nenabízí');
   assert.match(FJTaxonomy.describeConfig(cfg)[0], /^Důvod „naživo bych nevzal“: /);
 });
+
+// Soubor číselníků z verze do 4.8.4 nese dvě kolonky SR. Očista je nezná –
+// bez převodu by je tiše zahodila i se skrytím a pořadím.
+test('import souboru ze starší verze: dvě kolonky SR se převedou na „Hladiny v blízkosti"', () => {
+  const clean = FJTaxonomy.configFromImport({
+    kind: 'futures-journal-taxonomy',
+    taxonomy: { SR_TARGET: { hidden: ['VWAP', 'VAH'], order: ['VAL', 'VAH'] }, SR_SL: { hidden: ['VWAP'] } }
+  });
+  assert.deepEqual(clean, { NEAR_LEVEL: { hidden: ['VWAP'], order: ['VAL', 'VAH'] } }, 'skryté zůstane, co bylo skryté v obou');
+});

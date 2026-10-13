@@ -78,7 +78,9 @@
     VWAP_DEV2: 'VWAP odchylka 2',
     HVN: 'HVN',
     LVN: 'LVN',
-    HOD_LOD: 'HOD / LOD'
+    // High / Low of Day – dosavadní denní maximum / minimum. Ve výchozím stavu
+    // skrytá (DEFAULT_HIDDEN), uživatel si ji zapne v Nastavení → Číselníky.
+    HOD_LOD: 'High / Low dne'
   };
 
   // Potvrzení z order flow. MULTI-SELECT.
@@ -138,7 +140,7 @@
     VWAP_DEV1: 'VWAP odchylka 1',
     VWAP_DEV2: 'VWAP odchylka 2',
     HVN: 'HVN',
-    HOD_LOD: 'HOD / LOD',
+    HOD_LOD: 'High / Low dne',
     M2_EDGE: 'Hrana M2',
     IB_EDGE: 'Hrana IB',
     PDH_PDL: 'PDH / PDL',
@@ -148,16 +150,14 @@
   // Nová ruční pole obchodu (ZADANI_KONTEXT A4). Single-select, klíče ze
   // zadání, popisky jdou upravit jako u ostatních číselníků.
   // Trend na 30min grafu – existující `trend` (TREND) zůstává beze změny.
-  const TREND_HTF = { UP: 'Nahoru', DOWN: 'Dolů', RANGE: 'Range' };
+  // Popisky jsou stejné jako u trendu 1m (Long / Short / Range); klíče UP /
+  // DOWN / RANGE jsou ze zadání, jsou v uložených obchodech i v exportu a
+  // nemění se.
+  const TREND_HTF = { UP: 'Long', DOWN: 'Short', RANGE: 'Range' };
   // Kde byla absorpce: na extrému svíčky / pohybu, nebo uprostřed.
   const ABS_LOCATION = { EXTREME: 'Na extrému', MIDDLE: 'Uprostřed', NONE: 'Bez absorpce' };
   // Kolikátý test vstupní hladiny v seanci.
   const ENTRY_TEST_NO = { '1': '1. test', '2': '2. test', '3+': '3. a další' };
-  // Byla před vstupem vybraná likvidita (past na retail)?
-  const LIQUIDITY_SWEPT = { YES: 'Ano', NO: 'Ne' };
-  // Co leží ve volume profilu mezi vstupem a cílem. UNKNOWN je vědomé „nevím",
-  // ne „nevyplněno".
-  const PATH_PROFILE = { LVN: 'LVN – volná cesta', HVN: 'HVN – brzda', MIXED: 'Smíšené', UNKNOWN: 'Nevím' };
   // Známka zadaná PŘED vstupem (ochrana: gradeSetAt / gradeEdited / gradeRetro).
   const GRADE = { A: 'A', B: 'B', C: 'C' };
   // Netest / test hladiny: cena se hladiny v seanci ještě nedotkla / už ano.
@@ -179,12 +179,27 @@
     OTHER: 'Jiný důvod'
   };
 
+  // Kontext dne (ZADANI_KONTEXT A5): jednou za den a deník, uložený
+  // v dayNotes[date].dayContext. Klíče jsou ze zadání a nemění se; popisky,
+  // skrytí, pořadí a vlastní volby si uživatel upraví jako u ostatních
+  // číselníků. Typ dne je JEDEN seznam pro očekávaný i skutečný – jen tak jde
+  // porovnat, jestli se odhad trefil. Která pole z číselníků berou, říká
+  // FJContext.DAY_CONTEXT_GROUPS.
+  const DAY_OPEN = { IN_VA: 'Open ve value', ABOVE_VAH: 'Open nad VAH', BELOW_VAL: 'Open pod VAL', GAP_UP: 'Gap nahoru', GAP_DOWN: 'Gap dolů' };
+  const DAY_TYPE = {
+    TREND_UP: 'Trend nahoru', TREND_DOWN: 'Trend dolů', BALANCE_D: 'Balance (D)', P: 'P profil', b: 'b profil',
+    DOUBLE_DIST: 'Dvojitá distribuce', UNKNOWN: 'Nevím'
+  };
+  const DAY_VALUE_MIGRATION = { HIGHER: 'Výš', LOWER: 'Níž', OVERLAP: 'Překryv' };
+  const DAY_NEWS = { NONE: 'Bez zpráv', CPI: 'CPI', FOMC: 'FOMC', NFP: 'NFP', OTHER: 'Jiné zprávy' };
+
   const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
-    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, LIQUIDITY_SWEPT, PATH_PROFILE, GRADE };
+    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, GRADE, DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS };
 
   // Výchozí skryté klíče (uživatel je zobrazí tlačítkem Zobrazit). PDH/PDL
-  // a ONH/ONL jsou skryté i u vstupu – Adam je nepoužívá.
-  const DEFAULT_HIDDEN = { TARGET_LEVEL: ['PDH_PDL', 'ONH_ONL'] };
+  // a ONH/ONL jsou skryté i u vstupu – Adam je nepoužívá. High / Low dne
+  // (HOD_LOD) je skrytá všude: u vstupu, u hladin v blízkosti i u cílů.
+  const DEFAULT_HIDDEN = { ENTRY_LEVEL: ['HOD_LOD'], TARGET_LEVEL: ['PDH_PDL', 'ONH_ONL', 'HOD_LOD'] };
 
   // Sloučené volby. Klíč vlevo zůstává PLATNÝ (starý obchod ho může mít
   // uložený), ale ve statistikách se počítá pod klíčem vpravo a u nových
@@ -202,15 +217,14 @@
 
   // `optionsFrom` znamená, že skupina SDÍLÍ SEZNAM VOLEB s jinou skupinou.
   // Hladina je hladina, ať se na ni kouká jako na místo vstupu, nebo jako na
-  // překážku před targetem – proto se udržuje na jednom místě a přejmenování
-  // i nová vlastní volba platí rovnou pro všechny tři kolonky. Skrývání a
-  // pořadí si ale každá kolonka může nastavit vlastní.
+  // hladinu v blízkosti obchodu – proto se udržuje na jednom místě a
+  // přejmenování i nová vlastní volba platí rovnou pro obě kolonky. Skrývání
+  // a pořadí si ale každá kolonka může nastavit vlastní.
   const GROUPS = [
     { name: 'SETUP', label: 'Setup', cardinality: 'single' },
-    { name: 'TREND', label: 'Trend', cardinality: 'single' },
+    { name: 'TREND', label: 'Trend 1m', cardinality: 'single' },
     { name: 'ENTRY_LEVEL', label: 'Hladina vstupu', cardinality: 'multi' },
-    { name: 'SR_TARGET', label: 'SR proti targetu', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
-    { name: 'SR_SL', label: 'SR proti S/L', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
+    { name: 'NEAR_LEVEL', label: 'Hladiny v blízkosti', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
     { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' },
     { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' },
@@ -218,9 +232,11 @@
     { name: 'TREND_HTF', label: 'Trend 30m', cardinality: 'single' },
     { name: 'ABS_LOCATION', label: 'Absorpce – kde', cardinality: 'single' },
     { name: 'ENTRY_TEST_NO', label: 'Kolikátý test vstupu', cardinality: 'single' },
-    { name: 'LIQUIDITY_SWEPT', label: 'Vybraná likvidita', cardinality: 'single' },
-    { name: 'PATH_PROFILE', label: 'Profil cesty k cíli', cardinality: 'single' },
-    { name: 'GRADE', label: 'Známka', cardinality: 'single' }
+    { name: 'GRADE', label: 'Známka', cardinality: 'single' },
+    { name: 'DAY_OPEN', label: 'Kontext dne – open vůči value', cardinality: 'single' },
+    { name: 'DAY_TYPE', label: 'Kontext dne – typ dne (očekávaný i skutečný)', cardinality: 'single' },
+    { name: 'DAY_VALUE_MIGRATION', label: 'Kontext dne – migrace value', cardinality: 'single' },
+    { name: 'DAY_NEWS', label: 'Kontext dne – zprávy', cardinality: 'single' }
   ];
 
   const GROUP_BY_NAME = Object.fromEntries(GROUPS.map(g => [g.name, g]));
@@ -232,19 +248,17 @@
 
   const TRADE_CONTEXT_FIELDS = [
     { key: 'setupCode', cardinality: 'single', enumName: 'SETUP', label: 'Setup' },
-    { key: 'trend', cardinality: 'single', enumName: 'TREND', label: 'Trend' },
+    { key: 'trend', cardinality: 'single', enumName: 'TREND', label: 'Trend 1m' },
     { key: 'entryLevels', cardinality: 'multi', enumName: 'ENTRY_LEVEL', label: 'Hladina vstupu' },
-    // SR hladiny jsou ŘÁDKY { level, price, ticksFromEntry } – jedna hladina
-    // jeden řádek, stejný typ může být víckrát (dvě VAH na různých cenách).
-    // Sloučený obchod bere sjednocení řádků (sanitizeLevelRows).
-    { key: 'srTarget', cardinality: 'levelRows', enumName: 'SR_TARGET', label: 'SR proti targetu' },
-    { key: 'srStopLoss', cardinality: 'levelRows', enumName: 'SR_SL', label: 'SR proti S/L' },
-    // „Žádná hladina v cestě" – odlišuje „nic tam nebylo" od „nevyplněno".
+    // Hladiny v blízkosti jsou ŘÁDKY { level, price, testState? } – jedna
+    // hladina jeden řádek, stejný typ může být víckrát (dvě VAH na různých
+    // cenách). Sloučený obchod bere sjednocení řádků (sanitizeNearLevels).
+    { key: 'nearLevels', cardinality: 'levelRows', enumName: 'NEAR_LEVEL', label: 'Hladiny v blízkosti' },
+    // „Žádná hladina v blízkosti" – odlišuje „nic tam nebylo" od „nevyplněno".
     // Ukládá se jen true a jen u obchodu bez řádků. `noneFor` říká, ke
     // kterému poli patří: sloučený obchod ho má, jen když ho mají všechny
     // nohy a sjednocené řádky jsou prázdné.
-    { key: 'srTargetNone', cardinality: 'bool', enumName: null, noneFor: 'srTarget', label: 'SR proti targetu: žádná' },
-    { key: 'srStopLossNone', cardinality: 'bool', enumName: null, noneFor: 'srStopLoss', label: 'SR proti S/L: žádná' },
+    { key: 'nearLevelsNone', cardinality: 'bool', enumName: null, noneFor: 'nearLevels', label: 'Hladiny v blízkosti: žádná' },
     { key: 'ofConfirm', cardinality: 'multi', enumName: 'OF_CONFIRM', label: 'Order flow potvrzení' },
     { key: 'fillStatus', cardinality: 'single', enumName: 'FILL_STATUS', label: 'Stav naplnění' },
     { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' },
@@ -265,14 +279,10 @@
     { key: 'postExitFavorableTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Ticky po výstupu – ve směru zisku' },
     { key: 'postExitAdverseTicks', cardinality: 'number', enumName: null, merge: 'lastExit', label: 'Ticky po výstupu – proti' },
     { key: 'postExitAdverseFirst', cardinality: 'bool', enumName: null, merge: 'lastExit', label: 'Protipohyb přišel dřív' },
-    // Kontext v2 (A4). Single-select bere první neprázdný; netest/test hladin
-    // vstupu je mapa { KLÍČ: UNTESTED|TESTED } sjednocená přes nohy.
+    // Kontext v2 (A4). Single-select bere první neprázdný.
     { key: 'trendHtf', cardinality: 'single', enumName: 'TREND_HTF', label: 'Trend 30m' },
-    { key: 'entryLevelTests', cardinality: 'levelTests', enumName: 'ENTRY_LEVEL', label: 'Hladina vstupu – netest/test' },
     { key: 'entryTestNo', cardinality: 'single', enumName: 'ENTRY_TEST_NO', label: 'Kolikátý test vstupu' },
     { key: 'absLocation', cardinality: 'single', enumName: 'ABS_LOCATION', label: 'Absorpce – kde' },
-    { key: 'liquiditySwept', cardinality: 'single', enumName: 'LIQUIDITY_SWEPT', label: 'Vybraná likvidita' },
-    { key: 'pathProfile', cardinality: 'single', enumName: 'PATH_PROFILE', label: 'Profil cesty k cíli' },
     { key: 'grade', cardinality: 'single', enumName: 'GRADE', label: 'Známka' },
     // Čas prvního zadání známky: sloučený obchod bere nejdřívější. „Změněno
     // dodatečně" platí, když to tvrdí kterákoli noha.
@@ -342,7 +352,7 @@
   function hiddenKeys(group, config) {
     // Kolonka si smí skrýt volbu sama pro sebe. Když vlastní nastavení nemá,
     // zdědí ho ze zdrojové skupiny – co je skryté u hladiny vstupu, nemá
-    // smysl nabízet ani u SR kolonek.
+    // smysl nabízet ani u hladin v blízkosti.
     const own = groupConfig(group, config);
     const vocab = vocabularyOf(group);
     const inherited = vocab === group ? {} : groupConfig(vocab, config);
@@ -351,7 +361,9 @@
     const explicit = Array.isArray(g.hidden) ? g.hidden : [];
     const unhidden = Array.isArray(g.visible) ? g.visible : [];
     const aliased = Object.keys(aliasesFor(group, config));
-    const defaults = DEFAULT_HIDDEN[group] || [];
+    // Výchozí skrytí odvozené kolonky (Hladiny v blízkosti) se bere ze zdrojové
+    // skupiny – hladina skrytá u vstupu se ve výchozím stavu nenabízí ani tam.
+    const defaults = DEFAULT_HIDDEN[group] || DEFAULT_HIDDEN[vocab] || [];
     return new Set([...defaults, ...explicit, ...aliased].filter(k => !unhidden.includes(k)));
   }
 
@@ -362,7 +374,7 @@
   function labelOf(group, key, config) {
     if (!key) return '';
     // Popisek je vlastnost VOLBY, ne kolonky – přejmenovaná hladina se tak
-    // stejně jmenuje u vstupu i u obou SR kolonek.
+    // stejně jmenuje u vstupu i u hladin v blízkosti.
     const vocab = vocabularyOf(group);
     const g = groupConfig(vocab, config);
     const labels = (g.labels && typeof g.labels === 'object') ? g.labels : {};
@@ -431,19 +443,10 @@
     return Object.prototype.hasOwnProperty.call(TEST_STATE, value) ? value : '';
   }
 
-  // Netest / test u hladin vstupu: mapa { KLÍČ: UNTESTED|TESTED } jen pro
-  // vybrané hladiny (bez NONE). Nic vyplněno = null, ne prázdný objekt.
-  function sanitizeLevelTests(levels, tests) {
-    const chosen = new Set((Array.isArray(levels) ? levels : []).filter(k => k && k !== 'NONE'));
-    const out = {};
-    for (const [key, state] of Object.entries(tests && typeof tests === 'object' ? tests : {})) {
-      if (chosen.has(key) && sanitizeTestState(state)) out[key] = state;
-    }
-    return Object.keys(out).length ? out : null;
-  }
-
-  // SR hladiny: seznam řádků { level, price, ticksFromEntry }.
-  //   level          klíč číselníku (SR_TARGET / SR_SL)
+  // STARÝ TVAR (do 4.8.4): dva seznamy srTarget / srStopLoss s řádky
+  // { level, price, ticksFromEntry }. Funkce zůstává jen pro ČTENÍ starého
+  // zápisu – nový tvar je jeden seznam nearLevels (sanitizeNearLevels níž).
+  //   level          klíč číselníku
   //   price          cena hladiny, nebo null
   //   ticksFromEntry vzdálenost od vstupu v ticích, VŽDY KLADNĚ, nebo null –
   //                  stranu nese název pole a směr obchodu, ne znaménko
@@ -490,6 +493,148 @@
     return Array.isArray(value) && value.some(item => typeof item === 'string');
   }
 
+  // ------------------------------------------- hladiny v blízkosti (kontext v3)
+  // Jeden seznam řádků { level, price, testState? } místo dvojice srTarget /
+  // srStopLoss. Uživatel zadává jen typ, cenu a test / netest – stranu ani roli
+  // nevolí; polohu vůči vstupu, SL a cíli dopočítá FJContext.levelGeometry.
+  //
+  // Řádek BEZ ceny převzatý ze starého zápisu si nese `legacySide` ('TG' / 'SL')
+  // a původní kladné `ticksFromEntry` – jen díky nim má polohu. Řádek s cenou je
+  // nenese nikdy: cena je jediný zdroj pravdy. `NONE` není hladina („žádná
+  // hladina v blízkosti" je příznak nearLevelsNone, ne řádek).
+  // Shodné řádky (typ + cena) se sloučí, vyplněný test / netest se neztratí;
+  // holý řádek ustoupí řádku téže hladiny s cenou. `group` null = typ se proti
+  // číselníku NEOVĚŘUJE (převod běží dřív, než se načtou vlastní volby, a export
+  // bere obchody z víc deníků).
+  const LEGACY_SIDES = ['TG', 'SL'];
+
+  function sanitizeNearLevels(group, value, config) {
+    const list = Array.isArray(value) ? value : [];
+    const known = group ? new Set(allKeys(group, config)) : null;
+    const rows = [];
+    const bySignature = new Map();
+    for (const item of list) {
+      const raw = (item && typeof item === 'object') ? item : { level: item };
+      const level = typeof raw.level === 'string' ? raw.level : '';
+      if (!level || level === 'NONE' || (known && !known.has(level))) continue;
+      const price = numOrNull(raw.price);
+      const row = { level, price };
+      if (price == null && LEGACY_SIDES.includes(raw.legacySide)) {
+        const ticks = numOrNull(raw.ticksFromEntry);
+        row.ticksFromEntry = ticks == null ? null : Math.abs(ticks);
+        row.legacySide = raw.legacySide;
+      }
+      const testState = sanitizeTestState(raw.testState);
+      const signature = level + '|' + price + '|' + (row.legacySide || '') + '|' + (row.ticksFromEntry ?? '');
+      const same = bySignature.get(signature);
+      if (same) {
+        if (testState && !same.testState) same.testState = testState;
+        continue;
+      }
+      if (testState) row.testState = testState;
+      bySignature.set(signature, row);
+      rows.push(row);
+    }
+    const priced = new Set(rows.filter(r => r.price != null).map(r => r.level));
+    return rows.filter(r => r.price != null || r.legacySide || !priced.has(r.level));
+  }
+
+  // JEDINÉ pravidlo převodu starého zápisu (ZADANI_KONTEXT_V3 A2). Používá ho
+  // migrace deníku, čtení deníku, který ještě nebyl otevřen, i exporty:
+  //  - řádky obou seznamů za sebou (proti targetu, pak proti S/L), shodné
+  //    (typ + cena) jen jednou,
+  //  - řádek bez ceny dostane legacySide a ponechá si kladné ticksFromEntry,
+  //  - „žádná" platí jen tehdy, když byly „žádná" OBĚ strany (příznak, nebo
+  //    strana jen s řádkem NONE); jinak je prázdný seznam „nevyplněno".
+  const LEGACY_NEAR_KEYS = ['srTarget', 'srStopLoss', 'srTargetNone', 'srStopLossNone'];
+
+  function hasLegacyNearLevels(trade) {
+    return !!trade && typeof trade === 'object' && LEGACY_NEAR_KEYS.some(k => trade[k] !== undefined);
+  }
+
+  function nearLevelsFromLegacy(trade) {
+    const sides = { TG: sanitizeLevelRows(null, trade?.srTarget), SL: sanitizeLevelRows(null, trade?.srStopLoss) };
+    const merged = [];
+    for (const side of LEGACY_SIDES) {
+      for (const row of sides[side]) merged.push(row.price != null ? row : { ...row, legacySide: side });
+    }
+    const nearLevels = sanitizeNearLevels(null, merged);
+    const sideNone = (flag, rows) => trade?.[flag] === true || (rows.length > 0 && rows.every(r => r.level === 'NONE'));
+    return {
+      nearLevels,
+      nearLevelsNone: !nearLevels.length && sideNone('srTargetNone', sides.TG) && sideNone('srStopLossNone', sides.SL)
+    };
+  }
+
+  const hasNearLevels = trade => Array.isArray(trade.nearLevels) || trade.nearLevelsNone !== undefined;
+
+  // Hladiny v blízkosti obchodu, ať je uložený v novém, nebo starém tvaru.
+  function nearLevelsOf(trade) {
+    if (!trade || typeof trade !== 'object') return [];
+    if (Array.isArray(trade.nearLevels)) return sanitizeNearLevels(null, trade.nearLevels);
+    return !hasNearLevels(trade) && hasLegacyNearLevels(trade) ? nearLevelsFromLegacy(trade).nearLevels : [];
+  }
+
+  // Výslovné „žádná hladina v blízkosti". Platí jen bez řádků.
+  function nearLevelsNoneOf(trade) {
+    if (!trade || typeof trade !== 'object') return false;
+    if (hasNearLevels(trade)) return trade.nearLevelsNone === true && !nearLevelsOf(trade).length;
+    return hasLegacyNearLevels(trade) ? nearLevelsFromLegacy(trade).nearLevelsNone : false;
+  }
+
+  // Zapíše hladiny do obchodu v novém tvaru a odstraní starý. Mění `obj`.
+  function setNearLevels(obj, rows, none) {
+    for (const key of LEGACY_NEAR_KEYS) delete obj[key];
+    obj.nearLevels = Array.isArray(rows) ? rows : [];
+    if (none === true && !obj.nearLevels.length) obj.nearLevelsNone = true; else delete obj.nearLevelsNone;
+    return obj;
+  }
+
+  // Obchod ve starém tvaru převedený do nového (nový objekt). Obchod bez
+  // starých klíčů se vrací TENTÝŽ – převod je idempotentní a není co zapisovat.
+  function convertLegacyNear(trade) {
+    if (!hasLegacyNearLevels(trade)) return trade;
+    return setNearLevels({ ...trade }, nearLevelsOf(trade), nearLevelsNoneOf(trade));
+  }
+
+  // Pole zrušená v kontextu v3 – mažou se i z dat (rozhodnutí uživatele).
+  const V3_REMOVED_KEYS = ['liquiditySwept', 'pathProfile', 'entryLevelTests'];
+
+  function stripRemovedV3(trade) {
+    if (!trade || typeof trade !== 'object' || !V3_REMOVED_KEYS.some(k => k in trade)) return trade;
+    const out = { ...trade };
+    for (const key of V3_REMOVED_KEYS) delete out[key];
+    return out;
+  }
+
+  // Úprava číselníků deníku pro kontext v3: dvě kolonky SR se stanou jednou
+  // („Hladiny v blízkosti") – skryté zůstane jen to, co bylo skryté v OBOU,
+  // ať volba, kterou uživatel na jedné straně používal, nezmizí. Skupiny
+  // zrušených polí se odstraní. Konfigurace bez nich se vrací táž.
+  const DEAD_V3_GROUPS = ['SR_TARGET', 'SR_SL', 'LIQUIDITY_SWEPT', 'PATH_PROFILE'];
+
+  function migrateConfigV3(config) {
+    if (!config || typeof config !== 'object' || !DEAD_V3_GROUPS.some(k => config[k] !== undefined)) return config;
+    const out = { ...config };
+    for (const key of DEAD_V3_GROUPS) delete out[key];
+    const isGroup = g => !!g && typeof g === 'object';
+    const sides = [config.SR_TARGET, config.SR_SL];
+    if (sides.some(isGroup) && !isGroup(out.NEAR_LEVEL)) {
+      const base = isGroup(config.ENTRY_LEVEL) ? config.ENTRY_LEVEL : {};
+      // Kolonka bez vlastního nastavení dědila skrývání z hladiny vstupu.
+      const effective = g => (isGroup(g) && (Array.isArray(g.hidden) || Array.isArray(g.visible)) ? g : base);
+      const list = (g, field) => (Array.isArray(g[field]) ? g[field] : []);
+      const [a, b] = sides.map(effective);
+      const near = { hidden: list(a, 'hidden').filter(k => list(b, 'hidden').includes(k)) };
+      const visible = [...new Set([...list(a, 'visible'), ...list(b, 'visible')])];
+      if (visible.length) near.visible = visible;
+      const order = sides.filter(isGroup).map(g => g.order).find(Array.isArray);
+      if (order) near.order = order.slice();
+      out.NEAR_LEVEL = near;
+    }
+    return out;
+  }
+
   // Konfluence: `NONE` je výslovné „žádná hladina", takže se nepočítá.
   function confluenceCount(entryLevels, config) {
     return sanitizeMulti('ENTRY_LEVEL', entryLevels, config).filter(k => k !== 'NONE').length;
@@ -498,7 +643,8 @@
   // Klíče kontextových polí, která obchod nemá vyplněná (štítek „Neúplné").
   // Pořadí je pořadí formuláře. Nekontroluje se, co je nepovinné nebo má
   // hodnotu vždy: doba sledování, cílová hladina 2, „protipohyb přišel dřív".
-  //  - SR pole jsou vyplněná řádky NEBO příznakem „žádná hladina v cestě",
+  //  - hladiny v blízkosti jsou vyplněné řádky NEBO příznakem „žádná hladina
+  //    v blízkosti" (čte se i starý tvar – nepřevedený deník se posoudí stejně),
   //  - cílová hladina 1 potřebuje typ i cenu (bez ceny nejde R hladiny),
   //  - čísla (cena SL, MFE/MAE, po výstupu): vyplněná je i nula a i hodnota
   //    odvozená z výstupu; chybí jen prázdné,
@@ -512,11 +658,11 @@
     if (!sanitizeSingle('FILL_STATUS', trade.fillStatus, config)) missing.push('fillStatus');
     if (!sanitizeSingle('TREND', trade.trend, config)) missing.push('trend');
     if (!sanitizeMulti('ENTRY_LEVEL', trade.entryLevels, config).length) missing.push('entryLevels');
-    if (!sanitizeLevelRows('SR_TARGET', trade.srTarget, config).length && trade.srTargetNone !== true) missing.push('srTarget');
-    if (!sanitizeLevelRows('SR_SL', trade.srStopLoss, config).length && trade.srStopLossNone !== true) missing.push('srStopLoss');
+    if (!sanitizeNearLevels('NEAR_LEVEL', nearLevelsOf(trade), config).length && !nearLevelsNoneOf(trade)) missing.push('nearLevels');
     if (!sanitizeMulti('OF_CONFIRM', trade.ofConfirm, config).length) missing.push('ofConfirm');
-    // Kontext v2 (A4): trend 30m a známka. Ostatní nová pole úplnost
-    // neblokují, ať „Neúplné" nezčervená celý deník najednou.
+    // Kontext v2 (A4): trend 30m a známka. Ostatní pole kontextu se hlásí jen
+    // na přání (Nastavení → Přizpůsobení → Pole kontextu, missingContextByCard),
+    // ať „Neúplné" nezčervená celý deník najednou.
     if (!sanitizeSingle('TREND_HTF', trade.trendHtf, config)) missing.push('trendHtf');
     if (!sanitizeSingle('GRADE', trade.grade, config)) missing.push('grade');
     const target = sanitizeTargetLevel(trade.targetLevel1, config);
@@ -549,20 +695,64 @@
     { key: 'comments', label: 'Komentáře', checks: false }
   ];
   // Do které karty patří kontrolované pole. Cílová hladina 1 se dělí: typ
-  // je v Hladinách, cena v SL / TP (bez ceny nejde plánované R).
+  // je v Hladinách, cena v SL / TP – tam se plánovaný cíl ručně přepisuje
+  // (bez ceny nejde plánované R).
   const CARD_OF_FIELD = {
     slPrice: 'sltp',
     mfeTicks: 'course', maeTicks: 'course', postExitFavorableTicks: 'course', postExitAdverseTicks: 'course',
     setupCode: 'setup', fillStatus: 'setup', trend: 'setup', trendHtf: 'setup', grade: 'setup',
-    entryLevels: 'levels', srTarget: 'levels', srStopLoss: 'levels', ofConfirm: 'levels'
+    entryLevels: 'levels', nearLevels: 'levels', ofConfirm: 'levels'
   };
 
+  // ---------------------------------------------------- pole kontextu (v3 A4)
+  // Jednotlivá pole kontextu jdou skrýt a u každého zvlášť zapnout upozornění
+  // na nevyplněné (Nastavení → Přizpůsobení → Pole kontextu). Skryté pole
+  // zmizí z formuláře, rychlého formuláře, karty obchodu i dne a nepočítá se
+  // do „Neúplné"; DATA ZŮSTÁVAJÍ a jdou do exportů.
+  // `warnDefault` = pole se hlásilo už dřív (trend 30m, známka). Ostatní mají
+  // upozornění ve výchozím stavu vypnuté, ať starší obchody nezčervenají.
+  // `checks: false` = není co kontrolovat (dopočet).
+  const CONTEXT_FIELDS = [
+    { key: 'trendHtf', label: 'Trend 30m', warnDefault: true },
+    { key: 'grade', label: 'Známka A/B/C', warnDefault: true },
+    { key: 'entryTestNo', label: 'Kolikátý test vstupu' },
+    { key: 'absLocation', label: 'Absorpce – kde' },
+    { key: 'levelTestState', label: 'Test / netest u hladin' },
+    { key: 'dayContext', label: 'Kontext dne' },
+    { key: 'derivedRow', label: 'Řádek dopočtů', checks: false },
+    // Řádek „Vstupy" na kartě obchodu a pole „Vstup" u cíle ve formuláři.
+    { key: 'entries', label: 'Vstupy a dokupy', checks: false }
+  ];
+  const CONTEXT_FIELD_BY_KEY = Object.fromEntries(CONTEXT_FIELDS.map(f => [f.key, f]));
+
+  // Nastavení polí: { trendHtf: { show, warn }, … }. Chybějící pole nebo
+  // hodnota = výchozí (zobrazeno; upozornění podle warnDefault).
+  function normalizeFieldConfig(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = {};
+    for (const field of CONTEXT_FIELDS) {
+      const c = src[field.key] && typeof src[field.key] === 'object' ? src[field.key] : {};
+      out[field.key] = { show: c.show !== false, warn: typeof c.warn === 'boolean' ? c.warn : field.warnDefault === true };
+    }
+    return out;
+  }
+  function fieldShown(fieldConfig, key) { return normalizeFieldConfig(fieldConfig)[key]?.show !== false; }
+  function fieldWarns(fieldConfig, key) {
+    const c = normalizeFieldConfig(fieldConfig)[key];
+    return !!c && CONTEXT_FIELD_BY_KEY[key].checks !== false && c.show && c.warn;
+  }
+
   // Chybějící pole rozdělená po kartách, jako popisky. Rozhoduje
-  // missingContextKeys – tady se jen třídí, nic se nekontroluje znovu.
-  function missingContextByCard(trade, config) {
+  // missingContextKeys – tady se jen třídí a filtruje podle nastavení polí:
+  // trend 30m a známka vypadnou, když jsou skryté nebo bez upozornění;
+  // kolikátý test, absorpce a test / netest u hladin se naopak přidají jen se
+  // zapnutým upozorněním.
+  function missingContextByCard(trade, config, fieldConfig) {
     const out = {};
     for (const card of TRADE_CARDS) out[card.key] = [];
+    const fields = normalizeFieldConfig(fieldConfig);
     for (const key of missingContextKeys(trade, config)) {
+      if (CONTEXT_FIELD_BY_KEY[key] && !fieldWarns(fields, key)) continue;
       if (key === 'targetLevel1') {
         const tl = (trade && trade.targetLevel1) || {};
         if (!sanitizeSingle('TARGET_LEVEL', tl.type, config)) out.levels.push(contextFieldLabel(key) + ' (typ)');
@@ -571,6 +761,10 @@
       }
       out[CARD_OF_FIELD[key] || 'setup'].push(contextFieldLabel(key));
     }
+    if (!trade || typeof trade !== 'object' || trade.recordType === 'SETUP_ONLY') return out;
+    if (fieldWarns(fields, 'entryTestNo') && !sanitizeSingle('ENTRY_TEST_NO', trade.entryTestNo, config)) out.setup.push(CONTEXT_FIELD_BY_KEY.entryTestNo.label);
+    if (fieldWarns(fields, 'absLocation') && !sanitizeSingle('ABS_LOCATION', trade.absLocation, config)) out.levels.push(CONTEXT_FIELD_BY_KEY.absLocation.label);
+    if (fieldWarns(fields, 'levelTestState') && nearLevelsOf(trade).some(r => !r.testState)) out.levels.push(CONTEXT_FIELD_BY_KEY.levelTestState.label);
     return out;
   }
 
@@ -592,10 +786,15 @@
   }
 
   // Chybějící pole jen z karet, které jsou zobrazené a mají zapnuté upozornění
-  // (štítek „Neúplné" na kartě obchodu).
-  function missingForCards(trade, cardConfig, config) {
-    const byCard = missingContextByCard(trade, config);
-    return TRADE_CARDS.filter(card => cardWarns(cardConfig, card.key)).flatMap(card => byCard[card.key]);
+  // (štítek „Neúplné" na kartě obchodu). Kontext dne do žádné karty formuláře
+  // nepatří: hlásí se, když má zapnuté upozornění a volající ví, že dni chybí
+  // (`opts.dayContextMissing` – denní poznámky tenhle modul nezná).
+  function missingForCards(trade, cardConfig, config, fieldConfig, opts) {
+    const byCard = missingContextByCard(trade, config, fieldConfig);
+    const labels = TRADE_CARDS.filter(card => cardWarns(cardConfig, card.key)).flatMap(card => byCard[card.key]);
+    const isTrade = !!trade && typeof trade === 'object' && trade.recordType !== 'SETUP_ONLY';
+    if (isTrade && opts?.dayContextMissing === true && fieldWarns(fieldConfig, 'dayContext')) labels.push(CONTEXT_FIELD_BY_KEY.dayContext.label);
+    return labels;
   }
 
   // Klíč pro vlastní volbu. Odvozuje se z popisku, aby byl čitelný i v CSV,
@@ -654,10 +853,10 @@
         if (Object.keys(custom).length) clean.custom = custom;
       }
 
-      // Odvozená skupina (SR kolonky) nemá vlastní volby, sdílí je se zdrojovou
-      // skupinou – její vlastní volby se proto smí skrývat a řadit i tady.
-      // Bez toho kopie / export číselníků tiše zahodila např. skrytý
-      // CUSTOM_FIX_RRR u SR proti targetu.
+      // Odvozená skupina (Hladiny v blízkosti) nemá vlastní volby, sdílí je se
+      // zdrojovou skupinou – její vlastní volby se proto smí skrývat a řadit
+      // i tady. Bez toho kopie / export číselníků tiše zahodila např. skrytou
+      // vlastní hladinu.
       const source = vocabularyOf(group.name);
       const sourceCustom = source !== group.name && raw[source]?.custom && typeof raw[source].custom === 'object'
         ? Object.keys(raw[source].custom).filter(k => CUSTOM_KEY_RE.test(k) && cleanLabel(raw[source].custom[k]))
@@ -716,7 +915,10 @@
       throw new Error('Soubor není export číselníků (kind: ' + parsed.kind + ').');
     }
     const source = parsed.taxonomy && typeof parsed.taxonomy === 'object' ? parsed.taxonomy : parsed;
-    const clean = sanitizeConfig(source);
+    // Soubor ze starší verze nese dvě kolonky SR (proti targetu / proti S/L) –
+    // převedou se stejným pravidlem jako při migraci deníku, jinak by je očista
+    // tiše zahodila i se skrytím a pořadím.
+    const clean = sanitizeConfig(migrateConfigV3(source));
     if (!Object.keys(clean).length) throw new Error('Soubor neobsahuje žádnou použitelnou úpravu číselníku.');
     return clean;
   }
@@ -741,8 +943,12 @@
   return {
     // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
     SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
-    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, LIQUIDITY_SWEPT, PATH_PROFILE, GRADE, TEST_STATE, DEFAULT_HIDDEN,
-    sanitizeTestState, sanitizeLevelTests,
+    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, GRADE, TEST_STATE, DEFAULT_HIDDEN,
+    DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS,
+    sanitizeTestState,
+    // hladiny v blízkosti (kontext v3) a převod starého zápisu
+    sanitizeNearLevels, nearLevelsFromLegacy, hasLegacyNearLevels, nearLevelsOf, nearLevelsNoneOf, setNearLevels,
+    convertLegacyNear, stripRemovedV3, migrateConfigV3, LEGACY_NEAR_KEYS, V3_REMOVED_KEYS,
     ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, TRADE_CONTEXT_FIELDS,
     // konfigurace
     applyConfig, getConfig, groupConfig,
@@ -751,6 +957,7 @@
     visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     missingContextKeys, contextFieldLabel,
     TRADE_CARDS, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingForCards,
+    CONTEXT_FIELDS, normalizeFieldConfig, fieldShown, fieldWarns,
     makeCustomKey,
     // přenos mezi deníky a soubor
     sanitizeConfig, exportPayload, configFromImport, describeConfig,

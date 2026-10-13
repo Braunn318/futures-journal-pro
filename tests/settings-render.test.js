@@ -151,7 +151,7 @@ test('přenos číselníků: bez další karty se kopie nenabízí', () => {
 });
 
 test('dlaždice kontextových polí se vykreslí, včetně single-selectu', () => {
-  const dom = makeDom(['trend', 'entryLevels', 'srTarget', 'srStopLoss', 'ofConfirm', 'setupCode', 'fillStatus', 'confluenceHint']);
+  const dom = makeDom(['trend', 'entryLevels', 'nearLevels', 'ofConfirm', 'setupCode', 'fillStatus', 'confluenceHint']);
   FJTaxonomy.applyConfig({});
   const r = loadRenderer(
     ['$', 'esc', 'fillContextSelect', 'renderChipGrid', 'readChipGrid', 'renderSingleChipGrid', 'readSingleChipGrid', 'updateConfluenceHint'],
@@ -160,16 +160,15 @@ test('dlaždice kontextových polí se vykreslí, včetně single-selectu', () =
 
   r.renderSingleChipGrid('trend', 'TREND', 'LONG');
   r.renderChipGrid('entryLevels', 'ENTRY_LEVEL', ['VWAP']);
-  r.renderChipGrid('srTarget', 'SR_TARGET', ['VAH']);
-  r.renderChipGrid('srStopLoss', 'SR_SL', []);
+  r.renderChipGrid('nearLevels', 'NEAR_LEVEL', ['VAH']);
   r.fillContextSelect('setupCode', 'SETUP', '— nevyplněno —');
 
   assert.match(dom.nodes.trend.innerHTML, /data-key="LONG"/);
   assert.match(dom.nodes.trend.innerHTML, /chip on/, 'vybraná hodnota je zvýrazněná');
   assert.ok(!dom.nodes.trend.innerHTML.includes('data-key="VWAP"'), 'trend nabízí jen své tři stavy');
   assert.match(dom.nodes.entryLevels.innerHTML, /data-key="VWAP"/);
-  assert.match(dom.nodes.srTarget.innerHTML, /data-key="VAH"/);
-  assert.ok(dom.nodes.srStopLoss.innerHTML.includes('data-key="LIQUIDITY"'), 'SR proti S/L nabízí tytéž hladiny');
+  assert.match(dom.nodes.nearLevels.innerHTML, /data-key="VAH"/);
+  assert.ok(dom.nodes.nearLevels.innerHTML.includes('data-key="LIQUIDITY"'), 'Hladiny v blízkosti nabízejí tytéž hladiny jako vstup');
   assert.match(dom.nodes.setupCode.innerHTML, /nevyplněno/);
   // Aliasovaná hladina se u nového obchodu nenabízí.
   assert.ok(!dom.nodes.entryLevels.innerHTML.includes('data-key="VPOC_CANDLE"'));

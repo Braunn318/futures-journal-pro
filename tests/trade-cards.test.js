@@ -18,8 +18,7 @@ const complete = (extra = {}) => ({
   id: 't1', instrument: 'MES', side: 'short', result: 'target',
   setupCode: 'M2_OF', fillStatus: 'FILLED', trend: 'SHORT',
   entryLevels: ['VPOC_DAY'],
-  srTarget: [{ level: 'VPOC_30M', price: 7730, ticksFromEntry: 49 }],
-  srStopLoss: [{ level: 'LIQUIDITY', price: 7745, ticksFromEntry: 11 }],
+  nearLevels: [{ level: 'VPOC_30M', price: 7730 }, { level: 'LIQUIDITY', price: 7745 }],
   ofConfirm: ['ABS_ASK'],
   targetLevel1: { type: 'VPOC_1M', price: 7737.75 },
   slPrice: 7746, mfeTicks: 18, maeTicks: 2,
@@ -45,8 +44,8 @@ test('prázdný obchod: každé pole je ve své kartě', () => {
   assert.deepEqual(plain(FJTaxonomy.missingContextByCard({ instrument: 'MES' })), {
     sltp: ['Cena targetu', 'Cena Stop Lossu'],
     course: ['MFE', 'MAE', 'Ticky po výstupu – ve směru zisku', 'Ticky po výstupu – proti'],
-    setup: ['Setup', 'Stav naplnění', 'Trend', 'Trend 30m', 'Známka'],
-    levels: ['Hladina vstupu', 'SR proti targetu', 'SR proti S/L', 'Order flow potvrzení', 'Cílová hladina 1 (typ)'],
+    setup: ['Setup', 'Stav naplnění', 'Trend 1m', 'Trend 30m', 'Známka'],
+    levels: ['Hladina vstupu', 'Hladiny v blízkosti', 'Order flow potvrzení', 'Cílová hladina 1 (typ)'],
     comments: []
   });
 });
@@ -112,17 +111,17 @@ test('uložená konfigurace má přednost před starým klíčem', () => {
 // ---------- štítek „Neúplné" ----------
 
 const badge = cardConfig => loadRenderer(['esc', 'incompleteBadgeHTML'], { tradeCardConfig: cardConfig }).incompleteBadgeHTML;
-const holes = complete({ trend: '', srStopLoss: [], ofConfirm: [], maeTicks: '' });
+const holes = complete({ trend: '', nearLevels: [], ofConfirm: [], maeTicks: '' });
 
 test('štítek: všechny karty s upozorněním počítají vše', () => {
   assert.match(badge(cfg())(holes), /Neúplné · 4/);
-  assert.match(badge(cfg())(holes), /title="Chybí: MAE, Trend, SR proti S\/L, Order flow potvrzení"/);
+  assert.match(badge(cfg())(holes), /title="Chybí: MAE, Trend 1m, Hladiny v blízkosti, Order flow potvrzení"/);
 });
 
-test('štítek: vypnuté upozornění u Hladin odebere SR i order flow', () => {
+test('štítek: vypnuté upozornění u Hladin odebere hladiny v blízkosti i order flow', () => {
   const html = badge(cfg({ levels: { warn: false } }))(holes);
   assert.match(html, /Neúplné · 2/);
-  assert.doesNotMatch(html, /SR proti|Order flow/);
+  assert.doesNotMatch(html, /Hladiny v blízkosti|Order flow/);
 });
 
 test('štítek: skrytá karta se nepočítá', () => {
@@ -140,7 +139,7 @@ test('štítek: bez upozornění u všech karet se neukáže', () => {
 
 function pills(shown) {
   return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML',
-    'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'srRefDistanceText'],
+    'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown'],
   { FJTaxonomy, settings: { templates: [] }, tradeCardShown: key => shown[key] !== false });
 }
 
