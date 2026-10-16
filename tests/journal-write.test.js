@@ -181,7 +181,7 @@ test('tickFieldsVersion přežije čtení a zápis deníku v main procesu', () =
         dataRoot: () => root,
         defaultJournalData: () => ({ trades: [], settings: [] }),
         // Obrázky tu nejsou, přesun screenshotů se nemá co dělat.
-        deflateJournalImages: () => 0,
+        deflateJournalImages: () => 0, remapRenamedImages: () => 0,
         backupJournalFile: () => { throw new Error('záloha se tu dělat nemá'); },
         logInfo: () => {}
       }

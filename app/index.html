@@ -1106,12 +1106,25 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn" id="resetDataLocation" style="margin-top:10px;margin-left:8px">Vrátit na výchozí umístění</button>
           <div class="sub" style="margin-top:8px">Po změně se appka restartuje, ať se nové umístění projeví všude bezpečně.</div>
         </details>
+        <details class="card settings-card" data-card="imagesLocation">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Složka obrázků (screenshoty)</h3></summary>
+          <p class="sub">Screenshoty obchodů a dnů jsou obyčejné soubory v této složce, s čitelnými jmény podle obchodu, např. <b>2026-10-16_1428_MES_long_1.webp</b> nebo <b>2026-10-16_den_1.png</b>. V deníku je jen odkaz a v aplikaci jen malý náhled; kliknutím se obrázek otevře ve výchozím prohlížeči obrázků Windows. Složku můžeš dát kamkoli (jiný disk, synchronizovaná složka) – obrázky se do ní přesunou, odkazy v denících se nemění.</p>
+          <div id="imagesLocationInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji umístění…</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+            <button class="btn primary" id="changeImagesLocation" type="button">📁 Změnit složku obrázků…</button>
+            <button class="btn" id="openImagesFolder" type="button">Otevřít ve Windows</button>
+            <button class="btn" id="resetImagesLocation" type="button">Vrátit do výchozí složky</button>
+          </div>
+          <div class="sub" style="margin-top:8px">Podsložka <b>_nahledy</b> jsou jen zmenšeniny pro seznamy – jde kdykoli smazat, vytvoří se znovu. Soubor <b>_prejmenovani.json</b> pamatuje původní jména obrázků, ať je najdou i starší zálohy.</div>
+        </details>
         <details class="card settings-card" data-card="backup">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Záloha a obnova</h3></summary>
           <p class="sub">Data se ukládají lokálně v tomto prohlížeči.</p>
           <button class="btn primary" id="updateBackup">💾 Aktualizovat zálohu na SSD</button>
           <button class="btn" id="restoreBackup" style="display:block;margin-top:10px">♻️ Obnovit ze zálohy</button>
           <div id="backupPathInfo" class="sub" style="margin-top:10px">Umístění zálohy zatím není zvoleno.</div>
+          <label class="settings-check" style="margin-top:10px"><input type="checkbox" id="backupIncludeImages"> Zahrnout obrázky do zálohy</label>
+          <div class="sub">Vypnuto (výchozí): záloha i „Stáhnout zálohu JSON“ nesou jen odkazy na obrázky a jsou malé – obrázky zálohuj se složkou obrázků. Zapnuto: obrázky jsou v souboru zálohy (velký soubor, obnoví se i na jiném počítači).</div>
           <button class="btn" id="changeBackupPath" style="margin-top:10px">Změnit umístění zálohy…</button>
           <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
           <button class="btn" id="exportJson">Stáhnout zálohu JSON</button>
@@ -1434,9 +1447,12 @@ let editImages=[], calendarDate=new Date();
 // paměť a aplikace hlásila "Aplikace se neočekávaně ukončila".
 const MAX_SHOT_EDGE=2560;
 const SHOT_QUALITY=0.92;
-function loadImageElement(src){
+function loadImageElement(src,cors){
  return new Promise((resolve,reject)=>{
   const img=new Image();
+  // Obrázek z fjimg:// jde do canvasu (náhled) jen jako CORS – jinak by se
+  // canvas nedal exportovat.
+  if(cors)img.crossOrigin='anonymous';
   img.onload=()=>resolve(img);
   img.onerror=()=>reject(new Error('Obrázek se nepodařilo načíst.'));
   img.src=src;
@@ -1471,6 +1487,65 @@ async function storeScreenshot(dataUrl){
  if(r?.ok&&r.ref)return r.ref;
  showToast('Obrázek se nepodařilo uložit: '+(r?.error||'neznámá chyba'));
  return null;
+}
+// ---- Náhledy a čitelná jména obrázků (4.8.7) ----
+// Seznamy ukazují jen náhled (fjimg://thumb/…, 320 px). Chybí-li, obrázek se
+// jednou ukáže celý a náhled se na pozadí vytvoří (canvas → WebP) a uloží do
+// složky _nahledy vedle obrázků.
+const THUMB_WIDTH=320;
+function thumbSrc(ref){return typeof ref==='string'&&ref.startsWith('fjimg://store/')?'fjimg://thumb/'+ref.slice('fjimg://store/'.length):ref}
+function thumbImgHTML(ref,attrs=''){
+ return `<img src="${esc(thumbSrc(ref))}" data-full="${esc(ref)}" loading="lazy" decoding="async" onerror="thumbMissing(this)" title="Otevřít ve výchozím prohlížeči obrázků (pravé tlačítko: kopírovat / uložit jako)" ${attrs}>`;
+}
+const thumbQueue=[];const thumbQueued=new Set();let thumbBusy=false;
+window.thumbMissing=img=>{
+ if(img.dataset.fallback)return;
+ img.dataset.fallback='1';
+ const full=img.dataset.full;
+ if(!full||img.getAttribute('src')===full)return;
+ img.src=full;
+ if(full.startsWith('fjimg://store/')&&window.desktopAPI?.storeImageThumb&&!thumbQueued.has(full)){thumbQueued.add(full);thumbQueue.push(full);void runThumbQueue()}
+};
+async function runThumbQueue(){
+ if(thumbBusy)return;
+ thumbBusy=true;
+ try{
+  while(thumbQueue.length){
+   const ref=thumbQueue.shift();
+   try{
+    const img=await loadImageElement(ref,true);
+    const scale=Math.min(1,THUMB_WIDTH/(img.naturalWidth||THUMB_WIDTH));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round((img.naturalWidth||THUMB_WIDTH)*scale));
+    canvas.height=Math.max(1,Math.round((img.naturalHeight||THUMB_WIDTH*0.75)*scale));
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    const data=canvas.toDataURL('image/webp',0.8);
+    if(data.startsWith('data:image/webp'))await window.desktopAPI.storeImageThumb(ref,data);
+   }catch{}
+  }
+ }finally{thumbBusy=false}
+}
+// Před zápisem obchodu / dne: obrázky záznamu dostanou čitelná jména podle
+// data, času, instrumentu a směru (hlavní proces, image:assignNames) a odkazy
+// v záznamu se přepíšou. Selhání nic neblokuje – obrázek zůstane pod starým
+// jménem a pojmenuje se při příštím uložení nebo startu.
+function applyImageMapping(value,mapping,seen=new Set()){
+ if(!value||typeof value!=='object'||seen.has(value))return;
+ seen.add(value);
+ for(const k of Object.keys(value)){
+  const v=value[k];
+  if(typeof v==='string'&&mapping[v])value[k]=mapping[v];
+  else if(v&&typeof v==='object')applyImageMapping(v,mapping,seen);
+ }
+}
+async function nameRecordImages(obj,owner,record=obj){
+ const refs=(Array.isArray(obj?.images)?obj.images:[]).filter(r=>typeof r==='string'&&r.startsWith('fjimg://store/'));
+ if(!refs.length||!window.desktopAPI?.assignImageNames)return;
+ try{
+  const meta={date:record.date,entryTime:record.entryTime,instrument:record.instrument,side:record.side,recordType:record.recordType,day:record.day===true};
+  const r=await window.desktopAPI.assignImageNames(refs,meta,owner);
+  if(r?.ok&&r.mapping&&Object.keys(r.mapping).length)applyImageMapping(obj,r.mapping);
+ }catch{}
 }
 let tradeFormBaseline='';
 function tradeFormSnapshot(){
@@ -1555,6 +1630,13 @@ function getDayNote(date){
  return n?{...emptyDayNote(),...n,images:Array.isArray(n.images)?[...n.images]:[]}:emptyDayNote();
 }
 async function saveDayNote(date,patch){
+ // Nové obrázky dne dostanou čitelné jméno (2026-10-16_den_1.webp) ještě
+ // před zápisem – v deníku se uloží už nové odkazy.
+ if(patch&&Array.isArray(patch.images)&&typeof nameRecordImages==='function'){
+  const named={images:[...patch.images]};
+  await nameRecordImages(named,{journalId:activeJournalId,key:'day:'+date},{date,day:true});
+  patch={...patch,images:named.images};
+ }
  await commitJournal(journal=>{
   const current=journal.dayNotes[date]||emptyDayNote();
   const next={...current,...patch};
@@ -3809,7 +3891,7 @@ function tradeHTML(t){
  ${t.dailyPlan.psychology?`<div><b>Psychologie:</b> ${esc(t.dailyPlan.psychology)}</div>`:''}
  ${t.dailyPlan.note?`<div><b>Komentář k setupu:</b> ${esc(t.dailyPlan.note)}</div>`:''}
  </div></details>`:''}
- <div class="thumbs">${(t.images||[]).map(i=>`<img src="${i}" loading="lazy" decoding="async" onclick="openImage('${i}')">`).join('')}</div></div>
+ <div class="thumbs">${(t.images||[]).map(i=>thumbImgHTML(i,`onclick="openImage('${i}')"`)).join('')}</div></div>
  <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" title="Rychlý kontext (od tohoto obchodu dál)" onclick="openQuickContext('${t.id}')">⚡</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
 }
 
@@ -3831,7 +3913,7 @@ function dayKpis(dayTrades,include=currentInclude()){
 }
 function dayThumbsHTML(date){
  const note=getDayNote(date);
- const shotsHTML=(note.images||[]).map((src,i)=>`<div class="day-thumb-wrap"><img src="${src}" loading="lazy" decoding="async" onclick="openImage('${src}')"><button type="button" title="Odebrat" onclick="event.stopPropagation();removeDayImage('${date}',${i})">✕</button></div>`).join('');
+ const shotsHTML=(note.images||[]).map((src,i)=>`<div class="day-thumb-wrap">${thumbImgHTML(src,`onclick="openImage('${src}')"`)}<button type="button" title="Odebrat" onclick="event.stopPropagation();removeDayImage('${date}',${i})">✕</button></div>`).join('');
  const addShotBtn=(note.images||[]).length<3?`<button type="button" class="day-add-shot" onclick="event.stopPropagation();triggerDayShotPicker('${date}')" title="Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tento den rozbalený.">+ Přidat obrázek</button>`:'';
  return shotsHTML+addShotBtn;
 }
@@ -4306,7 +4388,15 @@ if($('dayContextModal')){
  $('dayContextModal').onclick=e=>{if(e.target===$('dayContextModal'))closeDayContext()};
 }
 let currentViewedImage='';
+// V aplikaci se plný obrázek otevírá jen ve výchozím prohlížeči obrázků
+// Windows (4.8.7) – v okně aplikace je jen náhled, ať plné obrázky nezatěžují
+// paměť. Okno prohlížeče v aplikaci zůstává jen pro běh v prohlížeči (bez
+// desktopAPI). Kopírovat / Uložit jako: pravé tlačítko na náhledu.
 window.openImage=src=>{
+ if(window.desktopAPI?.openImageExternally){
+  window.desktopAPI.openImageExternally(src).then(r=>{if(!r?.ok)showToast('Otevření se nezdařilo: '+(r?.error||'neznámá chyba'))});
+  return;
+ }
  currentViewedImage=src;
  $('imageViewerImg').src=src;
  const note=$('imageViewerNote');
@@ -4624,7 +4714,7 @@ function readLegRows(){
  }));
 }
 if($('addLegBtn'))$('addLegBtn').onclick=()=>{addLegRow();renderPostExitHints()};
-function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div><img src="${src}" style="cursor:pointer" title="Otevřít obrázek ve výchozím prohlížeči obrázků" onclick="openImageFromForm('${src}')"><button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
+function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div>${thumbImgHTML(src,`style="cursor:pointer" onclick="openImageFromForm('${src}')"`)}<button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
 window.removeImg=i=>{editImages.splice(i,1);showPreviews()}
 // ---- Setup bez vstupu → celý (hypotetický) obchod ----
 // Formulář obchodu dostane, co setup zná (plánovaný vstup jako cenu vstupu,
@@ -5488,6 +5578,10 @@ $('tradeForm').addEventListener('submit',async e=>{
   // Cíl / SL na špatné straně vstupu: neuloží se, dokud ho Adam neopraví
   // nebo vědomě nepotvrdí (A1.2). Potvrzený obchod se ukáže v Kontrole dat.
   if(!(await confirmBlockingIssues(obj,msg=>showConfirm(msg,{title:'Zkontroluj cenu',ok:'Uložit i tak',cancel:'Opravit'}))))return;
+
+  // Screenshoty dostanou čitelná jména podle data, času, instrumentu a směru
+  // (i po změně těchto údajů) – v deníku se uloží už nové odkazy.
+  await nameRecordImages(obj,{journalId:activeJournalId,key:id});
 
   await commitJournal(journal=>{
    const rows=Array.isArray(journal.trades)?journal.trades:(journal.trades=[]);
@@ -6844,6 +6938,8 @@ if(window.desktopAPI){
    const result=await window.desktopAPI.restoreJournalsBackup();
    if(result?.canceled)return;
    if(!result?.ok)throw new Error(result?.error||'neznámá chyba');
+   // Záloha bez obrázků z jiného počítače: odkazy zůstávají, jen soubory chybí.
+   if(result.missingImages>0)await showConfirm(`Deníky jsou obnovené. ${result.missingImages}× odkaz na obrázek, který ve složce obrázků není (záloha bez obrázků) – nic se nesmazalo; obrázky se ukážou, až je zkopíruješ do složky obrázků (Nastavení → Data a zálohy → Složka obrázků).`,{title:'Chybějící obrázky',ok:'Rozumím',cancel:'Zavřít'});
    applyRestoredJournals(result);
   }catch(err){showToast('Zálohu se nepodařilo obnovit: '+err.message)}
  };
@@ -6859,6 +6955,37 @@ if(window.desktopAPI){
  if($('changeBackupPath'))$('changeBackupPath').onclick=()=>showToast('Tato funkce je dostupná v desktopové aplikaci.');
 }
 
+// ---- Složka obrázků (4.8.7) ----
+function formatBytes(n){return n>=1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.round(n/1024)+' kB'}
+async function refreshImagesLocationInfo(){
+ const box=$('imagesLocationInfo'); if(!box)return;
+ if(!window.desktopAPI?.getImagesLocation){box.textContent='Dostupné jen v desktopové aplikaci.';return}
+ const r=await window.desktopAPI.getImagesLocation();
+ box.textContent=r?.ok?`Složka: ${r.dir}${r.isDefault?' (výchozí, v datové složce)':''} · obrázků: ${r.count} · ${formatBytes(r.bytes||0)}`:'Umístění se nepodařilo zjistit.';
+ if($('backupIncludeImages'))$('backupIncludeImages').checked=r?.includeInBackup===true;
+}
+async function imagesLocationAction(run,confirmText){
+ if(!window.desktopAPI?.getImagesLocation){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
+ if(confirmText&&!(await showConfirm(confirmText)))return;
+ const r=await run();
+ if(r?.canceled)return;
+ if(!r?.ok){showToast('Přesun se nepodařil: '+(r?.error||'neznámá chyba')+' Obrázky zůstaly, kde byly.');return}
+ showToast(r.unchanged?'Obrázky už v této složce jsou.':`Obrázky přesunuty (${r.moved||0} souborů): ${r.dir}`);
+ await refreshImagesLocationInfo();
+}
+if($('changeImagesLocation'))$('changeImagesLocation').onclick=()=>imagesLocationAction(()=>window.desktopAPI.chooseImagesLocation(),'Všechny obrázky se zkopírují do zvolené složky a po ověření se ze staré složky smažou. Odkazy v denících se nemění. Pokračovat?');
+if($('resetImagesLocation'))$('resetImagesLocation').onclick=()=>imagesLocationAction(()=>window.desktopAPI.resetImagesLocation(),'Přesunout obrázky zpět do výchozí složky (v datové složce aplikace)?');
+if($('openImagesFolder'))$('openImagesFolder').onclick=async()=>{
+ const r=await window.desktopAPI?.openImagesFolder?.();
+ if(r&&!r.ok)showToast('Složku se nepodařilo otevřít: '+(r.error||'neznámá chyba'));
+};
+if($('backupIncludeImages'))$('backupIncludeImages').onchange=async e=>{
+ if(!window.desktopAPI?.setBackupIncludeImages)return;
+ const r=await window.desktopAPI.setBackupIncludeImages(e.target.checked);
+ e.target.checked=r?.includeInBackup===true;
+ showToast(e.target.checked?'Obrázky se budou ukládat i do zálohy.':'Záloha ponese jen odkazy na obrázky.');
+};
+refreshImagesLocationInfo();
 async function refreshDataLocationInfo(){
  if(!window.desktopAPI?.getDataLocation){if($('dataLocationInfo'))$('dataLocationInfo').textContent='Dostupné jen v desktopové aplikaci.';return}
  const r=await window.desktopAPI.getDataLocation();
@@ -7082,10 +7209,14 @@ function renderCaptureMappings(accounts,mappings,hiddenAccounts=[]){
 async function capturedImages(e){
  const paths=Array.isArray(e.screenshotPaths)?e.screenshotPaths:[];
  const images=[];
+ // Jméno souboru podle obchodu, do kterého screenshot patří (stejné datum
+ // a čas jako mapCapturedTrade).
+ const exit=new Date(e.exitTime||e.receivedAt||Date.now()),entry=new Date(e.entryTime||e.receivedAt||Date.now());
+ const record={date:exit.toISOString().slice(0,10),entryTime:entry.toTimeString().slice(0,5),instrument:e.instrument||e.instrumentFull||'',side:e.side||''};
  for(const p of paths.slice(0,3)){
   // Automatický screenshot už na disku je – hlavní proces si ho přebere
   // rovnou ze souboru a vrátí jen odkaz, přes IPC neteče žádný obrázek.
-  const r=await window.desktopAPI.storeCaptureImage?.(p);
+  const r=await window.desktopAPI.storeCaptureImage?.(p,record);
   if(r?.ok&&r.ref){images.push(r.ref);continue}
   const legacy=await window.desktopAPI.captureReadScreenshot(p);
   if(legacy?.ok&&legacy.dataUrl)images.push(legacy.dataUrl);

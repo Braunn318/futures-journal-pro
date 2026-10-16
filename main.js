@@ -93,7 +93,10 @@ function writeSafetyBackupBeforeMove(oldDir) {
     if (!fs.existsSync(journalDataSrc)) return;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupDir = path.join(app.getPath('userData'), 'safety-backups', `pred-presunem-${stamp}`, 'journal-data');
-    fs.cpSync(journalDataSrc, backupDir, { recursive: true });
+    // Bez složky obrázků: ta se přesouvá stejně bezpečně (nejdřív kopie,
+    // pak mazání) a v userData by zbytečně ležela druhá sada screenshotů.
+    const imagesSrc = path.resolve(path.join(journalDataSrc, 'images'));
+    fs.cpSync(journalDataSrc, backupDir, { recursive: true, filter: src => path.resolve(src) !== imagesSrc && !path.resolve(src).startsWith(imagesSrc + path.sep) });
   } catch (error) {
     logError('writeSafetyBackupBeforeMove', error);
   }
@@ -127,6 +130,80 @@ function moveDataContents(oldDir, newDir) {
 ipcMain.handle('data:getLocation', async () => {
   try { const p = resolveDataDir(); return { ok: true, path: p, isDefault: p === app.getPath('userData') }; }
   catch (error) { return { ok: false, error: error.message }; }
+});
+// ---------- Složka obrázků (4.8.7) ----------
+// Obrázky můžou ležet kdekoli (jiný disk, synchronizovaná složka). Přesun:
+// kontrola konfliktů → kopie všeho → ověření velikostí → přepnutí → smazání
+// starých kopií. Když cokoli selže před přepnutím, platí dál stará složka
+// a nic se nesmaže. Soubor se stejným jménem a JINÝM obsahem v cíli přesun
+// zastaví – nic se nepřepisuje.
+function listImageFiles(dir) {
+  const out = [];
+  const walk = (base, rel) => {
+    if (!fs.existsSync(base)) return;
+    for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
+      const r = rel ? path.join(rel, entry.name) : entry.name;
+      if (entry.isDirectory()) { if (!rel && entry.name === THUMB_DIR) walk(path.join(base, entry.name), r); }
+      else if (!entry.name.endsWith('.tmp')) out.push(r);
+    }
+  };
+  walk(dir, '');
+  return out;
+}
+function imagesLocationInfo() {
+  const dir = imagesRoot();
+  const files = listImageFiles(dir).filter(f => !f.startsWith(THUMB_DIR + path.sep) && f !== IMAGE_RENAME_FILE);
+  let bytes = 0;
+  for (const f of files) { try { bytes += fs.statSync(path.join(dir, f)).size; } catch {} }
+  return { dir, isDefault: !imagesRoot() || path.resolve(imagesRoot()) === path.resolve(path.join(dataRoot(), 'images')), count: files.length, bytes, includeInBackup: backupIncludesImages() };
+}
+function moveImagesDir(target) {
+  const from = path.resolve(imagesRoot());
+  const to = path.resolve(target);
+  if (from === to) return { ok: true, unchanged: true };
+  if (to.startsWith(from + path.sep) || from.startsWith(to + path.sep)) throw new Error('Nová složka nesmí být uvnitř stávající ani naopak.');
+  const files = listImageFiles(from);
+  const conflicts = files.filter(f => fs.existsSync(path.join(to, f)) && !sameFileContent(path.join(from, f), path.join(to, f)));
+  if (conflicts.length) throw new Error(`V cílové složce už jsou jiné soubory se stejným jménem (${conflicts.slice(0, 3).join(', ')}${conflicts.length > 3 ? ' …' : ''}). Vyber prázdnou složku.`);
+  fs.mkdirSync(to, { recursive: true });
+  for (const f of files) {
+    const src = path.join(from, f), dest = path.join(to, f);
+    if (fs.existsSync(dest)) continue;
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
+    if (fs.statSync(dest).size !== fs.statSync(src).size) throw new Error(`Kopie ${f} nesedí – přesun zastaven, platí dál stará složka.`);
+  }
+  const defaultDir = path.resolve(path.join(dataRoot(), 'images'));
+  writeSettings({ ...readSettings(), imagesDir: to === defaultDir ? undefined : to });
+  imagesDirSetting.dir = to === defaultDir ? null : to;
+  imagesDirSetting.loaded = true;
+  for (const f of files) { try { fs.rmSync(path.join(from, f), { force: true }); } catch (error) { logError('Přesun obrázků – úklid', error); } }
+  logInfo('Složka obrázků', `${from} → ${to}: ${files.length} souborů`);
+  return { ok: true, moved: files.length };
+}
+ipcMain.handle('images:getLocation', async () => {
+  try { return { ok: true, ...imagesLocationInfo() }; }
+  catch (error) { return { ok: false, error: error.message }; }
+});
+ipcMain.handle('images:chooseLocation', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, { title: 'Vyber složku pro obrázky', properties: ['openDirectory', 'createDirectory'] });
+    if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
+    return { ...moveImagesDir(result.filePaths[0]), ...imagesLocationInfo() };
+  } catch (error) { logError('images:chooseLocation', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('images:resetLocation', async () => {
+  try { return { ...moveImagesDir(path.join(dataRoot(), 'images')), ...imagesLocationInfo() }; }
+  catch (error) { logError('images:resetLocation', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('images:openFolder', async () => {
+  fs.mkdirSync(imagesRoot(), { recursive: true });
+  const error = await shell.openPath(imagesRoot());
+  return error ? { ok: false, error } : { ok: true };
+});
+ipcMain.handle('images:setBackupInclude', async (_event, value) => {
+  writeSettings({ ...readSettings(), backupIncludeImages: value === true });
+  return { ok: true, includeInBackup: backupIncludesImages() };
 });
 ipcMain.handle('data:chooseLocation', async () => {
   try {
@@ -364,6 +441,14 @@ function readJournal(id) {
     writeJournalFile(id, journal);
     logInfo('Přesun screenshotů do souborů', `deník ${safeJournalId(id)}: ${moved} obrázků`);
   }
+  // Deník ze starší zálohy může odkazovat na obrázek pod jménem z doby před
+  // přejmenováním (4.8.7) – odkaz se přepíše na nové jméno, soubor je týž.
+  const remapped = remapRenamedImages(journal);
+  if (remapped) {
+    backupJournalFile(id, 'pred-prepisem-jmen-obrazku');
+    writeJournalFile(id, journal);
+    logInfo('Jména obrázků', `deník ${safeJournalId(id)}: ${remapped} odkazů na přejmenované obrázky`);
+  }
   return journal;
 }
 function writeJournalFile(id, data) {
@@ -394,14 +479,36 @@ function writeJournal(id, data) {
 // soubory a v deníku po nich zůstane jen krátký odkaz.
 const IMAGE_SCHEME = 'fjimg';
 const IMAGE_REF_PREFIX = `${IMAGE_SCHEME}://store/`;
-// Jméno souboru je otisk jeho obsahu: stejný obrázek se na disku neuloží
-// dvakrát a přesun obchodu mezi deníky nevyžaduje kopírování souborů.
-const IMAGE_NAME_RE = /^[a-f0-9]{64}\.[a-z0-9]{1,5}$/;
+// Jméno souboru: nově vložený obrázek dostane otisk obsahu (stejný obrázek se
+// neuloží dvakrát) a při uložení obchodu nebo dne čitelné jméno podle obchodu,
+// např. 2026-10-16_1428_MES_long_1.webp (4.8.7, nameStoredImages /
+// image:assignNames). Jméno je jen písmena, číslice, tečka, pomlčka
+// a podtržítko, nezačíná tečkou a neobsahuje „..“ – přes něj se tak
+// neprotlačí podadresář ani cesta mimo složku obrázků.
+const IMAGE_NAME_RE = /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.[a-z0-9]{1,5}$/;
+const IMAGE_HASH_NAME_RE = /^[a-f0-9]{64}\.[a-z0-9]{1,5}$/;
 const IMAGE_CONTENT_TYPES = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
   gif: 'image/gif', bmp: 'image/bmp', avif: 'image/avif', svg: 'image/svg+xml'
 };
-const imagesRoot = () => path.join(dataRoot(), 'images');
+// Složka obrázků: vlastní (Nastavení → Data a zálohy → Složka obrázků,
+// imagesDir v backup-settings.json), jinak <data>/journal-data/images. Čte se
+// při každém požadavku na obrázek, proto se pamatuje; mění ji jen
+// moveImagesDir.
+const imagesDirSetting = { loaded: false, dir: null };
+function imagesRoot() {
+  if (!imagesDirSetting.loaded) {
+    const custom = readSettings().imagesDir;
+    imagesDirSetting.dir = typeof custom === 'string' && path.isAbsolute(custom) ? custom : null;
+    imagesDirSetting.loaded = true;
+  }
+  return imagesDirSetting.dir || path.join(dataRoot(), 'images');
+}
+// Náhledy (šířka 320 px, WebP) – jen mezipaměť pro seznamy; kdykoli jde
+// smazat, vytvoří se znovu.
+const THUMB_DIR = '_nahledy';
+const thumbsRoot = () => path.join(imagesRoot(), THUMB_DIR);
+const thumbPath = name => path.join(thumbsRoot(), `${name}.thumb.webp`);
 
 function isImageRef(value) {
   return typeof value === 'string'
@@ -409,12 +516,38 @@ function isImageRef(value) {
     && IMAGE_NAME_RE.test(value.slice(IMAGE_REF_PREFIX.length));
 }
 function imageRefName(ref) { return isImageRef(ref) ? ref.slice(IMAGE_REF_PREFIX.length) : null; }
+// Přejmenované obrázky (otisk → čitelné jméno) si složka pamatuje
+// v _prejmenovani.json. Starší záloha nebo bezpečnostní kopie deníku tak dál
+// najde své obrázky i pod původním jménem (imageRefPath, readJournal).
+const IMAGE_RENAME_FILE = '_prejmenovani.json';
+function readImageRenames() {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(imagesRoot(), IMAGE_RENAME_FILE), 'utf8'));
+    return data && typeof data === 'object' ? data : {};
+  } catch { return {}; }
+}
+function writeImageRenames(map) {
+  fs.mkdirSync(imagesRoot(), { recursive: true });
+  const file = path.join(imagesRoot(), IMAGE_RENAME_FILE);
+  fs.writeFileSync(`${file}.tmp`, JSON.stringify(map, null, 1), 'utf8');
+  fs.renameSync(`${file}.tmp`, file);
+}
 // Cesta se skládá jen ze jména, které prošlo IMAGE_NAME_RE – přes ten se
 // neprotlačí ".." ani podadresář, takže odkaz nikdy neukáže mimo složku
-// s obrázky, ať přijde odkudkoli.
+// s obrázky, ať přijde odkudkoli. Chybí-li soubor, zkusí se nové jméno
+// přejmenovaného obrázku.
 function imageRefPath(ref) {
   const name = imageRefName(ref);
-  return name ? path.join(imagesRoot(), name) : null;
+  if (!name) return null;
+  const file = path.join(imagesRoot(), name);
+  if (fs.existsSync(file)) return file;
+  const renamed = readImageRenames()[name];
+  return renamed && IMAGE_NAME_RE.test(renamed) ? path.join(imagesRoot(), renamed) : file;
+}
+// Odkaz na náhled (fjimg://thumb/<jméno>) → odkaz na plný obrázek.
+function storeRefOf(value) {
+  const s = String(value || '');
+  return s.startsWith(`${IMAGE_SCHEME}://thumb/`) ? IMAGE_REF_PREFIX + s.slice(`${IMAGE_SCHEME}://thumb/`.length) : s;
 }
 function imageExtension(mime) {
   const subtype = String(mime || '').split('/')[1] || '';
@@ -442,7 +575,8 @@ function storeImageDataUrl(dataUrl) {
 // Obrázek může přijít jako odkaz (běžný stav) nebo jako base64 (starší záloha,
 // import). Když se přečíst nedá, vrací se null a volající to bere jako
 // "nedá se zpracovat", nikdy jako "smaž".
-function imageToBuffer(source) {
+function imageToBuffer(sourceValue) {
+  const source = storeRefOf(sourceValue);
   if (isImageRef(source)) {
     const file = imageRefPath(source);
     if (!file || !fs.existsSync(file)) return null;
@@ -486,27 +620,217 @@ function deflateJournalImages(data) {
 function inflateJournalImages(data) {
   return mapImageStrings(data, value => isImageRef(value) ? imageToDataUrl(value) : null);
 }
-// Obsluha adres "fjimg://store/<jméno>" – díky ní stačí v rendereru napsat
-// <img src="<odkaz>"> a obrázek se načte přímo ze souboru, bez base64 a bez
-// posílání dat přes IPC. Jméno je otisk obsahu, takže se smí cachovat natrvalo.
+// Obsluha adres "fjimg://store/<jméno>" (plný obrázek) a "fjimg://thumb/<jméno>"
+// (náhled ze složky _nahledy) – v rendereru stačí <img src="<odkaz>"> a obrázek
+// se načte přímo ze souboru, bez base64 a bez IPC. Jméno se může přejmenováním
+// uvolnit pro jiný obrázek, proto se nic necachuje natrvalo. Chybějící náhled
+// = 404 a renderer si ho vytvoří (thumbMissing).
 function registerImageProtocol() {
   try {
     protocol.handle(IMAGE_SCHEME, request => {
-      const name = decodeURIComponent(new URL(request.url).pathname).replace(/^\/+/, '');
+      const url = new URL(request.url);
+      const name = decodeURIComponent(url.pathname).replace(/^\/+/, '');
       if (!IMAGE_NAME_RE.test(name)) return new Response('', { status: 400 });
-      const file = path.join(imagesRoot(), name);
-      if (!fs.existsSync(file)) return new Response('', { status: 404 });
-      const ext = path.extname(file).slice(1).toLowerCase();
+      let file;
+      if (url.hostname === 'thumb') file = thumbPath(name);
+      else if (url.hostname === 'store') file = imageRefPath(IMAGE_REF_PREFIX + name);
+      else return new Response('', { status: 400 });
+      if (!file || !fs.existsSync(file)) return new Response('', { status: 404 });
+      const ext = url.hostname === 'thumb' ? 'webp' : path.extname(file).slice(1).toLowerCase();
       return new Response(fs.readFileSync(file), {
         headers: {
           'content-type': IMAGE_CONTENT_TYPES[ext] || 'application/octet-stream',
-          'cache-control': 'public, max-age=31536000, immutable'
+          'cache-control': 'no-cache',
+          // Náhled vzniká v rendereru přes canvas; bez CORS by canvas s obrázkem
+          // z vlastního protokolu nešel exportovat (tainted canvas).
+          'access-control-allow-origin': '*'
         }
       });
     });
   } catch (error) {
     logError('registerImageProtocol', error);
   }
+}
+
+// ---------- Čitelná jména obrázků (4.8.7) ----------
+// Základ jména podle záznamu: obchod „2026-10-16_1428_MES_long“, setup bez
+// vstupu „…_setup“, den „2026-10-16_den“. Soubor pak „<základ>_<n>.<přípona>“.
+function imageBaseFor(record) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(record?.date || '')) ? record.date : null;
+  if (!date) return null;
+  if (record.day) return `${date}_den`;
+  const clean = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '').slice(0, 20);
+  const time = /^(\d{1,2}):(\d{2})/.exec(String(record.entryTime || ''));
+  const hhmm = time ? time[1].padStart(2, '0') + time[2] : '0000';
+  const instrument = clean(String(record.instrument || '').trim().split(/\s+/)[0]) || 'obchod';
+  const side = record.recordType === 'SETUP_ONLY' ? 'setup' : (record.side === 'long' || record.side === 'short' ? record.side : 'obchod');
+  return `${date}_${hhmm}_${instrument}_${side}`;
+}
+function sameFileContent(a, b) {
+  try {
+    const sa = fs.statSync(a), sb = fs.statSync(b);
+    return sa.size === sb.size && fs.readFileSync(a).equals(fs.readFileSync(b));
+  } catch { return false; }
+}
+// Volné jméno pro obrázek `source` se základem `base`: první <base>_<n>.<ext>,
+// které neexistuje – nebo už obsahuje přesně tentýž obrázek (pak se použije,
+// nic se nekopíruje). `taken` = jména rezervovaná v téže dávce.
+function freeImageName(base, ext, source, taken = new Set()) {
+  // Číslo je jedinečné napříč příponami: vedle „…_1.png“ nevznikne „…_1.webp“.
+  const existing = fs.existsSync(imagesRoot()) ? fs.readdirSync(imagesRoot()).filter(n => n.startsWith(`${base}_`)) : [];
+  const stems = new Set([...existing, ...taken].map(n => n.replace(/\.[^.]+$/, '')));
+  for (let n = 1; n < 1000; n++) {
+    const name = `${base}_${n}.${ext}`;
+    if (taken.has(name)) continue;
+    const file = path.join(imagesRoot(), name);
+    if (fs.existsSync(file) && source && sameFileContent(file, source)) return name;
+    if (!stems.has(`${base}_${n}`)) return name;
+  }
+  return null;
+}
+// Přejmenování / kopie souboru i s jeho náhledem. Kopie, když na staré jméno
+// odkazuje ještě jiný záznam.
+function moveImageFile(oldName, newName, keepOld) {
+  const from = path.join(imagesRoot(), oldName), to = path.join(imagesRoot(), newName);
+  if (!fs.existsSync(to)) {
+    fs.copyFileSync(from, `${to}.tmp`);
+    fs.renameSync(`${to}.tmp`, to);
+  }
+  if (!sameFileContent(from, to)) throw new Error(`Kopie obrázku ${newName} nesedí s originálem.`);
+  try {
+    if (fs.existsSync(thumbPath(oldName)) && !fs.existsSync(thumbPath(newName))) fs.copyFileSync(thumbPath(oldName), thumbPath(newName));
+  } catch (error) { logError('moveImageFile – náhled', error); }
+  if (!keepOld) {
+    fs.rmSync(from, { force: true });
+    fs.rmSync(thumbPath(oldName), { force: true });
+  }
+}
+// Všechny záznamy se screenshoty v deníku: [{ key, record, base }]. Klíč
+// záznamu: id obchodu, nebo „day:<datum>“.
+function journalImageOwners(journal) {
+  const out = [];
+  for (const t of Array.isArray(journal?.trades) ? journal.trades : []) {
+    if (t && typeof t === 'object') out.push({ key: String(t.id || ''), record: t, base: imageBaseFor(t) });
+  }
+  const notes = journal?.dayNotes && typeof journal.dayNotes === 'object' ? journal.dayNotes : {};
+  for (const [date, note] of Object.entries(notes)) {
+    if (note && typeof note === 'object') out.push({ key: `day:${date}`, record: note, base: imageBaseFor({ date, day: true }) });
+  }
+  return out;
+}
+function journalFiles() {
+  if (!fs.existsSync(dataRoot())) return [];
+  return fs.readdirSync(dataRoot()).filter(f => f.endsWith('.json') && /^[a-zA-Z0-9_-]+\.json$/.test(f));
+}
+// Kolikrát se na jméno odkazuje mimo záznam `owner` ({ journalId, key }).
+// Nečitelný deník = „nevím" → bere se jako odkaz (raději kopie než ztráta).
+function imageUsedElsewhere(name, owner) {
+  for (const file of journalFiles()) {
+    const journalId = file.slice(0, -5);
+    let journal;
+    try { journal = JSON.parse(fs.readFileSync(path.join(dataRoot(), file), 'utf8')); }
+    catch { return true; }
+    for (const o of journalImageOwners(journal)) {
+      if (journalId === owner?.journalId && o.key === owner?.key) continue;
+      let used = false;
+      mapImageStrings(o.record, v => { if (imageRefName(storeRefOf(v)) === name) used = true; return null; });
+      if (used) return true;
+    }
+  }
+  return false;
+}
+// Při uložení obchodu / dne: obrázky záznamu dostanou čitelná jména podle
+// jeho data, času, instrumentu a směru. Obrázek, který už jméno se stejným
+// základem má, se nechá. Vrací { staré: nové } – volající přepíše odkazy
+// v záznamu ještě před zápisem deníku.
+function assignImageNames(refs, record, owner) {
+  const base = imageBaseFor(record);
+  const mapping = {};
+  if (!base) return mapping;
+  const renames = readImageRenames();
+  const taken = new Set();
+  for (const ref of Array.isArray(refs) ? refs : []) {
+    const name = imageRefName(storeRefOf(ref));
+    if (!name || mapping[ref]) continue;
+    const file = path.join(imagesRoot(), name);
+    if (!fs.existsSync(file)) continue;
+    if (name.startsWith(`${base}_`)) { taken.add(name); continue; }
+    const ext = path.extname(name).slice(1).toLowerCase();
+    const target = freeImageName(base, ext, file, taken);
+    if (!target || target === name) continue;
+    taken.add(target);
+    moveImageFile(name, target, imageUsedElsewhere(name, owner));
+    renames[name] = target;
+    mapping[ref] = IMAGE_REF_PREFIX + target;
+  }
+  if (Object.keys(mapping).length) writeImageRenames(renames);
+  return mapping;
+}
+// Odkazy podle tabulky přejmenování (deník ze starší zálohy). Vrací počet změn.
+function remapRenamedImages(data) {
+  const renames = readImageRenames();
+  if (!Object.keys(renames).length) return 0;
+  return mapImageStrings(data, value => {
+    const name = imageRefName(value);
+    if (!name || fs.existsSync(path.join(imagesRoot(), name))) return null;
+    const next = renames[name];
+    return next && IMAGE_NAME_RE.test(next) ? IMAGE_REF_PREFIX + next : null;
+  });
+}
+// Jednorázově (a znovu po obnově zálohy): obrázky s otiskem místo jména dostanou
+// čitelná jména ve VŠECH denících najednou – stejný soubor může patřit víc
+// záznamům. Pořadí: přečíst všechny deníky (nečitelný = nic se nedělá) →
+// záloha každého dotčeného deníku → kopie souborů pod nová jména → přepsání
+// odkazů v denících → teprve když se zapsaly všechny, smazání starých souborů.
+// Přerušení kdekoli nechá platná data; příští start dokončí zbytek.
+function nameStoredImages() {
+  const files = journalFiles();
+  const journals = [];
+  for (const file of files) {
+    try { journals.push({ id: file.slice(0, -5), data: JSON.parse(fs.readFileSync(path.join(dataRoot(), file), 'utf8')) }); }
+    catch (error) { logError(`Pojmenování obrázků: deník ${file} nejde přečíst, nic se nemění`, error); return { ok: false, renamed: 0 }; }
+  }
+  const mapping = {};
+  const taken = new Set();
+  for (const j of journals) {
+    for (const o of journalImageOwners(j.data)) {
+      if (!o.base) continue;
+      mapImageStrings(o.record, value => {
+        const name = imageRefName(value);
+        if (!name || !IMAGE_HASH_NAME_RE.test(name) || mapping[name]) return null;
+        const file = path.join(imagesRoot(), name);
+        if (!fs.existsSync(file)) return null;
+        const target = freeImageName(o.base, path.extname(name).slice(1).toLowerCase(), file, taken);
+        if (target) { mapping[name] = target; taken.add(target); }
+        return null;
+      });
+    }
+  }
+  if (!Object.keys(mapping).length) return { ok: true, renamed: 0 };
+  // Dotčený je každý deník, který některé z přejmenovaných jmen obsahuje
+  // (i u záznamu bez data – odkaz se přepíše všude).
+  const touched = new Set(journals.filter(j => {
+    let hit = false;
+    mapImageStrings(j.data, value => { const name = imageRefName(value); if (name && mapping[name]) hit = true; return null; });
+    return hit;
+  }).map(j => j.id));
+  for (const id of touched) backupJournalFile(id, 'pred-pojmenovanim-obrazku');
+  for (const [oldName, newName] of Object.entries(mapping)) moveImageFile(oldName, newName, true);
+  for (const j of journals) {
+    if (!touched.has(j.id)) continue;
+    const changed = mapImageStrings(j.data, value => {
+      const name = imageRefName(value);
+      return name && mapping[name] ? IMAGE_REF_PREFIX + mapping[name] : null;
+    });
+    if (changed) writeJournalFile(j.id, j.data);
+  }
+  writeImageRenames({ ...readImageRenames(), ...mapping });
+  for (const oldName of Object.keys(mapping)) {
+    fs.rmSync(path.join(imagesRoot(), oldName), { force: true });
+    fs.rmSync(thumbPath(oldName), { force: true });
+  }
+  logInfo('Pojmenování obrázků', `${Object.keys(mapping).length} obrázků v ${touched.size} denících`);
+  return { ok: true, renamed: Object.keys(mapping).length };
 }
 
 // ---------- "Odlehčený" export bez screenshotů – pro čtení jinými nástroji ----------
@@ -687,6 +1011,7 @@ function deleteJournalCompletely(journalId) {
     for (const name of own) {
       if (used.has(name)) continue;
       fs.rmSync(path.join(imagesRoot(), name), { force: true });
+      fs.rmSync(thumbPath(name), { force: true });
       removedImages++;
     }
   }
@@ -750,11 +1075,16 @@ ipcMain.handle('backup:exportOnce', async (_event, content, suggestedName) => {
 // přenosu, kvůli kterému se aplikace při ukládání obchodu ukončovala.
 // Obrázky se do zálohy vkládají jako base64, aby byl soubor soběstačný a šel
 // obnovit i na stroji, kde složka s obrázky neexistuje.
+// Obrázky jen na přání (Nastavení → Data a zálohy → „Zahrnout obrázky do
+// zálohy“, výchozí vypnuto): bez nich záloha nese jen odkazy a obrázky se
+// zálohují se svou složkou.
+const backupIncludesImages = () => readSettings().backupIncludeImages === true;
 function buildJournalsBackup(meta) {
   const profiles = Array.isArray(meta?.profiles) ? meta.profiles : [];
+  const includeImages = backupIncludesImages();
   const journals = profiles.map(profile => {
     const data = readJournal(profile.id);
-    inflateJournalImages(data);
+    if (includeImages) inflateJournalImages(data);
     // dayNotes se dřív do zálohy nedávaly vůbec, takže obnova ze zálohy tiše
     // smazala denní komentáře, náhledy a poznámky. Patří sem stejně jako obchody.
     return { profile, trades: data.trades, settings: data.settings, dayNotes: data.dayNotes };
@@ -762,6 +1092,7 @@ function buildJournalsBackup(meta) {
   return JSON.stringify({
     app: 'Futures Journal',
     version: 2,
+    imagesIncluded: includeImages,
     exportedAt: new Date().toISOString(),
     activeJournalId: meta?.activeJournalId || profiles[0]?.id || '',
     profiles,
@@ -781,7 +1112,19 @@ function restoreJournalsBackup(content) {
       dayNotes: (entry.dayNotes && typeof entry.dayNotes === 'object') ? entry.dayNotes : {}
     });
   }
-  return { activeJournalId: data.activeJournalId || data.profiles[0]?.id || '', profiles: data.profiles };
+  // Obrázky ze zálohy s base64 dostanou čitelná jména; odkazy na soubory, které
+  // ve složce obrázků nejsou (záloha bez obrázků z jiného počítače), se jen
+  // spočítají – nic se nemaže.
+  try { nameStoredImages(); } catch (error) { logError('Obnova zálohy – jména obrázků', error); }
+  let missingImages = 0;
+  for (const entry of data.journals) {
+    const id = entry?.profile?.id;
+    if (!id) continue;
+    try {
+      mapImageStrings(readJournal(id), value => { const file = isImageRef(value) ? imageRefPath(value) : null; if (file && !fs.existsSync(file)) missingImages++; return null; });
+    } catch (error) { logError('Obnova zálohy – kontrola obrázků', error); }
+  }
+  return { activeJournalId: data.activeJournalId || data.profiles[0]?.id || '', profiles: data.profiles, missingImages };
 }
 ipcMain.handle('backup:saveJournals', async (_event, meta) => {
   try {
@@ -827,7 +1170,7 @@ ipcMain.handle('backup:restoreJournals', async () => {
 ipcMain.handle('backup:exportJournalOnce', async (_event, journalId, suggestedName) => {
   try {
     const data = readJournal(journalId);
-    inflateJournalImages(data);
+    if (backupIncludesImages()) inflateJournalImages(data);
     const main = (data.settings || []).find(s => s?.key === 'main')?.value || {};
     return await exportFileOnce(JSON.stringify({ settings: main, trades: data.trades, dayNotes: data.dayNotes }, null, 2), suggestedName);
   } catch (error) {
@@ -1722,8 +2065,26 @@ ipcMain.handle('capture:markImported', async (_event, ids) => {
   const set = new Set(Array.isArray(ids) ? ids : []);
   const events = readCaptureEvents().map(e => set.has(e.id) ? { ...e, imported: true, importedAt: new Date().toISOString() } : e);
   writeCaptureEvents(events);
+  try { cleanupImportedCaptureScreenshots(events, set); } catch (error) { logError('Úklid screenshotů konektoru', error); }
   return { ok: true };
 });
+// Automatický screenshot je po importu v úložišti obrázků podruhé. Originál se
+// smaže, jen když ho úložiště opravdu převzalo (v tomto běhu aplikace) a když
+// na něj nečeká žádná nenaimportovaná událost ani otevřená pozice.
+function cleanupImportedCaptureScreenshots(events, importedIds) {
+  const waiting = new Set();
+  for (const e of events) if (!e.imported) for (const p of e.screenshotPaths || []) waiting.add(path.resolve(String(p)));
+  for (const pos of Object.values(readCaptureState().positions || {})) for (const p of pos.entryImages || []) waiting.add(path.resolve(String(p)));
+  for (const e of events) {
+    if (!importedIds.has(e.id)) continue;
+    for (const p of e.screenshotPaths || []) {
+      const resolved = path.resolve(String(p));
+      if (!storedCapturePaths.has(resolved) || waiting.has(resolved)) continue;
+      fs.rmSync(resolved, { force: true });
+      storedCapturePaths.delete(resolved);
+    }
+  }
+}
 ipcMain.handle('capture:clear', async () => { writeCaptureEvents([]); return { ok: true }; });
 ipcMain.handle('capture:clearPositions', async () => { const state = readCaptureState(); state.positions = {}; writeCaptureState(state); return { ok: true }; });
 ipcMain.handle('capture:setAutoImport', async (_event, value) => {
@@ -2028,7 +2389,8 @@ function dataUrlToBuffer(dataUrl) {
   if (!match) return null;
   return { buffer: Buffer.from(match[2], 'base64'), ext: imageExtension(match[1]) };
 }
-function openImageExternally(source) {
+function openImageExternally(sourceValue) {
+  const source = storeRefOf(sourceValue);
   // U obrázku uloženého jako soubor se otevře rovnou on – není důvod dělat
   // kopii v TEMPu a plnit disk druhou sadou screenshotů.
   const stored = imageRefPath(source);
@@ -2089,14 +2451,41 @@ ipcMain.handle('image:store', async (_event, dataUrl) => {
 });
 // Automatické screenshoty jsou už na disku jako PNG – uloží se do úložiště
 // rovnou ze souboru, bez oklikou přes base64 v rendereru.
-ipcMain.handle('image:storeCapture', async (_event, filePath) => {
+// `record` (datum, čas vstupu, instrument, směr) dá screenshotu rovnou čitelné
+// jméno; stejný obrázek (vstupní screenshot sdílený nohami pozice) se uloží
+// jen jednou. Originál v trade-capture/screenshots se smaže až po označení
+// události jako naimportované (capture:markImported), když ho už nic nečeká.
+const storedCapturePaths = new Set();
+ipcMain.handle('image:storeCapture', async (_event, filePath, record) => {
   try {
     const resolved = path.resolve(String(filePath || ''));
-    if (!resolved.startsWith(path.resolve(screenshotRoot()))) throw new Error('Neplatná cesta screenshotu.');
-    return { ok: true, ref: storeImageBuffer(fs.readFileSync(resolved), imageExtension(`image/${path.extname(resolved).slice(1) || 'png'}`)) };
+    if (!resolved.startsWith(path.resolve(screenshotRoot()) + path.sep)) throw new Error('Neplatná cesta screenshotu.');
+    let ref = storeImageBuffer(fs.readFileSync(resolved), imageExtension(`image/${path.extname(resolved).slice(1) || 'png'}`));
+    if (record) ref = assignImageNames([ref], record, null)[ref] || ref;
+    storedCapturePaths.add(resolved);
+    return { ok: true, ref };
   } catch (error) {
     return { ok: false, error: error.message };
   }
+});
+ipcMain.handle('image:assignNames', async (_event, refs, record, owner) => {
+  try { return { ok: true, mapping: assignImageNames(refs, record, owner) }; }
+  catch (error) { logError('image:assignNames', error); return { ok: false, error: error.message, mapping: {} }; }
+});
+// Náhled vytváří renderer (canvas → WebP) a posílá ho sem; jen WebP, jen do
+// složky náhledů a jen pro existující obrázek.
+ipcMain.handle('image:storeThumb', async (_event, ref, dataUrl) => {
+  try {
+    const name = imageRefName(storeRefOf(ref));
+    const file = name ? imageRefPath(IMAGE_REF_PREFIX + name) : null;
+    const parsed = dataUrlToBuffer(dataUrl);
+    if (!file || !fs.existsSync(file) || !parsed || parsed.ext !== 'webp' || parsed.buffer.length > 2 * 1024 * 1024) return { ok: false, error: 'Neplatný náhled.' };
+    fs.mkdirSync(thumbsRoot(), { recursive: true });
+    const target = thumbPath(path.basename(file));
+    fs.writeFileSync(`${target}.tmp`, parsed.buffer);
+    fs.renameSync(`${target}.tmp`, target);
+    return { ok: true };
+  } catch (error) { logError('image:storeThumb', error); return { ok: false, error: error.message }; }
 });
 
 ipcMain.handle('capture:testExecutionSequence', async () => {
@@ -2485,6 +2874,13 @@ app.whenReady().then(() => {
     if (!loginState.openAtLogin) logError('Windows auto-start', 'Automatické spuštění se nepodařilo aktivovat.');
   }
   registerImageProtocol();
+  // Obrázky s otiskem místo jména (do 4.8.6, obnovená záloha) dostanou čitelná
+  // jména dřív, než si deníky přečte okno. Chyba nic nezastaví – zkusí se
+  // znovu při dalším startu.
+  try {
+    const named = nameStoredImages();
+    if (named.renamed) logInfo('Start', `Pojmenováno obrázků: ${named.renamed}`);
+  } catch (error) { logError('Pojmenování obrázků při startu', error); }
   startCaptureServer();
   startRelayPolling();
   createTray();

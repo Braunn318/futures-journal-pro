@@ -100,7 +100,7 @@ test('přiřazení účtů nenabízí skrytý deník, kromě toho, ke kterému j
 
 const MAIN_NAMES = [
   'IMAGE_SCHEME', 'IMAGE_REF_PREFIX', 'IMAGE_NAME_RE',
-  'imagesRoot', 'isImageRef', 'imageRefName', 'mapImageStrings',
+  'imagesDirSetting', 'imagesRoot', 'THUMB_DIR', 'thumbsRoot', 'thumbPath', 'isImageRef', 'imageRefName', 'mapImageStrings',
   'safeJournalId', 'journalPath', 'aiExportPath',
   'journalImageNames', 'deleteJournalCompletely'
 ];
@@ -114,6 +114,7 @@ function storage() {
   const errors = [];
   const api = loadMain(MAIN_NAMES, {
     fs, path, URL,
+    readSettings: () => ({}),
     dataRoot: () => root,
     aiExportRoot: () => ai,
     logError: (where, error) => errors.push(where + ': ' + error.message)

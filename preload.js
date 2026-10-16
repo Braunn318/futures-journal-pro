@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // Uloží jeden obrázek do úložiště screenshotů a vrátí krátký odkaz, který
   // se zapíše k obchodu místo base64.
   storeImage: (dataUrl) => ipcRenderer.invoke('image:store', dataUrl),
-  storeCaptureImage: (filePath) => ipcRenderer.invoke('image:storeCapture', filePath),
+  storeCaptureImage: (filePath, record) => ipcRenderer.invoke('image:storeCapture', filePath, record),
   captureInstallNinjaConnector: () => ipcRenderer.invoke('capture:installNinjaConnector'),
   captureNinjaConnectorStatus: () => ipcRenderer.invoke('capture:ninjaConnectorStatus'),
   capturePrepareTradingViewPine: () => ipcRenderer.invoke('capture:prepareTradingViewPine'),
@@ -59,6 +59,14 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureExportTradingViewConnector: () => ipcRenderer.invoke('capture:exportTradingViewConnector'),
   captureExportTradingViewWorker: () => ipcRenderer.invoke('capture:exportTradingViewWorker'),
   captureOpenConnectorFolder: () => ipcRenderer.invoke('capture:openConnectorFolder'),
+  // Obrázky (4.8.7): čitelná jména podle obchodu, náhledy, vlastní složka.
+  assignImageNames: (refs, record, owner) => ipcRenderer.invoke('image:assignNames', refs, record, owner),
+  storeImageThumb: (ref, dataUrl) => ipcRenderer.invoke('image:storeThumb', ref, dataUrl),
+  getImagesLocation: () => ipcRenderer.invoke('images:getLocation'),
+  chooseImagesLocation: () => ipcRenderer.invoke('images:chooseLocation'),
+  resetImagesLocation: () => ipcRenderer.invoke('images:resetLocation'),
+  openImagesFolder: () => ipcRenderer.invoke('images:openFolder'),
+  setBackupIncludeImages: (value) => ipcRenderer.invoke('images:setBackupInclude', value),
   // Ruční import z NinjaTraderu: přehrání exekucí z CSV bez zápisu (náhled).
   captureManualReplay: (payloads) => ipcRenderer.invoke('capture:manualReplay', payloads),
   onCaptureEvent: (callback) => ipcRenderer.on('capture:event', (_event, payload) => callback(payload)),

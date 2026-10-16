@@ -46,7 +46,7 @@ test('A7/11: dayContext přežije readJournal() a zápis v main procesu', () => 
     const main = loadMain(['safeJournalId', 'journalPath', 'readJournal', 'writeJournalFile'], {
       fs, path, dataRoot: () => root,
       defaultJournalData: () => ({ trades: [], settings: [] }),
-      deflateJournalImages: () => 0,
+      deflateJournalImages: () => 0, remapRenamedImages: () => 0,
       backupJournalFile: () => { throw new Error('záloha se tu dělat nemá'); },
       logInfo: () => {}
     });

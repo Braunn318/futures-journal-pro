@@ -101,7 +101,7 @@ test('A7/2: značka verze contextVersion přežije readJournal() a zápis', () =
     const main = loadMain(['safeJournalId', 'journalPath', 'readJournal', 'writeJournalFile'], {
       fs, path, dataRoot: () => root,
       defaultJournalData: () => ({ trades: [], settings: [] }),
-      deflateJournalImages: () => 0,
+      deflateJournalImages: () => 0, remapRenamedImages: () => 0,
       backupJournalFile: () => { throw new Error('záloha se tu dělat nemá'); },
       logInfo: () => {}
     });

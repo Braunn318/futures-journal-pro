@@ -25,8 +25,9 @@ const { loadMain } = require('./helpers/extract');
 // Pořadí je významné: `const` se vyhodnocují shora dolů, takže IMAGE_SCHEME
 // musí být dřív než IMAGE_REF_PREFIX, který ho používá.
 const NAMES = [
-  'IMAGE_SCHEME', 'IMAGE_REF_PREFIX', 'IMAGE_NAME_RE', 'IMAGE_CONTENT_TYPES',
-  'imagesRoot', 'isImageRef', 'imageRefName', 'imageRefPath', 'imageExtension',
+  'IMAGE_SCHEME', 'IMAGE_REF_PREFIX', 'IMAGE_NAME_RE', 'IMAGE_HASH_NAME_RE', 'IMAGE_CONTENT_TYPES',
+  'imagesDirSetting', 'imagesRoot', 'THUMB_DIR', 'thumbsRoot', 'thumbPath', 'IMAGE_RENAME_FILE', 'readImageRenames', 'writeImageRenames',
+  'isImageRef', 'imageRefName', 'imageRefPath', 'storeRefOf', 'imageExtension',
   'dataUrlToBuffer', 'storeImageBuffer', 'storeImageDataUrl',
   'imageToBuffer', 'imageToDataUrl', 'mapImageStrings',
   'deflateJournalImages', 'inflateJournalImages'
@@ -36,7 +37,7 @@ const NAMES = [
 // úložiště a ať se nikdy nesáhne na skutečná data aplikace.
 function imageStore() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-images-'));
-  const api = loadMain(NAMES, { fs, path, crypto, Buffer, dataRoot: () => root, URL });
+  const api = loadMain(NAMES, { fs, path, crypto, Buffer, dataRoot: () => root, URL, readSettings: () => ({}) });
   return { root, ...api };
 }
 
@@ -150,7 +151,9 @@ test('odkaz nemůže ukázat mimo složku s obrázky', () => {
   for (const bogus of [
     'fjimg://store/../../backup-settings.json',
     'fjimg://store/..%2F..%2Fbackup-settings.json',
-    'fjimg://store/nejaky-soubor.png',
+    'fjimg://store/.skryty.png',
+    'fjimg://store/podslozka/obrazek.png',
+    'fjimg://store/a..b.png',
     'fjimg://jiny-host/aaaa.png',
     'file:///C:/Windows/win.ini'
   ]) {
