@@ -63,6 +63,10 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   // Automatické aktualizace z GitHubu – stav drží hlavní proces, renderer ho
   // jen zobrazuje a posílá rozhodnutí uživatele.
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+  // Odkaz do systémového prohlížeče (jen http/https) a kalendář makro zpráv.
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  getNewsCalendar: () => ipcRenderer.invoke('news:get'),
+  refreshNewsCalendar: (options) => ipcRenderer.invoke('news:refresh', options),
   getUpdateState: () => ipcRenderer.invoke('update:getState'),
   // options.test = true: hledat i mezi testovacími pre-release (jen ručně).
   checkForUpdates: (options) => ipcRenderer.invoke('update:check', options),

@@ -233,7 +233,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .day-psych-flag{position:absolute;bottom:6px;left:8px;font-size:10.5px;color:var(--yellow);opacity:.9}.day[data-date]{cursor:pointer}.day[data-date]:hover{border-color:rgba(var(--blue-rgb),.6)}.day-ctx-flag{position:absolute;bottom:6px;right:8px;font-size:12px;opacity:.8}.day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
 .day.week-summary{background:var(--panel2);border-color:rgba(var(--blue-rgb),.4)}
 .day.week-summary .num{color:var(--blue);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
-.day-flag{position:absolute;top:6px;right:8px;font-size:14px}
+.day-flag{position:absolute;top:6px;right:8px;font-size:14px}.day-news-flag{position:absolute;top:8px;left:34px;font-size:11px;line-height:16px;padding:0 5px;border-radius:6px;background:rgba(var(--blue-rgb),.22);color:var(--text)}.pill.news-pill{border-color:rgba(var(--blue-rgb),.55)}.news-row{padding:3px 0;font-size:13px}
 .limitbox{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
 .post-exit-warn{color:var(--yellow)}
 /* Blokující pravidlo ceny cíle / SL (FJContext.blockingIssues). */
@@ -506,6 +506,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div><h1 id="pageTitle">Přehled účtu</h1><div class="sub">Obchodní deník pro futures</div></div>
       <button class="btn primary" id="addTradeBtn" style="display:none">＋ Přidat obchod</button>
       <button class="btn" id="addSetupBtn" style="display:none" title="Setup, který byl, ale nedošlo k exekuci – vstupuje do fill rate, ne do P/L">＋ Setup bez vstupu</button>
+      <button class="btn" id="newsCalendarBtn" type="button" title="Otevře kalendář makro zpráv v prohlížeči (adresa jde změnit v Nastavení → Obecné → Kalendář zpráv)">📰 Kalendář zpráv</button>
     </div>
 
 
@@ -703,6 +704,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div id="dayRiskNote" class="alert"></div>
         <div id="dayContextBox" data-ctx-field="dayContext"></div>
         <div id="dayPsychBox"></div>
+        <div id="dayNewsBox"></div>
         <div id="dayTrades" class="trade-list"><div class="sub">Klikni v kalendáři na den – i bez obchodů, kontext dne jde vyplnit předem.</div></div>
       </div>
     </section>
@@ -869,6 +871,20 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
       <div class="subsection active" id="settingsGeneral">
       <div class="settings-grid">
+        <details class="card settings-card" data-card="newsCalendar">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Kalendář zpráv</h3></summary>
+          <label class="settings-check"><input type="checkbox" id="newsShowButton"> Tlačítko „📰 Kalendář zpráv“ v horní liště</label>
+          <div class="field" style="margin-top:8px"><label>Adresa, kterou tlačítko otevře</label><input type="text" id="newsUrl" placeholder="https://www.forexfactory.com/calendar"></div>
+          <label class="settings-check" style="margin-top:12px"><input type="checkbox" id="newsBadges"> Štítky „📰“ u dnů se zprávami (Deník, Kalendář, okno ☀)</label>
+          <div class="formgrid" style="margin-top:8px">
+            <div class="field"><label>Měny <span class="sub">— oddělené čárkou, např. USD, EUR</span></label><input type="text" id="newsCurrencies" placeholder="USD"></div>
+            <div class="field"><label>Dopad</label><select id="newsMinImpact"><option value="High">Jen vysoký</option><option value="Medium">Střední a vysoký</option><option value="Low">Všechny</option></select></div>
+          </div>
+          <div class="field" style="margin-top:8px"><label>Zdroj dat štítků <span class="sub">— týdenní JSON ve formátu ForexFactory</span></label><input type="text" id="newsFeedUrl" placeholder="https://nfs.faireconomy.media/ff_calendar_thisweek.json"></div>
+          <div class="mapping-row" style="margin-top:10px;grid-template-columns:auto 1fr"><button type="button" class="btn" id="newsRefreshBtn">Obnovit teď</button><span class="sub" id="newsStatus"></span></div>
+          <p class="sub" style="margin-top:8px">Zdroj dává jen aktuální týden. Deník si stažené týdny pamatuje (soubor news-calendar.json v datové složce), takže historie štítků začíná prvním stažením; následující týden se objeví, až ho zdroj zveřejní (obvykle v neděli). Stahuje se při startu a každých 6 hodin, nejvýš jednou za hodinu. Časy jsou v místním čase počítače. Ruční pole „Zprávy“ v Kontextu dne se samo nevyplňuje – štítek je jen informace vedle něj.</p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
         <details class="card settings-card" data-card="journals">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Deníky</h3></summary>
           <div class="panel-subtitle" style="margin-top:0">Přehled účtu po spuštění ukáže</div>
@@ -1151,6 +1167,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     <div class="field" style="max-width:220px;margin-bottom:10px"><label>Datum</label><input type="date" id="dayContextDate"></div>
     <div id="dayContextModalBox" data-ctx-field="dayContext"></div>
     <div id="dayPsychModalBox"></div>
+    <div id="dayNewsModalBox"></div>
     <div class="sub qc-help">Ranní pole vyplň před obchodováním, večerní po něm. Volba se uloží hned (klik / Enter / mezerník), druhý výběr téže volby ji zruší · Tab = další volba · Esc = zavřít</div>
   </div>
 </div>
@@ -3369,6 +3386,131 @@ function dayPsychSummary(psych){
   .map(p=>FJTaxonomy.DAY_PSYCH_LABELS[p].toLowerCase()+' '+FJTaxonomy.labelOf('PSYCH',psych[p])).join(' · ');
 }
 function anyDayPsychShown(){return Object.values(FJTaxonomy.DAY_PSYCH_FIELDS).some(k=>contextFieldShown(k))}
+// ==================== Kalendář zpráv (ForexFactory) ====================
+// Tlačítko otevře adresu z nastavení v systémovém prohlížeči. Štítky dnů se
+// počítají z mezipaměti, kterou stahuje hlavní proces (news:get / news:refresh):
+// filtr měn a dopadu, den podle MÍSTNÍHO času počítače. Svátek (Holiday)
+// zvolené měny se ukazuje vždy – trh je zavřený nebo zkrácený. Nastavení platí
+// pro celou aplikaci (localStorage).
+const NEWS_SETTINGS_KEY='FJ_newsCalendar';
+const NEWS_DEFAULTS={url:'https://www.forexfactory.com/calendar',showButton:true,badges:true,currencies:'USD',minImpact:'High',feedUrl:'https://nfs.faireconomy.media/ff_calendar_thisweek.json'};
+const NEWS_IMPACT_RANK={Low:1,Medium:2,High:3};
+const NEWS_IMPACT_LABEL={Low:'nízký',Medium:'střední',High:'vysoký',Holiday:'svátek'};
+function readNewsSettings(){
+ try{return {...NEWS_DEFAULTS,...JSON.parse(localStorage.getItem(NEWS_SETTINGS_KEY)||'{}')}}
+ catch{return {...NEWS_DEFAULTS}}
+}
+let newsSettings=readNewsSettings();
+let newsCache={events:[],fetchedAt:null,error:null};
+let newsByDate={};
+function newsCurrencyList(s){return String(s?.currencies||'').toUpperCase().split(/[\s,;]+/).filter(Boolean)}
+function newsEventsByDate(events,s){
+ const cur=new Set(newsCurrencyList(s));
+ const min=NEWS_IMPACT_RANK[s?.minImpact]||3;
+ const out={};
+ for(const e of Array.isArray(events)?events:[]){
+  if(!e||(cur.size&&!cur.has(e.country)))continue;
+  const holiday=e.impact==='Holiday';
+  if(!holiday&&(NEWS_IMPACT_RANK[e.impact]||0)<min)continue;
+  const d=new Date(e.date); if(isNaN(d))continue;
+  const key=localDateStr(d);
+  // Událost „celý den" má ve zdroji půlnoc newyorského času – čas se u ní
+  // neukazuje (svátek vždy celý den).
+  const time=holiday?'':`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  (out[key]=out[key]||[]).push({...e,time,holiday});
+ }
+ for(const k of Object.keys(out))out[k].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+ return out;
+}
+function rebuildNewsByDate(){newsByDate=newsSettings.badges?newsEventsByDate(newsCache.events,newsSettings):{}}
+function newsForDate(date){return (typeof newsByDate==='object'&&newsByDate&&newsByDate[date])||[]}
+function newsEventLine(e){
+ const extra=[e.forecast?'odhad '+e.forecast:'',e.previous?'předchozí '+e.previous:''].filter(Boolean).join(', ');
+ return `${e.holiday?'celý den':e.time} ${e.country} ${e.title}${e.holiday?' (svátek)':''}${extra?' – '+extra:''}`;
+}
+// Štítek dne: první tři události, zbytek „+N"; plný seznam v tooltipu.
+function newsPillHTML(date){
+ const list=newsForDate(date); if(!list.length)return '';
+ const shown=list.slice(0,3).map(e=>(e.holiday?'svátek ':e.time+' ')+e.title).join(' · ');
+ return `<span class="pill context-pill news-pill" title="${esc('Zprávy: '+list.map(newsEventLine).join('\n'))}">📰 ${esc(shown)}${list.length>3?` +${list.length-3}`:''}</span>`;
+}
+// Seznam událostí dne (okno ☀ a detail dne v Kalendáři).
+function renderDayNewsBox(date,box){
+ if(!box)return;
+ const list=date?newsForDate(date):[];
+ if(!list.length){box.innerHTML='';return}
+ box.innerHTML=`<div class="day-context-card"><div class="day-context-title">📰 Zprávy ${esc(date)} <span class="sub">— ${esc(newsCurrencyList(newsSettings).join(', ')||'všechny měny')}, místní čas</span></div>${list.map(e=>`<div class="news-row"><b>${esc(e.holiday?'celý den':e.time)}</b> <span class="pill">${esc(e.country)}</span> ${esc(e.title)} <span class="sub">${esc([NEWS_IMPACT_LABEL[e.impact]||e.impact,e.forecast?'odhad '+e.forecast:'',e.previous?'předchozí '+e.previous:''].filter(Boolean).join(' · '))}</span></div>`).join('')}</div>`;
+}
+function setNewsSettings(patch){
+ newsSettings={...newsSettings,...patch};
+ try{localStorage.setItem(NEWS_SETTINGS_KEY,JSON.stringify(newsSettings))}catch{}
+ applyNewsButton();
+ rebuildNewsByDate();
+ if(typeof renderTrades==='function')renderTrades();
+ if(typeof renderCalendar==='function')renderCalendar();
+}
+function applyNewsButton(){const b=$('newsCalendarBtn');if(b)b.style.display=newsSettings.showButton?'':'none'}
+function renderNewsStatus(){
+ const el=$('newsStatus'); if(!el)return;
+ const when=newsCache.fetchedAt?new Date(newsCache.fetchedAt).toLocaleString('cs-CZ'):'zatím nestaženo';
+ el.textContent=`Poslední stažení: ${when} · v mezipaměti ${newsCache.events.length} událostí${newsCache.error?' · poslední pokus selhal: '+newsCache.error:''}`;
+}
+async function refreshNews(manual){
+ if(!window.desktopAPI?.refreshNewsCalendar)return;
+ const before=JSON.stringify(newsCache.events);
+ const r=await window.desktopAPI.refreshNewsCalendar({feedUrl:newsSettings.feedUrl,manual:!!manual});
+ if(r&&Array.isArray(r.events))newsCache=r;
+ renderNewsStatus();
+ if(manual)showToast(r?.skipped?'Kalendář zpráv se stahoval před chvílí – další pokus za pár minut.':(r?.error?'Kalendář zpráv se nepodařilo stáhnout: '+r.error:'Kalendář zpráv obnoven.'));
+ if(JSON.stringify(newsCache.events)!==before){rebuildNewsByDate();renderTrades();renderCalendar()}
+}
+async function initNewsCalendar(){
+ applyNewsButton();
+ if(!window.desktopAPI?.getNewsCalendar)return;
+ try{
+  const c=await window.desktopAPI.getNewsCalendar();
+  if(c&&Array.isArray(c.events))newsCache=c;
+  rebuildNewsByDate();renderNewsStatus();renderTrades();renderCalendar();
+  await refreshNews(false);
+  setInterval(()=>{void refreshNews(false)},6*60*60*1000);
+ }catch(e){showToast('Kalendář zpráv: '+e.message)}
+}
+function fillNewsSettings(){
+ if(!$('newsUrl'))return;
+ $('newsShowButton').checked=!!newsSettings.showButton;
+ $('newsUrl').value=newsSettings.url||'';
+ $('newsBadges').checked=!!newsSettings.badges;
+ $('newsCurrencies').value=newsSettings.currencies||'';
+ $('newsMinImpact').value=newsSettings.minImpact||'High';
+ $('newsFeedUrl').value=newsSettings.feedUrl||'';
+ renderNewsStatus();
+}
+if($('newsCalendarBtn'))$('newsCalendarBtn').onclick=async()=>{
+ const url=String(newsSettings.url||'').trim()||NEWS_DEFAULTS.url;
+ if(window.desktopAPI?.openExternal){
+  const r=await window.desktopAPI.openExternal(url);
+  if(!r?.ok)showToast('Odkaz se nepodařilo otevřít: '+(r?.error||'neznámá chyba'));
+ }else window.open(url,'_blank','noopener');
+};
+if($('newsUrl')){
+ const urlOk=v=>/^https?:\/\//i.test(String(v||'').trim());
+ $('newsShowButton').onchange=e=>{setNewsSettings({showButton:e.target.checked});showToast(e.target.checked?'Tlačítko kalendáře zpráv zobrazeno.':'Tlačítko kalendáře zpráv skryto.')};
+ $('newsUrl').onchange=e=>{
+  const v=String(e.target.value||'').trim();
+  if(v&&!urlOk(v)){showToast('Adresa musí začínat https:// nebo http://.');e.target.value=newsSettings.url;return}
+  setNewsSettings({url:v||NEWS_DEFAULTS.url});e.target.value=newsSettings.url;showToast('Adresa kalendáře zpráv uložena.');
+ };
+ $('newsBadges').onchange=e=>{setNewsSettings({badges:e.target.checked});showToast(e.target.checked?'Štítky zpráv zapnuty.':'Štítky zpráv vypnuty.')};
+ $('newsCurrencies').onchange=e=>{const v=newsCurrencyList({currencies:e.target.value}).join(', ');setNewsSettings({currencies:v});e.target.value=v;showToast(v?'Měny zpráv: '+v+'.':'Štítky zpráv pro všechny měny.')};
+ $('newsMinImpact').onchange=e=>{setNewsSettings({minImpact:e.target.value});showToast('Dopad zpráv uložen.')};
+ $('newsFeedUrl').onchange=e=>{
+  const v=String(e.target.value||'').trim();
+  if(v&&!/^https:\/\//i.test(v)){showToast('Zdroj dat musí začínat https://.');e.target.value=newsSettings.feedUrl;return}
+  setNewsSettings({feedUrl:v||NEWS_DEFAULTS.feedUrl});e.target.value=newsSettings.feedUrl;showToast('Zdroj dat zpráv uložen – stáhne se při příštím obnovení.');
+ };
+ $('newsRefreshBtn').onclick=()=>{void refreshNews(true)};
+ fillNewsSettings();
+}
 // Štítek „Neúplné · N" v titulku karty: obchod nemá vyplněný kontext
 // (FJTaxonomy.missingContextKeys). Co chybí, říká tooltip – karta zůstane
 // kompaktní. Počítají se jen karty, které jsou zobrazené a mají zapnuté
@@ -3722,7 +3864,7 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span>${note.dayContext&&contextFieldShown('dayContext')?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}${dayTrades.length&&dayPsychWarnOnDay(date)?`<span class="pill context-pill psych-warn" title="Psychika dne – nevyplněno: ${esc(dayPsychMissingParts(date).map(p=>FJTaxonomy.DAY_PSYCH_LABELS[p].toLowerCase()).join(', '))}">⚠ Psychika dne</span>`:''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
+ <span class="date">${date}</span>${note.dayContext&&contextFieldShown('dayContext')?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}${dayTrades.length&&dayPsychWarnOnDay(date)?`<span class="pill context-pill psych-warn" title="Psychika dne – nevyplněno: ${esc(dayPsychMissingParts(date).map(p=>FJTaxonomy.DAY_PSYCH_LABELS[p].toLowerCase()).join(', '))}">⚠ Psychika dne</span>`:''}${typeof newsPillHTML==='function'?newsPillHTML(date):''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
  <div class="spacer"></div>
  ${levelsBtn}
  ${excludedHTML}
@@ -3967,7 +4109,9 @@ function renderCalendar(){
   const ctxSummary=!scope&&typeof getDayNote==='function'&&contextFieldShown('dayContext')?dayContextSummary(getDayNote(date).dayContext):'';
   // Psychika dne: upozornění jen u dne s obchody (aktivní deník).
   const psychWarn=!scope&&ts.length&&typeof dayPsychWarnOnDay==='function'&&dayPsychWarnOnDay(date);
-  html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" onclick="showDay('${date}')" ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}${ctxSummary?`<div class="day-ctx-flag" title="Kontext dne: ${esc(ctxSummary)}">☀</div>`:''}${psychWarn?'<div class="day-psych-flag" title="Psychika dne – nevyplněno">⚠ psychika</div>':''}</div>`;
+  // Zprávy nepatří deníku – ukazují se v každém výběru deníku.
+  const news=typeof newsForDate==='function'?newsForDate(date):[];
+  html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" onclick="showDay('${date}')" ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}${ctxSummary?`<div class="day-ctx-flag" title="Kontext dne: ${esc(ctxSummary)}">☀</div>`:''}${psychWarn?'<div class="day-psych-flag" title="Psychika dne – nevyplněno">⚠ psychika</div>':''}${news.length?`<div class="day-news-flag" title="${esc('Zprávy: '+news.map(newsEventLine).join('\n'))}">📰${news.length>1?' '+news.length:''}</div>`:''}</div>`;
   weekPnl+=p;weekCount+=ts.length;
   cellsInRow++;
   if(cellsInRow===7){flushWeek();cellsInRow=0}
@@ -4085,6 +4229,7 @@ function renderDayPsychBox(date,box=$('dayPsychBox'),opts={}){
 window.showDay=date=>{
  renderDayContextBox(date);
  if(typeof renderDayPsychBox==='function')renderDayPsychBox(date);
+ if(typeof renderDayNewsBox==='function')renderDayNewsBox(date,$('dayNewsBox'));
  const scope=$('calendarJournal')?.value||'';
  const rows=getCalendarRows();
  const showRisk=!scope;
@@ -4116,6 +4261,7 @@ function renderDayContextModal(focusFirst){
  const date=$('dayContextDate').value,box=$('dayContextModalBox');
  renderDayContextBox(date,box,{onSaved:renderDayContextBtn});
  renderDayPsychBox(date,$('dayPsychModalBox'),{onSaved:renderDayContextBtn});
+ renderDayNewsBox(date,$('dayNewsModalBox'));
  if(!focusFirst||!date)return;
  // Fokus na první nevyplněnou skupinu – nejdřív ranní, pak večerní.
  const dc=getDayNote(date).dayContext||{};
@@ -7532,6 +7678,7 @@ async function startJournalApplication(){
    }
   }catch(e){showToast('Převod na kontext v3 se nepodařil, deník zůstal beze změny: '+e.message)}
   await load();
+  void initNewsCalendar();
  }
  catch(e){journalAppStarted=false;showToast('Databázi se nepodařilo otevřít: '+e.message)}
 }

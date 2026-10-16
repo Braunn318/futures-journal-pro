@@ -106,7 +106,7 @@ function writeSafetyBackupBeforeMove(oldDir) {
 // originál pryč, ale appka o novém umístění ještě neví (přesně tohle byl
 // dřívější, nebezpečnější postup: kopírovat a rovnou mazat po jedné položce).
 function moveDataContents(oldDir, newDir) {
-  const entries = ['journal-data', 'trade-capture', 'backup-settings.json', 'futures-journal-error.log'];
+  const entries = ['journal-data', 'trade-capture', 'backup-settings.json', 'futures-journal-error.log', 'news-calendar.json'];
   fs.mkdirSync(newDir, { recursive: true });
   const copied = [];
   for (const name of entries) {
@@ -258,6 +258,13 @@ function createWindow() {
     }
   });
 
+  // Odkaz s target="_blank" nebo window.open: http/https do systémového
+  // prohlížeče, nikdy do nového okna Electronu.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const external = externalUrl(url);
+    if (external) shell.openExternal(external).catch(error => logError('window.open', error));
+    return { action: 'deny' };
+  });
   mainWindow.once('ready-to-show', () => { if (!startHidden) focusMainWindow(); });
   mainWindow.on('close', event => {
     if (!isQuitting) {
@@ -836,7 +843,7 @@ ipcMain.handle('app:factoryReset', async () => {
     // Vlastní obchody/nastavení/log mažeme z AKTUÁLNÍHO umístění dat (mohlo
     // být přesunuté mimo C:), zatímco vnitřní cache Chromia/Electronu
     // (IndexedDB, Local Storage…) zůstává vždy v defaultní userData složce.
-    const dataEntries = ['journal-data', 'trade-capture', 'backup-settings.json', 'futures-journal-error.log'];
+    const dataEntries = ['journal-data', 'trade-capture', 'backup-settings.json', 'futures-journal-error.log', 'news-calendar.json'];
     for (const name of dataEntries) {
       try { fs.rmSync(path.join(dataDir, name), { recursive: true, force: true }); } catch {}
     }
@@ -2286,6 +2293,104 @@ function requestUpdateOffer() {
   focusMainWindow();
   mainWindow.webContents.send('update:state', { ...updateState, requested: true });
 }
+// ---------- Odkazy do systémového prohlížeče ----------
+// Renderer smí otevřít jen http/https adresu – nic jiného (file:, javascript:,
+// vlastní schémata) se do shellu nepustí.
+function externalUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim());
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+  } catch { return null; }
+}
+ipcMain.handle('shell:openExternal', async (_event, value) => {
+  const url = externalUrl(value);
+  if (!url) return { ok: false, error: 'Adresa musí začínat https:// nebo http://.' };
+  try { await shell.openExternal(url); return { ok: true }; }
+  catch (error) { logError('shell:openExternal', error); return { ok: false, error: error.message }; }
+});
+
+// ---------- Kalendář makro zpráv (ForexFactory) ----------
+// Zdroj je veřejný týdenní JSON (výchozí nfs.faireconomy.media, adresa jde
+// změnit v Nastavení): [{ title, country, date (ISO s posunem), impact, forecast,
+// previous }]. Dává jen AKTUÁLNÍ týden, takže si deník stažené týdny drží
+// v mezipaměti news-calendar.json v datové složce – historie roste od prvního
+// stažení. Stahuje se nejvýš jednou za hodinu (ručně jednou za 5 minut), ať
+// zdroj nezahltíme; selhání se jen zapíše do protokolu a platí mezipaměť.
+const NEWS_FEED_DEFAULT = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+const NEWS_MIN_INTERVAL_MS = 60 * 60 * 1000;
+const NEWS_MANUAL_INTERVAL_MS = 5 * 60 * 1000;
+const newsCachePath = () => path.join(resolveDataDir(), 'news-calendar.json');
+const NEWS_TEXT_MAX = 160;
+function newsText(value) { return typeof value === 'string' ? value.trim().slice(0, NEWS_TEXT_MAX) : ''; }
+// Jen platné události: čas jde přečíst, název a měna jsou text. Ostatní se
+// zahodí (cizí data, nikdy se z nich nic nespouští ani nevkládá jako HTML).
+function normalizeNewsEvents(raw) {
+  if (!Array.isArray(raw)) return null;
+  const out = [];
+  for (const e of raw) {
+    if (!e || typeof e !== 'object') continue;
+    const date = newsText(e.date);
+    const time = Date.parse(date);
+    const title = newsText(e.title);
+    const country = newsText(e.country).toUpperCase();
+    if (!title || !country || !Number.isFinite(time)) continue;
+    out.push({ title, country, date: new Date(time).toISOString(), impact: newsText(e.impact), forecast: newsText(e.forecast), previous: newsText(e.previous) });
+  }
+  return out;
+}
+// Nový týden nahradí v mezipaměti všechny události ve stejném rozsahu dnů
+// (zdroj mohl událost přesunout nebo zrušit); ostatní týdny zůstávají.
+function mergeNewsEvents(cached, fresh) {
+  const old = Array.isArray(cached) ? cached : [];
+  if (!fresh.length) return old.slice();
+  const day = iso => iso.slice(0, 10);
+  const days = fresh.map(e => day(e.date)).sort();
+  const from = days[0], to = days[days.length - 1];
+  const kept = old.filter(e => day(e.date) < from || day(e.date) > to);
+  return [...kept, ...fresh].sort((a, b) => a.date.localeCompare(b.date));
+}
+function readNewsCache() {
+  try {
+    const data = JSON.parse(fs.readFileSync(newsCachePath(), 'utf8'));
+    return { fetchedAt: data.fetchedAt || null, attemptAt: data.attemptAt || null, error: data.error || null, events: Array.isArray(data.events) ? data.events : [] };
+  } catch { return { fetchedAt: null, attemptAt: null, error: null, events: [] }; }
+}
+function writeNewsCache(cache) {
+  fs.mkdirSync(path.dirname(newsCachePath()), { recursive: true });
+  const temp = newsCachePath() + '.tmp';
+  fs.writeFileSync(temp, JSON.stringify(cache), 'utf8');
+  fs.renameSync(temp, newsCachePath());
+}
+let newsFetching = null;
+async function refreshNewsCalendar({ feedUrl, manual } = {}) {
+  const cache = readNewsCache();
+  const url = externalUrl(feedUrl || NEWS_FEED_DEFAULT);
+  if (!url || !url.startsWith('https:')) return { ...cache, error: 'Adresa zdroje musí začínat https://.' };
+  const last = Date.parse(cache.attemptAt || '') || 0;
+  if (Date.now() - last < (manual ? NEWS_MANUAL_INTERVAL_MS : NEWS_MIN_INTERVAL_MS)) return { ...cache, skipped: true };
+  if (newsFetching) return newsFetching;
+  newsFetching = (async () => {
+    const attemptAt = new Date().toISOString();
+    try {
+      const response = await net.fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const fresh = normalizeNewsEvents(await response.json());
+      if (!fresh) throw new Error('Zdroj nevrátil seznam událostí.');
+      const next = { fetchedAt: attemptAt, attemptAt, error: null, events: mergeNewsEvents(cache.events, fresh) };
+      writeNewsCache(next);
+      return next;
+    } catch (error) {
+      logError('Kalendář zpráv', error);
+      const next = { ...cache, attemptAt, error: String(error?.message || error) };
+      try { writeNewsCache(next); } catch (e) { logError('Kalendář zpráv – mezipaměť', e); }
+      return next;
+    } finally { newsFetching = null; }
+  })();
+  return newsFetching;
+}
+ipcMain.handle('news:get', () => readNewsCache());
+ipcMain.handle('news:refresh', (_event, options) => refreshNewsCalendar(options || {}));
+
 ipcMain.handle('app:getVersion', () => app.getVersion());
 ipcMain.handle('update:getState', () => updateState);
 ipcMain.handle('update:check', (_event, options) => checkForUpdates(true, !!options?.test));
