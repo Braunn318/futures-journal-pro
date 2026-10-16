@@ -8,7 +8,8 @@ const { loadMain } = require('./extract');
 // Funkce a konstanty z main.js, které processExecution potřebuje.
 const CAPTURE_NAMES = [
   'POSITION_MISSING_GRACE_MS', 'SNAPSHOT_RACE_WINDOW_MS', 'positionIsMissing', 'openCapturePositions',
-  'signedExecutionQuantity', 'positionKey', 'lotKeyOf', 'positionLots', 'applyLots', 'takeFromLots', 'openPositionFromExecution', 'excursionTicks', 'processExecution',
+  'signedExecutionQuantity', 'positionKey', 'lotKeyOf', 'positionLots', 'applyLots', 'takeFromLots', 'LIVE_CAPTURE', 'openPositionFromExecution', 'excursionTicks',
+  'applyExecution', 'processExecution',
   'normalizeSnapshotPosition', 'processPositionSnapshot'
 ];
 

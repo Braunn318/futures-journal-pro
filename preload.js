@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureExportTradingViewConnector: () => ipcRenderer.invoke('capture:exportTradingViewConnector'),
   captureExportTradingViewWorker: () => ipcRenderer.invoke('capture:exportTradingViewWorker'),
   captureOpenConnectorFolder: () => ipcRenderer.invoke('capture:openConnectorFolder'),
+  // Ruční import z NinjaTraderu: přehrání exekucí z CSV bez zápisu (náhled).
+  captureManualReplay: (payloads) => ipcRenderer.invoke('capture:manualReplay', payloads),
   onCaptureEvent: (callback) => ipcRenderer.on('capture:event', (_event, payload) => callback(payload)),
   // Automatické aktualizace z GitHubu – stav drží hlavní proces, renderer ho
   // jen zobrazuje a posílá rozhodnutí uživatele.

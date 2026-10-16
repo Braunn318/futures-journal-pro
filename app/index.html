@@ -230,6 +230,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .dow.week{color:var(--blue);font-weight:700}
 .day{min-height:105px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px;position:relative}
 .day.empty{opacity:.25}.day.out-month{opacity:.5}.day.out-month .num{color:var(--muted)}.day .num{font-weight:800}.day .pnl{font-size:12px;margin-top:7px}.day .count{font-size:11px;color:var(--muted);margin-top:4px}
+.nt8-table{width:100%;border-collapse:collapse;font-size:12.5px}.nt8-table th,.nt8-table td{padding:5px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.nt8-table th{color:var(--muted);font-weight:700;position:sticky;top:0;background:var(--panel)}.nt8-table tr.nt8-present td,.nt8-table tr.nt8-maybe td{opacity:.75}.nt8-status{font-weight:700}.nt8-status.new{color:var(--green)}.nt8-status.maybe{color:var(--yellow)}.nt8-status.present,.nt8-status.nopv{color:var(--muted)}
 .day-psych-flag{position:absolute;bottom:6px;left:8px;font-size:10.5px;color:var(--yellow);opacity:.9}.day[data-date]{cursor:pointer}.day[data-date]:hover{border-color:rgba(var(--blue-rgb),.6)}.day-ctx-flag{position:absolute;bottom:6px;right:8px;font-size:12px;opacity:.8}.day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
 .day.week-summary{background:var(--panel2);border-color:rgba(var(--blue-rgb),.4)}
 .day.week-summary .num{color:var(--blue);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
@@ -666,6 +667,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
         <button class="btn" id="dayContextBtn" type="button" title="Kontext a psychika dne (otevření vs value, očekávaný typ dne, zprávy, psychika před / v průběhu / po seanci) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button>
         <button class="btn" id="quickContextBtn" type="button" title="Doplnit kontext obchodům z aktuálního výběru, které ho nemají úplný – celé na klávesnici">⚡ Rychlý kontext</button>
+        <button class="btn" id="nt8ManualImportBtn2" type="button" title="Když automatický import z NinjaTraderu selže: obchody z exportu NT8 (Executions nebo Trades), ze souboru CSV nebo vložené ze schránky – s náhledem před zápisem">⬇ Import z NT8</button>
         <select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select>
         <button class="btn" id="clearSkipLiveBtn" type="button" style="display:none" title="Živý deník: odebere chybné „naživo bych nevzal“ (i s důvodem) u všech takových záznamů aktivního deníku. Nic jiného se nemění.">Odebrat „naživo bych nevzal“</button>
         <span class="include-toggles" data-include-scope="journal"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span>
@@ -782,6 +784,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn" id="captureTestMultiTarget" title="Nasimuluje pozici uzavřenou přes TP1, Break Even a TP2 (pro test slučování)">Otestovat TP1/BE/TP2</button>
           <button class="btn" id="captureTestScaleIn" title="Nasimuluje dokup do otevřené pozice a výstup, který zavře původní i dokoupený kontrakt">Otestovat dokup</button>
           <button class="btn" id="captureImport">Importovat nyní</button>
+          <button class="btn" id="nt8ManualImportBtn" title="Když automatický import selže: obchody z exportu NinjaTraderu (Executions nebo Trade Performance → Trades), ze souboru CSV nebo vložené ze schránky">Ruční import z NT8…</button>
           <button class="btn" id="captureOpenConnectors">Otevřít složku konektorů</button>
           <button class="btn" id="captureNewKey">Nový API klíč</button>
           <button class="btn danger" id="captureClear">Vymazat frontu</button>
@@ -1172,6 +1175,20 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   </div>
 </div>
 
+<div class="modal" id="nt8ImportModal">
+  <div class="modalbox" style="max-width:1180px">
+    <div class="modalhead"><h2>Ruční import z NinjaTraderu</h2><button class="icon" id="closeNt8Import" title="Zavřít">✕</button></div>
+    <p class="sub">Pro chvíle, kdy automatický import selže. V NinjaTraderu otevři <b>Executions</b> (stejná data, která čte konektor – víc cílů a dokupy vyjdou stejně jako u automatického importu) nebo <b>Trade Performance → Trades</b>, pravým tlačítkem dej <b>Export</b> do CSV a soubor tu vyber. Nebo řádky v mřížce označ, zkopíruj (Ctrl+C) a vlož sem – i s řádkem hlavičky. Nic se nezapíše, dokud nepotvrdíš náhled.</p>
+    <div class="mapping-row" style="grid-template-columns:auto 1fr;margin-top:10px"><input type="file" id="nt8ImportFile" accept=".csv,.txt,text/csv,text/plain"><span class="sub">CSV z exportu NinjaTraderu (oddělovač ; , nebo tab, desetinná čárka i tečka)</span></div>
+    <textarea id="nt8ImportText" style="width:100%;min-height:90px;margin-top:8px;font-family:monospace;font-size:12px" placeholder="…nebo sem vlož řádky zkopírované z mřížky NinjaTraderu (Ctrl+V), včetně hlavičky"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn primary" id="nt8ImportPreviewBtn">Načíst náhled</button></div>
+    <div id="nt8ImportAlert" class="alert red"></div>
+    <div id="nt8ImportSummary" class="sub" style="margin-top:10px"></div>
+    <div id="nt8ImportPreview" style="margin-top:8px;overflow:auto;max-height:46vh"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button type="button" class="btn primary" id="nt8ImportRun" disabled>Importovat vybrané</button><span class="sub" id="nt8ImportCount"></span></div>
+  </div>
+</div>
+
 <div class="modal" id="quickContextModal">
   <div class="modalbox qc-box" style="max-width:880px">
     <div class="modalhead"><h2>Rychlý kontext <span class="sub" id="qcProgress"></span></h2><button class="icon" id="closeQuickContext" title="Zavřít bez uložení (Esc)">✕</button></div>
@@ -1382,6 +1399,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <script src="points.js"></script>
 <script src="context.js"></script>
 <script src="journals.js"></script>
+<script src="nt8import.js"></script>
 <script>
 const DB_VERSION=1;
 const JOURNAL_LIST_KEY='FuturesJournal_profiles';
@@ -3745,7 +3763,12 @@ function tradeHTML(t){
  const ctxPills=contextPillsHTML(t);
  const incompleteBadge=incompleteBadgeHTML(t)+(typeof dataCheckBadgeHTML==='function'?dataCheckBadgeHTML(t):'');
  const levelsBlock=tradeLevelsBlockHTML(t);
- const importedBadge=isImported?`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Automaticky naimportováno z konektoru">⚡ Auto import</span>`:'';
+ // Ruční import z NT8 má ID událostí nt8m: (exekuce) / nt8t: (obchody).
+ const importIds=[t.sourceEventId,...(Array.isArray(t.sourceEventIds)?t.sourceEventIds:[])].map(String);
+ const manualImport=importIds.some(id=>id.startsWith('nt8m:')||id.startsWith('nt8t:'));
+ const importedBadge=isImported?(manualImport
+  ?`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Naimportováno ručně z exportu NinjaTraderu">⬇ Ruční import NT8</span>`
+  :`<span class="pill" style="font-size:10px;padding:1px 6px;opacity:.7" title="Automaticky naimportováno z konektoru">⚡ Auto import</span>`):'';
  // „Naživo bych nevzal“: štítek nese popisek DŮVODU, ne obecné „nevzal bych“ –
  // karta je navíc tónovaná, ať se obchod v seznamu nesplete se živým.
  const skipLive=t.wouldSkipLive===true;
@@ -7231,6 +7254,208 @@ async function importCapturedTrades(silent=false){
  await refreshCaptureStatus();
  if(!silent)showToast(`Importováno obchodů: ${count}`);
  return count;
+}
+// ---- Ruční import z NinjaTraderu (4.8.7) ----
+// Export z mřížky NT8 (Executions nebo Trades) ze souboru nebo ze schránky →
+// náhled → zápis stejnou cestou jako automatický import (mapCapturedTrade +
+// appendOrMergeCapturedTrade): šablony, komise ze šablony, přiřazení účtů
+// k deníkům i slučování nohou podle positionId. Nic se nezahodí samo:
+//  - „už v deníku" = deník má obchod se stejným ID události nebo ID výstupní
+//    exekuce z NT (odškrtnuto),
+//  - „možná duplicita" = stejný den, instrument, směr, čas vstupu i výstupu
+//    a počet kontraktů u obchodu nebo jeho nohy (odškrtnuto, rozhodne uživatel;
+//    shoda hodnot se NIKDY nepoužívá k automatickému zahození – viz main.js
+//    u positionKey),
+//  - „nový" (zaškrtnuto).
+const nt8Import={groups:[],format:null};
+function nt8ExecIdOf(e){
+ const id=String(e?.sourceExecutionId||'').replace(/#\d+$/,'');
+ return id.startsWith('csv:')?'':id;
+}
+// ID výstupní exekuce z CSV proti uloženému exitExecutionId: konektor ukládá
+// ID exekuce NT (např. 615959724479_1), export ho může mít i bez přípony.
+function nt8ExecIdMatches(stored,csvId){
+ const s=String(stored||'').replace(/#\d+$/,'');
+ return !!(csvId&&s&&(s===csvId||s.startsWith(csvId+'_')||csvId.startsWith(s+'_')));
+}
+function nt8TradeHasExec(t,csvId){
+ if(!csvId)return false;
+ if(nt8ExecIdMatches(t.exitExecutionId,csvId))return true;
+ return Array.isArray(t.legs)&&t.legs.some(l=>nt8ExecIdMatches(l.exitExecutionId,csvId));
+}
+// Shoda podle hodnot je jen upozornění, a raději širší než užší: falešná
+// „možná duplicita" stojí jedno kliknutí, přehlédnutá znamená zdvojený obchod.
+// Proto se nesrovnává počet kontraktů (starší ručně zadané obchody ho mívají
+// jinak než NT) a chybějící směr u starého obchodu sedí na oba. `m` je jedna
+// noha nebo celá pozice (první vstup, poslední výstup) – deník mohl pozici
+// uložit jako jeden obchod, kdežto z exekucí vyjdou nohy.
+function nt8ValueMatch(t,m){
+ if(t.recordType==='SETUP_ONLY'||t.date!==m.date)return false;
+ if(t.side&&m.side&&t.side!==m.side)return false;
+ if(normalizeInstrumentCode(t.instrument)!==normalizeInstrumentCode(m.instrument))return false;
+ if(t.externalAccount&&m.externalAccount&&t.externalAccount!==m.externalAccount)return false;
+ const same=x=>x.entryTime===m.entryTime&&x.exitTime===m.exitTime;
+ return same(t)||(Array.isArray(t.legs)&&t.legs.some(l=>same({...l,entryTime:l.entryTime||t.entryTime})));
+}
+// Stav jedné události proti obchodům cílového deníku.
+function nt8EventStatus(e,mapped,journalTrades){
+ const csvId=nt8ExecIdOf(e);
+ const present=journalTrades.find(t=>tradeHasSourceEventId(t,e.id)||nt8TradeHasExec(t,csvId));
+ if(present)return {status:'present',match:present};
+ const maybe=journalTrades.find(t=>nt8ValueMatch(t,mapped));
+ return maybe?{status:'maybe',match:maybe}:{status:'new',match:null};
+}
+// Celá pozice proti deníku: první vstup a poslední výstup.
+function nt8PositionMatch(mappedLegs,journalTrades){
+ const first=mappedLegs.reduce((a,x)=>x.entryTime<a.entryTime?x:a,mappedLegs[0]);
+ const lastExit=mappedLegs.reduce((a,x)=>x.exitTime>a?x.exitTime:a,mappedLegs[0].exitTime);
+ return journalTrades.find(t=>nt8ValueMatch(t,{...first,exitTime:lastExit}))||null;
+}
+const NT8_STATUS_RANK={new:0,maybe:1,present:2,nopv:3};
+const NT8_STATUS_TEXT={new:'nový',maybe:'možná duplicita',present:'už v deníku',nopv:'chybí hodnota bodu'};
+async function nt8BuildPreview(text){
+ const table=FJNt8Import.parseTable(text);
+ if(!table.format)throw new Error('Nepoznám formát. Potřebuju hlavičku mřížky NinjaTraderu Executions (Instrument, Action, Quantity, Price, Time…) nebo Trades (Instrument, Market pos., Qty, Entry price, Exit price, Entry time, Exit time…) – zkopíruj i řádek hlavičky, nebo použij Export do CSV.');
+ if(!table.rows.length)throw new Error('Pod hlavičkou nejsou žádné řádky.');
+ const helpers={pointValueOf:i=>getPointValueForInstrument(i),tickSizeOf:i=>getTickSizeForInstrument(i)};
+ let events=[],errors=[],open=[],skipped=[];
+ if(table.format==='executions'){
+  const parsed=FJNt8Import.executionPayloads(table.rows,helpers);
+  errors=parsed.errors;
+  // Bez hodnoty bodu by jádro počítalo s 1 a P/L by byl nesmysl – takové
+  // exekuce se nepřehrávají, náhled je ukáže jako „chybí hodnota bodu".
+  const noPv=parsed.payloads.filter(p=>!p.pointValue);
+  const r=await window.desktopAPI.captureManualReplay(parsed.payloads.filter(p=>p.pointValue));
+  if(!r?.ok)throw new Error(r?.error||'Exekuce se nepodařilo zpracovat.');
+  events=r.closed;open=r.open||[];skipped=r.skipped||[];
+  for(const p of noPv)errors.push({line:null,error:`${p.instrumentFull}: chybí hodnota bodu (doplň šablonu instrumentu v Nastavení → Šablony) – exekuce ${p.time.slice(0,10)} ${p.orderAction} ${p.quantity} @ ${p.price} vynechána.`});
+ }else{
+  const parsed=FJNt8Import.tradeEvents(table.rows,helpers);
+  events=parsed.events;errors=parsed.errors;
+ }
+ const mappings=captureSnapshot?.accountMappings||{};
+ const journals={};
+ const journalOf=async id=>{
+  if(!journals[id]){
+   const r=await window.desktopAPI.readJournal(id);
+   const data=r?.ok?r.data:{trades:[],settings:[]};
+   const jSettings=(Array.isArray(data.settings)?data.settings:[]).find(s=>s.key==='main')?.value||settings;
+   journals[id]={trades:Array.isArray(data.trades)?data.trades:[],settings:jSettings};
+  }
+  return journals[id];
+ };
+ const byPosition=new Map();
+ for(const e of events){
+  const journalId=mappings[e.account]||activeJournalId;
+  const j=await journalOf(journalId);
+  const mapped=mapCapturedTrade(e,[],j.settings);
+  const st=e.grossPnl==null?{status:'nopv',match:null}:nt8EventStatus(e,mapped,j.trades);
+  const key=journalId+'|'+(e.positionId||e.id);
+  if(!byPosition.has(key))byPosition.set(key,{key,journalId,events:[],mapped:[],statuses:[]});
+  const g=byPosition.get(key);
+  g.events.push(e);g.mapped.push(mapped);g.statuses.push(st);
+ }
+ const groups=[...byPosition.values()].map(g=>{
+  let status=g.statuses.reduce((a,s)=>NT8_STATUS_RANK[s.status]>NT8_STATUS_RANK[a]?s.status:a,'new');
+  let match=g.statuses.find(s=>s.match)?.match||null;
+  if(status==='new'){
+   const pos=nt8PositionMatch(g.mapped,journals[g.journalId].trades);
+   if(pos){status='maybe';match=pos}
+  }
+  return {...g,status,match,checked:status==='new'};
+ }).sort((a,b)=>String(a.events[0].entryTime).localeCompare(String(b.events[0].entryTime)));
+ return {format:table.format,groups,errors,open,skipped};
+}
+function nt8JournalName(id){return journalProfiles.find(j=>j.id===id)?.name||id}
+function renderNt8Preview(){
+ const box=$('nt8ImportPreview');
+ const groups=nt8Import.groups;
+ if(!groups.length){box.innerHTML='';$('nt8ImportRun').disabled=true;$('nt8ImportCount').textContent='';return}
+ const rows=groups.map((g,i)=>{
+  const m=g.mapped[0],last=g.mapped[g.mapped.length-1];
+  const contracts=g.mapped.reduce((a,x)=>a+Number(x.contracts||0),0);
+  const pnl=g.mapped.reduce((a,x)=>a+Number(x.pnlRaw||0),0);
+  const exits=[...new Set(g.mapped.map(x=>x.exitPrice))].join(' / ');
+  const matchText=g.match?` – ${esc(g.match.date||'')} ${esc(g.match.entryTime||'')} ${esc(g.match.instrument||'')} ${esc(sideMeta(g.match.side)?.text||'')}`:'';
+  return `<tr class="nt8-${g.status}"><td><input type="checkbox" class="nt8-pick" data-i="${i}"${g.checked?' checked':''}${g.status==='nopv'?' disabled':''}></td>
+   <td>${esc(m.date)}</td><td>${esc(m.entryTime)} → ${esc(last.exitTime)}</td><td title="Účet ${esc(g.events[0].account||'–')} → deník ${esc(nt8JournalName(g.journalId))} (podle přiřazení účtů, jinak aktivní deník)">${esc(nt8JournalName(g.journalId))}</td>
+   <td>${esc(m.instrument)}</td><td>${esc(sideMeta(m.side)?.text||m.side||'')}</td><td>${contracts}</td><td>${esc(m.entryPrice)}</td><td>${esc(exits)}</td><td>${g.events.length}</td>
+   <td class="${pnl>=0?'pos':'neg'}">${pnl>=0?'+':''}${money(pnl)}</td><td><span class="nt8-status ${g.status}">${esc(NT8_STATUS_TEXT[g.status])}</span><span class="sub">${matchText}</span></td></tr>`;
+ }).join('');
+ box.innerHTML=`<table class="nt8-table"><thead><tr><th><input type="checkbox" id="nt8PickAll" title="Vybrat / zrušit vše"></th><th>Datum</th><th>Čas</th><th>Deník</th><th>Instrument</th><th>Směr</th><th>Kontr.</th><th>Vstup</th><th>Výstup</th><th>Nohy</th><th>P/L</th><th>Stav</th></tr></thead><tbody>${rows}</tbody></table>`;
+ box.querySelectorAll('.nt8-pick').forEach(cb=>cb.onchange=()=>{nt8Import.groups[Number(cb.dataset.i)].checked=cb.checked;updateNt8Count()});
+ $('nt8PickAll').onchange=e=>{nt8Import.groups.forEach(g=>{if(g.status!=='nopv')g.checked=e.target.checked});renderNt8Preview()};
+ updateNt8Count();
+}
+function updateNt8Count(){
+ const n=nt8Import.groups.filter(g=>g.checked).length;
+ $('nt8ImportRun').disabled=!n;
+ $('nt8ImportCount').textContent=n?`Vybráno obchodů: ${n} (P/L a komise podle šablon deníku, jako u automatického importu)`:'';
+}
+async function nt8Preview(){
+ const alert=$('nt8ImportAlert');alert.classList.remove('show');alert.textContent='';
+ const text=$('nt8ImportText').value;
+ if(!text.trim()){alert.textContent='Vyber soubor nebo vlož řádky z NinjaTraderu.';alert.classList.add('show');return}
+ try{
+  const r=await nt8BuildPreview(text);
+  nt8Import.groups=r.groups;nt8Import.format=r.format;
+  const counts=Object.keys(NT8_STATUS_TEXT).map(s=>[s,r.groups.filter(g=>g.status===s).length]).filter(([,n])=>n).map(([s,n])=>`${NT8_STATUS_TEXT[s]}: ${n}`);
+  const notes=[];
+  notes.push(`Formát: ${r.format==='executions'?'exekuce (Executions)':'obchody (Trades)'} · obchodů: ${r.groups.length}${counts.length?' · '+counts.join(' · '):''}`);
+  if(r.open.length)notes.push(`Neuzavřené pozice na konci souboru (vynechány): ${r.open.map(p=>`${p.instrumentFull} ${p.side} ${p.quantity} ks od ${new Date(p.openedAt).toLocaleString('cs-CZ')}`).join('; ')}`);
+  if(r.skipped.length)notes.push(`Výstupy bez vstupu v souboru (vynechány – export začíná uprostřed pozice): ${r.skipped.length}`);
+  if(r.errors.length)notes.push(`Nečitelné řádky: ${r.errors.map(e=>(e.line?'ř. '+e.line+': ':'')+e.error).join(' · ')}`);
+  $('nt8ImportSummary').innerHTML=notes.map(n=>`<div>${esc(n)}</div>`).join('');
+  renderNt8Preview();
+ }catch(err){
+  nt8Import.groups=[];renderNt8Preview();$('nt8ImportSummary').textContent='';
+  alert.textContent=err?.message||String(err);alert.classList.add('show');
+ }
+}
+async function nt8RunImport(){
+ const chosen=nt8Import.groups.filter(g=>g.checked&&g.status!=='nopv');
+ if(!chosen.length)return;
+ const risky=chosen.filter(g=>g.status!=='new').length;
+ if(risky&&!(await showConfirm(`${risky}× vybraný obchod deník možná už má (stav „už v deníku“ / „možná duplicita“). Importovat i tak?`)))return;
+ const alert=$('nt8ImportAlert');alert.classList.remove('show');
+ $('nt8ImportRun').disabled=true;
+ try{
+  // Záloha každého cílového deníku PŘED prvním zápisem; když se nepovede,
+  // nezapíše se nic.
+  for(const id of new Set(chosen.map(g=>g.journalId))){
+   const b=await window.desktopAPI?.backupJournal?.(id,'pred-rucnim-importem-nt8');
+   if(!b||b.ok!==true)throw new Error('Zálohu deníku „'+nt8JournalName(id)+'“ se nepodařilo vytvořit'+(b?.error?': '+b.error:'')+' – nic se nezapsalo.');
+  }
+  let count=0;
+  for(const g of chosen)for(const e of g.events)if(await appendOrMergeCapturedTrade(g.journalId,e,[]))count++;
+  calendarAllTrades=null;
+  const current=await window.desktopAPI.readJournal(activeJournalId);
+  if(current?.ok){db.data=current.data;setRecords(db.data.trades||[]);renderAll()}
+  $('nt8ImportModal').classList.remove('open');
+  showToast(`Ruční import z NT8: zapsáno nohou ${count} v ${chosen.length} obchodech. Záloha deníku je v safety-backups.`);
+ }catch(err){
+  alert.textContent='Import se nepodařil: '+(err?.message||err);alert.classList.add('show');
+  updateNt8Count();
+ }
+}
+function openNt8Import(){
+ if(!window.desktopAPI?.captureManualReplay){showToast('Ruční import z NT8 funguje jen v nainstalované aplikaci.');return}
+ nt8Import.groups=[];$('nt8ImportText').value='';$('nt8ImportFile').value='';$('nt8ImportSummary').textContent='';
+ $('nt8ImportAlert').classList.remove('show');renderNt8Preview();
+ $('nt8ImportModal').classList.add('open');
+}
+if($('nt8ImportModal')){
+ $('nt8ManualImportBtn').onclick=openNt8Import;
+ if($('nt8ManualImportBtn2'))$('nt8ManualImportBtn2').onclick=openNt8Import;
+ $('closeNt8Import').onclick=()=>$('nt8ImportModal').classList.remove('open');
+ $('nt8ImportFile').onchange=async e=>{
+  const file=e.target.files?.[0]; if(!file)return;
+  if(file.size>20*1024*1024){showToast('Soubor je příliš velký (víc než 20 MB).');return}
+  $('nt8ImportText').value=await file.text();
+  void nt8Preview();
+ };
+ $('nt8ImportPreviewBtn').onclick=()=>{void nt8Preview()};
+ $('nt8ImportRun').onclick=()=>{void nt8RunImport()};
 }
 $('clearInvalidPositions').onclick=async()=>{
  if(!(await showConfirm('Vymazat celý seznam otevřených pozic v deníku? Uzavřené obchody se nesmažou.')))return;
