@@ -100,6 +100,23 @@ canvas{width:100%;height:100%}
 .stat-list{display:grid;gap:5px}
 .stat-list .row{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--text2)}
 .stat-list .row b{color:var(--text);font-weight:800}
+/* Řádky setupů a skupin mimo výkon (renderSetupStats / renderGroupStats) –
+   bez vlastního stylu měly 16 px a popisek se slepil s hodnotou. */
+.stat-list .stat-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:11.5px;color:var(--text2)}
+.stat-list .stat-row span{min-width:0}
+.stat-list .stat-row b{color:var(--text);font-weight:800;white-space:nowrap;text-align:right}
+.stat-list>.sub{color:var(--muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;margin:6px 0 0!important}
+.overview-row h3 .sub,.groups-row h3 .sub{font-size:10.5px;font-weight:600;margin:0}
+.groups-row{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;align-items:start}
+.groups-row>.card{padding:12px 14px;min-width:0}
+.groups-row h3{font-size:12.5px;margin:0 0 8px}
+/* Histogram vyplní výšku karty podle sousedních karet – bez prázdného místa. */
+.hist-card{display:flex;flex-direction:column}
+.hist-card .chart-wrap.sm{flex:1;height:auto;min-height:140px}
+.hist-card .chart-wrap canvas{position:absolute;inset:0}
+/* Horní lišta: akce pohromadě vpravo, menší. */
+.topbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.topbar-actions .btn{padding:7px 12px;font-size:13px}
 .bar-list{display:grid;gap:6px}
 .bar-row{display:grid;grid-template-columns:56px 1fr 64px;gap:7px;align-items:center;font-size:10.5px}
 .bar-row .bar-name{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -117,6 +134,17 @@ canvas{width:100%;height:100%}
 .legend i{width:13px;height:2px;border-radius:2px;display:inline-block}
 .section{display:none}.section.active{display:block}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px}.toolbar input,.toolbar select{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px;border-radius:10px}
+/* Toolbar Deníku: řádek filtrů a řádek akcí, kompaktní prvky ve skupinách. */
+.toolbar{flex-direction:column;gap:8px;margin-bottom:10px}
+.toolbar-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
+.toolbar-group{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+.toolbar-group.push-right{margin-left:auto}
+.toolbar input,.toolbar select,.toolbar .btn{padding:5px 9px;font-size:12.5px;border-radius:8px;height:30px;line-height:1.2}
+.toolbar input[type=checkbox]{height:auto;padding:0}
+.toolbar #search{width:200px}
+.toolbar-label{color:var(--muted);font-size:12px;gap:5px}
+.toolbar .skip-live-toggle{font-size:12px}
+.toolbar-hint{font-size:12px;margin:0 0 10px}
 .trade-list{display:grid;gap:14px}.trade{display:grid;grid-template-columns:1.2fr .8fr 1fr auto;gap:16px;align-items:center}
 .trade .title{font-size:18px;font-weight:800}.trade .meta{color:var(--muted);font-size:13px;margin-top:5px}.pill{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:800;font-size:12px}
 .pill.win{background:rgba(var(--green-rgb),.15);color:var(--green)}.pill.loss{background:rgba(var(--red-rgb),.15);color:var(--red)}.pill.be{background:rgba(var(--yellow-rgb),.18);color:var(--yellow)}
@@ -505,9 +533,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   <main class="main">
 <div class="topbar">
       <div><h1 id="pageTitle">Přehled účtu</h1><div class="sub">Obchodní deník pro futures</div></div>
-      <button class="btn primary" id="addTradeBtn" style="display:none">＋ Přidat obchod</button>
-      <button class="btn" id="addSetupBtn" style="display:none" title="Setup, který byl, ale nedošlo k exekuci – vstupuje do fill rate, ne do P/L">＋ Setup bez vstupu</button>
-      <button class="btn" id="newsCalendarBtn" type="button" title="Otevře kalendář makro zpráv v prohlížeči (adresa jde změnit v Nastavení → Obecné → Kalendář zpráv)">📰 Kalendář zpráv</button>
+      <div class="topbar-actions">
+        <button class="btn primary" id="addTradeBtn" style="display:none">＋ Přidat obchod</button>
+        <button class="btn" id="addSetupBtn" style="display:none" title="Setup, který byl, ale nedošlo k exekuci – vstupuje do fill rate, ne do P/L">＋ Setup bez vstupu</button>
+        <button class="btn" id="newsCalendarBtn" type="button" title="Otevře kalendář makro zpráv v prohlížeči (adresa jde změnit v Nastavení → Obecné → Kalendář zpráv)">📰 Kalendář zpráv</button>
+      </div>
     </div>
 
 
@@ -576,16 +606,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="overallStatsList" class="stat-list"></div>
           <div class="panel-subtitle">Top instrumenty dle P/L</div>
           <div id="topInstruments" class="bar-list"></div>
-          <div class="panel-subtitle">Setupy a fill rate</div>
-          <div id="setupStatsBox" class="stat-list"></div>
-          <div id="skipLiveStatsBlock"><div class="panel-subtitle">Naživo bych nevzal <span class="sub">— evidováno zvlášť</span></div>
-          <div id="skipLiveStatsBox" class="stat-list"></div></div>
-          <div class="panel-subtitle">No fill – hypoteticky <span class="sub">— nenaplněno / nestihnuto, evidováno zvlášť</span></div>
-          <div id="noFillStatsBox" class="stat-list"></div>
-          <div id="skippedStatsBlock"><div class="panel-subtitle">Vědomě vynechané – hypoteticky <span class="sub">— evidováno zvlášť</span></div>
-          <div id="skippedStatsBox" class="stat-list"></div></div>
         </div>
-        <div class="card">
+        <div class="card hist-card">
           <h3>Rozložení zisků a ztrát</h3>
           <div class="panel-subtitle" style="margin-top:0">Počet obchodů podle výše zisku/ztráty ($)</div>
           <div class="chart-wrap sm"><canvas id="histChart"></canvas></div>
@@ -597,6 +619,26 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="gauge-wrap"><canvas id="gaugeProfitRate"></canvas><div class="gauge-label"><span class="gauge-pct" id="gaugeProfitRateLabel">0%</span><span class="gauge-name">Profit Rate</span></div></div>
           </div>
           <div class="stat-list" id="tradeStatsTable"></div>
+        </div>
+      </div>
+
+      <div class="section-divider"><span>SETUPY A HYPOTETICKÉ OBCHODY</span></div>
+      <div class="grid groups-row">
+        <div class="card">
+          <h3>Setupy a fill rate</h3>
+          <div id="setupStatsBox" class="stat-list"></div>
+        </div>
+        <div class="card" id="skipLiveStatsBlock">
+          <h3>Naživo bych nevzal <span class="sub">— evidováno zvlášť</span></h3>
+          <div id="skipLiveStatsBox" class="stat-list"></div>
+        </div>
+        <div class="card">
+          <h3>No fill – hypoteticky <span class="sub">— nenaplněno / nestihnuto</span></h3>
+          <div id="noFillStatsBox" class="stat-list"></div>
+        </div>
+        <div class="card" id="skippedStatsBlock">
+          <h3>Vědomě vynechané – hypoteticky <span class="sub">— evidováno zvlášť</span></h3>
+          <div id="skippedStatsBox" class="stat-list"></div>
         </div>
       </div>
 
@@ -660,25 +702,26 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
     <section id="journal" class="section">
       <div class="toolbar">
+       <div class="toolbar-row">
+        <span class="toolbar-group">
         <input id="search" placeholder="Hledat instrument nebo komentář">
         <select id="filterResult"><option value="">Všechny výsledky</option><option value="target">Target</option><option value="breakeven">Break Even</option><option value="stoploss">Stop Loss</option></select>
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
         <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
-        <button class="btn" id="dayContextBtn" type="button" title="Kontext a psychika dne (otevření vs value, očekávaný typ dne, zprávy, psychika před / v průběhu / po seanci) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button>
-        <button class="btn" id="quickContextBtn" type="button" title="Doplnit kontext obchodům z aktuálního výběru, které ho nemají úplný – celé na klávesnici">⚡ Rychlý kontext</button>
-        <button class="btn" id="nt8ManualImportBtn2" type="button" title="Když automatický import z NinjaTraderu selže: obchody z exportu NT8 (Executions nebo Trades), ze souboru CSV nebo vložené ze schránky – s náhledem před zápisem">⬇ Import z NT8</button>
-        <select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select>
-        <button class="btn" id="clearSkipLiveBtn" type="button" style="display:none" title="Živý deník: odebere chybné „naživo bych nevzal“ (i s důvodem) u všech takových záznamů aktivního deníku. Nic jiného se nemění.">Odebrat „naživo bych nevzal“</button>
-        <span class="include-toggles" data-include-scope="journal"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span>
-        <input type="date" id="filterDate">
-        <input type="date" id="newDayDate" title="Datum dne k přidání">
-        <button class="btn" id="addEmptyDay" title="Přidá denní blok (komentář/náhled/poznámky/screenshoty) i bez obchodu">+ Přidat den</button>
-        <button class="btn" id="exportCsv">Export CSV</button>
-        <button class="btn" id="printPdf">Tisk / PDF</button>
-        <button class="btn" id="mergeSelected" title="Sloučí vybrané obchody (např. TP1/TP2/BE ze stejné pozice) do jednoho">🔗 Sloučit vybrané</button>
+        </span>
+        <span class="toolbar-group"><select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select></span>
+        <label class="toolbar-group toolbar-label" title="Zobrazit jen obchody tohoto dne">Den <input type="date" id="filterDate"></label>
+        <span class="toolbar-group"><span class="include-toggles" data-include-scope="journal"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveJournal"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillJournal"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedJournal"> včetně vědomě vynechaných</label></span></span>
+       </div>
+       <div class="toolbar-row">
+        <span class="toolbar-group"><button class="btn" id="dayContextBtn" type="button" title="Kontext a psychika dne (otevření vs value, očekávaný typ dne, zprávy, psychika před / v průběhu / po seanci) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button><button class="btn" id="quickContextBtn" type="button" title="Doplnit kontext obchodům z aktuálního výběru, které ho nemají úplný – celé na klávesnici">⚡ Rychlý kontext</button><button class="btn" id="clearSkipLiveBtn" type="button" style="display:none" title="Živý deník: odebere chybné „naživo bych nevzal“ (i s důvodem) u všech takových záznamů aktivního deníku. Nic jiného se nemění.">Odebrat „naživo bych nevzal“</button></span>
+        <span class="toolbar-group"><input type="date" id="newDayDate" title="Datum dne k přidání"><button class="btn" id="addEmptyDay" title="Přidá denní blok (komentář/náhled/poznámky/screenshoty) i bez obchodu">+ Přidat den</button></span>
+        <span class="toolbar-group"><button class="btn" id="mergeSelected" title="Sloučí vybrané obchody (např. TP1/TP2/BE ze stejné pozice) do jednoho">🔗 Sloučit vybrané</button></span>
+        <span class="toolbar-group push-right"><button class="btn" id="nt8ManualImportBtn2" type="button" title="Když automatický import z NinjaTraderu selže: obchody z exportu NT8 (Executions nebo Trades), ze souboru CSV nebo vložené ze schránky – s náhledem před zápisem">⬇ Import z NT8</button><button class="btn" id="exportCsv">Export CSV</button><button class="btn" id="printPdf">Tisk / PDF</button></span>
+       </div>
       </div>
-      <div class="sub" style="margin:-6px 0 10px">Zaškrtni obchody, které NinjaTrader rozdělil na více cílů (TP1/TP2/BE), a sluč je tlačítkem výše do jednoho obchodu.</div>
+      <div class="sub toolbar-hint">Zaškrtni obchody, které NinjaTrader rozdělil na více cílů (TP1/TP2/BE), a sluč je tlačítkem výše do jednoho obchodu.</div>
       <div id="tradeList" class="trade-list"></div>
       <input id="dayShotInput" type="file" accept="image/*" multiple style="display:none">
     </section>

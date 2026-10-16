@@ -2,6 +2,14 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.8 - 2026-10-16
+Layout only – no stored data changes.
+- Top bar: "＋ Přidat obchod", "＋ Setup bez vstupu" and "📰 Kalendář zpráv" sit together on the right and are smaller (before: spread across the whole width).
+- Deník toolbar: compact controls in two rows. Row 1 = filters (search, result, side, naživo, fill state, Kontrola dat, "Den" date filter, the "včetně…" switches). Row 2 = actions (Kontext dne, Rychlý kontext, date + "+ Přidat den", Sloučit vybrané; on the right Import z NT8, Export CSV, Tisk / PDF). The date filter now has the label "Den", so it is no longer confused with the date of "+ Přidat den". Nothing was removed.
+- Přehled účtu: rows of "Setupy a fill rate", "No fill", "Vědomě vynechané" and "Naživo bych nevzal" had no style (16 px, label stuck to the value, e.g. "Fill rate96.2 %"). They now look like the other statistics (small font, value on the right).
+- Přehled účtu: these four blocks moved from the "Celková výkonnost" card to their own row "SETUPY A HYPOTETICKÉ OBCHODY" (one card each; the naživo / vědomě vynechané cards hide by journal mode as before). "Celková výkonnost" keeps profit / loss / ratio and Top instrumenty.
+- "Rozložení zisků a ztrát": the histogram fills the card height instead of a fixed 150 px with empty space below.
+
 ## 4.8.7 - 2026-10-16
 Four parts: images outside the app, Psychika 1–8, news calendar (ForexFactory), manual NinjaTrader import. THE IMAGE PART RENAMES STORED SCREENSHOTS (once, with backups).
 
