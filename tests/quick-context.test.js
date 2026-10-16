@@ -11,6 +11,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { loadRenderer } = require('./helpers/extract');
+const FJTaxonomy = require('../app/taxonomy.js');
 
 const plain = v => JSON.parse(JSON.stringify(v));
 const r = () => loadRenderer(['contextFieldShown', 'isSetupRecord', 'tradeRecords', 'quickMissingKeys', 'quickBatch', 'QC_GROUPS', 'quickGroups', 'quickDraftFrom', 'quickContextApply'], {});
@@ -121,6 +122,47 @@ test('dávka: nabízí se jen obchody, kterým chybí něco, co tu jde doplnit',
   assert.deepEqual(plain(q.quickMissingKeys({ ...complete, slPrice: undefined, trend: '' })), ['trend', 'slPrice']);
   const rows = [{ id: 'p', date: '2026-10-09', entryTime: '15:31', ...complete, targetLevel1: { type: 'VPOC_1M', price: null } }, { id: 'a', date: '2026-10-09', entryTime: '16:00' }];
   assert.deepEqual(plain(q.quickBatch(rows).map(t => t.id)), ['a']);
+});
+
+// Dávka a štítek „Neúplné" berou stejný výběr (FJTaxonomy.missingWarnItems):
+// rozhodují karty i pole a jejich „Upozorňovat na nevyplněné".
+const rWith = globals => loadRenderer(['contextFieldShown', 'isSetupRecord', 'tradeRecords', 'quickMissingKeys', 'quickBatch', 'QC_GROUPS'], globals);
+const badge = (t, globals) => plain(FJTaxonomy.missingForCards(t, globals.tradeCardConfig || {}, undefined, globals.contextFieldConfig,
+  { dayContextMissing: !!globals.dayContextMissingFor?.(t) }));
+
+test('dávka podle upozornění: zobrazené pole bez upozornění obchod v dávce nedrží', () => {
+  const globals = { contextFieldConfig: FJTaxonomy.normalizeFieldConfig({ trendHtf: { show: true, warn: false } }) };
+  const t = { id: 'x', date: '2026-10-09', ...complete, trendHtf: '' };
+  assert.deepEqual(plain(rWith(globals).quickMissingKeys(t)), []);
+  assert.deepEqual(badge(t, globals), [], 'štítek obchod taky bere jako úplný');
+});
+
+test('dávka podle upozornění: absorpce, test / netest a vypnutá karta', () => {
+  const globals = { contextFieldConfig: FJTaxonomy.normalizeFieldConfig({ absLocation: { warn: true }, levelTestState: { warn: true } }) };
+  const q = rWith(globals);
+  assert.deepEqual(plain(q.quickMissingKeys({ ...complete })), ['absLocation'], 'absorpce se tu doplnit dá');
+  const withRow = { ...complete, absLocation: 'EXTREME', nearLevels: [{ level: 'VAL', price: 7799 }], nearLevelsNone: false };
+  assert.deepEqual(plain(q.quickMissingKeys(withRow)), ['levelTestState'], 'test / netest u řádku hladiny');
+  const levelsOff = { ...globals, tradeCardConfig: FJTaxonomy.normalizeCardConfig({ levels: { warn: false } }) };
+  assert.deepEqual(plain(rWith(levelsOff).quickMissingKeys({ ...complete, ofConfirm: [] })), [], 'karta Hladiny bez upozornění');
+  assert.deepEqual(badge({ ...complete, ofConfirm: [] }, levelsOff), []);
+});
+
+test('dávka: kontext dne drží obchod jen do vyplnění dne', () => {
+  const dayNotes = {};
+  const globals = {
+    contextFieldConfig: FJTaxonomy.normalizeFieldConfig({ dayContext: { warn: true } }),
+    dayContextMissingFor: t => !(dayNotes[t.date] && dayNotes[t.date].openVsValue)
+  };
+  const q = rWith(globals);
+  const rows = [{ id: 'k', date: '2026-10-09', entryTime: '15:31', ...complete }, { id: 'l', date: '2026-10-09', entryTime: '16:00', ...complete }];
+  assert.deepEqual(plain(q.quickMissingKeys(rows[0])), ['dayContext']);
+  assert.deepEqual(plain(q.quickBatch(rows).map(t => t.id)), ['k', 'l']);
+  dayNotes['2026-10-09'] = { openVsValue: 'IN_VA' };
+  assert.deepEqual(plain(q.quickBatch(rows).map(t => t.id)), [], 'vyplněný Denní kontext obchody z dávky vyřadí');
+  const off = rWith({ ...globals, contextFieldConfig: FJTaxonomy.normalizeFieldConfig({}) });
+  delete dayNotes['2026-10-09'];
+  assert.deepEqual(plain(off.quickMissingKeys(rows[0])), [], 'bez upozornění na kontext dne se obchod nenabízí');
 });
 
 test('zápis: klíč, který číselník deníku nezná, zůstane, dokud na něj uživatel nesáhne', () => {

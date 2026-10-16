@@ -2,6 +2,15 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.6 - 2026-10-16
+- Rychlý kontext offers the same trades the "Neúplné" badge flags. Both use one list (FJTaxonomy.missingWarnItems), so the switches in Nastavení → Přizpůsobení (Karty obchodu and Pole kontextu, "Zobrazit" and "Upozorňovat na nevyplněné") now apply to the batch too:
+  - a field shown with its warning off (e.g. Trend 30m) no longer keeps a trade in the batch;
+  - "Absorpce – kde" and "Test / netest u hladin" with their warning on now bring a trade into the batch;
+  - a card with its warning off no longer counts.
+- "Kontext dne" keeps a trade in the batch only while the day has no morning context and its warning is on. Once the day's context is filled in, in Rychlý kontext or in the normal Denní kontext, the trades of that day drop out of the batch.
+- Price of target 1 and the post-exit ticks still stay out of the batch (they are filled in the full form); the badge keeps flagging them.
+- Code cleanup without visible change: shared settings rows for Karty obchodu / Pole kontextu, cheaper trade list rendering (derived values only for the summary pill), one tradeToV3 helper for export and backup import.
+
 ## 4.8.5 - 2026-10-13
 Four parts: trade context v3 (docs/ZADANI_KONTEXT_V3.md, part A), the NinjaTrader import fix, the scale-in (dokup) fix and the check for test versions below. The version number stays 4.8.5 – it had not been released yet.
 

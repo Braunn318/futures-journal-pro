@@ -5217,18 +5217,19 @@ $('tradeForm').addEventListener('submit',async e=>{
 // Ukládá JEN kontextová pole, a jen ta, která se změnila – ostatní pole
 // obchodu (P/L, ceny, komise) se nedotknou.
 let journalVisibleTrades=null;
-// Která kontextová pole obchodu ještě chybí A jdou tady doplnit. Obchod, kterému
-// chybí jen něco, co rychlý formulář nenabízí, by z dávky nikdy nezmizel:
-//  - pole skrytá v Nastavení → Přizpůsobení → Pole kontextu,
-//  - cena cíle 1 (tady se volí jen typ) a ticky po výstupu – ty se doplňují
-//    v plném formuláři; štítek „Neúplné" na kartě obchodu je hlásí dál.
+// Která pole obchodu ještě chybí A jdou tady doplnit. Výběr je tentýž jako
+// u štítku „Neúplné" (FJTaxonomy.missingWarnItems): jen zobrazené karty a pole
+// se zapnutým „Upozorňovat na nevyplněné". Obchod, kterému chybí jen něco, co
+// rychlý formulář nenabízí, by z dávky nikdy nezmizel – proto se vynechá cena
+// cíle 1 (tady se volí jen typ) a ticky po výstupu; ty se doplňují v plném
+// formuláři a štítek je hlásí dál. Kontext dne drží obchod v dávce jen do
+// chvíle, kdy ho den má vyplněný (tady, nebo v běžném Denním kontextu).
 function quickMissingKeys(t){
- const fillable=new Set([...QC_GROUPS.map(g=>g.key),'slPrice','mfeTicks','maeTicks']);
- return FJTaxonomy.missingContextKeys(t).filter(k=>{
-  if(k==='targetLevel1')return !FJTaxonomy.sanitizeSingle('TARGET_LEVEL',t?.targetLevel1?.type);
-  // Pole mimo „Pole kontextu" je pro contextFieldShown vždy zobrazené.
-  return fillable.has(k)&&contextFieldShown(k);
- });
+ const fillable=new Set([...QC_GROUPS.map(g=>g.key),'slPrice','mfeTicks','maeTicks','levelTestState','dayContext']);
+ const items=FJTaxonomy.missingWarnItems(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig,undefined,
+  typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig,
+  {dayContextMissing:typeof dayContextMissingFor==='function'&&dayContextMissingFor(t)});
+ return [...new Set(items.filter(i=>i.key==='targetLevel1'?i.part==='type':fillable.has(i.key)).map(i=>i.key))];
 }
 // Dávka: obchody chronologicky; bez startu jen ty s nevyplněným kontextem,
 // se startem od daného obchodu dál (ten vždy, další jen nevyplněné).
@@ -5343,7 +5344,9 @@ function loadQuickTrade(){
  $('qcAlert').classList.remove('show');
  renderQuickContext();
  const missing=quickMissingKeys(t);
- const first=quickGroups().find(g=>missing.includes(g.key==='targetLevel1Type'?'targetLevel1':g.key))?.key||QC_GROUPS[0].key;
+ // Test / netest se vyplňuje u řádků hladin v blízkosti.
+ const missingIn=g=>missing.includes(g.key==='targetLevel1Type'?'targetLevel1':g.key)||(g.key==='nearLevels'&&missing.includes('levelTestState'));
+ const first=quickGroups().find(missingIn)?.key||QC_GROUPS[0].key;
  focusQuickGroup(qc.dayShown?'day.'+FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k]):first);
 }
 function closeQuickContext(){$('quickContextModal').classList.remove('open');qc.batch=[];renderTrades()}

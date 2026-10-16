@@ -758,28 +758,37 @@
     return c.show && c.warn;
   }
 
-  // Chybějící pole rozdělená po kartách, jako popisky. Rozhoduje
-  // missingContextKeys – tady se jen třídí a filtruje podle nastavení polí:
-  // trend 30m a známka vypadnou, když jsou skryté nebo bez upozornění;
-  // kolikátý test, absorpce a test / netest u hladin se naopak přidají jen se
-  // zapnutým upozorněním.
-  function missingContextByCard(trade, config, fieldConfig) {
-    const out = {};
-    for (const card of TRADE_CARDS) out[card.key] = [];
+  // Chybějící pole jako položky { key, card, label, part? } v pořadí
+  // formuláře. Rozhoduje missingContextKeys – tady se jen třídí a filtruje
+  // podle nastavení polí: trend 30m a známka vypadnou, když jsou skryté nebo
+  // bez upozornění; kolikátý test, absorpce a test / netest u hladin se naopak
+  // přidají jen se zapnutým upozorněním. Cílová hladina 1 má dvě položky:
+  // part 'type' (karta Hladiny) a 'price' (karta SL / TP).
+  function missingContextItems(trade, config, fieldConfig) {
+    const items = [];
+    const add = (key, card, label, part) => items.push(part ? { key, card, label, part } : { key, card, label });
     for (const key of missingContextKeys(trade, config)) {
       if (CONTEXT_FIELD_BY_KEY[key] && !fieldWarns(fieldConfig, key)) continue;
       if (key === 'targetLevel1') {
         const tl = (trade && trade.targetLevel1) || {};
-        if (!sanitizeSingle('TARGET_LEVEL', tl.type, config)) out.levels.push(contextFieldLabel(key) + ' (typ)');
-        if (numOrNull(tl.price) == null) out.sltp.push('Cena targetu');
+        if (!sanitizeSingle('TARGET_LEVEL', tl.type, config)) add(key, 'levels', contextFieldLabel(key) + ' (typ)', 'type');
+        if (numOrNull(tl.price) == null) add(key, 'sltp', 'Cena targetu', 'price');
         continue;
       }
-      out[CARD_OF_FIELD[key] || 'setup'].push(contextFieldLabel(key));
+      add(key, CARD_OF_FIELD[key] || 'setup', contextFieldLabel(key));
     }
-    if (!trade || typeof trade !== 'object' || trade.recordType === 'SETUP_ONLY') return out;
-    if (fieldWarns(fieldConfig, 'entryTestNo') && !sanitizeSingle('ENTRY_TEST_NO', trade.entryTestNo, config)) out.setup.push(CONTEXT_FIELD_BY_KEY.entryTestNo.label);
-    if (fieldWarns(fieldConfig, 'absLocation') && !sanitizeSingle('ABS_LOCATION', trade.absLocation, config)) out.levels.push(CONTEXT_FIELD_BY_KEY.absLocation.label);
-    if (fieldWarns(fieldConfig, 'levelTestState') && nearLevelsOf(trade).some(r => !r.testState)) out.levels.push(CONTEXT_FIELD_BY_KEY.levelTestState.label);
+    if (!trade || typeof trade !== 'object' || trade.recordType === 'SETUP_ONLY') return items;
+    if (fieldWarns(fieldConfig, 'entryTestNo') && !sanitizeSingle('ENTRY_TEST_NO', trade.entryTestNo, config)) add('entryTestNo', 'setup', CONTEXT_FIELD_BY_KEY.entryTestNo.label);
+    if (fieldWarns(fieldConfig, 'absLocation') && !sanitizeSingle('ABS_LOCATION', trade.absLocation, config)) add('absLocation', 'levels', CONTEXT_FIELD_BY_KEY.absLocation.label);
+    if (fieldWarns(fieldConfig, 'levelTestState') && nearLevelsOf(trade).some(r => !r.testState)) add('levelTestState', 'levels', CONTEXT_FIELD_BY_KEY.levelTestState.label);
+    return items;
+  }
+
+  // Chybějící pole rozdělená po kartách, jako popisky (hlavičky karet formuláře).
+  function missingContextByCard(trade, config, fieldConfig) {
+    const out = {};
+    for (const card of TRADE_CARDS) out[card.key] = [];
+    for (const item of missingContextItems(trade, config, fieldConfig)) out[item.card].push(item.label);
     return out;
   }
 
@@ -795,16 +804,24 @@
     return c.show && c.warn;
   }
 
-  // Chybějící pole jen z karet, které jsou zobrazené a mají zapnuté upozornění
-  // (štítek „Neúplné" na kartě obchodu). Kontext dne do žádné karty formuláře
-  // nepatří: hlásí se, když má zapnuté upozornění a volající ví, že dni chybí
-  // (`opts.dayContextMissing` – denní poznámky tenhle modul nezná).
-  function missingForCards(trade, cardConfig, config, fieldConfig, opts) {
-    const byCard = missingContextByCard(trade, config, fieldConfig);
-    const labels = TRADE_CARDS.filter(card => cardWarns(cardConfig, card.key)).flatMap(card => byCard[card.key]);
+  // Na co se upozorňuje: chybějící pole jen z karet, které jsou zobrazené
+  // a mají zapnuté upozornění, v pořadí formuláře. Jeden výběr pro štítek
+  // „Neúplné" i pro dávku rychlého kontextu. Kontext dne do žádné karty
+  // formuláře nepatří (card: null): hlásí se, když má zapnuté upozornění
+  // a volající ví, že dni chybí (`opts.dayContextMissing` – denní poznámky
+  // tenhle modul nezná). Jakmile má den kontext vyplněný, položka zmizí.
+  function missingWarnItems(trade, cardConfig, config, fieldConfig, opts) {
+    const items = missingContextItems(trade, config, fieldConfig).filter(item => cardWarns(cardConfig, item.card));
     const isTrade = !!trade && typeof trade === 'object' && trade.recordType !== 'SETUP_ONLY';
-    if (isTrade && opts?.dayContextMissing === true && fieldWarns(fieldConfig, 'dayContext')) labels.push(CONTEXT_FIELD_BY_KEY.dayContext.label);
-    return labels;
+    if (isTrade && opts?.dayContextMissing === true && fieldWarns(fieldConfig, 'dayContext')) items.push({ key: 'dayContext', card: null, label: CONTEXT_FIELD_BY_KEY.dayContext.label });
+    return items;
+  }
+
+  // Popisky pro štítek „Neúplné": po kartách v pořadí karet, kontext dne nakonec.
+  function missingForCards(trade, cardConfig, config, fieldConfig, opts) {
+    const items = missingWarnItems(trade, cardConfig, config, fieldConfig, opts);
+    const byCard = TRADE_CARDS.flatMap(card => items.filter(item => item.card === card.key));
+    return [...byCard, ...items.filter(item => item.card == null)].map(item => item.label);
   }
 
   // Klíč pro vlastní volbu. Odvozuje se z popisku, aby byl čitelný i v CSV,
@@ -966,7 +983,7 @@
     allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey, isLevelKey, DEFAULT_NOT_LEVEL,
     visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     missingContextKeys, contextFieldLabel,
-    TRADE_CARDS, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingForCards,
+    TRADE_CARDS, missingContextItems, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingWarnItems, missingForCards,
     CONTEXT_FIELDS, normalizeFieldConfig, fieldShown, fieldWarns,
     makeCustomKey,
     // přenos mezi deníky a soubor
