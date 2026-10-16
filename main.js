@@ -76,6 +76,26 @@ function resolveDataDir() {
   } catch {}
   return app.getPath('userData');
 }
+function readDataLocationConfig() {
+  try { return JSON.parse(fs.readFileSync(dataLocationConfigPath(), 'utf8')) || {}; }
+  catch { return {}; }
+}
+// Instalační složka programu. Instalátor ji při každé aktualizaci celou smaže
+// (odinstalace staré verze), i s tím, co do ní uživatel uložil – data ani
+// obrázky v ní proto ležet nesmí (4.8.9: takhle se ztratily screenshoty).
+// Ve zdrojové verzi instalace není; test si ji podstrčí přes FJ_TEST_INSTALL_DIR.
+function installDir() {
+  if (app.isPackaged) return path.dirname(app.getPath('exe'));
+  return process.env.FJ_TEST_INSTALL_DIR || null;
+}
+function isInsideInstallDir(p) {
+  const inst = installDir();
+  if (!inst || !p) return false;
+  const norm = x => path.resolve(x).toLowerCase();
+  const target = norm(p);
+  return target === norm(inst) || target.startsWith(norm(inst) + path.sep);
+}
+const INSTALL_DIR_ERROR = 'Tahle složka je uvnitř složky programu. Instalátor ji při každé aktualizaci smaže i s daty – vyber složku mimo program (např. E:\\ nebo Dokumenty).';
 function writeDataLocationConfig(customDataDir) {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
   fs.writeFileSync(dataLocationConfigPath(), JSON.stringify({ customDataDir }, null, 2), 'utf8');
@@ -161,6 +181,7 @@ function moveImagesDir(target) {
   const from = path.resolve(imagesRoot());
   const to = path.resolve(target);
   if (from === to) return { ok: true, unchanged: true };
+  if (isInsideInstallDir(to)) throw new Error(INSTALL_DIR_ERROR);
   if (to.startsWith(from + path.sep) || from.startsWith(to + path.sep)) throw new Error('Nová složka nesmí být uvnitř stávající ani naopak.');
   const files = listImageFiles(from);
   const conflicts = files.filter(f => fs.existsSync(path.join(to, f)) && !sameFileContent(path.join(from, f), path.join(to, f)));
@@ -214,6 +235,7 @@ ipcMain.handle('data:chooseLocation', async () => {
     if (result.canceled || !result.filePaths?.[0]) return { ok: false, canceled: true };
     const oldDir = resolveDataDir();
     const newDir = path.join(result.filePaths[0], 'FuturesJournalPRO-Data');
+    if (isInsideInstallDir(newDir)) return { ok: false, error: INSTALL_DIR_ERROR };
     if (path.resolve(newDir) === path.resolve(oldDir)) return { ok: false, error: 'Vybraná složka už je aktuálním umístěním dat.' };
     writeSafetyBackupBeforeMove(oldDir);
     moveDataContents(oldDir, newDir);
@@ -2861,7 +2883,52 @@ app.on('second-instance', () => {
   else focusMainWindow();
 });
 
+// Vlastní složka dat, která chybí (odpojený disk, smazaná aktualizací), se už
+// potichu nenahradí výchozí AppData – uživatel by viděl prázdný deník nebo
+// starou kopii a nevěděl proč. Ukazatel v data-location.json se nemaže.
+function checkDataLocationAtStartup() {
+  for (;;) {
+    const custom = readDataLocationConfig().customDataDir;
+    if (!custom || fs.existsSync(custom)) break;
+    const choice = dialog.showMessageBoxSync({
+      type: 'warning',
+      title: 'Futures Journal PRO',
+      message: 'Složka s daty nebyla nalezena.',
+      detail: `Nastavená složka:\n${custom}\n\nPokud je na odpojeném disku, připoj ho a dej „Zkusit znovu". Pokud se přesunula, vyber ji. „Pokračovat s výchozí" otevře data z AppData jen pro tohle spuštění – nastavená složka zůstane a příště se zeptám znovu.`,
+      buttons: ['Zkusit znovu', 'Vybrat složku…', 'Pokračovat s výchozí', 'Ukončit'],
+      defaultId: 0,
+      cancelId: 3,
+      noLink: true
+    });
+    if (choice === 0) continue;
+    if (choice === 2) { logInfo('Umístění dat', `Nenalezeno ${custom}, tento běh používá výchozí složku.`); break; }
+    if (choice === 3) { app.exit(0); return false; }
+    const picked = dialog.showOpenDialogSync({ title: 'Vyber složku s daty Futures Journal PRO', properties: ['openDirectory'] });
+    if (!picked?.[0]) continue;
+    const candidates = [picked[0], path.join(picked[0], 'FuturesJournalPRO-Data')];
+    const found = candidates.find(dir => fs.existsSync(path.join(dir, 'journal-data')));
+    if (!found) { dialog.showMessageBoxSync({ type: 'error', title: 'Futures Journal PRO', message: 'Ve vybrané složce nejsou data deníku (chybí podsložka journal-data).', noLink: true }); continue; }
+    writeDataLocationConfig(found);
+    logInfo('Umístění dat', `${custom} nenalezeno, vybráno ${found}`);
+    break;
+  }
+  return true;
+}
+// Data nebo obrázky uvnitř složky programu: příští aktualizace je smaže.
+function warnIfDataInsideInstallDir() {
+  const places = [resolveDataDir(), imagesRoot()].filter(isInsideInstallDir);
+  if (!places.length) return;
+  logInfo('Umístění dat', `Data uvnitř složky programu: ${places.join(', ')}`);
+  dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Futures Journal PRO',
+    message: 'Data leží ve složce programu – příští aktualizace je smaže.',
+    detail: `${[...new Set(places)].join('\n')}\n\nPřesuň je jinam: Nastavení → Data a zálohy → umístění dat (a případně Složka obrázků). Vyber složku mimo ${installDir()}.`,
+    noLink: true
+  }).catch(() => {});
+}
 app.whenReady().then(() => {
+  if (!checkDataLocationAtStartup()) return;
   // Ve Windows se aplikace automaticky spustí po přihlášení skrytě do oznamovací oblasti.
   if (process.platform === 'win32' && app.isPackaged) {
     app.setLoginItemSettings({
@@ -2885,7 +2952,13 @@ app.whenReady().then(() => {
   startRelayPolling();
   createTray();
   initAutoUpdate();
-  return createWindow();
+  const created = createWindow();
+  // Až když je okno vidět – při startu na pozadí (po přihlášení) by se
+  // varování ztratilo za skrytým oknem.
+  mainWindow.once('show', () => {
+    try { warnIfDataInsideInstallDir(); } catch (error) { logError('Kontrola umístění dat', error); }
+  });
+  return created;
 }).catch(error => {
   logError('Application startup', error);
   dialog.showErrorBox('Futures Journal PRO', `Aplikaci se nepodařilo spustit.

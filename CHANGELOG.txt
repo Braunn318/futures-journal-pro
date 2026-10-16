@@ -2,6 +2,12 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.9 - 2026-10-17
+Data location safety – no stored data changes.
+- Fixed: data or images stored inside the program folder (e.g. E:\Programme\Futures Journal PRO\FuturesJournalPRO-Data) were wiped by the next update – the installer uninstalls the old version and deletes the whole program folder. Choosing a data folder or an image folder inside the program folder is now refused with an explanation.
+- Fixed: when the custom data folder is missing at start (deleted, disconnected disk), the app no longer silently switches to AppData (looked like "the path reset itself"). A dialog shows the missing path and offers Zkusit znovu / Vybrat složku… / Pokračovat s výchozí / Ukončit. The pointer in data-location.json is kept unless a new folder is picked.
+- Added: warning on first window show when data or images already lie inside the program folder, with the way to move them.
+
 ## 4.8.8 - 2026-10-16
 Layout only – no stored data changes.
 - Top bar: "＋ Přidat obchod", "＋ Setup bez vstupu" and "📰 Kalendář zpráv" sit together on the right and are smaller (before: spread across the whole width).

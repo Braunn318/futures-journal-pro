@@ -45,7 +45,9 @@ function world() {
     readSettings: () => ({ ...settings }),
     writeSettings: next => { settings = JSON.parse(JSON.stringify(next)); },
     backupJournalFile: (id, reason) => { backups.push([id, reason, fs.readFileSync(path.join(data, `${id}.json`), 'utf8')]); return { ok: true }; },
-    logInfo: () => {}, logError: () => {}
+    logInfo: () => {}, logError: () => {},
+    // Pojistku proti složce programu hlídá data-location.test.js.
+    isInsideInstallDir: () => false, INSTALL_DIR_ERROR: ''
   });
   const writeJournal = (id, j) => fs.writeFileSync(path.join(data, `${id}.json`), JSON.stringify(j));
   const readJournal = id => JSON.parse(fs.readFileSync(path.join(data, `${id}.json`), 'utf8'));
