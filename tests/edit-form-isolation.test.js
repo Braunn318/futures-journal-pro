@@ -143,7 +143,7 @@ test('obchod bez obrázků otevře prázdný formulář a nespadne', () => {
 
 function dayNotes(stored) {
   const r = loadRenderer(
-    ['emptyDayNote', 'getDayNote', 'ensureActiveJournalData', 'commitJournal', 'saveDayNote'],
+    ['emptyDayNote', 'getDayNote', 'ensureActiveJournalData', 'commitJournal', 'saveDayNote', 'dayNoteIsEmpty'],
     {
       db: { data: { trades: [], settings: [], dayNotes: stored }, close() {} },
       activeJournalId: 'j1',

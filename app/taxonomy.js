@@ -163,6 +163,12 @@
   // Netest / test hladiny: cena se hladiny v seanci ještě nedotkla / už ano.
   // Pevné, needitovatelné – na obou hodnotách stojí analýza.
   const TEST_STATE = { UNTESTED: 'netest', TESTED: 'test' };
+  // Psychika na škále 1–8 (1 nejhorší, 8 nejlepší). Jedna škála pro obchod
+  // (před vstupem / v průběhu / po výstupu) i pro den (před seancí /
+  // v průběhu / po seanci). Popisky jdou přejmenovat a hodnoty skrýt nebo
+  // přeřadit; vlastní hodnotu přidat nejde (GROUPS `fixed`) – škála je 1–8
+  // a na pořadí čísel stojí statistika.
+  const PSYCH = { '1': '1 – nejhorší', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8 – nejlepší' };
 
   // Proč by obchod naživo NEVZAL (wouldSkipLive). V backtestu se setup dá vzít
   // i tak – replay nic nestojí a výsledek je informace –, ale do výkonu
@@ -194,7 +200,7 @@
   const DAY_NEWS = { NONE: 'Bez zpráv', CPI: 'CPI', FOMC: 'FOMC', NFP: 'NFP', OTHER: 'Jiné zprávy' };
 
   const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
-    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, GRADE, DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS };
+    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, GRADE, DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS, PSYCH };
 
   // Výchozí skryté klíče (uživatel je zobrazí tlačítkem Zobrazit). PDH/PDL
   // a ONH/ONL jsou skryté i u vstupu – Adam je nepoužívá. High / Low dne
@@ -236,7 +242,9 @@
     { name: 'DAY_OPEN', label: 'Kontext dne – open vůči value', cardinality: 'single' },
     { name: 'DAY_TYPE', label: 'Kontext dne – typ dne (očekávaný i skutečný)', cardinality: 'single' },
     { name: 'DAY_VALUE_MIGRATION', label: 'Kontext dne – migrace value', cardinality: 'single' },
-    { name: 'DAY_NEWS', label: 'Kontext dne – zprávy', cardinality: 'single' }
+    { name: 'DAY_NEWS', label: 'Kontext dne – zprávy', cardinality: 'single' },
+    // `fixed`: pevná škála – přejmenovat, skrýt a přeřadit jde, přidat ne.
+    { name: 'PSYCH', label: 'Psychika (škála 1–8, obchod i den)', cardinality: 'single', fixed: true }
   ];
 
   const GROUP_BY_NAME = Object.fromEntries(GROUPS.map(g => [g.name, g]));
@@ -287,7 +295,12 @@
     // Čas prvního zadání známky: sloučený obchod bere nejdřívější. „Změněno
     // dodatečně" platí, když to tvrdí kterákoli noha.
     { key: 'gradeSetAt', cardinality: 'string', enumName: null, merge: 'min', label: 'Známka zadána' },
-    { key: 'gradeEdited', cardinality: 'bool', enumName: null, merge: 'any', label: 'Známka změněna dodatečně' }
+    { key: 'gradeEdited', cardinality: 'bool', enumName: null, merge: 'any', label: 'Známka změněna dodatečně' },
+    // Psychika obchodu 1–8 (karta Psychika). Sloučený obchod bere první
+    // vyplněnou hodnotu jako ostatní single-select pole.
+    { key: 'psychBefore', cardinality: 'single', enumName: 'PSYCH', label: 'Psychika – před vstupem' },
+    { key: 'psychDuring', cardinality: 'single', enumName: 'PSYCH', label: 'Psychika – v průběhu' },
+    { key: 'psychAfter', cardinality: 'single', enumName: 'PSYCH', label: 'Psychika – po výstupu' }
   ];
 
   // ------------------------------------------------------- uživatelská úprava
@@ -700,6 +713,7 @@
     { key: 'course', label: 'Pohyb ceny' },
     { key: 'setup', label: 'Setup' },
     { key: 'levels', label: 'Hladiny' },
+    { key: 'psych', label: 'Psychika' },
     { key: 'comments', label: 'Komentáře', checks: false }
   ];
   // Do které karty patří kontrolované pole. Cílová hladina 1 se dělí: typ
@@ -709,7 +723,8 @@
     slPrice: 'sltp',
     mfeTicks: 'course', maeTicks: 'course', postExitFavorableTicks: 'course', postExitAdverseTicks: 'course',
     setupCode: 'setup', fillStatus: 'setup', trend: 'setup', trendHtf: 'setup', grade: 'setup',
-    entryLevels: 'levels', nearLevels: 'levels', ofConfirm: 'levels'
+    entryLevels: 'levels', nearLevels: 'levels', ofConfirm: 'levels',
+    psychBefore: 'psych', psychDuring: 'psych', psychAfter: 'psych'
   };
 
   // ---------------------------------------------------- pole kontextu (v3 A4)
@@ -729,9 +744,27 @@
     { key: 'dayContext', label: 'Kontext dne' },
     { key: 'derivedRow', label: 'Řádek dopočtů', checks: false },
     // Řádek „Vstupy" na kartě obchodu a pole „Vstup" u cíle ve formuláři.
-    { key: 'entries', label: 'Vstupy a dokupy', checks: false }
+    { key: 'entries', label: 'Vstupy a dokupy', checks: false },
+    // Psychika obchodu (karta Psychika) – upozornění na přání.
+    { key: 'psychBefore', label: 'Psychika – před vstupem' },
+    { key: 'psychDuring', label: 'Psychika – v průběhu obchodu' },
+    { key: 'psychAfter', label: 'Psychika – po výstupu' },
+    // Psychika dne. „Upozorňovat" u pole říká, že se jeho nevyplnění hlásí;
+    // KDE se hlásí, určují dva řádky `warnOnly` (bez „Zobrazit"): na dni
+    // (záhlaví dne v Deníku, kalendář) a u obchodů toho dne (štítek
+    // „Neúplné", Rychlý kontext). Obě místa jsou ve výchozím stavu zapnutá,
+    // pole samotná bez upozornění – dokud si ho uživatel nezapne, nic se
+    // nehlásí.
+    { key: 'psychDayBefore', label: 'Psychika dne – před seancí' },
+    { key: 'psychDayDuring', label: 'Psychika dne – v průběhu seance' },
+    { key: 'psychDayAfter', label: 'Psychika dne – po seanci' },
+    { key: 'psychDayWarnDay', label: 'Psychika dne – upozornění na dni', warnOnly: true, warnDefault: true },
+    { key: 'psychDayWarnTrades', label: 'Psychika dne – upozornění u obchodů dne', warnOnly: true, warnDefault: true }
   ];
   const CONTEXT_FIELD_BY_KEY = Object.fromEntries(CONTEXT_FIELDS.map(f => [f.key, f]));
+  // Psychika dne: klíč v dayNotes[date].psych → pole kontextu (nastavení).
+  const DAY_PSYCH_FIELDS = { before: 'psychDayBefore', during: 'psychDayDuring', after: 'psychDayAfter' };
+  const DAY_PSYCH_LABELS = { before: 'Před seancí', during: 'V průběhu seance', after: 'Po seanci' };
 
   // { show, warn } jedné zapínatelné položky (karta, pole kontextu) z uloženého
   // nastavení. Chybějící položka nebo hodnota = výchozí: zobrazeno, upozornění
@@ -749,13 +782,32 @@
   function normalizeFieldConfig(raw) { return normalizeToggles(CONTEXT_FIELDS, raw, fieldToggle); }
   function fieldShown(fieldConfig, key) {
     const field = CONTEXT_FIELD_BY_KEY[key];
-    return !field || fieldToggle(fieldConfig, field).show;
+    return !field || field.warnOnly === true || fieldToggle(fieldConfig, field).show;
   }
   function fieldWarns(fieldConfig, key) {
     const field = CONTEXT_FIELD_BY_KEY[key];
     if (!field || field.checks === false) return false;
     const c = fieldToggle(fieldConfig, field);
-    return c.show && c.warn;
+    // Řádek jen s upozorněním (místo upozornění) se skrýt nedá.
+    return (field.warnOnly === true || c.show) && c.warn;
+  }
+
+  // Psychika dne: které části (before / during / after) chybí a mají se
+  // hlásit – jen zobrazená pole se zapnutým upozorněním. Hodnota platí, když
+  // ji škála zná (i skrytá volba).
+  function missingDayPsych(psych, fieldConfig, config) {
+    const p = psych && typeof psych === 'object' ? psych : {};
+    return Object.keys(DAY_PSYCH_FIELDS).filter(part =>
+      fieldWarns(fieldConfig, DAY_PSYCH_FIELDS[part]) && !sanitizeSingle('PSYCH', p[part], config));
+  }
+  // Uložitelný tvar psychiky dne: jen známé části s platnou hodnotou; nic = null.
+  function sanitizeDayPsych(psych, config) {
+    const out = {};
+    for (const part of Object.keys(DAY_PSYCH_FIELDS)) {
+      const v = psych && typeof psych === 'object' ? psych[part] : undefined;
+      if (typeof v === 'string' && v && isValidKey('PSYCH', v, config)) out[part] = v;
+    }
+    return Object.keys(out).length ? out : null;
   }
 
   // Chybějící pole jako položky { key, card, label, part? } v pořadí
@@ -781,6 +833,9 @@
     if (fieldWarns(fieldConfig, 'entryTestNo') && !sanitizeSingle('ENTRY_TEST_NO', trade.entryTestNo, config)) add('entryTestNo', 'setup', CONTEXT_FIELD_BY_KEY.entryTestNo.label);
     if (fieldWarns(fieldConfig, 'absLocation') && !sanitizeSingle('ABS_LOCATION', trade.absLocation, config)) add('absLocation', 'levels', CONTEXT_FIELD_BY_KEY.absLocation.label);
     if (fieldWarns(fieldConfig, 'levelTestState') && nearLevelsOf(trade).some(r => !r.testState)) add('levelTestState', 'levels', CONTEXT_FIELD_BY_KEY.levelTestState.label);
+    for (const key of ['psychBefore', 'psychDuring', 'psychAfter']) {
+      if (fieldWarns(fieldConfig, key) && !sanitizeSingle('PSYCH', trade[key], config)) add(key, 'psych', CONTEXT_FIELD_BY_KEY[key].label);
+    }
     return items;
   }
 
@@ -814,6 +869,10 @@
     const items = missingContextItems(trade, config, fieldConfig).filter(item => cardWarns(cardConfig, item.card));
     const isTrade = !!trade && typeof trade === 'object' && trade.recordType !== 'SETUP_ONLY';
     if (isTrade && opts?.dayContextMissing === true && fieldWarns(fieldConfig, 'dayContext')) items.push({ key: 'dayContext', card: null, label: CONTEXT_FIELD_BY_KEY.dayContext.label });
+    // Psychika dne: `opts.dayPsychMissing` = dni chybí některá hlídaná část
+    // (missingDayPsych – volající zná denní poznámky). U obchodu se hlásí, jen
+    // když je zapnuté „upozornění u obchodů dne".
+    if (isTrade && opts?.dayPsychMissing === true && fieldWarns(fieldConfig, 'psychDayWarnTrades')) items.push({ key: 'dayPsych', card: null, label: 'Psychika dne' });
     return items;
   }
 
@@ -868,7 +927,8 @@
       const defaults = DEFAULT_ENUMS[vocabularyOf(group.name)] || {};
 
       const custom = {};
-      if (g.custom && typeof g.custom === 'object') {
+      // Pevná škála (psychika 1–8) vlastní volby nemá – ani z importu.
+      if (!group.fixed && g.custom && typeof g.custom === 'object') {
         for (const key of Object.keys(g.custom)) {
           if (!CUSTOM_KEY_RE.test(key)) continue;
           // Vlastní volba nesmí přepsat výchozí klíč – jinak by import
@@ -971,7 +1031,7 @@
     // výchozí číselníky (neměnné – uživatelská úprava jde přes config)
     SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
     TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, GRADE, TEST_STATE, DEFAULT_HIDDEN,
-    DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS,
+    DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS, PSYCH,
     sanitizeTestState,
     // hladiny v blízkosti (kontext v3) a převod starého zápisu
     sanitizeNearLevels, nearLevelsFromLegacy, nearLevelsOf, nearLevelsNoneOf, setNearLevels,
@@ -985,6 +1045,7 @@
     missingContextKeys, contextFieldLabel,
     TRADE_CARDS, missingContextItems, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingWarnItems, missingForCards,
     CONTEXT_FIELDS, normalizeFieldConfig, fieldShown, fieldWarns,
+    DAY_PSYCH_FIELDS, DAY_PSYCH_LABELS, missingDayPsych, sanitizeDayPsych,
     makeCustomKey,
     // přenos mezi deníky a soubor
     sanitizeConfig, exportPayload, configFromImport, describeConfig,

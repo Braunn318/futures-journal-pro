@@ -61,7 +61,7 @@ test('A7/11: dayContext přežije readJournal() a zápis v main procesu', () => 
 });
 
 function rendererJournal(initial) {
-  const r = loadRenderer(['SCHEMA_VERSION', 'ensureActiveJournalData', 'commitJournal', 'emptyDayNote', 'getDayNote', 'saveDayNote', 'saveDayContext'], {
+  const r = loadRenderer(['SCHEMA_VERSION', 'ensureActiveJournalData', 'commitJournal', 'emptyDayNote', 'getDayNote', 'saveDayNote', 'saveDayContext', 'dayNoteIsEmpty'], {
     db: { data: initial, close() {} },
     activeJournalId: 'j1',
     window: { desktopAPI: { writeJournal: async () => ({ ok: true }) } }
@@ -187,8 +187,11 @@ test('4.8.2: tlačítko ☀ Kontext dne ukáže ✓, když má dnešek ranní ko
 
 test('4.8.2: Deník má tlačítko a okno kontextu dne s nativním datem', () => {
   const html = readRepoFile('app/index.html');
-  assert.match(html, /<button class="btn" id="dayContextBtn" data-ctx-field="dayContext" type="button"[^>]*>☀ Kontext dne<\/button>/);
-  assert.match(html, /<div class="modal" id="dayContextModal">[\s\S]*?<input type="date" id="dayContextDate">[\s\S]*?<div id="dayContextModalBox"><\/div>/);
+  // Tlačítko otevírá kontext i psychiku dne, jeho viditelnost proto řídí
+  // applyContextFieldVisibility (ne data-ctx-field) – zmizí, až když jsou
+  // skryté obě.
+  assert.match(html, /<button class="btn" id="dayContextBtn" type="button"[^>]*>☀ Kontext dne<\/button>/);
+  assert.match(html, /<div class="modal" id="dayContextModal">[\s\S]*?<input type="date" id="dayContextDate">[\s\S]*?<div id="dayContextModalBox" data-ctx-field="dayContext"><\/div>\s*<div id="dayPsychModalBox"><\/div>/);
 });
 
 // Volby kontextu dne nejsou natvrdo v kódu: jsou to číselníky deníku

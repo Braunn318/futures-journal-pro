@@ -359,7 +359,7 @@ test('A7/7: smazaná pole nejsou ve slovníku polí, ve formuláři ani v export
   assert.ok(html.includes('id="nearLevels"') && html.includes('id="nearLevelsNone"'));
 
   const r = loadRenderer(['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'reportSigned', 'levelCsvCount', 'levelCsvHeader', 'levelCsvCells',
-    'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY',
+    'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH',
     'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable', 'reportCsvTable'],
   { settings: { templates: [] }, activeJournalId: 'j1', journalProfiles: [] });
   const trade = { ...LONG, date: '2026-10-09', entryTime: '15:31', result: 'target', pnlRaw: 18.1,
@@ -441,11 +441,14 @@ const completeTrade = (extra = {}) => ({
 const fields = over => FJTaxonomy.normalizeFieldConfig(over);
 const missing = (trade, fieldCfg, opts) => FJTaxonomy.missingForCards(trade, {}, undefined, fieldCfg, opts);
 
-test('A4: pole kontextu – osm polí, vše zobrazené; upozornění ve výchozím stavu jen u trendu 30m a známky', () => {
-  assert.deepEqual(FJTaxonomy.CONTEXT_FIELDS.map(f => f.key), ['trendHtf', 'grade', 'entryTestNo', 'absLocation', 'levelTestState', 'dayContext', 'derivedRow', 'entries']);
+test('A4: pole kontextu – vše zobrazené; upozornění ve výchozím stavu jen u trendu 30m a známky', () => {
+  assert.deepEqual(FJTaxonomy.CONTEXT_FIELDS.map(f => f.key), ['trendHtf', 'grade', 'entryTestNo', 'absLocation', 'levelTestState', 'dayContext', 'derivedRow', 'entries',
+    'psychBefore', 'psychDuring', 'psychAfter', 'psychDayBefore', 'psychDayDuring', 'psychDayAfter', 'psychDayWarnDay', 'psychDayWarnTrades']);
   const cfg = fields(undefined);
   for (const f of FJTaxonomy.CONTEXT_FIELDS) assert.equal(cfg[f.key].show, true, f.key);
-  assert.deepEqual(FJTaxonomy.CONTEXT_FIELDS.filter(f => FJTaxonomy.fieldWarns(cfg, f.key)).map(f => f.key), ['trendHtf', 'grade']);
+  // Dva řádky psychiky dne jen říkají, KDE se upozorňuje; pole psychiky
+  // samotná upozornění ve výchozím stavu nemají, takže se nic nehlásí.
+  assert.deepEqual(FJTaxonomy.CONTEXT_FIELDS.filter(f => FJTaxonomy.fieldWarns(cfg, f.key)).map(f => f.key), ['trendHtf', 'grade', 'psychDayWarnDay', 'psychDayWarnTrades']);
   assert.equal(FJTaxonomy.fieldWarns(fields({ derivedRow: { warn: true } }), 'derivedRow'), false, 'řádek dopočtů se nekontroluje nikdy');
 });
 

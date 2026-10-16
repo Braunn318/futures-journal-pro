@@ -109,7 +109,8 @@ test('zápis: obchod ve starém tvaru (dva seznamy SR) zůstane bez zásahu stej
 
 test('skupiny rychlého formuláře: jeden seznam hladin, zrušená pole nejsou', () => {
   const keys = plain(r().quickGroups().map(g => g.key));
-  assert.deepEqual(keys, ['setupCode', 'fillStatus', 'trend', 'trendHtf', 'grade', 'entryTestNo', 'entryLevels', 'nearLevels', 'ofConfirm', 'absLocation', 'targetLevel1Type']);
+  assert.deepEqual(keys, ['setupCode', 'fillStatus', 'trend', 'trendHtf', 'grade', 'entryTestNo', 'entryLevels', 'nearLevels', 'ofConfirm', 'absLocation', 'targetLevel1Type',
+    'psychBefore', 'psychDuring', 'psychAfter']);
 });
 
 // Obchod, kterému chybí jen něco, co rychlý formulář nenabízí (cena cíle –

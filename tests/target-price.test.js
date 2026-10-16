@@ -232,7 +232,7 @@ test('chybějící pole se rozdělí do karet; cílová hladina 1 podle toho, co
     slPrice: 7746, mfeTicks: 18, maeTicks: 2, postExitFavorableTicks: 1, postExitAdverseTicks: 30
   };
   eq(r.missingBySection({ ...base, targetLevel1: { type: 'VPOC_1M', price: '' } }),
-    { sltp: ['Cena targetu'], course: [], setup: [], levels: [], comments: [] });
+    { sltp: ['Cena targetu'], course: [], setup: [], levels: [], psych: [], comments: [] });
   eq(r.missingBySection({ ...base, targetLevel1: { type: '', price: 7737.75 } }).levels,
     ['Cílová hladina 1 (typ)']);
   const m = r.missingBySection({ ...base, slPrice: '', maeTicks: '', trend: '', targetLevel1: { type: 'VPOC_1M', price: 7737.75 } });

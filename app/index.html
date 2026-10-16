@@ -202,6 +202,11 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .day-comment-row .lbl{color:var(--blue);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-right:6px}
 .day-comment-row input{width:calc(100% - 26px);background:transparent;border:1px solid transparent;color:var(--text2);font-family:inherit;font-size:13.5px;padding:2px 4px;border-radius:6px}
 .day-comment-row input:hover,.day-comment-row input:focus{background:var(--input-bg);border-color:var(--line);outline:none}
+.day-psych-row{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;color:var(--text2);font-size:13px;margin:6px 0 0 26px}
+.day-psych-row .lbl{color:var(--blue);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+.day-psych-row label{display:inline-flex;gap:6px;align-items:center}
+.day-psych-row select{padding:2px 6px;min-width:64px}
+.pill.psych-warn{border-color:rgba(var(--yellow-rgb),.7);color:var(--yellow)}
 .day-thumbs{display:flex;gap:7px;margin:10px 0 2px 26px;flex-wrap:wrap;align-items:center}
 .day-thumbs img{width:64px;height:48px;object-fit:cover;border-radius:7px;border:1px solid var(--line);cursor:pointer}
 .day-thumbs .day-thumb-wrap{position:relative}
@@ -225,7 +230,7 @@ input[type="color"]{height:42px;padding:4px;cursor:pointer;background:var(--inpu
 .dow.week{color:var(--blue);font-weight:700}
 .day{min-height:105px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px;position:relative}
 .day.empty{opacity:.25}.day.out-month{opacity:.5}.day.out-month .num{color:var(--muted)}.day .num{font-weight:800}.day .pnl{font-size:12px;margin-top:7px}.day .count{font-size:11px;color:var(--muted);margin-top:4px}
-.day[data-date]{cursor:pointer}.day[data-date]:hover{border-color:rgba(var(--blue-rgb),.6)}.day-ctx-flag{position:absolute;bottom:6px;right:8px;font-size:12px;opacity:.8}.day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
+.day-psych-flag{position:absolute;bottom:6px;left:8px;font-size:10.5px;color:var(--yellow);opacity:.9}.day[data-date]{cursor:pointer}.day[data-date]:hover{border-color:rgba(var(--blue-rgb),.6)}.day-ctx-flag{position:absolute;bottom:6px;right:8px;font-size:12px;opacity:.8}.day.has{cursor:pointer}.day.risk{box-shadow:inset 0 0 0 2px var(--red)}.day.goal{box-shadow:inset 0 0 0 2px var(--green)}
 .day.week-summary{background:var(--panel2);border-color:rgba(var(--blue-rgb),.4)}
 .day.week-summary .num{color:var(--blue);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
 .day-flag{position:absolute;top:6px;right:8px;font-size:14px}
@@ -658,7 +663,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <select id="filterSide"><option value="">Long i Short</option><option value="long">Jen Long</option><option value="short">Jen Short</option><option value="none">Bez směru</option></select>
         <select id="filterSkipLive" title="Obchody, které bych naživo nevzal (vzaté jen kvůli měření)"><option value="">Živé i „naživo bych nevzal“</option><option value="only">Jen „naživo bych nevzal“</option><option value="exclude">Bez „naživo bych nevzal“</option></select>
         <select id="filterFill" title="Stav naplnění: naplněné obchody, nenaplněné / nestihnuté (no fill) a vědomě vynechané setupy"><option value="">Všechny stavy naplnění</option><option value="filled">Jen naplněné</option><option value="noFill">Jen no fill</option><option value="skipped">Jen vědomě vynechané</option></select>
-        <button class="btn" id="dayContextBtn" data-ctx-field="dayContext" type="button" title="Kontext dne (otevření vs value, očekávaný typ dne, zprávy …) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button>
+        <button class="btn" id="dayContextBtn" type="button" title="Kontext a psychika dne (otevření vs value, očekávaný typ dne, zprávy, psychika před / v průběhu / po seanci) – ráno ještě před prvním obchodem, celé i na klávesnici">☀ Kontext dne</button>
         <button class="btn" id="quickContextBtn" type="button" title="Doplnit kontext obchodům z aktuálního výběru, které ho nemají úplný – celé na klávesnici">⚡ Rychlý kontext</button>
         <select id="filterDataCheck" title="Záznamy, které je potřeba ručně zkontrolovat: cíl nebo SL na špatné straně vstupu, „naživo bych nevzal“ v živém deníku, „vědomě vynechán“ v backtest deníku. Nic se neopravuje samo."><option value="">Bez kontroly dat</option><option value="only">Kontrola dat</option></select>
         <button class="btn" id="clearSkipLiveBtn" type="button" style="display:none" title="Živý deník: odebere chybné „naživo bych nevzal“ (i s důvodem) u všech takových záznamů aktivního deníku. Nic jiného se nemění.">Odebrat „naživo bych nevzal“</button>
@@ -697,6 +702,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <h3>Obchody vybraného dne</h3>
         <div id="dayRiskNote" class="alert"></div>
         <div id="dayContextBox" data-ctx-field="dayContext"></div>
+        <div id="dayPsychBox"></div>
         <div id="dayTrades" class="trade-list"><div class="sub">Klikni v kalendáři na den – i bez obchodů, kontext dne jde vyplnit předem.</div></div>
       </div>
     </section>
@@ -956,6 +962,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Karty obchodu</h3></summary>
           <p class="sub">Které karty se ukazují ve formuláři obchodu a u obchodu v Deníku, a u kterých upozorňovat na nevyplněná pole (štítek „⚠ Neúplné“ na kartě obchodu a „chybí N“ v hlavičce karty). Skrytá karta jen zmizí – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí karty se zase ukážou.</p>
           <div id="tradeCardSettings" style="margin-top:10px"></div>
+          <p class="sub" style="margin-top:10px"><b>Psychika</b> – před vstupem, v průběhu a po výstupu, ale jen pole, která mají v „Pole kontextu“ zapnuté upozornění (ve výchozím stavu žádné).</p>
           <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend 1m, trend 30m, známka; <b>Hladiny</b> – hladina vstupu, hladiny v blízkosti (hladina, nebo „žádná hladina v blízkosti“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
@@ -965,6 +972,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="contextFieldSettings" style="margin-top:10px"></div>
           <div class="field" style="margin-top:14px;max-width:560px"><label>Známka – „doplněno zpětně“ až po <span class="sub">— minut od uložení obchodu do deníku</span></label><input type="number" id="gradeRetroGraceMinutes" min="0" step="1" placeholder="30"></div>
           <p class="sub">Známka zadaná do téhle lhůty od uložení obchodu (u pozice s víc cíli od posledního výstupu) se nepovažuje za doplněnou zpětně – importovanému obchodu ji dřív zadat nejde. Výchozí je 30 minut, 0 = hned po uložení. Platí pro aktivní deník, uloží se hned a stejně počítá i export (CSV, AI export). V backtest deníku se „doplněno zpětně“ neurčuje.</p>
+          <p class="sub" style="margin-top:10px"><b>Psychika</b> (škála 1–8, 1 nejhorší, 8 nejlepší): tři pole obchodu jsou v kartě Psychika, tři pole dne v okně ☀ Kontext dne, v detailu dne v Kalendáři a v řádku „Psychika“ u dne v Deníku. U polí dne „Upozorňovat na nevyplněné“ říká, že se pole hlídá; <b>kde</b> se to ukáže, určují dva řádky „upozornění na dni“ (záhlaví dne v Deníku a kalendář, jen dny s obchody) a „upozornění u obchodů dne“ (štítek „⚠ Neúplné“ a Rychlý kontext). Popisky hodnot jdou přejmenovat v Nastavení → Číselníky.</p>
           <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
@@ -1141,7 +1149,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   <div class="modalbox" style="max-width:760px">
     <div class="modalhead"><h2>Kontext dne</h2><button class="icon" id="closeDayContext" title="Zavřít (Esc)">✕</button></div>
     <div class="field" style="max-width:220px;margin-bottom:10px"><label>Datum</label><input type="date" id="dayContextDate"></div>
-    <div id="dayContextModalBox"></div>
+    <div id="dayContextModalBox" data-ctx-field="dayContext"></div>
+    <div id="dayPsychModalBox"></div>
     <div class="sub qc-help">Ranní pole vyplň před obchodováním, večerní po něm. Volba se uloží hned (klik / Enter / mezerník), druhý výběr téže volby ji zruší · Tab = další volba · Esc = zavřít</div>
   </div>
 </div>
@@ -1327,6 +1336,15 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full sub" id="contextDerived" data-ctx-field="derivedRow" title="Dopočítáno z cen hladin, vstupu, SL a cíle – needituje se a do obchodu se neukládá."></div>
         </div>
       </details>
+      <details class="trade-section" data-card="psych">
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Psychika</span><span class="sub trade-section-summary" id="psychSummary"></span><span class="trade-section-missing" id="psychMissing"></span></summary>
+        <div class="formgrid">
+          <div class="field full sub">Škála 1–8: 1 = nejhorší, 8 = nejlepší. Druhým kliknutím na tutéž hodnotu se volba zruší.</div>
+          <div class="field full" data-ctx-field="psychBefore"><label>Před vstupem</label><div id="psychBefore" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="psychDuring"><label>V průběhu obchodu</label><div id="psychDuring" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="psychAfter"><label>Po výstupu</label><div id="psychAfter" class="chip-grid"></div></div>
+        </div>
+      </details>
       <details class="trade-section" data-card="comments">
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Komentáře</span><span class="sub trade-section-summary" id="commentsSummary"></span><span class="trade-section-missing" id="commentsMissing"></span></summary>
         <div class="formgrid">
@@ -1505,10 +1523,13 @@ async function saveDayNote(date,patch){
  await commitJournal(journal=>{
   const current=journal.dayNotes[date]||emptyDayNote();
   const next={...current,...patch};
-  // Kontext dne (A5) je taky obsah – den jen s kontextem se nesmí smazat.
-  const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length)&&!next.dayContext;
-  if(isEmpty)delete journal.dayNotes[date];else journal.dayNotes[date]=next;
+  if(dayNoteIsEmpty(next))delete journal.dayNotes[date];else journal.dayNotes[date]=next;
  });
+}
+// Kontext dne (A5) i psychika dne jsou taky obsah – den jen s nimi se nesmí
+// smazat.
+function dayNoteIsEmpty(n){
+ return !n.comment&&!n.preview&&!n.notes&&(!n.images||!n.images.length)&&!n.dayContext&&!n.psych;
 }
 // Kontext dne (A5): doplňuje se po polích – večerní pole nepřepíše ranní.
 // Prázdná hodnota pole smaže; prázdný kontext se neukládá vůbec.
@@ -1519,8 +1540,18 @@ async function saveDayContext(date,patch){
   const clean=FJContext.sanitizeDayContext(merged);
   const next={...current};
   if(clean)next.dayContext=clean;else delete next.dayContext;
-  const isEmpty=!next.comment&&!next.preview&&!next.notes&&(!next.images||!next.images.length)&&!next.dayContext;
-  if(isEmpty)delete journal.dayNotes[date];else journal.dayNotes[date]=next;
+  if(dayNoteIsEmpty(next))delete journal.dayNotes[date];else journal.dayNotes[date]=next;
+ });
+}
+// Psychika dne (1–8): { before, during, after } v dayNotes[date].psych.
+// Doplňuje se po částech jako kontext dne; prázdná hodnota část smaže.
+async function saveDayPsych(date,patch){
+ await commitJournal(journal=>{
+  const current=journal.dayNotes[date]||emptyDayNote();
+  const clean=FJTaxonomy.sanitizeDayPsych({...(current.psych||{}),...(patch||{})});
+  const next={...current};
+  if(clean)next.psych=clean;else delete next.psych;
+  if(dayNoteIsEmpty(next))delete journal.dayNotes[date];else journal.dayNotes[date]=next;
  });
 }
 async function clearStore(name){
@@ -1779,6 +1810,9 @@ function applyContextFieldVisibility(){
  document.querySelectorAll('[data-ctx-field]').forEach(el=>{
   el.style.display=contextFieldShown(el.dataset.ctxField)?'':'none';
  });
+ // Tlačítko ☀ otevírá kontext i psychiku dne – zmizí, až když jsou skryté obě.
+ const dayBtn=typeof document.getElementById==='function'?document.getElementById('dayContextBtn'):null;
+ if(dayBtn)dayBtn.style.display=contextFieldShown('dayContext')||(typeof anyDayPsychShown==='function'&&anyDayPsychShown())?'':'none';
 }
 // Chybí dni obchodu ranní kontext dne? Jen u obchodu aktivního deníku – denní
 // poznámky jiného deníku (Přehled, Reporty) tu nejsou.
@@ -2855,7 +2889,8 @@ function renderTaxonomyEditor(){
    <summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">${esc(group.label)} <span class="sub">(${keys.length} voleb)</span></summary>
    ${sourceLabel?`<p class="sub" style="margin-top:8px">Používá stejný seznam voleb jako <b>${esc(sourceLabel)}</b> – hladina je hladina, ať se na ni koukáš jako na místo vstupu, nebo jako na překážku. Přejmenovat volbu a přidat novou jde u „${esc(sourceLabel)}" a platí to pro obě kolonky. Skrýt a přeuspořádat si tady můžeš zvlášť.</p>`:''}
    <div style="margin-top:10px">${rows}</div>
-   ${sourceLabel?'':`<div class="mapping-row" style="margin-top:10px">
+   ${group.fixed?'<p class="sub" style="margin-top:8px">Pevná škála – hodnoty jde přejmenovat, skrýt a přeřadit, novou přidat nejde.</p>':''}
+   ${sourceLabel||group.fixed?'':`<div class="mapping-row" style="margin-top:10px">
     <input type="text" class="tax-new" data-group="${esc(group.name)}" placeholder="Nová volba – napiš popisek">
     <button type="button" class="btn tax-add" data-group="${esc(group.name)}">Přidat volbu</button>
    </div>`}
@@ -3024,7 +3059,9 @@ function fillContextSelect(id,enumName,emptyLabel,selected){
 }
 // Nová single-select pole kontextu v2 (A4): id prvku = klíč v obchodu.
 // Známka (grade) jde zvlášť přes FJContext.applyGrade.
-const NEW_SINGLE_FIELDS=[['trendHtf','TREND_HTF'],['entryTestNo','ENTRY_TEST_NO'],['absLocation','ABS_LOCATION']];
+const NEW_SINGLE_FIELDS=[['trendHtf','TREND_HTF'],['entryTestNo','ENTRY_TEST_NO'],['absLocation','ABS_LOCATION'],
+ ['psychBefore','PSYCH'],['psychDuring','PSYCH'],['psychAfter','PSYCH']];
+const PSYCH_TRADE_FIELDS=['psychBefore','psychDuring','psychAfter'];
 // Pod známkou: kdy byla zadaná a jestli se dodatečně měnila / doplnila zpětně.
 function renderGradeNote(t){
  const el=$('gradeNote'); if(!el)return;
@@ -3285,8 +3322,12 @@ function contextPillsHTML(t){
  // v backtestovém deníku) hlásí štítek „Neúplné" v titulku karty
  // (incompleteBadgeHTML) – zapíná se v Nastavení → Obecné.
  if(FJPoints.slTicksSuspicious(t.slTicks))parts.push(`<span class="pill context-pill post-exit-warn" title="SL nepravděpodobně daleko, překlep?">SL ${esc(t.slTicks)} t?</span>`);
+ // Psychika (karta Psychika) má vlastní pilulku na konci; skrytá karta nebo
+ // skrytá pole ji schovají, data zůstávají.
+ const psych=typeof psychTradeParts==='function'&&(typeof tradeCardShown!=='function'||tradeCardShown('psych'))?psychTradeParts(t):[];
+ const psychPill=psych.length?` <span class="pill context-pill" title="Psychika (1 nejhorší – 8 nejlepší)">Psychika ${esc(psych.join(' · '))}</span>`:'';
  // Skrytá karta Setup (Nastavení → Přizpůsobení) schová i své pilulky.
- if(typeof tradeCardShown==='function'&&!tradeCardShown('setup'))return parts.join(' ');
+ if(typeof tradeCardShown==='function'&&!tradeCardShown('setup'))return parts.join(' ')+psychPill;
  if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
  if(t.trend)parts.push(`<span class="pill context-pill" title="Trend 1m">1m: ${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
  // Skryté pole kontextu (Nastavení → Přizpůsobení → Pole kontextu) schová
@@ -3297,8 +3338,37 @@ function contextPillsHTML(t){
   parts.push(`<span class="pill context-pill${flags.length?' grade-flag':''}" title="Známka${flags.length?' – '+esc(flags.join(', ')):''}">Známka ${esc(FJTaxonomy.labelOf('GRADE',t.grade))}${flags.length?' *':''}</span>`);
  }
  if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
- return parts.join(' ');
+ return parts.join(' ')+psychPill;
 }
+// Psychika obchodu jako krátké části „před 6 · během 4 · po 7" – jen
+// vyplněná a zobrazená pole, popisek hodnoty z číselníku deníku.
+const PSYCH_TRADE_SHORT={psychBefore:'před',psychDuring:'během',psychAfter:'po'};
+function psychTradeParts(t){
+ return PSYCH_TRADE_FIELDS.filter(k=>t&&t[k]&&(typeof contextFieldShown!=='function'||contextFieldShown(k)))
+  .map(k=>PSYCH_TRADE_SHORT[k]+' '+FJTaxonomy.labelOf('PSYCH',t[k]));
+}
+// Psychika dne (dayNotes[date].psych): chybí dni některá hlídaná část?
+// Jen u aktivního deníku – denní poznámky jiného deníku tu nejsou.
+function dayPsychMissingParts(date){
+ if(!date||typeof getDayNote!=='function')return [];
+ return FJTaxonomy.missingDayPsych(getDayNote(date).psych,typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig);
+}
+function dayPsychMissingFor(t){
+ if(!t?.date||(t.journalId&&t.journalId!==activeJournalId))return false;
+ return dayPsychMissingParts(t.date).length>0;
+}
+// Upozornění na dni (záhlaví dne, kalendář) – jen se zapnutým „upozornění
+// na dni" a jen u dne, který má obchody.
+function dayPsychWarnOnDay(date){
+ return typeof contextFieldConfig!=='undefined'&&FJTaxonomy.fieldWarns(contextFieldConfig,'psychDayWarnDay')&&dayPsychMissingParts(date).length>0;
+}
+// Psychika dne jako text „před seancí 6 · po seanci 3" (zobrazená pole).
+function dayPsychSummary(psych){
+ if(!psych)return '';
+ return Object.keys(FJTaxonomy.DAY_PSYCH_FIELDS).filter(p=>psych[p]&&contextFieldShown(FJTaxonomy.DAY_PSYCH_FIELDS[p]))
+  .map(p=>FJTaxonomy.DAY_PSYCH_LABELS[p].toLowerCase()+' '+FJTaxonomy.labelOf('PSYCH',psych[p])).join(' · ');
+}
+function anyDayPsychShown(){return Object.values(FJTaxonomy.DAY_PSYCH_FIELDS).some(k=>contextFieldShown(k))}
 // Štítek „Neúplné · N" v titulku karty: obchod nemá vyplněný kontext
 // (FJTaxonomy.missingContextKeys). Co chybí, říká tooltip – karta zůstane
 // kompaktní. Počítají se jen karty, které jsou zobrazené a mají zapnuté
@@ -3306,7 +3376,8 @@ function contextPillsHTML(t){
 function incompleteBadgeHTML(t){
  const labels=FJTaxonomy.missingForCards(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig,undefined,
   typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig,
-  {dayContextMissing:typeof dayContextMissingFor==='function'&&dayContextMissingFor(t)});
+  {dayContextMissing:typeof dayContextMissingFor==='function'&&dayContextMissingFor(t),
+   dayPsychMissing:typeof dayPsychMissingFor==='function'&&dayPsychMissingFor(t)});
  if(!labels.length)return '';
  return `<span class="pill incomplete-pill" title="Chybí: ${esc(labels.join(', '))}">⚠ Neúplné · ${labels.length}</span>`;
 }
@@ -3651,13 +3722,14 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span>${note.dayContext&&contextFieldShown('dayContext')?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
+ <span class="date">${date}</span>${note.dayContext&&contextFieldShown('dayContext')?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}${dayTrades.length&&dayPsychWarnOnDay(date)?`<span class="pill context-pill psych-warn" title="Psychika dne – nevyplněno: ${esc(dayPsychMissingParts(date).map(p=>FJTaxonomy.DAY_PSYCH_LABELS[p].toLowerCase()).join(', '))}">⚠ Psychika dne</span>`:''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
  <div class="spacer"></div>
  ${levelsBtn}
  ${excludedHTML}
  <span class="stat ${kpi.pnl>=0?'pos':'neg'}">${kpi.pnl>=0?'+':''}${money(kpi.pnl)}</span>
  </div>
  <div class="day-comment-row"><span class="lbl">Komentář</span><input type="text" placeholder="Volitelné" value="${esc(note.comment)}" onclick="event.stopPropagation()" onblur="saveDayField('${date}','comment',this.value)"></div>
+ ${dayPsychRowHTML(date,note)}
  <div class="day-thumbs">${dayThumbsHTML(date)}</div>
  <div class="day-detail">
  <div class="day-kpis">
@@ -3672,6 +3744,22 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  ${dayTrades.length||daySetups.length?`<div class="day-trades">${dayTrades.map(tradeHTML).join('')}${daySetups.map(setupRowHTML).join('')}</div>`:''}
  </div>`;
 }
+// Psychika dne v bloku dne v Deníku: tři malé výběry na jednom řádku, uloží
+// se hned po změně. Skryté pole se neukáže, jeho hodnota zůstává.
+function dayPsychRowHTML(date,note){
+ const parts=Object.keys(FJTaxonomy.DAY_PSYCH_FIELDS).filter(p=>contextFieldShown(FJTaxonomy.DAY_PSYCH_FIELDS[p]));
+ if(!parts.length)return '';
+ const psych=note.psych||{};
+ const sel=p=>{
+  const opts=FJTaxonomy.visibleOptions('PSYCH',psych[p]?[psych[p]]:[]);
+  return `<label>${esc(FJTaxonomy.DAY_PSYCH_LABELS[p])}<select data-part="${p}" onclick="event.stopPropagation()" onchange="saveDayPsychField('${date}','${p}',this.value)"><option value="">–</option>${opts.map(o=>`<option value="${esc(o.key)}"${psych[p]===o.key?' selected':''}>${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('')}</select></label>`;
+ };
+ return `<div class="day-psych-row" title="Psychika dne: 1 nejhorší, 8 nejlepší"><span class="lbl">Psychika</span>${parts.map(sel).join('')}</div>`;
+}
+window.saveDayPsychField=async(date,part,value)=>{
+ try{await saveDayPsych(date,{[part]:value});renderTrades();if(typeof renderCalendar==='function')renderCalendar()}
+ catch(e){showToast('Psychiku dne se nepodařilo uložit: '+e.message)}
+};
 function findDayWrap(date){return document.querySelector(`.day-wrap[data-day="${CSS.escape(date)}"]`)}
 window.toggleDayNote=date=>{
  if(openDayNotes.has(date))openDayNotes.delete(date);else openDayNotes.add(date);
@@ -3877,7 +3965,9 @@ function renderCalendar(){
   const title=[...violations,...achievements].join(' | ');
   // ☀ = den má kontext dne (jen aktivní deník – kontext patří deníku).
   const ctxSummary=!scope&&typeof getDayNote==='function'&&contextFieldShown('dayContext')?dayContextSummary(getDayNote(date).dayContext):'';
-  html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" onclick="showDay('${date}')" ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}${ctxSummary?`<div class="day-ctx-flag" title="Kontext dne: ${esc(ctxSummary)}">☀</div>`:''}</div>`;
+  // Psychika dne: upozornění jen u dne s obchody (aktivní deník).
+  const psychWarn=!scope&&ts.length&&typeof dayPsychWarnOnDay==='function'&&dayPsychWarnOnDay(date);
+  html+=`<div class="day ${ts.length?'has':''} ${flagCls}${inMonth?'':' out-month'}" data-date="${date}" onclick="showDay('${date}')" ${title?`title="${esc(title)}"`:''}><div class="num">${d.getDate()}</div>${ts.length?`<div class="pnl ${p>=0?'pos':'neg'}">${dualMoney(p,true)}</div><div class="count">${ts.length} obchodů</div>`:''}${violations.length?'<div class="day-flag risk-flag">⚠️</div>':''}${!violations.length&&achievements.length?'<div class="day-flag goal-flag">🎯</div>':''}${ctxSummary?`<div class="day-ctx-flag" title="Kontext dne: ${esc(ctxSummary)}">☀</div>`:''}${psychWarn?'<div class="day-psych-flag" title="Psychika dne – nevyplněno">⚠ psychika</div>':''}</div>`;
   weekPnl+=p;weekCount+=ts.length;
   cellsInRow++;
   if(cellsInRow===7){flushWeek();cellsInRow=0}
@@ -3964,8 +4054,37 @@ function renderDayContextBox(date,box=$('dayContextBox'),opts={}){
   });
  });
 }
+// Psychika dne (1–8) v detailu dne v Kalendáři a v okně ☀: tři skupiny
+// dlaždic, uloží se hned po kliknutí. Jen aktivní deník a jen zobrazená pole.
+function renderDayPsychBox(date,box=$('dayPsychBox'),opts={}){
+ if(!box)return;
+ const scope=opts.onSaved?'':($('calendarJournal')?.value||'');
+ const parts=Object.keys(FJTaxonomy.DAY_PSYCH_FIELDS).filter(p=>contextFieldShown(FJTaxonomy.DAY_PSYCH_FIELDS[p]));
+ if(scope||!date||!parts.length){box.innerHTML='';return}
+ const psych=getDayNote(date).psych||{};
+ const missing=new Set(dayPsychMissingParts(date));
+ const group=p=>`<div class="day-context-group" data-part="${p}"><div class="qc-label">${esc(FJTaxonomy.DAY_PSYCH_LABELS[p])}${missing.has(p)?' <span class="sub" style="color:var(--yellow)">— nevyplněno</span>':''}</div><div class="chip-grid">${FJTaxonomy.visibleOptions('PSYCH',psych[p]?[psych[p]]:[]).map(o=>`<span class="chip${psych[p]===o.key?' on':''}" data-value="${esc(o.key)}" role="button" tabindex="0">${esc(o.label)}${o.hidden?' (skrytá)':''}</span>`).join('')}</div></div>`;
+ box.innerHTML=`<div class="day-context-card"><div class="day-context-title">Psychika dne ${esc(date)} <span class="sub">— 1 nejhorší, 8 nejlepší; kliknutím se uloží, druhým zruší</span></div>${parts.map(group).join('')}</div>`;
+ box.querySelectorAll('.day-context-group').forEach(g=>{
+  const part=g.dataset.part;
+  g.querySelectorAll('.chip').forEach(chip=>{
+   const pick=async()=>{
+    const v=chip.dataset.value;
+    try{
+     await saveDayPsych(date,{[part]:psych[part]===v?'':v});
+     renderDayPsychBox(date,box,opts);
+     box.querySelector(`.day-context-group[data-part="${part}"] .chip[data-value="${CSS.escape(v)}"]`)?.focus();
+     if(opts.onSaved)opts.onSaved(part);else{renderTrades();renderCalendar()}
+    }catch(e){showToast('Psychiku dne se nepodařilo uložit: '+e.message)}
+   };
+   chip.onclick=pick;
+   chip.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();pick()}};
+  });
+ });
+}
 window.showDay=date=>{
  renderDayContextBox(date);
+ if(typeof renderDayPsychBox==='function')renderDayPsychBox(date);
  const scope=$('calendarJournal')?.value||'';
  const rows=getCalendarRows();
  const showRisk=!scope;
@@ -3996,6 +4115,7 @@ function renderDayContextBtn(){
 function renderDayContextModal(focusFirst){
  const date=$('dayContextDate').value,box=$('dayContextModalBox');
  renderDayContextBox(date,box,{onSaved:renderDayContextBtn});
+ renderDayPsychBox(date,$('dayPsychModalBox'),{onSaved:renderDayContextBtn});
  if(!focusFirst||!date)return;
  // Fokus na první nevyplněnou skupinu – nejdřív ranní, pak večerní.
  const dc=getDayNote(date).dayContext||{};
@@ -4701,6 +4821,7 @@ function formContextDraft(){
   ofConfirm:readChipGrid('ofConfirm','OF_CONFIRM'),
   entryTestNo:readSingleChipGrid('entryTestNo','ENTRY_TEST_NO'),absLocation:readSingleChipGrid('absLocation','ABS_LOCATION'),
   trendHtf:readSingleChipGrid('trendHtf','TREND_HTF'),grade:readSingleChipGrid('grade','GRADE'),
+  psychBefore:readSingleChipGrid('psychBefore','PSYCH'),psychDuring:readSingleChipGrid('psychDuring','PSYCH'),psychAfter:readSingleChipGrid('psychAfter','PSYCH'),
   targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price}
  };
 }
@@ -4730,6 +4851,10 @@ function renderTradeSections(){
  if(missedByApplies(d.fillStatus)&&val(d.missedByTicks))setup.push('minuto o '+d.missedByTicks+' t');
  if(d.trend)setup.push('trend 1m '+FJTaxonomy.labelOf('TREND',d.trend));
  if($('setupSummary'))$('setupSummary').textContent=setup.length?'— '+setup.join(' · '):'';
+ if($('psychSummary')){
+  const psych=psychTradeParts(d);
+  $('psychSummary').textContent=psych.length?'— '+psych.join(' · '):'';
+ }
  const texts=['tradePlanSetup','tradePlanPsychology','tradePlanNote','comment'].filter(id=>val($(id)?.value)).length;
  const shots=typeof editImages!=='undefined'&&Array.isArray(editImages)?editImages.length:0;
  const comments=[];
@@ -5225,10 +5350,11 @@ let journalVisibleTrades=null;
 // formuláři a štítek je hlásí dál. Kontext dne drží obchod v dávce jen do
 // chvíle, kdy ho den má vyplněný (tady, nebo v běžném Denním kontextu).
 function quickMissingKeys(t){
- const fillable=new Set([...QC_GROUPS.map(g=>g.key),'slPrice','mfeTicks','maeTicks','levelTestState','dayContext']);
+ const fillable=new Set([...QC_GROUPS.map(g=>g.key),'slPrice','mfeTicks','maeTicks','levelTestState','dayContext','dayPsych']);
  const items=FJTaxonomy.missingWarnItems(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig,undefined,
   typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig,
-  {dayContextMissing:typeof dayContextMissingFor==='function'&&dayContextMissingFor(t)});
+  {dayContextMissing:typeof dayContextMissingFor==='function'&&dayContextMissingFor(t),
+   dayPsychMissing:typeof dayPsychMissingFor==='function'&&dayPsychMissingFor(t)});
  return [...new Set(items.filter(i=>i.key==='targetLevel1'?i.part==='type':fillable.has(i.key)).map(i=>i.key))];
 }
 // Dávka: obchody chronologicky; bez startu jen ty s nevyplněným kontextem,
@@ -5256,9 +5382,13 @@ const QC_GROUPS=[
  {key:'nearLevels',group:'NEAR_LEVEL',label:'Hladiny v blízkosti',type:'rows'},
  {key:'ofConfirm',group:'OF_CONFIRM',label:'Order flow',type:'multi'},
  {key:'absLocation',group:'ABS_LOCATION',label:'Absorpce – kde',type:'single',field:'absLocation'},
- {key:'targetLevel1Type',group:'TARGET_LEVEL',label:'Typ cíle 1',type:'single'}
+ {key:'targetLevel1Type',group:'TARGET_LEVEL',label:'Typ cíle 1',type:'single'},
+ // Karta Psychika: skrytá karta schová všechny tři skupiny.
+ {key:'psychBefore',group:'PSYCH',label:'Psychika – před vstupem',type:'single',field:'psychBefore',card:'psych'},
+ {key:'psychDuring',group:'PSYCH',label:'Psychika – v průběhu',type:'single',field:'psychDuring',card:'psych'},
+ {key:'psychAfter',group:'PSYCH',label:'Psychika – po výstupu',type:'single',field:'psychAfter',card:'psych'}
 ];
-function quickGroups(){return QC_GROUPS.filter(g=>!g.field||contextFieldShown(g.field))}
+function quickGroups(){return QC_GROUPS.filter(g=>(!g.field||contextFieldShown(g.field))&&(!g.card||typeof tradeCardShown!=='function'||tradeCardShown(g.card)))}
 const QC_KEYS='123456789abcdefghijklmnopqrstuvwxyz';
 // Pracovní kopie kontextu obchodu pro formulář. Hladiny v blízkosti se čtou
 // i ze starého tvaru (dva seznamy SR) – stejným převodem jako při migraci.
@@ -5270,6 +5400,7 @@ function quickDraftFrom(t){
   nearLevelsNone:FJTaxonomy.nearLevelsNoneOf(t),
   ofConfirm:FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm),
   absLocation:t.absLocation||'',grade:t.grade||'',
+  psychBefore:t.psychBefore||'',psychDuring:t.psychDuring||'',psychAfter:t.psychAfter||'',
   targetLevel1Type:t.targetLevel1?.type||'',
   slPrice:t.slPrice??'',mfeTicks:t.mfeTicks??'',maeTicks:t.maeTicks??'',touched:{}
  };
@@ -5321,7 +5452,7 @@ function quickContextApply(existing,d,nowIso){
  }
  return obj;
 }
-const qc={batch:[],index:0,draft:null,dayDraft:null,dayShown:false,focusKey:''};
+const qc={batch:[],index:0,draft:null,dayDraft:null,dayShown:false,psychParts:[],psychDraft:{},focusKey:''};
 window.openQuickContext=startId=>{
  const list=Array.isArray(journalVisibleTrades)?journalVisibleTrades:tradeRecords(trades);
  qc.batch=quickBatch(list,startId).map(t=>t.id);
@@ -5340,6 +5471,11 @@ function loadQuickTrade(){
  // když pole „Kontext dne" není skryté).
  qc.dayShown=contextFieldShown('dayContext')&&dayContextMissingFor(t);
  qc.dayDraft={...dc};
+ // Psychika dne: pruh jen u dne, kterému chybí hlídaná část, a jen když se
+ // to má hlásit u obchodů (jinak by obchod v dávce nebyl kvůli ní).
+ qc.psychParts=FJTaxonomy.fieldWarns(contextFieldConfig,'psychDayWarnTrades')&&dayPsychMissingFor(t)
+  ?Object.keys(FJTaxonomy.DAY_PSYCH_FIELDS).filter(p=>contextFieldShown(FJTaxonomy.DAY_PSYCH_FIELDS[p])):[];
+ qc.psychDraft={...(getDayNote(t.date).psych||{})};
  qc.focusKey='';
  $('qcAlert').classList.remove('show');
  renderQuickContext();
@@ -5347,7 +5483,8 @@ function loadQuickTrade(){
  // Test / netest se vyplňuje u řádků hladin v blízkosti.
  const missingIn=g=>missing.includes(g.key==='targetLevel1Type'?'targetLevel1':g.key)||(g.key==='nearLevels'&&missing.includes('levelTestState'));
  const first=quickGroups().find(missingIn)?.key||QC_GROUPS[0].key;
- focusQuickGroup(qc.dayShown?'day.'+FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k]):first);
+ const psychFirst=qc.psychParts.length?'dpsych.'+(dayPsychMissingParts(t.date)[0]||qc.psychParts[0]):'';
+ focusQuickGroup(qc.dayShown?'day.'+FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k]):(psychFirst||first));
 }
 function closeQuickContext(){$('quickContextModal').classList.remove('open');qc.batch=[];renderTrades()}
 function focusQuickGroup(key){
@@ -5379,6 +5516,11 @@ function renderQuickContext(){
   const opts=FJContext.dayContextOptions(k,qc.dayDraft[k]);
   return `<div class="qc-group" tabindex="0" data-key="day.${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}</div><div class="chip-grid">${opts.map((o,i)=>quickChip(o.label+(o.hidden?' ·':''),qc.dayDraft[k]===o.key,i)).join('')}</div></div>`;
  }).join('')}</div>`:'';
+ // Psychika dne – pod ranním kontextem, jen chybějící den.
+ if(qc.psychParts.length)$('qcDay').innerHTML+=`<div class="qc-day"><div class="qc-day-title">Psychika dne ${esc(t.date)} <span class="sub">— 1 nejhorší, 8 nejlepší, jednou za den</span></div>${qc.psychParts.map(p=>{
+  const opts=FJTaxonomy.visibleOptions('PSYCH',[qc.psychDraft[p]]);
+  return `<div class="qc-group" tabindex="0" data-key="dpsych.${p}"><div class="qc-label">${esc(FJTaxonomy.DAY_PSYCH_LABELS[p])}</div><div class="chip-grid">${opts.map((o,i)=>quickChip(o.label+(o.hidden?' ·':''),qc.psychDraft[p]===o.key,i)).join('')}</div></div>`;
+ }).join('')}</div>`;
  const showTest=contextFieldShown('levelTestState');
  $('qcGroups').innerHTML=quickGroups().map(g=>{
   const opts=quickOptions(g);
@@ -5405,6 +5547,11 @@ function renderQuickContext(){
 // Volba dlaždice podle indexu (klik i klávesa). Vrací true u single-select
 // výběru – pak se focus posune na další skupinu.
 function quickPick(key,index){
+ if(key.startsWith('dpsych.')){
+  const p=key.slice(7),v=FJTaxonomy.visibleOptions('PSYCH',[qc.psychDraft[p]])[index]?.key; if(v===undefined)return false;
+  qc.psychDraft[p]=qc.psychDraft[p]===v?'':v;
+  return true;
+ }
  if(key.startsWith('day.')){
   const k=key.slice(4),v=FJContext.dayContextOptions(k,qc.dayDraft[k])[index]?.key; if(v===undefined)return false;
   qc.dayDraft[k]=qc.dayDraft[k]===v?'':v;
@@ -5509,6 +5656,12 @@ async function saveQuickContext(){
    const patch={};
    for(const k of FJContext.DAY_CONTEXT_MORNING)if((qc.dayDraft[k]||'')!==(before[k]||''))patch[k]=qc.dayDraft[k]||'';
    if(Object.keys(patch).length)await saveDayContext(t.date,patch);
+  }
+  if(qc.psychParts?.length&&t.date){
+   const before=getDayNote(t.date).psych||{};
+   const patch={};
+   for(const p of qc.psychParts)if((qc.psychDraft[p]||'')!==(before[p]||''))patch[p]=qc.psychDraft[p]||'';
+   if(Object.keys(patch).length)await saveDayPsych(t.date,patch);
   }
   await load();
   quickNext();
@@ -5809,12 +5962,14 @@ function renderToggleSettings({box,items,cfg,cls,set,shownText}){
  if(!box)return;
  box.innerHTML=items.map(item=>{
   const c=cfg[item.key];
+  // Řádek jen s upozorněním (kde se upozorňuje) nemá co skrývat.
+  const shown=item.warnOnly===true||c.show;
   const warn=item.checks===false
    ?'<span class="sub">— nic se nekontroluje</span>'
-   :`<label class="settings-check" style="margin:0${c.show?'':';opacity:.45'}"><input type="checkbox" class="${cls}-warn" data-key="${esc(item.key)}"${c.warn?' checked':''}${c.show?'':' disabled'}> Upozorňovat na nevyplněné</label>`;
+   :`<label class="settings-check" style="margin:0${shown?'':';opacity:.45'}"><input type="checkbox" class="${cls}-warn" data-key="${esc(item.key)}"${c.warn?' checked':''}${shown?'':' disabled'}> ${item.warnOnly?'Upozorňovat':'Upozorňovat na nevyplněné'}</label>`;
   return `<div class="mapping-row ${cls}-row" style="grid-template-columns:minmax(120px,1fr) auto minmax(220px,1.4fr)">
    <div><b>${esc(item.label)}</b></div>
-   <label class="settings-check" style="margin:0"><input type="checkbox" class="${cls}-show" data-key="${esc(item.key)}"${c.show?' checked':''}> Zobrazit</label>
+   ${item.warnOnly?'<span class="sub">—</span>':`<label class="settings-check" style="margin:0"><input type="checkbox" class="${cls}-show" data-key="${esc(item.key)}"${c.show?' checked':''}> Zobrazit</label>`}
    <div>${warn}</div>
   </div>`;
  }).join('');
@@ -6093,12 +6248,18 @@ const CONTEXT_CSV_DERIVED=[
  ['P/L dne před obchodem','dayPnlBefore'],['Seance','session'],['Známka doplněná zpětně','gradeRetro']
 ];
 const CONTEXT_CSV_DAY=[['Open vůči value','openVsValue'],['Typ dne očekávaný','dayTypeExpected'],['Typ dne skutečný','dayTypeActual'],['Migrace value','valueMigration'],['Zprávy','newsEvent']];
+// Psychika 1–8 (4.8.7) – sloupce až na konci, ať se stávající nepohnou.
+// Hodnota je klíč škály (číslo), stejně jako u ostatních číselníků.
+const CONTEXT_CSV_PSYCH=[['Psychika – před vstupem','psychBefore'],['Psychika – v průběhu','psychDuring'],['Psychika – po výstupu','psychAfter']];
+const CONTEXT_CSV_DAY_PSYCH=[['Psychika – před seancí','before'],['Psychika – v průběhu','during'],['Psychika – po seanci','after']];
 function csvBool(v){return v==null?'':(v?'ano':'ne')}
 function contextCsvHeader(){
  const out=CONTEXT_CSV_MANUAL.map(([h])=>h);
  out.push('Známka změněna dodatečně','Žádná hladina v blízkosti');
  for(const [h] of CONTEXT_CSV_DERIVED)out.push(h+' (dopočet)');
  for(const [h] of CONTEXT_CSV_DAY)out.push('Den: '+h);
+ for(const [h] of CONTEXT_CSV_PSYCH)out.push(h);
+ for(const [h] of CONTEXT_CSV_DAY_PSYCH)out.push('Den: '+h);
  return out;
 }
 // ctx: { tickSize, config (číselníky deníku), dayOrder (FJContext.dayOrder
@@ -6116,6 +6277,9 @@ function contextCsvCells(t,ctx={}){
  }
  const dc=ctx.dayContext||{};
  for(const [,k] of CONTEXT_CSV_DAY)out.push(dc[k]||'');
+ for(const [,k] of CONTEXT_CSV_PSYCH)out.push(t[k]??'');
+ const dp=ctx.dayPsych||{};
+ for(const [,k] of CONTEXT_CSV_DAY_PSYCH)out.push(dp[k]||'');
  return out;
 }
 // Celá tabulka exportu Deníku (hlavička + řádky). dayNoteOf(date) vrací
@@ -6131,7 +6295,7 @@ function journalCsvTable(rows,dayNoteOf,opts={}){
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?(note||emptyDayNoteCells()):null;
   const tickSize=opts.tickSizeOf?.(t.instrument);
-  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext})]);
+  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych})]);
  }
  return out;
 }
@@ -6153,7 +6317,7 @@ function reportCsvTable(rows,allRows,dayNoteOf,journals={}){
   const dn=t.date&&first[key]===t?(note||{}):null;
   const j=journals[t.journalId]||{};
   const tickSize=FJPoints.tickSizeFor(t.instrument,j.templates);
-  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext})]);
+  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych})]);
  }
  return out;
 }
@@ -6181,7 +6345,21 @@ $('exportJson').onclick=async()=>{
  }
  download(new Blob([JSON.stringify({settings,trades:[...trades,...setupRecords]},null,2)],{type:'application/json'}),'futures-journal-zaloha.json');
 };
-$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const raw of data.trades){const t=FJTaxonomy.tradeToV3(raw);if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings.taxonomy?{...data.settings,taxonomy:FJTaxonomy.migrateConfigV3(data.settings.taxonomy)}:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
+// Denní poznámky ze zálohy (komentář, kontext a psychika dne, screenshoty).
+// Do 4.8.6 je „Nahrát zálohu JSON" nečetla, takže se obnovou ztratily. Záloha
+// bez dayNotes (starší formát) nechá stávající poznámky beze změny (null).
+async function restorableDayNotes(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+ const out={};
+ for(const [date,note] of Object.entries(raw)){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!note||typeof note!=='object')continue;
+  const n={...note};
+  if(Array.isArray(n.images)){const refs=[];for(const img of n.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}n.images=refs}
+  out[date]=n;
+ }
+ return out;
+}
+$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const raw of data.trades){const t=FJTaxonomy.tradeToV3(raw);if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings.taxonomy?{...data.settings,taxonomy:FJTaxonomy.migrateConfigV3(data.settings.taxonomy)}:data.settings});const notes=await restorableDayNotes(data.dayNotes);if(notes)await commitJournal(journal=>{journal.dayNotes=notes});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
 $('clearAll').onclick=async()=>{if(await showConfirm('Tato akce smaže všechny obchody a nastavení pouze v aktuálním deníku. Pokračovat?')){await clearStore('trades');await clearStore('settings');safeReload()}};
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 

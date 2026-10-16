@@ -35,8 +35,8 @@ const cfg = (over = {}) => {
 
 // ---------- rozdělení po kartách ----------
 
-test('karty formuláře: pět karet v pořadí formuláře, Komentáře nic nekontrolují', () => {
-  assert.deepEqual(FJTaxonomy.TRADE_CARDS.map(c => c.key), ['sltp', 'course', 'setup', 'levels', 'comments']);
+test('karty formuláře: šest karet v pořadí formuláře, Komentáře nic nekontrolují', () => {
+  assert.deepEqual(FJTaxonomy.TRADE_CARDS.map(c => c.key), ['sltp', 'course', 'setup', 'levels', 'psych', 'comments']);
   assert.equal(FJTaxonomy.TRADE_CARDS.find(c => c.key === 'comments').checks, false);
 });
 
@@ -46,6 +46,7 @@ test('prázdný obchod: každé pole je ve své kartě', () => {
     course: ['MFE', 'MAE', 'Ticky po výstupu – ve směru zisku', 'Ticky po výstupu – proti'],
     setup: ['Setup', 'Stav naplnění', 'Trend 1m', 'Trend 30m', 'Známka'],
     levels: ['Hladina vstupu', 'Hladiny v blízkosti', 'Order flow potvrzení', 'Cílová hladina 1 (typ)'],
+    psych: [],
     comments: []
   });
 });
