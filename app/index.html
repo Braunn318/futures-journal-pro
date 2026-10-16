@@ -1158,6 +1158,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <button class="btn" id="openImagesFolder" type="button">Otevřít ve Windows</button>
             <button class="btn" id="resetImagesLocation" type="button">Vrátit do výchozí složky</button>
           </div>
+          <div id="imagesIntegrityInfo" class="sub" style="margin-top:10px"></div>
+          <button class="btn" id="restoreImagesFromBackup" type="button" style="display:none;margin-top:8px">♻️ Doplnit chybějící obrázky ze zálohy</button>
           <div class="sub" style="margin-top:8px">Podsložka <b>_nahledy</b> jsou jen zmenšeniny pro seznamy – jde kdykoli smazat, vytvoří se znovu. Soubor <b>_prejmenovani.json</b> pamatuje původní jména obrázků, ať je najdou i starší zálohy.</div>
         </details>
         <details class="card settings-card" data-card="backup">
@@ -1166,6 +1168,13 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn primary" id="updateBackup">💾 Aktualizovat zálohu na SSD</button>
           <button class="btn" id="restoreBackup" style="display:block;margin-top:10px">♻️ Obnovit ze zálohy</button>
           <div id="backupPathInfo" class="sub" style="margin-top:10px">Umístění zálohy zatím není zvoleno.</div>
+          <label class="settings-check" style="margin-top:10px"><input type="checkbox" id="backupImagesMirror"> Zálohovat obrázky do složky vedle zálohy</label>
+          <div class="sub">Záloha má dvě části: soubor s obchody (JSON) a složku s obrázky, na které deníky odkazují (výchozí <b>&lt;jméno zálohy&gt;_obrazky</b> vedle souboru). Kopírují se jen nové obrázky; obrázky smazaných obchodů se ze složky uklidí. „Obnovit ze zálohy“ doplní i obrázky. Předchozí 3 verze souboru zálohy zůstávají vedle jako <b>…_predchozi-1..3.json</b>.</div>
+          <div id="backupImagesMirrorInfo" class="sub" style="margin-top:6px;word-break:break-all"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+            <button class="btn" id="chooseBackupImagesDir" type="button">📁 Změnit složku zálohy obrázků…</button>
+            <button class="btn" id="resetBackupImagesDir" type="button">Vedle souboru zálohy</button>
+          </div>
           <label class="settings-check" style="margin-top:10px"><input type="checkbox" id="backupIncludeImages"> Zahrnout obrázky do zálohy</label>
           <div class="sub">Vypnuto (výchozí): záloha i „Stáhnout zálohu JSON“ nesou jen odkazy na obrázky a jsou malé – obrázky zálohuj se složkou obrázků. Zapnuto: obrázky jsou v souboru zálohy (velký soubor, obnoví se i na jiném počítači).</div>
           <button class="btn" id="changeBackupPath" style="margin-top:10px">Změnit umístění zálohy…</button>
@@ -6972,7 +6981,13 @@ if(window.desktopAPI){
    if(result?.canceled)return;
    if(!result?.ok)throw new Error(result?.error||'neznámá chyba');
    $('backupPathInfo').textContent=`Aktuální záloha: ${result.path}`;
-   showToast('Kompletní záloha byla aktualizována.');
+   const img=result.images;
+   let msg='Kompletní záloha byla aktualizována.';
+   if(img)msg+=` Obrázky: ${img.total} v záloze (${img.copied} nových${img.removed?`, ${img.removed} uklizeno`:''}).`;
+   if(img?.missingInSource)msg+=` ⚠ ${img.missingInSource} obrázků chybí ve složce obrázků – v záloze zůstaly.`;
+   if(result.tradesBefore!=null&&result.tradesAfter<result.tradesBefore)msg+=` ⚠ Obchodů ubylo (${result.tradesBefore} → ${result.tradesAfter}); předchozí verze je vedle jako …_predchozi-1.json.`;
+   showToast(msg);
+   refreshBackupImagesMirrorInfo();refreshImagesLocationInfo();
   }catch(err){showToast('Zálohu se nepodařilo vytvořit: '+err.message)}
  };
  $('restoreBackup').onclick=async()=>{
@@ -6982,13 +6997,14 @@ if(window.desktopAPI){
    if(result?.canceled)return;
    if(!result?.ok)throw new Error(result?.error||'neznámá chyba');
    // Záloha bez obrázků z jiného počítače: odkazy zůstávají, jen soubory chybí.
-   if(result.missingImages>0)await showConfirm(`Deníky jsou obnovené. ${result.missingImages}× odkaz na obrázek, který ve složce obrázků není (záloha bez obrázků) – nic se nesmazalo; obrázky se ukážou, až je zkopíruješ do složky obrázků (Nastavení → Data a zálohy → Složka obrázků).`,{title:'Chybějící obrázky',ok:'Rozumím',cancel:'Zavřít'});
+   if(result.restoredImages>0&&!(result.missingImages>0))showToast(`Deníky obnovené, ${result.restoredImages} obrázků doplněno ze zálohy obrázků.`);
+   if(result.missingImages>0)await showConfirm(`Deníky jsou obnovené${result.restoredImages?`, ${result.restoredImages} obrázků doplněno ze zálohy obrázků`:''}. ${result.missingImages}× odkaz na obrázek, který ve složce obrázků není (záloha bez obrázků) – nic se nesmazalo; obrázky se ukážou, až je zkopíruješ do složky obrázků (Nastavení → Data a zálohy → Složka obrázků).`,{title:'Chybějící obrázky',ok:'Rozumím',cancel:'Zavřít'});
    applyRestoredJournals(result);
   }catch(err){showToast('Zálohu se nepodařilo obnovit: '+err.message)}
  };
  if($('changeBackupPath'))$('changeBackupPath').onclick=async()=>{
   const result=await window.desktopAPI.changeBackupPath();
-  if(result?.ok){$('backupPathInfo').textContent=`Aktuální záloha: ${result.path}`;showToast('Umístění zálohy bylo změněno.')}
+  if(result?.ok){$('backupPathInfo').textContent=`Aktuální záloha: ${result.path}`;showToast('Umístění zálohy bylo změněno.');refreshBackupImagesMirrorInfo()}
   else if(!result?.canceled)showToast('Změna se nezdařila: '+(result?.error||'neznámá chyba'));
  };
  refreshBackupPathInfo();
@@ -7006,7 +7022,50 @@ async function refreshImagesLocationInfo(){
  const r=await window.desktopAPI.getImagesLocation();
  box.textContent=r?.ok?`Složka: ${r.dir}${r.isDefault?' (výchozí, v datové složce)':''} · obrázků: ${r.count} · ${formatBytes(r.bytes||0)}`:'Umístění se nepodařilo zjistit.';
  if($('backupIncludeImages'))$('backupIncludeImages').checked=r?.includeInBackup===true;
+ refreshImageIntegrity();
 }
+// Kontrola integrity (4.8.9): odkazy na obrázky, které ve složce chybí. Jen
+// upozornění tady v Nastavení, žádný dialog při startu.
+async function refreshImageIntegrity(){
+ const box=$('imagesIntegrityInfo'),btn=$('restoreImagesFromBackup'); if(!box||!window.desktopAPI?.getImageIntegrity)return;
+ const r=await window.desktopAPI.getImageIntegrity();
+ if(!r?.ok){box.textContent='Kontrola obrázků se nepodařila: '+(r?.error||'neznámá chyba');box.style.color='var(--red)';if(btn)btn.style.display='none';return}
+ box.style.color=r.missing?'var(--red)':'';
+ box.textContent=r.missing?`⚠ Chybí ${r.missing} z ${r.refs} obrázků, na které deníky odkazují (např. ${r.sample.slice(0,3).join(', ')}). ${r.recoverable?`${r.recoverable} z nich je v záloze obrázků.`:'V záloze obrázků nejsou.'}`:`✓ Všech ${r.refs} obrázků, na které deníky odkazují, je ve složce.`;
+ if(btn)btn.style.display=r.recoverable?'':'none';
+}
+async function refreshBackupImagesMirrorInfo(){
+ const box=$('backupImagesMirrorInfo'); if(!box||!window.desktopAPI?.getBackupImagesMirror)return;
+ const r=await window.desktopAPI.getBackupImagesMirror();
+ if($('backupImagesMirror'))$('backupImagesMirror').checked=r?.enabled!==false;
+ if(!r?.ok){box.textContent='';return}
+ box.textContent=!r.enabled?'Záloha obrázků je vypnutá – obrázky zálohuj jinak (kopie složky obrázků).':r.dir?`Složka zálohy obrázků: ${r.dir}${r.isDefault?' (vedle souboru zálohy)':''} · ${r.count} obrázků${r.updatedAt?` · naposledy ${new Date(r.updatedAt).toLocaleString('cs-CZ')}`:' · zatím prázdná'}`:'Složka zálohy obrázků vznikne vedle souboru zálohy při první záloze.';
+}
+if($('restoreImagesFromBackup'))$('restoreImagesFromBackup').onclick=async()=>{
+ const r=await window.desktopAPI?.restoreImagesFromBackup?.();
+ if(!r?.ok){showToast('Obrázky se nepodařilo doplnit: '+(r?.error||'neznámá chyba'));return}
+ showToast(`Doplněno ${r.restored} obrázků ze zálohy${r.missing?`, ${r.missing} dál chybí`:''}.`);
+ await refreshImagesLocationInfo();
+};
+if($('backupImagesMirror'))$('backupImagesMirror').onchange=async e=>{
+ if(!window.desktopAPI?.setBackupImagesMirror)return;
+ await window.desktopAPI.setBackupImagesMirror(e.target.checked);
+ await refreshBackupImagesMirrorInfo();
+};
+if($('chooseBackupImagesDir'))$('chooseBackupImagesDir').onclick=async()=>{
+ if(!window.desktopAPI?.chooseBackupImagesDir){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
+ const r=await window.desktopAPI.chooseBackupImagesDir();
+ if(r?.canceled)return;
+ if(!r?.ok){showToast('Změna se nezdařila: '+(r?.error||'neznámá chyba'));return}
+ showToast('Při příští záloze se obrázky zkopírují do nové složky (stará zůstává beze změny).');
+ await refreshBackupImagesMirrorInfo();
+};
+if($('resetBackupImagesDir'))$('resetBackupImagesDir').onclick=async()=>{
+ if(!window.desktopAPI?.resetBackupImagesDir)return;
+ await window.desktopAPI.resetBackupImagesDir();
+ await refreshBackupImagesMirrorInfo();
+};
+refreshBackupImagesMirrorInfo();
 async function imagesLocationAction(run,confirmText){
  if(!window.desktopAPI?.getImagesLocation){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
  if(confirmText&&!(await showConfirm(confirmText)))return;

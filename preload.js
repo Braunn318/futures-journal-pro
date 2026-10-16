@@ -67,6 +67,12 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   resetImagesLocation: () => ipcRenderer.invoke('images:resetLocation'),
   openImagesFolder: () => ipcRenderer.invoke('images:openFolder'),
   setBackupIncludeImages: (value) => ipcRenderer.invoke('images:setBackupInclude', value),
+  getBackupImagesMirror: () => ipcRenderer.invoke('backup:getImagesMirror'),
+  setBackupImagesMirror: (value) => ipcRenderer.invoke('backup:setImagesMirror', value),
+  chooseBackupImagesDir: () => ipcRenderer.invoke('backup:chooseImagesDir'),
+  resetBackupImagesDir: () => ipcRenderer.invoke('backup:resetImagesDir'),
+  getImageIntegrity: () => ipcRenderer.invoke('images:integrity'),
+  restoreImagesFromBackup: () => ipcRenderer.invoke('images:restoreFromBackup'),
   // Ruční import z NinjaTraderu: přehrání exekucí z CSV bez zápisu (náhled).
   captureManualReplay: (payloads) => ipcRenderer.invoke('capture:manualReplay', payloads),
   onCaptureEvent: (callback) => ipcRenderer.on('capture:event', (_event, payload) => callback(payload)),

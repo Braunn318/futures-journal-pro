@@ -1059,6 +1059,7 @@ ipcMain.handle('backup:changePath', async () => {
       filters: [{ name: 'Záloha Futures Journal', extensions: ['json'] }]
     });
     if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+    if (isInsideInstallDir(result.filePath)) return { ok: false, error: INSTALL_DIR_ERROR };
     writeSettings({ ...readSettings(), backupPath: result.filePath });
     return { ok: true, path: result.filePath };
   } catch (error) {
@@ -1101,7 +1102,7 @@ ipcMain.handle('backup:exportOnce', async (_event, content, suggestedName) => {
 // zálohy“, výchozí vypnuto): bez nich záloha nese jen odkazy a obrázky se
 // zálohují se svou složkou.
 const backupIncludesImages = () => readSettings().backupIncludeImages === true;
-function buildJournalsBackup(meta) {
+function buildJournalsBackup(meta, images) {
   const profiles = Array.isArray(meta?.profiles) ? meta.profiles : [];
   const includeImages = backupIncludesImages();
   const journals = profiles.map(profile => {
@@ -1115,13 +1116,15 @@ function buildJournalsBackup(meta) {
     app: 'Futures Journal',
     version: 2,
     imagesIncluded: includeImages,
+    // Druhá část zálohy (zrcadlo obrázků) – obnova podle toho ví, kde hledat.
+    imagesBackup: images ? { dir: images.dir, count: images.total } : null,
     exportedAt: new Date().toISOString(),
     activeJournalId: meta?.activeJournalId || profiles[0]?.id || '',
     profiles,
     journals
   });
 }
-function restoreJournalsBackup(content) {
+function restoreJournalsBackup(content, sourcePath) {
   const data = JSON.parse(content);
   if (!data || !Array.isArray(data.profiles) || !Array.isArray(data.journals)) throw new Error('Neplatná záloha.');
   for (const entry of data.journals) {
@@ -1138,6 +1141,15 @@ function restoreJournalsBackup(content) {
   // ve složce obrázků nejsou (záloha bez obrázků z jiného počítače), se jen
   // spočítají – nic se nemaže.
   try { nameStoredImages(); } catch (error) { logError('Obnova zálohy – jména obrázků', error); }
+  // Druhá část zálohy: chybějící obrázky se doplní ze zrcadla – složka uvedená
+  // v záloze, jinak <soubor zálohy>_obrazky vedle zvoleného souboru.
+  let restoredImages = 0;
+  const mirror = [data.imagesBackup?.dir, defaultBackupImagesDir(sourcePath), backupImagesDirPath()]
+    .find(dir => typeof dir === 'string' && path.isAbsolute(dir) && fs.existsSync(dir));
+  if (mirror) {
+    try { restoredImages = restoreImagesFromMirror(mirror).restored; }
+    catch (error) { logError('Obnova zálohy – obrázky ze zálohy', error); }
+  }
   let missingImages = 0;
   for (const entry of data.journals) {
     const id = entry?.profile?.id;
@@ -1146,8 +1158,198 @@ function restoreJournalsBackup(content) {
       mapImageStrings(readJournal(id), value => { const file = isImageRef(value) ? imageRefPath(value) : null; if (file && !fs.existsSync(file)) missingImages++; return null; });
     } catch (error) { logError('Obnova zálohy – kontrola obrázků', error); }
   }
-  return { activeJournalId: data.activeJournalId || data.profiles[0]?.id || '', profiles: data.profiles, missingImages };
+  return { activeJournalId: data.activeJournalId || data.profiles[0]?.id || '', profiles: data.profiles, missingImages, restoredImages };
 }
+// ---------- Záloha ve dvou částech: obchody (JSON) + obrázky (složka) ----------
+// 4.8.9: po aktualizaci 4.8.8 se ztratily všechny screenshoty – data ležela ve
+// složce programu, instalátor ji smazal, deníky se vrátily ze zálohy, ale
+// záloha nesla jen odkazy a obrázky nebyly zálohované nikde. „Aktualizovat
+// zálohu" proto vedle JSONu udržuje zrcadlo obrázků (výchozí složka
+// <záloha>_obrazky, jde změnit nebo vypnout). Zrcadlo drží přesně obrázky, na
+// které některý deník odkazuje (obrázky smazaných obchodů se z něj uklidí),
+// ale odkazovaný obrázek, který chybí ve zdroji, v něm zůstane – i záloha
+// spuštěná až po ztrátě tak o zálohu obrázků nepřijde.
+const BACKUP_MANIFEST_FILE = '_manifest.json';
+const BACKUP_KEEP_PREVIOUS = 3;
+const backupMirrorsImages = () => readSettings().backupImagesMirror !== false;
+function defaultBackupImagesDir(backupPath) {
+  if (!backupPath) return null;
+  const ext = path.extname(backupPath);
+  return `${ext ? backupPath.slice(0, -ext.length) : backupPath}_obrazky`;
+}
+function backupImagesDirPath(backupPath = readSettings().backupPath) {
+  const custom = readSettings().backupImagesDir;
+  return typeof custom === 'string' && path.isAbsolute(custom) ? custom : defaultBackupImagesDir(backupPath);
+}
+// Jména obrázků, na které odkazuje některý deník v datové složce →
+// { jméno: [deníky] }. Nečitelný deník = výjimka: nevíme, co používá, a ze
+// zrcadla se pak nesmí nic smazat.
+function referencedImageNames() {
+  const refs = {};
+  for (const file of journalFiles()) {
+    const id = file.slice(0, -5);
+    let journal;
+    try { journal = JSON.parse(fs.readFileSync(path.join(dataRoot(), file), 'utf8')); }
+    catch (error) { throw new Error(`Deník ${file} nejde přečíst – záloha obrázků se neprovedla, nic se nesmazalo (${error.message}).`); }
+    mapImageStrings(journal, value => {
+      const name = imageRefName(storeRefOf(value));
+      if (name) (refs[name] ||= []).includes(id) || refs[name].push(id);
+      return null;
+    });
+  }
+  return refs;
+}
+function readBackupManifest(dir) {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(dir, BACKUP_MANIFEST_FILE), 'utf8'));
+    return data && typeof data.files === 'object' ? data : { files: {} };
+  } catch { return { files: {} }; }
+}
+function fileSha256(file) { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); }
+function copyFileChecked(src, dest) {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, `${dest}.tmp`);
+  if (fs.statSync(`${dest}.tmp`).size !== fs.statSync(src).size) {
+    fs.rmSync(`${dest}.tmp`, { force: true });
+    throw new Error(`Kopie ${path.basename(dest)} nesedí s originálem.`);
+  }
+  fs.renameSync(`${dest}.tmp`, dest);
+}
+// Pořadí: 1) zkopírovat všechny nové / změněné obrázky, 2) teprve když se
+// zkopírovalo vše, uklidit soubory, na které už nic neodkazuje, 3) manifest.
+// Selhání v kroku 1 nic nesmaže a výjimka zastaví i zápis JSONu zálohy.
+function mirrorImagesToBackup(dir) {
+  if (isInsideInstallDir(dir)) throw new Error(INSTALL_DIR_ERROR);
+  const refs = referencedImageNames();
+  fs.mkdirSync(dir, { recursive: true });
+  const previous = readBackupManifest(dir).files;
+  const files = {};
+  let copied = 0, missingInSource = 0;
+  for (const [name, journals] of Object.entries(refs)) {
+    const src = imageRefPath(IMAGE_REF_PREFIX + name);
+    const dest = path.join(dir, name);
+    const old = previous[name];
+    if (!src || !fs.existsSync(src)) {
+      if (fs.existsSync(dest)) files[name] = { ...(old || { size: fs.statSync(dest).size }), journals };
+      missingInSource++;
+      continue;
+    }
+    const stat = fs.statSync(src);
+    const unchanged = fs.existsSync(dest) && old && old.size === stat.size && old.mtimeMs === stat.mtimeMs && fs.statSync(dest).size === stat.size;
+    if (unchanged) { files[name] = { ...old, journals }; continue; }
+    const sha256 = fileSha256(src);
+    if (!(fs.existsSync(dest) && fs.statSync(dest).size === stat.size && fileSha256(dest) === sha256)) {
+      copyFileChecked(src, dest);
+      copied++;
+    }
+    files[name] = { size: stat.size, mtimeMs: stat.mtimeMs, sha256, journals };
+  }
+  let removed = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile() || entry.name === BACKUP_MANIFEST_FILE || entry.name === IMAGE_RENAME_FILE || files[entry.name]) continue;
+    if (refs[entry.name]) continue;
+    fs.rmSync(path.join(dir, entry.name), { force: true });
+    removed++;
+  }
+  const renames = path.join(imagesRoot(), IMAGE_RENAME_FILE);
+  if (fs.existsSync(renames)) copyFileChecked(renames, path.join(dir, IMAGE_RENAME_FILE));
+  const manifest = { app: 'Futures Journal', updatedAt: new Date().toISOString(), imagesDir: imagesRoot(), count: Object.keys(files).length, files };
+  fs.writeFileSync(path.join(dir, `${BACKUP_MANIFEST_FILE}.tmp`), JSON.stringify(manifest, null, 1), 'utf8');
+  fs.renameSync(path.join(dir, `${BACKUP_MANIFEST_FILE}.tmp`), path.join(dir, BACKUP_MANIFEST_FILE));
+  return { dir, copied, removed, total: Object.keys(files).length, referenced: Object.keys(refs).length, missingInSource };
+}
+// Odkazované obrázky, které ve složce obrázků chybí, se doplní ze zrcadla.
+// Nic se nepřepisuje, jen doplňuje.
+function restoreImagesFromMirror(dir) {
+  const refs = referencedImageNames();
+  let restored = 0, missing = 0;
+  for (const name of Object.keys(refs)) {
+    const target = imageRefPath(IMAGE_REF_PREFIX + name);
+    if (target && fs.existsSync(target)) continue;
+    const src = dir ? path.join(dir, name) : null;
+    if (src && fs.existsSync(src)) { copyFileChecked(src, path.join(imagesRoot(), name)); restored++; }
+    else missing++;
+  }
+  if (restored) logInfo('Obrázky doplněné ze zálohy', `${restored} souborů z ${dir}`);
+  return { restored, missing };
+}
+// Kontrola integrity pro Nastavení: kolik odkazů vede na chybějící soubor
+// a kolik z nich jde doplnit ze zrcadla.
+function imageIntegrityReport() {
+  const refs = referencedImageNames();
+  const mirror = backupImagesDirPath();
+  const missing = Object.keys(refs).filter(name => { const f = imageRefPath(IMAGE_REF_PREFIX + name); return !f || !fs.existsSync(f); });
+  const recoverable = mirror ? missing.filter(name => fs.existsSync(path.join(mirror, name))).length : 0;
+  return { refs: Object.keys(refs).length, missing: missing.length, sample: missing.slice(0, 20), recoverable, mirrorDir: mirror };
+}
+const countBackupTrades = backup => (Array.isArray(backup?.journals) ? backup.journals : []).reduce((n, j) => n + (Array.isArray(j?.trades) ? j.trades.length : 0), 0);
+// Předchozí verze zálohy se nechá vedle jako …_predchozi-1..3.json – jen když
+// se obsah deníků opravdu změnil, aby opakované klikání nevytlačilo starší
+// dobrou zálohu (třeba tu z doby před ztrátou dat).
+function rotatePreviousBackup(backupPath, nextJournals) {
+  if (!fs.existsSync(backupPath)) return { rotated: false, tradesBefore: null };
+  let old = null;
+  try { old = JSON.parse(fs.readFileSync(backupPath, 'utf8')); } catch {}
+  const tradesBefore = old ? countBackupTrades(old) : null;
+  if (old && JSON.stringify(old.journals) === JSON.stringify(nextJournals)) return { rotated: false, tradesBefore };
+  const ext = path.extname(backupPath) || '.json';
+  const stem = backupPath.slice(0, backupPath.length - path.extname(backupPath).length);
+  const nth = n => `${stem}_predchozi-${n}${ext}`;
+  fs.rmSync(nth(BACKUP_KEEP_PREVIOUS), { force: true });
+  for (let n = BACKUP_KEEP_PREVIOUS - 1; n >= 1; n--) if (fs.existsSync(nth(n))) fs.renameSync(nth(n), nth(n + 1));
+  fs.copyFileSync(backupPath, nth(1));
+  return { rotated: true, tradesBefore };
+}
+// Celá záloha: obrázky → JSON (JSON nikdy neodkazuje na obrázek, který
+// v zrcadle není), JSON atomicky přes .tmp.
+function saveJournalsBackupTo(backupPath, meta) {
+  if (isInsideInstallDir(backupPath)) throw new Error(INSTALL_DIR_ERROR);
+  const images = backupMirrorsImages() ? mirrorImagesToBackup(backupImagesDirPath(backupPath)) : null;
+  const content = buildJournalsBackup(meta, images);
+  const next = JSON.parse(content);
+  const { rotated, tradesBefore } = rotatePreviousBackup(backupPath, next.journals);
+  fs.writeFileSync(`${backupPath}.tmp`, content, 'utf8');
+  fs.renameSync(`${backupPath}.tmp`, backupPath);
+  return { ok: true, path: backupPath, images, rotated, tradesBefore, tradesAfter: countBackupTrades(next) };
+}
+function backupImagesMirrorInfo() {
+  const backupPath = readSettings().backupPath || null;
+  const dir = backupImagesDirPath(backupPath);
+  const manifest = dir ? readBackupManifest(dir) : { files: {} };
+  return { enabled: backupMirrorsImages(), dir, isDefault: !readSettings().backupImagesDir, count: Object.keys(manifest.files).length, updatedAt: manifest.updatedAt || null };
+}
+ipcMain.handle('backup:getImagesMirror', async () => {
+  try { return { ok: true, ...backupImagesMirrorInfo() }; }
+  catch (error) { return { ok: false, error: error.message }; }
+});
+ipcMain.handle('backup:setImagesMirror', async (_event, value) => {
+  writeSettings({ ...readSettings(), backupImagesMirror: value === true });
+  return { ok: true, ...backupImagesMirrorInfo() };
+});
+ipcMain.handle('backup:chooseImagesDir', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, { title: 'Vyber složku pro zálohu obrázků', properties: ['openDirectory', 'createDirectory'] });
+    if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
+    if (isInsideInstallDir(result.filePaths[0])) return { ok: false, error: INSTALL_DIR_ERROR };
+    if (path.resolve(result.filePaths[0]) === path.resolve(imagesRoot())) return { ok: false, error: 'Záloha obrázků nesmí být přímo ve složce obrázků.' };
+    writeSettings({ ...readSettings(), backupImagesDir: result.filePaths[0] });
+    return { ok: true, ...backupImagesMirrorInfo() };
+  } catch (error) { logError('backup:chooseImagesDir', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('backup:resetImagesDir', async () => {
+  const next = readSettings();
+  delete next.backupImagesDir;
+  writeSettings(next);
+  return { ok: true, ...backupImagesMirrorInfo() };
+});
+ipcMain.handle('images:integrity', async () => {
+  try { return { ok: true, ...imageIntegrityReport() }; }
+  catch (error) { return { ok: false, error: error.message }; }
+});
+ipcMain.handle('images:restoreFromBackup', async () => {
+  try { return { ok: true, ...restoreImagesFromMirror(backupImagesDirPath()), ...imageIntegrityReport() }; }
+  catch (error) { logError('images:restoreFromBackup', error); return { ok: false, error: error.message }; }
+});
 ipcMain.handle('backup:saveJournals', async (_event, meta) => {
   try {
     let { backupPath } = readSettings();
@@ -1158,11 +1360,11 @@ ipcMain.handle('backup:saveJournals', async (_event, meta) => {
         filters: [{ name: 'Záloha Futures Journal', extensions: ['json'] }]
       });
       if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+      if (isInsideInstallDir(result.filePath)) return { ok: false, error: INSTALL_DIR_ERROR };
       backupPath = result.filePath;
       writeSettings({ ...readSettings(), backupPath });
     }
-    fs.writeFileSync(backupPath, buildJournalsBackup(meta), 'utf8');
-    return { ok: true, path: backupPath };
+    return saveJournalsBackupTo(backupPath, meta);
   } catch (error) {
     logError('backup:saveJournals', error);
     return { ok: false, error: error.message };
@@ -1180,7 +1382,7 @@ ipcMain.handle('backup:restoreJournals', async () => {
       backupPath = result.filePaths[0];
       writeSettings({ ...readSettings(), backupPath });
     }
-    const restored = restoreJournalsBackup(fs.readFileSync(backupPath, 'utf8'));
+    const restored = restoreJournalsBackup(fs.readFileSync(backupPath, 'utf8'), backupPath);
     return { ok: true, path: backupPath, ...restored };
   } catch (error) {
     logError('backup:restoreJournals', error);
