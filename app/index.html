@@ -3126,7 +3126,8 @@ window.appendLevelRow=(row={})=>{
   el.dataset.legacyTicks=row.ticksFromEntry!=null?row.ticksFromEntry:'';
  }
  el.querySelector('.sr-level').addEventListener('change',()=>updateLevelsSummary());
- el.querySelector('.sr-price').addEventListener('input',()=>{renderLevelDistances();updateLevelsSummary()});
+ // Vzdálenosti překreslí scheduleTradeSections (poslouchá celý #tradeForm).
+ el.querySelector('.sr-price').addEventListener('input',()=>updateLevelsSummary());
  el.querySelector('.sr-test').addEventListener('change',()=>updateLevelsSummary());
  el.querySelector('.sr-remove').addEventListener('click',()=>{el.remove();updateLevelsSummary()});
  host.appendChild(el);
@@ -3337,7 +3338,9 @@ function tradeDerived(t){
  const own=!t?.journalId||t.journalId===activeJournalId;
  return FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(t?.instrument),dayOrder:own?cachedDayOrder(trades):null,mode:journalModeOf(t),gradeRetroGraceMin:settings.gradeRetroGraceMinutes});
 }
-function levelPillsHTML(t){
+// `opts.countOnly`: volajícímu stačí počet – řádek dopočtů (celé derivedFields,
+// i se sessionOf) se nesestavuje.
+function levelPillsHTML(t,opts={}){
  const parts=[];
  const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
  const testNo=t.entryTestNo&&contextFieldShown('entryTestNo')?' · '+FJTaxonomy.labelOf('ENTRY_TEST_NO',t.entryTestNo):'';
@@ -3345,9 +3348,9 @@ function levelPillsHTML(t){
  // Hladiny v blízkosti: typ @ cena (test) · vzdálenosti v ticích. Vzdálenosti
  // jsou dopočet z cen (FJContext.levelGeometry) – nic z nich se neukládá
  // a žádná hladina tu nedostává roli. Obchod ve starém tvaru se čte převodem.
- const d=typeof tradeDerived==='function'?tradeDerived(t):FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(t.instrument)});
+ const tick=getTickSizeForInstrument(t.instrument);
  const near=FJTaxonomy.nearLevelsOf(t);
- if(near.length)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti (cena · od vstupu · od SL · do cíle, v ticích)">Hladiny: ${esc(near.map((r,i)=>formatLevelRow(r,d.nearLevels[i])).join(', '))}</span>`);
+ if(near.length)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti (cena · od vstupu · od SL · do cíle, v ticích)">Hladiny: ${esc(near.map(r=>formatLevelRow(r,FJContext.levelGeometry(r,t,tick))).join(', '))}</span>`);
  else if(FJTaxonomy.nearLevelsNoneOf(t))parts.push('<span class="pill context-pill" title="Hladiny v blízkosti: žádná">Hladiny: žádná</span>');
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
@@ -3361,7 +3364,9 @@ function levelPillsHTML(t){
  // Řádek dopočtů se přidává jen k vyplněným hladinám a do počtu se nepočítá –
  // počet říká, jestli má obchod co rozbalovat.
  const count=parts.length;
- const derived=count&&contextFieldShown('derivedRow')?FJContext.derivedSummaryParts(d,{levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',near[i]?.level)}):[];
+ const derived=count&&!opts.countOnly&&contextFieldShown('derivedRow')
+  ?FJContext.derivedSummaryParts(typeof tradeDerived==='function'?tradeDerived(t):FJContext.derivedFields(t,{tickSize:tick}),{levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',near[i]?.level)})
+  :[];
  if(derived.length)parts.push(`<span class="pill context-pill derived-pill" title="Dopočítáno z cen – needituje se">${esc(derived.join(' · '))}</span>`);
  return {html:parts.join(' '),count};
 }
@@ -3638,7 +3643,7 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  // Tlačítko na hromadné rozbalení hladin. Počítá se jen z obchodů, které
  // hladiny vyplněné mají – obchod bez kontextu nemá co rozbalovat a jinak
  // by tlačítko tvrdilo „Rozbalit" i ve chvíli, kdy je rozbalené všechno.
- const withLevels=dayTrades.filter(t=>levelPillsHTML(t).count);
+ const withLevels=dayTrades.filter(t=>levelPillsHTML(t,{countOnly:true}).count);
  const allOpen=withLevels.length&&withLevels.every(t=>openTradeLevels.has(t.id));
  const levelsBtn=withLevels.length
   ?`<button type="button" class="btn day-levels-btn" onclick="event.stopPropagation();toggleDayLevels('${date}',this)" title="Rozbalí nebo sbalí hladiny u všech obchodů tohoto dne">${allOpen?'Sbalit hladiny':'Rozbalit hladiny'}</button>`
@@ -5221,8 +5226,8 @@ function quickMissingKeys(t){
  const fillable=new Set([...QC_GROUPS.map(g=>g.key),'slPrice','mfeTicks','maeTicks']);
  return FJTaxonomy.missingContextKeys(t).filter(k=>{
   if(k==='targetLevel1')return !FJTaxonomy.sanitizeSingle('TARGET_LEVEL',t?.targetLevel1?.type);
-  if(!fillable.has(k))return false;
-  return !FJTaxonomy.CONTEXT_FIELDS.some(f=>f.key===k)||contextFieldShown(k);
+  // Pole mimo „Pole kontextu" je pro contextFieldShown vždy zobrazené.
+  return fillable.has(k)&&contextFieldShown(k);
  });
 }
 // Dávka: obchody chronologicky; bez startu jen ty s nevyplněným kontextem,
@@ -5332,7 +5337,7 @@ function loadQuickTrade(){
  const dc=getDayNote(t.date).dayContext||{};
  // Ranní pruh kontextu dne jen u dne, kterému ranní kontext chybí (a jen
  // když pole „Kontext dne" není skryté).
- qc.dayShown=contextFieldShown('dayContext')&&!!t.date&&FJContext.DAY_CONTEXT_MORNING.some(k=>!dc[k]);
+ qc.dayShown=contextFieldShown('dayContext')&&dayContextMissingFor(t);
  qc.dayDraft={...dc};
  qc.focusKey='';
  $('qcAlert').classList.remove('show');
@@ -5794,60 +5799,38 @@ function readOpenSettingsCards(){try{const v=JSON.parse(localStorage.getItem(SET
   });
  });
 })();
-// Nastavení → Přizpůsobení → Karty obchodu: u každé karty „Zobrazit"
-// a „Upozorňovat na nevyplněné". Upozornění skryté karty nejde zapnout –
-// skrytá karta se nekontroluje.
-function renderTradeCardSettings(){
- const box=$('tradeCardSettings');if(!box)return;
- const cfg=tradeCardConfig;
- box.innerHTML=FJTaxonomy.TRADE_CARDS.map(card=>{
-  const c=cfg[card.key];
-  const warn=card.checks===false
+// Nastavení → Přizpůsobení → Karty obchodu a Pole kontextu: u každé položky
+// „Zobrazit" a „Upozorňovat na nevyplněné". Upozornění skryté položky nejde
+// zapnout – skrytá položka se nekontroluje.
+function renderToggleSettings({box,items,cfg,cls,set,shownText}){
+ if(!box)return;
+ box.innerHTML=items.map(item=>{
+  const c=cfg[item.key];
+  const warn=item.checks===false
    ?'<span class="sub">— nic se nekontroluje</span>'
-   :`<label class="settings-check" style="margin:0${c.show?'':';opacity:.45'}"><input type="checkbox" class="trade-card-warn" data-card="${esc(card.key)}"${c.warn?' checked':''}${c.show?'':' disabled'}> Upozorňovat na nevyplněné</label>`;
-  return `<div class="mapping-row trade-card-row" style="grid-template-columns:minmax(120px,1fr) auto minmax(220px,1.4fr)">
-   <div><b>${esc(card.label)}</b></div>
-   <label class="settings-check" style="margin:0"><input type="checkbox" class="trade-card-show" data-card="${esc(card.key)}"${c.show?' checked':''}> Zobrazit</label>
+   :`<label class="settings-check" style="margin:0${c.show?'':';opacity:.45'}"><input type="checkbox" class="${cls}-warn" data-key="${esc(item.key)}"${c.warn?' checked':''}${c.show?'':' disabled'}> Upozorňovat na nevyplněné</label>`;
+  return `<div class="mapping-row ${cls}-row" style="grid-template-columns:minmax(120px,1fr) auto minmax(220px,1.4fr)">
+   <div><b>${esc(item.label)}</b></div>
+   <label class="settings-check" style="margin:0"><input type="checkbox" class="${cls}-show" data-key="${esc(item.key)}"${c.show?' checked':''}> Zobrazit</label>
    <div>${warn}</div>
   </div>`;
  }).join('');
- box.querySelectorAll('.trade-card-show').forEach(el=>el.onchange=()=>{
-  const card=FJTaxonomy.TRADE_CARDS.find(x=>x.key===el.dataset.card);
-  setTradeCardConfig({...tradeCardConfig,[el.dataset.card]:{...tradeCardConfig[el.dataset.card],show:el.checked}});
-  showToast(`Karta „${card?.label||el.dataset.card}“ je ${el.checked?'zobrazená':'skrytá'}.`);
- });
- box.querySelectorAll('.trade-card-warn').forEach(el=>el.onchange=()=>{
-  const card=FJTaxonomy.TRADE_CARDS.find(x=>x.key===el.dataset.card);
-  setTradeCardConfig({...tradeCardConfig,[el.dataset.card]:{...tradeCardConfig[el.dataset.card],warn:el.checked}});
-  showToast(`${card?.label||el.dataset.card}: upozornění na nevyplněné ${el.checked?'zapnuto':'vypnuto'}.`);
- });
+ const labelOf=key=>items.find(x=>x.key===key)?.label||key;
+ const onToggle=(prop,toast)=>el=>el.onchange=()=>{
+  const key=el.dataset.key;
+  set({...cfg,[key]:{...cfg[key],[prop]:el.checked}});
+  showToast(toast(labelOf(key),el.checked));
+ };
+ box.querySelectorAll(`.${cls}-show`).forEach(onToggle('show',shownText));
+ box.querySelectorAll(`.${cls}-warn`).forEach(onToggle('warn',(label,on)=>`${label}: upozornění na nevyplněné ${on?'zapnuto':'vypnuto'}.`));
 }
-// Nastavení → Přizpůsobení → Pole kontextu: u každého pole „Zobrazit"
-// a „Upozorňovat na nevyplněné" (stejný vzor jako karty obchodu). Upozornění
-// skrytého pole nejde zapnout – skryté pole se nekontroluje.
+function renderTradeCardSettings(){
+ renderToggleSettings({box:$('tradeCardSettings'),items:FJTaxonomy.TRADE_CARDS,cfg:tradeCardConfig,cls:'trade-card',set:setTradeCardConfig,
+  shownText:(label,on)=>`Karta „${label}“ je ${on?'zobrazená':'skrytá'}.`});
+}
 function renderContextFieldSettings(){
- const box=$('contextFieldSettings');if(!box)return;
- const cfg=contextFieldConfig;
- box.innerHTML=FJTaxonomy.CONTEXT_FIELDS.map(field=>{
-  const c=cfg[field.key];
-  const warn=field.checks===false
-   ?'<span class="sub">— nic se nekontroluje</span>'
-   :`<label class="settings-check" style="margin:0${c.show?'':';opacity:.45'}"><input type="checkbox" class="context-field-warn" data-field="${esc(field.key)}"${c.warn?' checked':''}${c.show?'':' disabled'}> Upozorňovat na nevyplněné</label>`;
-  return `<div class="mapping-row context-field-row" style="grid-template-columns:minmax(120px,1fr) auto minmax(220px,1.4fr)">
-   <div><b>${esc(field.label)}</b></div>
-   <label class="settings-check" style="margin:0"><input type="checkbox" class="context-field-show" data-field="${esc(field.key)}"${c.show?' checked':''}> Zobrazit</label>
-   <div>${warn}</div>
-  </div>`;
- }).join('');
- const labelOf=key=>FJTaxonomy.CONTEXT_FIELDS.find(x=>x.key===key)?.label||key;
- box.querySelectorAll('.context-field-show').forEach(el=>el.onchange=()=>{
-  setContextFieldConfig({...contextFieldConfig,[el.dataset.field]:{...contextFieldConfig[el.dataset.field],show:el.checked}});
-  showToast(`Pole „${labelOf(el.dataset.field)}“ je ${el.checked?'zobrazené':'skryté'}.`);
- });
- box.querySelectorAll('.context-field-warn').forEach(el=>el.onchange=()=>{
-  setContextFieldConfig({...contextFieldConfig,[el.dataset.field]:{...contextFieldConfig[el.dataset.field],warn:el.checked}});
-  showToast(`${labelOf(el.dataset.field)}: upozornění na nevyplněné ${el.checked?'zapnuto':'vypnuto'}.`);
- });
+ renderToggleSettings({box:$('contextFieldSettings'),items:FJTaxonomy.CONTEXT_FIELDS,cfg:contextFieldConfig,cls:'context-field',set:setContextFieldConfig,
+  shownText:(label,on)=>`Pole „${label}“ je ${on?'zobrazené':'skryté'}.`});
 }
 renderTradeCardSettings();
 applyTradeCardVisibility();
@@ -6195,7 +6178,7 @@ $('exportJson').onclick=async()=>{
  }
  download(new Blob([JSON.stringify({settings,trades:[...trades,...setupRecords]},null,2)],{type:'application/json'}),'futures-journal-zaloha.json');
 };
-$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const raw of data.trades){const t=FJTaxonomy.convertLegacyNear(FJTaxonomy.stripRemovedV3(raw));if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings.taxonomy?{...data.settings,taxonomy:FJTaxonomy.migrateConfigV3(data.settings.taxonomy)}:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
+$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const raw of data.trades){const t=FJTaxonomy.tradeToV3(raw);if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings.taxonomy?{...data.settings,taxonomy:FJTaxonomy.migrateConfigV3(data.settings.taxonomy)}:data.settings});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
 $('clearAll').onclick=async()=>{if(await showConfirm('Tato akce smaže všechny obchody a nastavení pouze v aktuálním deníku. Pokračovat?')){await clearStore('trades');await clearStore('settings');safeReload()}};
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 

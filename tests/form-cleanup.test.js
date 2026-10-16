@@ -284,7 +284,7 @@ test('tlačítko dne nesmí zavřít celý den', () => {
   assert.match(src, /Sbalit hladiny/);
   assert.match(src, /Rozbalit hladiny/);
   // Tlačítko se vykresluje jen tam, kde je co rozbalovat.
-  assert.match(src, /const withLevels=dayTrades\.filter\(t=>levelPillsHTML\(t\)\.count\)/);
+  assert.match(src, /const withLevels=dayTrades\.filter\(t=>levelPillsHTML\(t,\{countOnly:true\}\)\.count\)/);
 });
 
 test('hlavička sbalené položky vypadá jako ovládací prvek, ne jako popisek', () => {

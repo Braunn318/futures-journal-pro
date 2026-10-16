@@ -19,6 +19,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { loadRenderer, loadMain } = require('./helpers/extract');
+const { CAPTURE_NAMES } = require('./helpers/capture-harness');
 
 const SETTINGS = {
   templates: [{ instrument: 'MES', pointValue: 5, defaultCommission: 1.9 }],
@@ -33,8 +34,7 @@ test('main.js: uzavření pozice na vstupní ceně dá záporný čistý výsled
   const state = { positions: {}, executionIds: [] };
 
   const main = loadMain(
-    ['POSITION_MISSING_GRACE_MS', 'SNAPSHOT_RACE_WINDOW_MS', 'positionIsMissing',
-      'signedExecutionQuantity', 'positionKey', 'lotKeyOf', 'positionLots', 'applyLots', 'takeFromLots', 'openPositionFromExecution', 'excursionTicks', 'processExecution'],
+    CAPTURE_NAMES,
     {
       // Stuby okolí: stav pozic v paměti, žádné screenshoty, žádný disk.
       readCaptureState: () => state,

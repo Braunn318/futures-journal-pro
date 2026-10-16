@@ -550,7 +550,7 @@ function writeAiExportMirror(id, data) {
     // Kontext v3: export nese vždy nový tvar (nearLevels, bez odebraných
     // polí) – i u deníku, který od aktualizace ještě nebyl otevřen a na disku
     // má starý zápis. Převod je tentýž jako při migraci deníku.
-    const exportTrade = t => FJContext.convertLegacyNear(FJContext.stripRemovedV3(stripImages(t)));
+    const exportTrade = t => FJContext.tradeToV3(stripImages(t));
     // Dokup: vstupy pozice dopočítané z nohou (FJPoints.entriesOf). Jen
     // u obchodu, který víc vstupů opravdu má.
     const entriesOf = t => { const entries = FJPoints.entriesOf(t); return entries.length > 1 ? { entries } : {}; };

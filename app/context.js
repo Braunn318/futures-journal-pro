@@ -96,9 +96,8 @@
     return ticks == null ? null : ticks + 0;
   }
 
-  function roundTicks(n) {
-    return Math.round(n * 10000) / 10000 + 0;
-  }
+  // Stejné zaokrouhlení jako ticksOf; `+ 0` srovná zápornou nulu.
+  const roundTicks = n => FJPoints.roundTicks(n) + 0;
 
   // Geometrie jednoho řádku hladiny:
   //   fromEntry  vzdálenost od vstupu, + ve směru obchodu. Řádek bez ceny
@@ -144,6 +143,16 @@
   // kolik jich kde je); výslovné „žádná hladina v blízkosti" = 0.
   const BETWEEN_STOP_AND_TARGET = ['STOP_TO_ENTRY', 'AT_ENTRY', 'ENTRY_TO_TARGET'];
 
+  // Index řádku, za kterým je SL nejblíž (stopBehindTicks); -1 = žádný. Při
+  // shodě první v pořadí obchodu. Sdílí ho dopočet i jeho popis.
+  function stopBehindIndex(geometry) {
+    let best = -1;
+    geometry.forEach((g, i) => {
+      if (BETWEEN_STOP_AND_TARGET.includes(g.position) && g.fromStop > 0 && (best < 0 || g.fromStop < geometry[best].fromStop)) best = i;
+    });
+    return best;
+  }
+
   function nearLevelMetrics(trade, tickSize, geometry) {
     const tax = FJTaxonomy();
     const rows = Array.isArray(geometry) ? geometry : tax.nearLevelsOf(trade).map(r => levelGeometry(r, trade, tickSize));
@@ -155,7 +164,8 @@
     const min = list => (list.length ? Math.min(...list) : null);
     out.nearestAheadTicks = min(rows.filter(g => g.position === 'ENTRY_TO_TARGET').map(g => g.fromEntry));
     out.nearestAheadR = ratio(out.nearestAheadTicks, slTicks(trade, tickSize));
-    out.stopBehindTicks = min(rows.filter(g => BETWEEN_STOP_AND_TARGET.includes(g.position) && g.fromStop > 0).map(g => g.fromStop));
+    const behind = stopBehindIndex(rows);
+    out.stopBehindTicks = behind < 0 ? null : rows[behind].fromStop;
     if (rows.every(g => g.position != null)) {
       out.levelsStopToEntry = rows.filter(g => g.position === 'STOP_TO_ENTRY').length;
       out.levelsEntryToTarget = rows.filter(g => g.position === 'ENTRY_TO_TARGET').length;
@@ -403,7 +413,7 @@
       parts.push('Nejbližší hladina ve směru: ' + signedTicks(d.nearestAheadTicks, true) + ' t' + (d.nearestAheadR != null ? ' (' + cz(d.nearestAheadR) + ' R)' : ''));
     }
     if (d.stopBehindTicks != null) {
-      const i = rows.findIndex(g => g.fromStop === d.stopBehindTicks && BETWEEN_STOP_AND_TARGET.includes(g.position));
+      const i = stopBehindIndex(rows);
       const name = i >= 0 && typeof opts.levelName === 'function' ? opts.levelName(i) : '';
       parts.push('SL ' + cz(d.stopBehindTicks) + ' t za ' + (name || 'nejbližší hladinou'));
     }
@@ -552,7 +562,7 @@
     targetTicks, slTicks, targetOnLevel,
     POSITIONS, levelGeometry, nearLevelMetrics, levelDistanceText,
     nearLevelsFromLegacy: viaTaxonomy('nearLevelsFromLegacy'), nearLevelsOf: viaTaxonomy('nearLevelsOf'),
-    nearLevelsNoneOf: viaTaxonomy('nearLevelsNoneOf'), setNearLevels: viaTaxonomy('setNearLevels'),
+    nearLevelsNoneOf: viaTaxonomy('nearLevelsNoneOf'), tradeToV3: viaTaxonomy('tradeToV3'),
     convertLegacyNear: viaTaxonomy('convertLegacyNear'), stripRemovedV3: viaTaxonomy('stripRemovedV3'),
     migrateConfigV3: viaTaxonomy('migrateConfigV3'),
     countsInDay, signedPnl, dayOrder, SESSIONS, sessionOf, berlinInstant, derivedFields,

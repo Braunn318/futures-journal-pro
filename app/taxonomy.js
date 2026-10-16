@@ -607,6 +607,14 @@
     return out;
   }
 
+  // Obchod v tvaru kontextu v3: bez zrušených polí a s hladinami v novém
+  // tvaru. Tentýž převod pro export, zálohu i čtení neotevřeného deníku;
+  // migrace volá oba kroky zvlášť (záloha mezi nimi). Obchod, na kterém není
+  // co převést, se vrací tentýž.
+  function tradeToV3(trade) {
+    return convertLegacyNear(stripRemovedV3(trade));
+  }
+
   // Úprava číselníků deníku pro kontext v3: dvě kolonky SR se stanou jednou
   // („Hladiny v blízkosti") – skryté zůstane jen to, co bylo skryté v OBOU,
   // ať volba, kterou uživatel na jedné straně používal, nezmizí. Skupiny
@@ -725,21 +733,29 @@
   ];
   const CONTEXT_FIELD_BY_KEY = Object.fromEntries(CONTEXT_FIELDS.map(f => [f.key, f]));
 
-  // Nastavení polí: { trendHtf: { show, warn }, … }. Chybějící pole nebo
-  // hodnota = výchozí (zobrazeno; upozornění podle warnDefault).
-  function normalizeFieldConfig(raw) {
-    const src = raw && typeof raw === 'object' ? raw : {};
-    const out = {};
-    for (const field of CONTEXT_FIELDS) {
-      const c = src[field.key] && typeof src[field.key] === 'object' ? src[field.key] : {};
-      out[field.key] = { show: c.show !== false, warn: typeof c.warn === 'boolean' ? c.warn : field.warnDefault === true };
-    }
-    return out;
+  // { show, warn } jedné zapínatelné položky (karta, pole kontextu) z uloženého
+  // nastavení. Chybějící položka nebo hodnota = výchozí: zobrazeno, upozornění
+  // podle `warnDefault`. Čte se jen ta jedna položka – volá se při vykreslení
+  // za každý obchod.
+  function toggleOf(raw, key, warnDefault) {
+    const c = raw && typeof raw === 'object' && raw[key] && typeof raw[key] === 'object' ? raw[key] : {};
+    return { show: c.show !== false, warn: typeof c.warn === 'boolean' ? c.warn : warnDefault };
   }
-  function fieldShown(fieldConfig, key) { return normalizeFieldConfig(fieldConfig)[key]?.show !== false; }
+  const normalizeToggles = (items, raw, toggle) => Object.fromEntries(items.map(item => [item.key, toggle(raw, item)]));
+
+  // Nastavení polí: { trendHtf: { show, warn }, … }. Upozornění ve výchozím
+  // stavu podle warnDefault.
+  const fieldToggle = (raw, field) => toggleOf(raw, field.key, field.warnDefault === true);
+  function normalizeFieldConfig(raw) { return normalizeToggles(CONTEXT_FIELDS, raw, fieldToggle); }
+  function fieldShown(fieldConfig, key) {
+    const field = CONTEXT_FIELD_BY_KEY[key];
+    return !field || fieldToggle(fieldConfig, field).show;
+  }
   function fieldWarns(fieldConfig, key) {
-    const c = normalizeFieldConfig(fieldConfig)[key];
-    return !!c && CONTEXT_FIELD_BY_KEY[key].checks !== false && c.show && c.warn;
+    const field = CONTEXT_FIELD_BY_KEY[key];
+    if (!field || field.checks === false) return false;
+    const c = fieldToggle(fieldConfig, field);
+    return c.show && c.warn;
   }
 
   // Chybějící pole rozdělená po kartách, jako popisky. Rozhoduje
@@ -750,9 +766,8 @@
   function missingContextByCard(trade, config, fieldConfig) {
     const out = {};
     for (const card of TRADE_CARDS) out[card.key] = [];
-    const fields = normalizeFieldConfig(fieldConfig);
     for (const key of missingContextKeys(trade, config)) {
-      if (CONTEXT_FIELD_BY_KEY[key] && !fieldWarns(fields, key)) continue;
+      if (CONTEXT_FIELD_BY_KEY[key] && !fieldWarns(fieldConfig, key)) continue;
       if (key === 'targetLevel1') {
         const tl = (trade && trade.targetLevel1) || {};
         if (!sanitizeSingle('TARGET_LEVEL', tl.type, config)) out.levels.push(contextFieldLabel(key) + ' (typ)');
@@ -762,27 +777,22 @@
       out[CARD_OF_FIELD[key] || 'setup'].push(contextFieldLabel(key));
     }
     if (!trade || typeof trade !== 'object' || trade.recordType === 'SETUP_ONLY') return out;
-    if (fieldWarns(fields, 'entryTestNo') && !sanitizeSingle('ENTRY_TEST_NO', trade.entryTestNo, config)) out.setup.push(CONTEXT_FIELD_BY_KEY.entryTestNo.label);
-    if (fieldWarns(fields, 'absLocation') && !sanitizeSingle('ABS_LOCATION', trade.absLocation, config)) out.levels.push(CONTEXT_FIELD_BY_KEY.absLocation.label);
-    if (fieldWarns(fields, 'levelTestState') && nearLevelsOf(trade).some(r => !r.testState)) out.levels.push(CONTEXT_FIELD_BY_KEY.levelTestState.label);
+    if (fieldWarns(fieldConfig, 'entryTestNo') && !sanitizeSingle('ENTRY_TEST_NO', trade.entryTestNo, config)) out.setup.push(CONTEXT_FIELD_BY_KEY.entryTestNo.label);
+    if (fieldWarns(fieldConfig, 'absLocation') && !sanitizeSingle('ABS_LOCATION', trade.absLocation, config)) out.levels.push(CONTEXT_FIELD_BY_KEY.absLocation.label);
+    if (fieldWarns(fieldConfig, 'levelTestState') && nearLevelsOf(trade).some(r => !r.testState)) out.levels.push(CONTEXT_FIELD_BY_KEY.levelTestState.label);
     return out;
   }
 
-  // Nastavení karet: { sltp: { show, warn }, … }. Chybějící karta nebo
-  // hodnota = zapnuto (výchozí stav je vše zobrazené i s upozorněním).
-  function normalizeCardConfig(raw) {
-    const src = raw && typeof raw === 'object' ? raw : {};
-    const out = {};
-    for (const card of TRADE_CARDS) {
-      const c = src[card.key] && typeof src[card.key] === 'object' ? src[card.key] : {};
-      out[card.key] = { show: c.show !== false, warn: c.warn !== false };
-    }
-    return out;
-  }
-  function cardShown(cardConfig, key) { return normalizeCardConfig(cardConfig)[key]?.show !== false; }
+  // Nastavení karet: { sltp: { show, warn }, … }. Výchozí stav je vše
+  // zobrazené i s upozorněním.
+  const CARD_BY_KEY = Object.fromEntries(TRADE_CARDS.map(c => [c.key, c]));
+  const cardToggle = (raw, card) => toggleOf(raw, card.key, true);
+  function normalizeCardConfig(raw) { return normalizeToggles(TRADE_CARDS, raw, cardToggle); }
+  function cardShown(cardConfig, key) { return !CARD_BY_KEY[key] || cardToggle(cardConfig, CARD_BY_KEY[key]).show; }
   function cardWarns(cardConfig, key) {
-    const c = normalizeCardConfig(cardConfig)[key];
-    return !!c && c.show && c.warn;
+    if (!CARD_BY_KEY[key]) return false;
+    const c = cardToggle(cardConfig, CARD_BY_KEY[key]);
+    return c.show && c.warn;
   }
 
   // Chybějící pole jen z karet, které jsou zobrazené a mají zapnuté upozornění
@@ -947,8 +957,8 @@
     DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS,
     sanitizeTestState,
     // hladiny v blízkosti (kontext v3) a převod starého zápisu
-    sanitizeNearLevels, nearLevelsFromLegacy, hasLegacyNearLevels, nearLevelsOf, nearLevelsNoneOf, setNearLevels,
-    convertLegacyNear, stripRemovedV3, migrateConfigV3, LEGACY_NEAR_KEYS, V3_REMOVED_KEYS,
+    sanitizeNearLevels, nearLevelsFromLegacy, nearLevelsOf, nearLevelsNoneOf, setNearLevels,
+    convertLegacyNear, stripRemovedV3, tradeToV3, migrateConfigV3, V3_REMOVED_KEYS,
     ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, TRADE_CONTEXT_FIELDS,
     // konfigurace
     applyConfig, getConfig, groupConfig,
