@@ -2,6 +2,11 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.91 - 2026-10-18
+Layout only – no stored data changes. New version numbering: the last number gets a second digit (4.8.9 → 4.8.91, then 4.8.92 …); one version number covers all test builds and the final release of that version.
+- Fixed: Reporty and Kalendář – the dropdowns showed only the top half of the text ("Všechny deníky") and every field was stretched over the whole width. The two-row layout of the Deník toolbar from 4.8.8 applied to every toolbar, and the field padding did not fit the 30 px height. The Deník toolbar keeps its two rows; Reporty and Kalendář have the fields side by side again, compact, each as wide as its longest option.
+- Přehled účtu: filter dropdowns (Rozsah, Deník / karta, Instrument) and "Zobrazit" are smaller (same size as in Deník) and as wide as their text – "Kompletní portfolio" is no longer cut off. On a narrow window they take the full width.
+
 ## 4.8.9 - 2026-10-17
 Data location safety – no stored data changes.
 - Fixed: data or images stored inside the program folder (e.g. E:\Programme\Futures Journal PRO\FuturesJournalPRO-Data) were wiped by the next update – the installer uninstalls the old version and deletes the whole program folder. Choosing a data folder or an image folder inside the program folder is now refused with an explanation.
