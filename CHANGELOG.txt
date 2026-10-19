@@ -2,6 +2,17 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.92 - 2026-10-19
+NinjaTrader connector: a wrong API key no longer goes unnoticed, plus a reminder after a NinjaTrader update. No stored trades change; the NT8 connector itself is unchanged (still version 3).
+- Reported 2026-10-19: a trade was not imported. Cause: the API key in the NT8 connector (installed 27. 9.) no longer matched the app's key, so every message from NinjaTrader was refused (401) – silently, with nothing in the log or the app. No trade had been imported since 16. 10. evening. The two setups without a fill entered that day had nothing to do with it.
+- How the key changed: the data lay in the program folder, which an update deleted on 16. 10. (fixed in 4.8.9). The app then fell back to its default folder and created new connector settings with a new random key (and empty account mappings).
+- New: Integrace → NinjaTrader shows "NinjaTrader 8.1.8.4 · konektor v3 · API klíč sedí / nesedí". If the installed connector carries a different key, or the app is refusing its messages, a warning offers "Přeinstalovat teď" (once per app run while the problem lasts). Stav služby shows the number of refused messages; the first refusal is written to the error log.
+- New: reminder after a NinjaTrader update. The app reads the NinjaTrader version from Windows (installed programs list) at start and every hour; when it changes, it offers to reinstall the connector (then F5 in NinjaScript Editor). "Později" reminds again at the next app start. Switch: Integrace → NinjaTrader → "Upozornit po aktualizaci NinjaTraderu" (on by default). Reinstalling the connector settles the reminder.
+- Fixed: the connector settings (and with them the API key) were replaced by new ones on any read error. Now new settings are created only when the file is missing; a damaged file is kept aside as settings.json.poskozeny-<time> and logged; any other read error (e.g. a locked file) changes nothing and is logged.
+- The error log now notes when the chosen data folder does not exist and the default one is used.
+- Tests: 9 new in tests/connector-key.test.js.
+- Tests: the export comparison with the old export (csv-export-compat) failed on a manually entered trade without entry/exit time – the old rule could not check "Známka doplněná zpětně" (empty), the current one uses the save time (createdAt) and gives "ne". The value is correct; the test now allows empty → value for such trades.
+
 ## 4.8.91 - 2026-10-18
 Layout only – no stored data changes. New version numbering: the last number gets a second digit (4.8.9 → 4.8.91, then 4.8.92 …); one version number covers all test builds and the final release of that version.
 - Fixed: Reporty and Kalendář – the dropdowns showed only the top half of the text ("Všechny deníky") and every field was stretched over the whole width. The two-row layout of the Deník toolbar from 4.8.8 applied to every toolbar, and the field padding did not fit the 30 px height. The Deník toolbar keeps its two rows; Reporty and Kalendář have the fields side by side again, compact, each as wide as its longest option.

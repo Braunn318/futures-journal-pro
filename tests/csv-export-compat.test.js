@@ -47,7 +47,10 @@ const REMOVED = new Set(['Vybraná likvidita', 'Profil cesty k cíli', 'Hladina 
 // „doplněno zpětně" platí až po lhůtě od uložení obchodu (výchozí 30 minut),
 // ne hned po čase výstupu. Pravidlo se tím jen uvolnilo – „ano" se smí změnit
 // na „ne", nikdy naopak.
+// Obchod bez času vstupu i výstupu (ručně zadaný) starý kód ověřit neuměl
+// (prázdné); nový bere čas uložení createdAt – tam smí prázdné dostat hodnotu.
 const RELAXED = new Set(['Známka doplněná zpětně (dopočet)']);
+const retroNowVerifiable = t => !!t && !t.exitTime && !t.entryTime && Number(t.createdAt) > 0;
 
 function gitShow(file) {
   return execFileSync('git', ['show', BASE + ':' + file], { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -86,7 +89,8 @@ const cell = v => String(v ?? '');
 
 // Každý sloupec „před", který není nahrazený ani smazaný, musí být v „po":
 // ve stejném pořadí a se stejnými buňkami. Vrací počet porovnaných buněk.
-function assertKeptColumnsIdentical(before, after, label) {
+// `trades` (volitelné) = obchody v pořadí řádků exportu (řádek n ↔ trades[n - 1]).
+function assertKeptColumnsIdentical(before, after, label, trades) {
   assert.equal(after.length, before.length, label + ': počet řádků');
   const kept = before[0].map((name, index) => ({ name, index })).filter(c => !REPLACED.test(c.name) && !REMOVED.has(c.name));
   assert.ok(kept.length > 60, label + ': porovnává se většina sloupců (' + kept.length + ')');
@@ -104,7 +108,7 @@ function assertKeptColumnsIdentical(before, after, label) {
     kept.forEach((c, i) => {
       const was = cell(before[row][c.index]), now = cell(after[row][positions[i]]);
       if (RELAXED.has(c.name)) {
-        assert.ok(now === was || (was === 'ano' && now === 'ne'), `${label}: řádek ${row}, sloupec „${c.name}“: ${was || 'prázdné'} → ${now || 'prázdné'}`);
+        assert.ok(now === was || (was === 'ano' && now === 'ne') || (was === '' && (now === 'ano' || now === 'ne') && retroNowVerifiable(trades?.[row - 1])), `${label}: řádek ${row}, sloupec „${c.name}“: ${was || 'prázdné'} → ${now || 'prázdné'}`);
         return;
       }
       assert.equal(now, was, `${label}: řádek ${row}, sloupec „${c.name}“`);
@@ -221,7 +225,7 @@ test('A7/10: export Deníku – živé deníky z ai-export: mimo nahrazené / sm
       const opts = { config: data.taxonomy || {}, mode: 'LIVE' };
       const before = OLD.renderer.journalCsvTable(trades, d => notes[d] || null, { ...opts, tickSizeOf: i => OLD.points.tickSizeFor(i, []) });
       const after = NEW.journalCsvTable(trades.map(migrate), d => notes[d] || null, { ...opts, config: FJTaxonomy.migrateConfigV3(opts.config), tickSizeOf: i => FJPoints.tickSizeFor(i, []) });
-      cells += assertKeptColumnsIdentical(before, after, path.basename(file));
+      cells += assertKeptColumnsIdentical(before, after, path.basename(file), trades);
       tradesChecked += trades.length;
     }
     assert.ok(tradesChecked > 0, 'aspoň jeden obchod ověřen');

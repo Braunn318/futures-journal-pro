@@ -68,11 +68,22 @@ function writeSettings(data) {
 // malý ukazatel na skutečné umístění dat – samotné deníky, screenshoty a
 // nastavení se pak čtou/zapisují ZE ZVOLENÉ SLOŽKY, ne z C:.
 const dataLocationConfigPath = () => path.join(app.getPath('userData'), 'data-location.json');
+// Když nastavená složka dat chybí (smazaná, odpojený disk), aplikace jede
+// z výchozí userData – a tam si konektor založí nové nastavení s NOVÝM API
+// klíčem (2026-10-16: data ve složce programu smazala aktualizace, NT8 pak tři
+// dny posílal starý klíč a nic se neimportovalo). Chování zůstává, jen se
+// o něm jednou za běh dozví protokol.
+let dataDirFallbackLogged = false;
 function resolveDataDir() {
   try {
     const raw = fs.readFileSync(dataLocationConfigPath(), 'utf8');
     const cfg = JSON.parse(raw);
     if (cfg.customDataDir && fs.existsSync(cfg.customDataDir)) return cfg.customDataDir;
+    if (cfg.customDataDir && !dataDirFallbackLogged) {
+      // Příznak před zápisem: appendLog sám volá resolveDataDir.
+      dataDirFallbackLogged = true;
+      logError('Umístění dat', `nastavená složka dat ${cfg.customDataDir} neexistuje, použita výchozí ${app.getPath('userData')}`);
+    }
   } catch {}
   return app.getPath('userData');
 }
@@ -1458,20 +1469,48 @@ function defaultCaptureSettings() {
     // Účty přidané ručně v Nastavení. Bez nich by se dal namapovat jen účet,
     // který už někdy poslal událost – Playback účet tedy až PO prvním
     // obchodě, který by mezitím spadl do živého deníku.
-    manualAccounts: []
+    manualAccounts: [],
+    // Upozornění po aktualizaci NinjaTraderu (4.8.92): poslední viděná verze
+    // NT8, jestli se upozorňuje a jestli kdy byl konektor nainstalovaný.
+    ntSeenVersion: '',
+    ntUpdateNotice: true,
+    ntConnectorSeen: false
   };
 }
+// Nové nastavení (a s ním nový API klíč) se zakládá JEN když soubor chybí.
+// Dřív ho přepsala jakákoli chyba čtení – i dočasný zámek souboru – a NT8 pak
+// posílal klíč, který aplikace odmítala, aniž by o tom kdokoli věděl.
+//  - poškozený JSON: odloží se vedle (settings.json.poskozeny-<čas>), zapíše
+//    do protokolu a založí nové – nový klíč odhalí kontrola konektoru,
+//  - jiná chyba čtení: výchozí hodnoty jen v paměti, soubor se nepřepíše
+//    a zápis takového nastavení writeCaptureSettings odmítne.
 function readCaptureSettings() {
   ensureCaptureRoot();
+  let raw;
   try {
-    return { ...defaultCaptureSettings(), ...JSON.parse(fs.readFileSync(captureSettingsPath(), 'utf8')) };
-  } catch {
+    raw = fs.readFileSync(captureSettingsPath(), 'utf8');
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      const defaults = defaultCaptureSettings();
+      fs.writeFileSync(captureSettingsPath(), JSON.stringify(defaults, null, 2), 'utf8');
+      return defaults;
+    }
+    logError('Nastavení konektoru nejde přečíst', error);
+    return { ...defaultCaptureSettings(), _readFailed: true };
+  }
+  try {
+    return { ...defaultCaptureSettings(), ...JSON.parse(raw) };
+  } catch (error) {
+    const aside = `${captureSettingsPath()}.poskozeny-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    try { fs.renameSync(captureSettingsPath(), aside); } catch (renameError) { logError('Nastavení konektoru – odložení poškozeného souboru', renameError); }
+    logError('Nastavení konektoru je poškozené', `${error.message}; odloženo jako ${aside}, založen nový API klíč – konektor v NT8 je potřeba přeinstalovat`);
     const defaults = defaultCaptureSettings();
     fs.writeFileSync(captureSettingsPath(), JSON.stringify(defaults, null, 2), 'utf8');
     return defaults;
   }
 }
 function writeCaptureSettings(settings) {
+  if (settings && settings._readFailed) throw new Error('Nastavení konektoru teď nejde přečíst, změna se neuložila. Zkus to znovu.');
   ensureCaptureRoot();
   fs.writeFileSync(captureSettingsPath(), JSON.stringify(settings, null, 2), 'utf8');
 }
@@ -2177,6 +2216,28 @@ function sendJson(res, status, data) {
   });
   res.end(body);
 }
+// Zprávy odmítnuté kvůli API klíči. Dřív se odmítnutí nikde neukázalo: NT8
+// posílal starý klíč a obchody se tři dny tiše neimportovaly (2026-10-16 až 19).
+// Jen v paměti – po restartu se počítá znovu, protokol dostane první
+// odmítnutí po každém přijetí (ne každou sekundu snímku pozic).
+const captureRejected = { count: 0, lastAt: null, source: '', lastAcceptedAt: null, loggedSinceAccept: false };
+function noteCaptureRequest(state, accepted, source, now) {
+  if (accepted) {
+    state.lastAcceptedAt = now;
+    state.loggedSinceAccept = false;
+    return false;
+  }
+  state.count += 1;
+  state.lastAt = now;
+  state.source = String(source || '');
+  if (state.loggedSinceAccept) return false;
+  state.loggedSinceAccept = true;
+  return true;
+}
+// Odmítání trvá = poslední odmítnutí je novější než poslední přijatá zpráva.
+function captureRejectedActive(state) {
+  return !!(state && state.lastAt && (!state.lastAcceptedAt || state.lastAt > state.lastAcceptedAt));
+}
 function startCaptureServer() {
   if (captureServer) return;
   captureServer = http.createServer((req, res) => {
@@ -2189,7 +2250,16 @@ function startCaptureServer() {
     }
     if (url.pathname === '/api/v1/events' && req.method === 'POST') {
       const key = req.headers['x-fj-api-key'] || url.searchParams.get('key');
-      if (key !== settings.apiKey) return sendJson(res, 401, { ok: false, error: 'Neplatný API klíč.' });
+      const source = String(req.headers['x-fj-source'] || '');
+      // Nastavení se teď nepodařilo přečíst – klíč nejde ověřit, není to odmítnutí.
+      if (settings._readFailed) return sendJson(res, 503, { ok: false, error: 'Nastavení nejde přečíst, zkus to znovu.' });
+      if (key !== settings.apiKey) {
+        if (noteCaptureRequest(captureRejected, false, source, new Date().toISOString())) {
+          logInfo('Konektor', `zpráva odmítnuta – neplatný API klíč${source ? ` (${source})` : ''}. Obchody se neimportují, konektor je potřeba přeinstalovat (Integrace → NinjaTrader).`);
+        }
+        return sendJson(res, 401, { ok: false, error: 'Neplatný API klíč.' });
+      }
+      noteCaptureRequest(captureRejected, true, source, new Date().toISOString());
       let raw = '';
       req.on('data', chunk => {
         raw += chunk;
@@ -2277,6 +2347,7 @@ ipcMain.handle('capture:status', async () => {
     relayUrl: settings.relayUrl,
     relayToken: settings.relayToken,
     pending: events.filter(e => !e.imported && e.type === 'trade_closed').length,
+    rejected: { count: captureRejected.count, lastAt: captureRejected.lastAt, active: captureRejectedActive(captureRejected) },
     accounts,
     openPositions: openCapturePositions(state)
   };
@@ -2432,26 +2503,81 @@ async function installNinjaConnectorFile({ documentsDir, source, fsApi }) {
 // nese? Počítá se každá kopie třídy v Custom, nejen soubor na správném místě –
 // stará kopie pod jiným jménem je taky „starý konektor" a bez ní by se
 // upozornění nikdy neukázalo. Rozhoduje nejstarší nalezená verze.
-async function ninjaConnectorStatus({ documentsDir, currentVersion, fsApi }) {
+// API klíč zapsaný v konektoru (konstanta API_KEY v .cs). null = konektor ho
+// v téhle podobě nemá a posoudit nejde.
+function ninjaConnectorApiKey(source) {
+  const m = /\bAPI_KEY\s*=\s*"([^"]*)"/.exec(String(source || ''));
+  return m ? m[1] : null;
+}
+// keyMismatch: některá kopie konektoru posílá jiný klíč, než má aplikace –
+// každá její zpráva skončí 401 a obchody se neimportují. Klíč sám se z funkce
+// nevrací, jen příznak.
+async function ninjaConnectorStatus({ documentsDir, currentVersion, fsApi, apiKey }) {
   const target = ninjaConnectorTargetPath(documentsDir);
   if (!fsApi.existsSync(target.customDir)) return { installed: false, currentVersion };
   const copies = await findNinjaConnectorCopies(target.customDir, fsApi);
   if (!copies.length) return { installed: false, currentVersion };
   const installedVersion = Math.min(...copies.map(copy => ninjaConnectorVersion(copy.source)));
-  return { installed: true, installedVersion, currentVersion, outdated: installedVersion < currentVersion };
+  const keyMismatch = typeof apiKey === 'string' && copies.some(copy => {
+    const key = ninjaConnectorApiKey(copy.source);
+    return key !== null && key !== apiKey;
+  });
+  return { installed: true, installedVersion, currentVersion, outdated: installedVersion < currentVersion, keyMismatch };
+}
+// Verze NinjaTraderu ze záznamu odinstalace ve Windows (výstup `reg query …
+// \Uninstall /s`): blok, jehož DisplayName je přesně „NinjaTrader" (ne doplňky
+// typu „… pro NinjaTrader 8"), a jeho DisplayVersion. Nenalezeno = ''.
+function ninjaTraderVersionFromReg(output) {
+  const blocks = String(output || '').split(/\r?\n(?=HKEY_)/);
+  for (const block of blocks) {
+    const value = name => {
+      const m = new RegExp(`^[ \\t]+${name}[ \\t]+REG_\\w+[ \\t]*(.*?)[ \\t\\r]*$`, 'm').exec(block);
+      return m ? m[1] : null;
+    };
+    if (value('DisplayName') === 'NinjaTrader') return value('DisplayVersion') || '';
+  }
+  return '';
+}
+const NT_UNINSTALL_KEYS = [
+  'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
+];
+// Jen čte registr, asynchronně (hlavní proces přijímá exekuce). Mimo Windows
+// nebo bez NT8 v registru (přenosná instalace) vrátí ''.
+async function readNinjaTraderVersion() {
+  if (process.platform !== 'win32') return '';
+  const { execFile } = require('child_process');
+  for (const key of NT_UNINSTALL_KEYS) {
+    const output = await new Promise(resolve => {
+      execFile('reg', ['query', key, '/s'], { windowsHide: true, maxBuffer: 32 * 1024 * 1024 }, (error, stdout) => resolve(error ? '' : stdout));
+    });
+    const version = ninjaTraderVersionFromReg(output);
+    if (version) return version;
+  }
+  return '';
 }
 function ninjaConnectorTemplateSource() {
   return fs.readFileSync(path.join(connectorsDir(), 'NinjaTrader8', 'FuturesJournalCapture.cs'), 'utf8');
 }
 // Šablona s dosazeným API klíčem – sdílí ji automatická instalace i „Uložit konektor".
 function ninjaConnectorSourceWithKey() {
-  return ninjaConnectorTemplateSource().replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', readCaptureSettings().apiKey);
+  const settings = readCaptureSettings();
+  // Bez přečteného nastavení by se do konektoru zapsal náhodný klíč.
+  if (settings._readFailed) throw new Error('Nastavení konektoru teď nejde přečíst, konektor se nezapsal. Zkus to znovu.');
+  return ninjaConnectorTemplateSource().replace('SEM_VLOZ_API_KLIC_Z_APLIKACE', settings.apiKey);
 }
 
 ipcMain.handle('capture:installNinjaConnector', async () => {
   try {
     const result = await installNinjaConnectorFile({ documentsDir: app.getPath('documents'), source: ninjaConnectorSourceWithKey(), fsApi: fs });
-    if (result.ok) await shell.openPath(result.addOnsDir);
+    if (result.ok) {
+      // Přeinstalace vyřizuje i upozornění po aktualizaci NT8.
+      const ntVersion = await readNinjaTraderVersion();
+      const settings = readCaptureSettings();
+      if (!settings._readFailed) writeCaptureSettings({ ...settings, ntConnectorSeen: true, ...(ntVersion ? { ntSeenVersion: ntVersion } : {}) });
+      await shell.openPath(result.addOnsDir);
+    }
     return result;
   } catch (error) {
     logError('Install NinjaTrader connector', error);
@@ -2461,11 +2587,40 @@ ipcMain.handle('capture:installNinjaConnector', async () => {
 ipcMain.handle('capture:ninjaConnectorStatus', async () => {
   try {
     const currentVersion = ninjaConnectorVersion(ninjaConnectorTemplateSource());
-    return await ninjaConnectorStatus({ documentsDir: app.getPath('documents'), currentVersion, fsApi: fs });
+    const settings = readCaptureSettings();
+    const status = await ninjaConnectorStatus({ documentsDir: app.getPath('documents'), currentVersion, fsApi: fs, apiKey: settings._readFailed ? undefined : settings.apiKey });
+    // Pamatuje si, že konektor kdy nainstalovaný byl – upozornění po
+    // aktualizaci NT8 pak platí i tehdy, když ho aktualizace odstranila.
+    if (status.installed && !settings.ntConnectorSeen && !settings._readFailed) writeCaptureSettings({ ...settings, ntConnectorSeen: true });
+    const ntVersion = await readNinjaTraderVersion();
+    return {
+      ...status,
+      ntVersion,
+      ntSeenVersion: settings.ntSeenVersion || '',
+      ntUpdateNotice: settings.ntUpdateNotice !== false,
+      ntConnectorSeen: !!(settings.ntConnectorSeen || status.installed),
+      rejectedActive: captureRejectedActive(captureRejected)
+    };
   } catch (error) {
     logError('NinjaTrader connector status', error);
     return { installed: false };
   }
+});
+// Uživatel upozornění po aktualizaci NT8 vyřídil (přeinstaloval, nebo jen
+// první zjištění verze) – tahle verze už se hlásit nebude.
+ipcMain.handle('capture:ackNinjaTraderVersion', async (_event, version) => {
+  try {
+    const settings = readCaptureSettings();
+    writeCaptureSettings({ ...settings, ntSeenVersion: String(version || '') });
+    return { ok: true };
+  } catch (error) { logError('capture:ackNinjaTraderVersion', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('capture:setNtUpdateNotice', async (_event, value) => {
+  try {
+    const settings = readCaptureSettings();
+    writeCaptureSettings({ ...settings, ntUpdateNotice: value !== false });
+    return { ok: true };
+  } catch (error) { return { ok: false, error: error.message }; }
 });
 
 ipcMain.handle('capture:prepareTradingViewPine', async () => {

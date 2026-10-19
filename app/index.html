@@ -847,6 +847,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="card">
         <h2>NinjaTrader</h2>
         <p class="sub">Konektor používá stejný lokální endpoint a API klíč jako sekce "Stav a obecné".</p>
+        <div class="sub" id="ntConnectorState" style="margin-top:10px">Stav konektoru se zjišťuje…</div>
+        <div class="settings-grid" style="margin-top:12px">
+          <div class="field"><label>Upozornit po aktualizaci NinjaTraderu</label>
+            <select id="ntUpdateNoticeSelect"><option value="ano">Zapnuto</option><option value="ne">Vypnuto</option></select>
+          </div>
+        </div>
         <div class="integration-actions">
           <button class="btn primary" id="captureInstallNinja">Nainstalovat NinjaTrader konektor automaticky</button>
           <button class="btn" id="captureExportConnector">Pouze stáhnout NinjaTrader konektor</button>
@@ -7254,7 +7260,8 @@ async function refreshCaptureStatus(){
  const r=await window.desktopAPI.captureStatus();
  if(!r?.ok)return;
  captureSnapshot=r;
- $('captureStatusText').value=r.running?`Běží na portu ${r.port}`:'Neběží';
+ $('captureStatusText').value=(r.running?`Běží na portu ${r.port}`:'Neběží')+(r.rejected?.active?` · odmítnuté zprávy: ${r.rejected.count} – neplatný API klíč, přeinstaluj konektor`:'');
+ $('captureStatusText').classList.toggle('neg',!!r.rejected?.active);
  $('capturePendingCount').value=r.pending;
  $('captureEndpoint').value=r.endpoint;
  $('captureApiKey').value=r.apiKey;
@@ -7703,7 +7710,8 @@ $('clearInvalidPositions').onclick=async()=>{
  await window.desktopAPI.captureClearPositions();
  await refreshCaptureStatus();
 };
-$('captureRefresh').onclick=refreshCaptureStatus;
+$('captureRefresh').onclick=()=>{void refreshCaptureStatus();void refreshNinjaConnectorState()};
+$('ntUpdateNoticeSelect').onchange=async e=>{await window.desktopAPI.captureSetNtUpdateNotice(e.target.value==='ano');await refreshNinjaConnectorState()};
 $('captureTestSequence').onclick=async()=>{await window.desktopAPI.captureTestExecutionSequence();await refreshCaptureStatus()};
 $('captureTestMultiTarget').onclick=async()=>{
  await window.desktopAPI.captureTestMultiTargetSequence();
@@ -7720,6 +7728,7 @@ async function installNinjaConnector(){
  const r=await window.desktopAPI.captureInstallNinjaConnector();
  if(r?.ok)showToast('Hotovo. Konektor byl automaticky vložen do NinjaTraderu. Teď spusť NinjaTrader, otevři NinjaScript Editor a stiskni F5 pro kompilaci.');
  else showToast('Automatická instalace se nepodařila: '+(r?.error||'neznámá chyba'));
+ void refreshNinjaConnectorState();
  return r;
 }
 $('captureInstallNinja').onclick=()=>installNinjaConnector();
@@ -7730,31 +7739,100 @@ const CONNECTOR_NOTICE_KEY='FJ_ntConnectorNoticeSeen';
 function shouldShowConnectorNotice(status,seenVersion){
  return !!(status&&status.installed&&status.outdated&&String(seenVersion??'')!==String(status.currentVersion));
 }
-let connectorNoticeChecked=false;
+// Po aktualizaci NinjaTraderu (verze z registru Windows, 4.8.92):
+// 'record' = verzi jen zapsat (první zjištění, upozornění vypnuté, konektor
+// nikdy nainstalovaný), 'notice' = upozornit, 'none' = nic.
+function ntUpdateNoticeAction(status){
+ const current=String(status?.ntVersion||'');
+ if(!current)return 'none';
+ const seen=String(status.ntSeenVersion||'');
+ if(seen===current)return 'none';
+ if(!seen||status.ntUpdateNotice===false||!status.ntConnectorSeen)return 'record';
+ return 'notice';
+}
+// Které upozornění na konektor ukázat (nejvýš jedno naráz). Pořadí podle
+// závažnosti: nesedící API klíč (obchody se neimportují vůbec) → aktualizovaný
+// NinjaTrader → starší verze konektoru. Klíč a NT8 se hlásí jednou za běh
+// aplikace, dokud trvají; starší verze jednou pro danou verzi konektoru.
+function connectorNoticeKind(status,seenVersion,{keyNoticeShown=false,ntNoticeDismissed=false}={}){
+ if(!status)return null;
+ if((status.keyMismatch||status.rejectedActive)&&!keyNoticeShown)return 'key';
+ if(ntUpdateNoticeAction(status)==='notice'&&!ntNoticeDismissed)return 'nt';
+ if(shouldShowConnectorNotice(status,seenVersion))return 'outdated';
+ return null;
+}
+function ninjaConnectorStateHTML(status){
+ if(!status)return 'Stav konektoru se nepodařilo zjistit.';
+ const parts=[status.ntVersion?`NinjaTrader ${esc(status.ntVersion)}`:'verze NinjaTraderu nezjištěna'];
+ if(!status.installed)parts.push('konektor nenainstalovaný');
+ else{
+  parts.push(`konektor v${esc(status.installedVersion)}${status.outdated?` (aktuální je v${esc(status.currentVersion)})`:''}`);
+  parts.push(status.keyMismatch?'<b class="neg">API klíč nesedí – obchody se neimportují, přeinstaluj konektor</b>':'API klíč sedí');
+ }
+ if(status.rejectedActive&&!status.keyMismatch)parts.push('<b class="neg">aplikace odmítá zprávy konektoru (neplatný API klíč)</b>');
+ if(ntUpdateNoticeAction(status)==='notice')parts.push(`<b class="neutral">NinjaTrader aktualizován z ${esc(status.ntSeenVersion)} – přeinstaluj konektor</b>`);
+ return parts.join(' · ');
+}
+function renderNinjaConnectorState(status){
+ const el=$('ntConnectorState');
+ if(el)el.innerHTML=ninjaConnectorStateHTML(status);
+ const sel=$('ntUpdateNoticeSelect');
+ if(sel&&status)sel.value=status.ntUpdateNotice===false?'ne':'ano';
+}
+let connectorNoticeRunning=false;
+let connectorKeyNoticeShown=false;
+let ntNoticeDismissedFor='';
 function waitForNoOpenModal(){
  return new Promise(resolve=>{
   const check=()=>document.querySelector('.modal.open')?setTimeout(check,1500):resolve();
   check();
  });
 }
+// Běží po přihlášení a pak jednou za hodinu (aplikace běží dlouho a NT8 se
+// mezitím může aktualizovat nebo konektor přestat posílat platný klíč).
+let connectorNoticeTimer=null;
 async function maybeShowConnectorNotice(){
- if(connectorNoticeChecked)return;
- connectorNoticeChecked=true;
+ // Hodinová kontrola začíná až tady – load() běží po přihlášení, takže okno
+ // nevyskočí přes přihlašovací obrazovku.
+ if(!connectorNoticeTimer)connectorNoticeTimer=setInterval(()=>void maybeShowConnectorNotice(),60*60*1000);
+ if(connectorNoticeRunning)return;
+ connectorNoticeRunning=true;
  try{
   let seen=null;
   try{seen=localStorage.getItem(CONNECTOR_NOTICE_KEY)}catch(e){}
   const status=await window.desktopAPI?.captureNinjaConnectorStatus?.();
-  if(!shouldShowConnectorNotice(status,seen))return;
+  renderNinjaConnectorState(status);
+  if(!status)return;
+  if(ntUpdateNoticeAction(status)==='record')await window.desktopAPI.captureAckNinjaTraderVersion?.(status.ntVersion);
+  const kind=connectorNoticeKind(status,seen,{keyNoticeShown:connectorKeyNoticeShown,ntNoticeDismissed:ntNoticeDismissedFor===status.ntVersion});
+  if(!kind)return;
   // Nevyskočí přes rozdělanou práci (formulář obchodu, jiné potvrzení) –
   // počká, až žádné okno otevřené není.
   await waitForNoOpenModal();
-  // Příznak se ukládá PŘED zobrazením – okno se nesmí ukázat podruhé ani po
-  // zavření aplikace uprostřed dialogu.
-  try{localStorage.setItem(CONNECTOR_NOTICE_KEY,String(status.currentVersion))}catch(e){}
-  const ok=await showConfirm('Pro pokročilé funkce a stabilitu doporučujeme přeinstalovat NT8 konektor. Platí pro stávající uživatele s již nainstalovaným NT8 konektorem.\n\nPo přeinstalaci otevři v NinjaTraderu NinjaScript Editor a stiskni F5.',
-   {title:'NinjaTrader 8 konektor',ok:'Přeinstalovat teď',cancel:'Později'});
+  const after='\n\nPo přeinstalaci otevři v NinjaTraderu NinjaScript Editor a stiskni F5.';
+  let ok=false;
+  if(kind==='key'){
+   connectorKeyNoticeShown=true;
+   ok=await showConfirm('Konektor v NinjaTraderu posílá jiný API klíč než aplikace. Aplikace jeho zprávy odmítá a obchody se do deníku NEIMPORTUJÍ.'+after+'\n\nObchody, které mezitím proběhly, doplň přes Integrace → „Ruční import z NT8…“.',
+    {title:'NinjaTrader 8 konektor – nesedí API klíč',ok:'Přeinstalovat teď',cancel:'Později'});
+  }else if(kind==='nt'){
+   ok=await showConfirm(`NinjaTrader byl aktualizován (${status.ntSeenVersion} → ${status.ntVersion}). Přeinstaluj konektor, jinak se obchody nemusí importovat.`+after,
+    {title:'NinjaTrader 8 konektor',ok:'Přeinstalovat teď',cancel:'Později'});
+   // „Později" = připomenout při dalším spuštění aplikace, ne každou hodinu.
+   if(!ok)ntNoticeDismissedFor=status.ntVersion;
+  }else{
+   // Příznak se ukládá PŘED zobrazením – okno se nesmí ukázat podruhé ani po
+   // zavření aplikace uprostřed dialogu.
+   try{localStorage.setItem(CONNECTOR_NOTICE_KEY,String(status.currentVersion))}catch(e){}
+   ok=await showConfirm('Pro pokročilé funkce a stabilitu doporučujeme přeinstalovat NT8 konektor. Platí pro stávající uživatele s již nainstalovaným NT8 konektorem.'+after,
+    {title:'NinjaTrader 8 konektor',ok:'Přeinstalovat teď',cancel:'Později'});
+  }
   if(ok)await installNinjaConnector();
  }catch(e){console.error('connector notice',e)}
+ finally{connectorNoticeRunning=false}
+}
+async function refreshNinjaConnectorState(){
+ try{renderNinjaConnectorState(await window.desktopAPI?.captureNinjaConnectorStatus?.())}catch(e){console.error('connector state',e)}
 }
 // ---------- Automatické aktualizace ----------
 // Stav drží hlavní proces (main.js, sekce „Automatické aktualizace“), tady se
@@ -7988,7 +8066,7 @@ $('captureExportTradingViewWorker').onclick=async()=>{
 $('captureOpenConnectors').onclick=async()=>{const r=await window.desktopAPI.captureOpenConnectorFolder();if(!r?.ok)showToast('Složku nelze otevřít: '+(r?.error||''))};
 $('captureNewKey').onclick=async()=>{
  if(!(await showConfirm('Starý NinjaTrader konektor přestane fungovat, dokud v něm nezměníš klíč. Pokračovat?')))return;
- await window.desktopAPI.captureRegenerateKey();await refreshCaptureStatus();
+ await window.desktopAPI.captureRegenerateKey();await refreshCaptureStatus();void refreshNinjaConnectorState();
 };
 $('captureClear').onclick=async()=>{if(await showConfirm('Vymazat frontu zachycených událostí?')){await window.desktopAPI.captureClear();await refreshCaptureStatus()}};
 $('captureScreenshotMode').onchange=async e=>{await window.desktopAPI.captureSetScreenshotMode(e.target.value);await refreshCaptureStatus()};
