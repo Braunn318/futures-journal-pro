@@ -370,6 +370,7 @@ textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-c
 .settings-check{display:flex;align-items:center;gap:8px;cursor:pointer}
 .settings-check input{width:auto}
 
+.data-missing-banner{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:60;display:none;align-items:center;gap:12px;max-width:min(760px,calc(100vw - 32px));padding:10px 14px;border-radius:10px;background:var(--panel2);border:1px solid var(--red);box-shadow:0 10px 30px rgba(var(--shadow-rgb),.35);line-height:1.4}.data-missing-banner.show{display:flex}.data-missing-banner strong{color:var(--red)}.data-missing-banner span{flex:1;word-break:break-all}
 .status-toast{position:fixed;right:22px;bottom:22px;z-index:50;padding:12px 16px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);box-shadow:0 10px 30px rgba(var(--shadow-rgb),.35);display:none;max-width:420px;white-space:pre-line;line-height:1.4;cursor:pointer}.status-toast.show{display:block}
 @media(max-width:1000px){#integrations>.grid{grid-template-columns:1fr!important}.journal-switcher{min-width:220px;margin:0 12px}.stats{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}.trade{grid-template-columns:1fr}.app{grid-template-columns:1fr}.sidebar{height:auto;position:static;display:flex;align-items:center;justify-content:space-between;padding:14px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.brand{margin:0}.main{padding:16px}.kpi-strip{grid-template-columns:repeat(2,1fr)}.overview-row,.performance-row{grid-template-columns:1fr}}
 @media(max-width:900px){.calendar{grid-template-columns:repeat(7,1fr)}.dow.week,.day.week-summary{display:none}}
@@ -1205,6 +1206,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
   </main>
 </div>
 
+<div class="data-missing-banner" id="dataMissingBanner" role="alert"><span><strong>Složka s daty není dostupná.</strong> <span id="dataMissingPath"></span> Ukládání je pozastavené, zprávy z NinjaTraderu se drží v záloze.</span><button class="btn" id="dataMissingRetry">Zkusit znovu</button></div>
 <div class="status-toast" id="statusToast"></div>
 
 <div class="modal" id="journalNameModal">
@@ -7105,7 +7107,7 @@ refreshImagesLocationInfo();
 async function refreshDataLocationInfo(){
  if(!window.desktopAPI?.getDataLocation){if($('dataLocationInfo'))$('dataLocationInfo').textContent='Dostupné jen v desktopové aplikaci.';return}
  const r=await window.desktopAPI.getDataLocation();
- if($('dataLocationInfo'))$('dataLocationInfo').textContent=r?.ok?`Aktuální umístění: ${r.path}${r.isDefault?' (výchozí, systémový disk)':''}`:'Umístění se nepodařilo zjistit.';
+ if($('dataLocationInfo'))$('dataLocationInfo').textContent=r?.ok?`Aktuální umístění: ${r.path}${r.isDefault?' (výchozí, systémový disk)':''}${r.missing?' – NENÍ DOSTUPNÁ':''}`:'Umístění se nepodařilo zjistit.';
 }
 if($('changeDataLocation'))$('changeDataLocation').onclick=async()=>{
  if(!window.desktopAPI?.chooseDataLocation){showToast('Tato funkce je dostupná v desktopové aplikaci.');return}
@@ -7122,6 +7124,20 @@ if($('resetDataLocation'))$('resetDataLocation').onclick=async()=>{
  else showToast('Nepodařilo se: '+(r?.error||'neznámá chyba'));
 };
 refreshDataLocationInfo();
+// Složka dat zmizela / je zpět (main: watchDataDir). Banner drží, dokud není zpět.
+function applyDataAvailability(state){
+ const banner=$('dataMissingBanner');if(!banner)return;
+ const wasMissing=banner.classList.contains('show');
+ if(state?.ok===false){$('dataMissingPath').textContent=state.path||'';banner.classList.add('show')}
+ else{banner.classList.remove('show');if(wasMissing)showToast('Složka s daty je zpět, ukládání pokračuje.')}
+ refreshDataLocationInfo();
+}
+window.desktopAPI?.onDataAvailability?.(applyDataAvailability);
+window.desktopAPI?.getDataAvailability?.().then(applyDataAvailability).catch(()=>{});
+if($('dataMissingRetry'))$('dataMissingRetry').onclick=async()=>{
+ const r=await window.desktopAPI?.retryDataLocation?.();
+ if(r?.ok)applyDataAvailability({ok:true});
+};
 
 async function refreshAiExportInfo(){
  if(!window.desktopAPI?.getAiExportInfo){if($('aiExportInfo'))$('aiExportInfo').textContent='Dostupné jen v desktopové aplikaci.';return}

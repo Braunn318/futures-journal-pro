@@ -41,7 +41,13 @@ if (!hasSingleInstanceLock) {
   app.quit();
 }
 const settingsPath = () => path.join(resolveDataDir(), 'backup-settings.json');
-const logPath = () => path.join(resolveDataDir(), 'futures-journal-error.log');
+// Protokol se zapíše vždy: když složka dat zrovna chybí, do výchozí userData
+// (jen pro diagnostiku – data deníku tam nikdy nejdou).
+function logPath() {
+  let dir;
+  try { dir = resolveDataDir(); } catch { dir = app.getPath('userData'); }
+  return path.join(dir, 'futures-journal-error.log');
+}
 
 function appendLog(context, text) {
   try {
@@ -68,24 +74,38 @@ function writeSettings(data) {
 // malý ukazatel na skutečné umístění dat – samotné deníky, screenshoty a
 // nastavení se pak čtou/zapisují ZE ZVOLENÉ SLOŽKY, ne z C:.
 const dataLocationConfigPath = () => path.join(app.getPath('userData'), 'data-location.json');
-// Když nastavená složka dat chybí (smazaná, odpojený disk), aplikace jede
-// z výchozí userData – a tam si konektor založí nové nastavení s NOVÝM API
-// klíčem (2026-10-16: data ve složce programu smazala aktualizace, NT8 pak tři
-// dny posílal starý klíč a nic se neimportovalo). Chování zůstává, jen se
-// o něm jednou za běh dozví protokol.
-let dataDirFallbackLogged = false;
+// Nastavená složka dat chybí (odpojený disk, spadlá síťová jednotka, smazaná
+// složka): appka NIKDY tiše nepřejde na výchozí userData – dřív tam zapisovala
+// obchody, které po návratu disku nebyly vidět, a konektor si založil nové
+// nastavení s NOVÝM API klíčem (2026-10-16). Místo toho resolveDataDir hodí
+// chybu FJ_DATA_DIR_MISSING: zápis i čtení selžou nahlas, ukládání je
+// pozastavené, zprávy konektoru se drží v záloze (captureSpool) a uživatel
+// dostane upozornění (watchDataDir).
+// Výjimka: při startu zvolené „Pokračovat s výchozí" (checkDataLocationAtStartup)
+// – pak tenhle běh vědomě jede z userData až do konce.
+const dataDirState = { sessionDefault: false, missing: null, onMissing: null };
+function dataDirMissingError(dir) {
+  const error = new Error(`Složka s daty není dostupná: ${dir}. Ukládání je pozastavené – připoj disk a dej „Zkusit znovu".`);
+  error.code = 'FJ_DATA_DIR_MISSING';
+  return error;
+}
+// Nastavená vlastní složka, ze které tenhle běh má jet (null = výchozí userData).
+function configuredDataDir() {
+  if (dataDirState.sessionDefault) return null;
+  return readDataLocationConfig().customDataDir || null;
+}
 function resolveDataDir() {
-  try {
-    const raw = fs.readFileSync(dataLocationConfigPath(), 'utf8');
-    const cfg = JSON.parse(raw);
-    if (cfg.customDataDir && fs.existsSync(cfg.customDataDir)) return cfg.customDataDir;
-    if (cfg.customDataDir && !dataDirFallbackLogged) {
-      // Příznak před zápisem: appendLog sám volá resolveDataDir.
-      dataDirFallbackLogged = true;
-      logError('Umístění dat', `nastavená složka dat ${cfg.customDataDir} neexistuje, použita výchozí ${app.getPath('userData')}`);
-    }
-  } catch {}
-  return app.getPath('userData');
+  const custom = configuredDataDir();
+  if (!custom) return app.getPath('userData');
+  if (fs.existsSync(custom)) return custom;
+  if (dataDirState.missing !== custom) {
+    dataDirState.missing = custom;
+    if (dataDirState.onMissing) { try { dataDirState.onMissing(custom); } catch {} }
+  }
+  throw dataDirMissingError(custom);
+}
+function dataDirAvailable() {
+  try { resolveDataDir(); return true; } catch { return false; }
 }
 function readDataLocationConfig() {
   try { return JSON.parse(fs.readFileSync(dataLocationConfigPath(), 'utf8')) || {}; }
@@ -111,56 +131,213 @@ function writeDataLocationConfig(customDataDir) {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
   fs.writeFileSync(dataLocationConfigPath(), JSON.stringify({ customDataDir }, null, 2), 'utf8');
 }
-// Přesune existující deníky/nastavení/screenshoty ze staré do nové složky
-// (kopie + smazání originálu, aby se místo na starém disku opravdu uvolnilo).
-// Doplňková pojistka navíc: těsně před JAKÝMKOLIV přesunem se obchody
-// (bez screenshotů, kvůli rychlosti) zkopírují i do pevného, nikdy se
-// nepřesouvajícího umístění – pro případ, že by se přesun i přes výše
-// popsané bezpečné pořadí něčím nečekaným přerušil (např. vynucené
-// ukončení procesu uprostřed kopírování).
+// ---------- Přesun složky dat (bezpečné pořadí, 4.8.93) ----------
+// Co ve složce dat patří deníku a stěhuje se s ní. ESSENTIAL jsou data, která
+// nejdou znovu vytvořit – když už je cíl má, přesun se odmítne (nic se
+// nepřepisuje). Ostatní jsou dopočet / mezipaměť / protokol.
+const DATA_ENTRIES = ['journal-data', 'trade-capture', 'backup-settings.json', 'ai-export', 'futures-journal-error.log', 'news-calendar.json'];
+const DATA_ENTRIES_ESSENTIAL = ['journal-data', 'trade-capture', 'backup-settings.json'];
+// Pojistka těsně před přesunem do pevného, nikdy se nepřesouvajícího místa
+// (userData/safety-backups): deníky (bez obrázků – ty se kopírují a ověřují
+// stejně jako zbytek), konektor (API klíč, mapování účtů, exekuce, pozice; bez
+// screenshotů), nastavení a manifest AI exportu. Když se záloha nepovede,
+// přesun se nespustí.
 function writeSafetyBackupBeforeMove(oldDir) {
-  try {
-    const journalDataSrc = path.join(oldDir, 'journal-data');
-    if (!fs.existsSync(journalDataSrc)) return;
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupDir = path.join(app.getPath('userData'), 'safety-backups', `pred-presunem-${stamp}`, 'journal-data');
-    // Bez složky obrázků: ta se přesouvá stejně bezpečně (nejdřív kopie,
-    // pak mazání) a v userData by zbytečně ležela druhá sada screenshotů.
-    const imagesSrc = path.resolve(path.join(journalDataSrc, 'images'));
-    fs.cpSync(journalDataSrc, backupDir, { recursive: true, filter: src => path.resolve(src) !== imagesSrc && !path.resolve(src).startsWith(imagesSrc + path.sep) });
-  } catch (error) {
-    logError('writeSafetyBackupBeforeMove', error);
-  }
-}
-// Přesune existující deníky/nastavení/screenshoty ze staré do nové složky.
-// Pořadí je záměrně: 1) zkopírovat VŠECHNO, 2) teprve pak přepnout appku na
-// nové umístění, 3) až úplně nakonec (a jen jako "úklid") smazat staré
-// soubory. Kdyby cokoliv selhalo v kroku 1, nic se nesmaže a appka dál vidí
-// svá data na původním místě beze změny – nikdy nemůže nastat stav, kdy je
-// originál pryč, ale appka o novém umístění ještě neví (přesně tohle byl
-// dřívější, nebezpečnější postup: kopírovat a rovnou mazat po jedné položce).
-function moveDataContents(oldDir, newDir) {
-  const entries = ['journal-data', 'trade-capture', 'backup-settings.json', 'futures-journal-error.log', 'news-calendar.json'];
-  fs.mkdirSync(newDir, { recursive: true });
-  const copied = [];
-  for (const name of entries) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupDir = path.join(app.getPath('userData'), 'safety-backups', `pred-presunem-${stamp}`);
+  const skip = [path.join(oldDir, 'journal-data', 'images'), path.join(oldDir, 'trade-capture', 'screenshots')].map(p => path.resolve(p));
+  const keep = src => { const r = path.resolve(src); return !skip.some(s => r === s || r.startsWith(s + path.sep)); };
+  for (const name of ['journal-data', 'trade-capture', 'backup-settings.json', path.join('ai-export', 'index.json')]) {
     const src = path.join(oldDir, name);
     if (!fs.existsSync(src)) continue;
-    const dest = path.join(newDir, name);
-    fs.cpSync(src, dest, { recursive: true, force: true });
-    if (!fs.existsSync(dest)) throw new Error(`Kopírování "${name}" do nového umístění se nezdařilo.`);
-    copied.push(src);
+    fs.mkdirSync(path.dirname(path.join(backupDir, name)), { recursive: true });
+    fs.cpSync(src, path.join(backupDir, name), { recursive: true, filter: keep });
   }
-  // Od tohoto místa dál appka už najde svá data v newDir bez ohledu na to,
-  // jestli se podaří smazat staré soubory – volající hned poté zapíše
-  // ukazatel na nové umístění (writeDataLocationConfig).
-  for (const src of copied) {
-    try { fs.rmSync(src, { recursive: true, force: true }); } catch (error) { logError('moveDataContents cleanup', error); }
+  return backupDir;
+}
+// Soubory položky (složky i jednoho souboru) jako relativní cesta → velikost.
+function dataEntryFiles(root) {
+  const out = new Map();
+  const walk = (abs, rel) => {
+    const st = fs.statSync(abs);
+    if (!st.isDirectory()) { out.set(rel, st.size); return; }
+    for (const name of fs.readdirSync(abs)) walk(path.join(abs, name), rel ? path.join(rel, name) : name);
+  };
+  if (fs.existsSync(root)) walk(root, '');
+  return out;
+}
+function assertSameDataEntry(src, dest, name) {
+  const a = dataEntryFiles(src), b = dataEntryFiles(dest);
+  for (const [rel, size] of a) {
+    if (b.get(rel) !== size) throw new Error(`Kopie „${path.join(name, rel)}“ v novém umístění nesedí – přesun zastaven, data zůstávají na původním místě.`);
   }
+  if (b.size !== a.size) throw new Error(`Kopie „${name}“ v novém umístění nesedí (počet souborů) – přesun zastaven, data zůstávají na původním místě.`);
+}
+// Přesun dat ze staré do nové složky. Pořadí:
+//   1) cíl nesmí už mít data deníku (jinak odmítnout – nic se nepřepisuje),
+//   2) pojistná záloha (když selže, konec),
+//   3) zkopírovat vše a OVĚŘIT (seznam souborů a velikosti),
+//   4) přepnout ukazatel (`switchPointer`),
+//   5) až potom smazat staré kopie (jen úklid – selhání se jen zaloguje).
+// Selže-li cokoli v 1–4, ze staré složky se nic nesmaže a z cíle se odstraní
+// jen to, co sem tenhle přesun nakopíroval.
+// Celý přesun MUSÍ zůstat synchronní: dokud běží, hlavní proces nevyřídí
+// žádný jiný zápis (uložení obchodu, zprávu konektoru) – ty počkají a zapíšou
+// se až do nového umístění. S async kopírováním by zápis během přesunu skončil
+// ve staré složce a úklid by ho smazal.
+function moveDataContents(oldDir, newDir, switchPointer) {
+  const present = DATA_ENTRIES.filter(name => fs.existsSync(path.join(oldDir, name)));
+  const target = path.resolve(newDir);
+  if (present.some(name => { const base = path.resolve(path.join(oldDir, name)); return target === base || target.startsWith(base + path.sep); })) {
+    throw new Error('Nová složka nesmí ležet uvnitř přesouvaných dat (např. v journal-data).');
+  }
+  const clash = DATA_ENTRIES_ESSENTIAL.filter(name => fs.existsSync(path.join(newDir, name)));
+  if (clash.length) throw new Error(`Ve vybrané složce už jsou data deníku (${clash.join(', ')}): ${newDir}. Vyber prázdnou složku, nebo tu starou nejdřív přejmenuj – nic se nepřepisuje.`);
+  writeSafetyBackupBeforeMove(oldDir);
+  const createdDir = !fs.existsSync(newDir);
+  const copied = [];
+  try {
+    fs.mkdirSync(newDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    for (const name of present) {
+      const src = path.join(oldDir, name), dest = path.join(newDir, name);
+      if (fs.existsSync(dest)) {
+        // Jen dopočet / mezipaměť / protokol (data deníku odmítnuta výš):
+        // starý protokol se odloží, zbytek se nahradí čerstvou kopií.
+        if (name === 'futures-journal-error.log') fs.renameSync(dest, `${dest}.predchozi-${stamp}`);
+        else fs.rmSync(dest, { recursive: true, force: true });
+      }
+      copied.push(name);
+      fs.cpSync(src, dest, { recursive: true });
+      assertSameDataEntry(src, dest, name);
+    }
+    // Vlastní složka obrázků uvnitř přesouvané položky se stěhuje s ní –
+    // nastavení v NOVÉ kopii musí ukazovat na nové místo.
+    const custom = readImagesDirFrom(newDir);
+    const inside = custom && copied.find(name => { const base = path.resolve(path.join(oldDir, name)); const r = path.resolve(custom); return r === base || r.startsWith(base + path.sep); });
+    const movedImagesDir = inside ? path.join(newDir, path.relative(oldDir, custom)) : null;
+    if (movedImagesDir) {
+      const file = path.join(newDir, 'backup-settings.json');
+      fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), imagesDir: movedImagesDir }, null, 2), 'utf8');
+    }
+    switchPointer();
+    if (movedImagesDir) { imagesDirSetting.dir = movedImagesDir; imagesDirSetting.loaded = true; }
+  } catch (error) {
+    for (const name of copied) { try { fs.rmSync(path.join(newDir, name), { recursive: true, force: true }); } catch {} }
+    if (createdDir) { try { fs.rmdirSync(newDir); } catch {} }
+    throw error;
+  }
+  // Ukazatel už vede do newDir – appka svá data najde i kdyby úklid selhal.
+  for (const name of copied) {
+    try { fs.rmSync(path.join(oldDir, name), { recursive: true, force: true }); } catch (error) { logError('Přesun dat – úklid', error); }
+  }
+  logInfo('Umístění dat', `${oldDir} → ${newDir}: ${copied.join(', ') || 'nic k přesunu'}`);
+  return copied;
+}
+function readImagesDirFrom(dir) {
+  try {
+    const custom = JSON.parse(fs.readFileSync(path.join(dir, 'backup-settings.json'), 'utf8')).imagesDir;
+    return typeof custom === 'string' && path.isAbsolute(custom) ? custom : null;
+  } catch { return null; }
 }
 ipcMain.handle('data:getLocation', async () => {
   try { const p = resolveDataDir(); return { ok: true, path: p, isDefault: p === app.getPath('userData') }; }
-  catch (error) { return { ok: false, error: error.message }; }
+  catch (error) {
+    if (error?.code === 'FJ_DATA_DIR_MISSING') return { ok: true, path: configuredDataDir(), isDefault: false, missing: true };
+    return { ok: false, error: error.message };
+  }
+});
+// ---------- Složka dat zmizela za běhu ----------
+// Hlídá se každých 5 s a hned při prvním neúspěšném resolveDataDir. Zmizení:
+// protokol, banner v rendereru, upozornění (Zkusit znovu / Vybrat složku… /
+// Zavřít). Návrat: banner pryč a přehrání zálohy konektoru. Do userData se
+// mezitím nic nezapisuje (rozhodnutí 2026-10-19: žádné „Pokračovat s výchozí"
+// za běhu – data by se rozdělila na dvě místa).
+const DATA_DIR_WATCH_MS = 5000;
+const dataDirWatch = { timer: null, dialogOpen: false };
+function sendDataDirState(ok, dir) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('data:availability', { ok, path: dir });
+}
+function handleDataDirMissing(dir) {
+  // Volá se zevnitř resolveDataDir (třeba uprostřed zápisu) – zbytek až po něm.
+  setImmediate(() => {
+    logInfo('Umístění dat', `složka dat ${dir} není dostupná – ukládání pozastaveno, zprávy konektoru jdou do zálohy (userData/capture-spool)`);
+    sendDataDirState(false, dir);
+    showDataDirMissingDialog(dir).catch(error => logError('Umístění dat – upozornění', error));
+  });
+}
+// Je složka zpět? Pokud ano, zruší stav „chybí", dá vědět rendereru a přehraje zálohu.
+function checkDataDirBack() {
+  if (!dataDirState.missing) return true;
+  const custom = configuredDataDir();
+  if (custom && !fs.existsSync(custom)) return false;
+  const was = dataDirState.missing;
+  dataDirState.missing = null;
+  logInfo('Umístění dat', `složka dat ${was} je zpět, ukládání pokračuje`);
+  sendDataDirState(true, custom || app.getPath('userData'));
+  replayCaptureSpool().catch(error => logError('Záloha konektoru', error));
+  return true;
+}
+// Vybraná složka (nebo její podsložka FuturesJournalPRO-Data) musí obsahovat journal-data.
+function findDataDirIn(picked) {
+  return [picked, path.join(picked, 'FuturesJournalPRO-Data')].find(dir => fs.existsSync(path.join(dir, 'journal-data'))) || null;
+}
+async function showDataDirMissingDialog(dir) {
+  if (dataDirWatch.dialogOpen) return;
+  dataDirWatch.dialogOpen = true;
+  try {
+    for (;;) {
+      if (checkDataDirBack()) return;
+      const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const { response } = await dialog.showMessageBox(owner, {
+        type: 'warning',
+        title: 'Futures Journal PRO',
+        message: 'Složka s daty není dostupná.',
+        detail: `${dir}\n\nUkládání je pozastavené, nic se nezapisuje jinam. Zprávy z NinjaTraderu se drží v záloze a doplní se, až bude složka zpět.\n\nPřipoj disk a dej „Zkusit znovu". Pokud se složka přesunula, vyber ji (aplikace se pak restartuje a načte data z ní).`,
+        buttons: ['Zkusit znovu', 'Vybrat složku…', 'Zavřít'],
+        defaultId: 0,
+        cancelId: 2,
+        noLink: true
+      });
+      if (response === 0) continue;
+      if (response === 2) return;
+      const picked = await dialog.showOpenDialog(owner, { title: 'Vyber složku s daty Futures Journal PRO', properties: ['openDirectory'] });
+      if (picked.canceled || !picked.filePaths?.[0]) continue;
+      const found = findDataDirIn(picked.filePaths[0]);
+      if (!found) {
+        await dialog.showMessageBox(owner, { type: 'error', title: 'Futures Journal PRO', message: 'Ve vybrané složce nejsou data deníku (chybí podsložka journal-data).', noLink: true });
+        continue;
+      }
+      if (isInsideInstallDir(found)) {
+        await dialog.showMessageBox(owner, { type: 'error', title: 'Futures Journal PRO', message: INSTALL_DIR_ERROR, noLink: true });
+        continue;
+      }
+      writeDataLocationConfig(found);
+      logInfo('Umístění dat', `${dir} nedostupné, za běhu vybráno ${found} – restart`);
+      app.relaunch();
+      app.exit(0);
+      return;
+    }
+  } finally {
+    dataDirWatch.dialogOpen = false;
+  }
+}
+function watchDataDir() {
+  dataDirState.onMissing = handleDataDirMissing;
+  if (dataDirWatch.timer) clearInterval(dataDirWatch.timer);
+  dataDirWatch.timer = setInterval(() => {
+    if (dataDirState.missing) checkDataDirBack();
+    else dataDirAvailable();
+  }, DATA_DIR_WATCH_MS);
+}
+ipcMain.handle('data:retryLocation', async () => {
+  if (checkDataDirBack()) return { ok: true };
+  showDataDirMissingDialog(dataDirState.missing).catch(error => logError('Umístění dat – upozornění', error));
+  return { ok: false, missing: true, path: dataDirState.missing };
+});
+ipcMain.handle('data:availability', async () => {
+  const ok = dataDirAvailable();
+  return { ok, path: ok ? resolveDataDir() : dataDirState.missing };
 });
 // ---------- Složka obrázků (4.8.7) ----------
 // Obrázky můžou ležet kdekoli (jiný disk, synchronizovaná složka). Přesun:
@@ -248,9 +425,7 @@ ipcMain.handle('data:chooseLocation', async () => {
     const newDir = path.join(result.filePaths[0], 'FuturesJournalPRO-Data');
     if (isInsideInstallDir(newDir)) return { ok: false, error: INSTALL_DIR_ERROR };
     if (path.resolve(newDir) === path.resolve(oldDir)) return { ok: false, error: 'Vybraná složka už je aktuálním umístěním dat.' };
-    writeSafetyBackupBeforeMove(oldDir);
-    moveDataContents(oldDir, newDir);
-    writeDataLocationConfig(newDir);
+    moveDataContents(oldDir, newDir, () => writeDataLocationConfig(newDir));
     return { ok: true, path: newDir };
   } catch (error) {
     logError('data:chooseLocation', error);
@@ -261,11 +436,9 @@ ipcMain.handle('data:resetLocationToDefault', async () => {
   try {
     const oldDir = resolveDataDir();
     const defaultDir = app.getPath('userData');
-    if (path.resolve(oldDir) !== path.resolve(defaultDir)) {
-      writeSafetyBackupBeforeMove(oldDir);
-      moveDataContents(oldDir, defaultDir);
-    }
-    fs.rmSync(dataLocationConfigPath(), { force: true });
+    const dropPointer = () => fs.rmSync(dataLocationConfigPath(), { force: true });
+    if (path.resolve(oldDir) !== path.resolve(defaultDir)) moveDataContents(oldDir, defaultDir, dropPointer);
+    else dropPointer();
     return { ok: true, path: defaultDir };
   } catch (error) {
     logError('data:resetLocationToDefault', error);
@@ -531,6 +704,9 @@ const IMAGE_CONTENT_TYPES = {
 const imagesDirSetting = { loaded: false, dir: null };
 function imagesRoot() {
   if (!imagesDirSetting.loaded) {
+    // Bez složky dat nejde nastavení přečíst – hodí chybu a nic si nezapamatuje
+    // (jinak by si běh natrvalo uložil výchozí složku místo vlastní).
+    dataRoot();
     const custom = readSettings().imagesDir;
     imagesDirSetting.dir = typeof custom === 'string' && path.isAbsolute(custom) ? custom : null;
     imagesDirSetting.loaded = true;
@@ -665,9 +841,15 @@ function registerImageProtocol() {
       const name = decodeURIComponent(url.pathname).replace(/^\/+/, '');
       if (!IMAGE_NAME_RE.test(name)) return new Response('', { status: 400 });
       let file;
-      if (url.hostname === 'thumb') file = thumbPath(name);
-      else if (url.hostname === 'store') file = imageRefPath(IMAGE_REF_PREFIX + name);
-      else return new Response('', { status: 400 });
+      try {
+        if (url.hostname === 'thumb') file = thumbPath(name);
+        else if (url.hostname === 'store') file = imageRefPath(IMAGE_REF_PREFIX + name);
+        else return new Response('', { status: 400 });
+      } catch (error) {
+        // Složka dat chybí – obrázek teď nejde načíst (renderer si náhled nemá tvořit).
+        if (error?.code === 'FJ_DATA_DIR_MISSING') return new Response('', { status: 503 });
+        throw error;
+      }
       if (!file || !fs.existsSync(file)) return new Response('', { status: 404 });
       const ext = url.hostname === 'thumb' ? 'webp' : path.extname(file).slice(1).toLowerCase();
       return new Response(fs.readFileSync(file), {
@@ -1484,7 +1666,15 @@ function defaultCaptureSettings() {
 //    do protokolu a založí nové – nový klíč odhalí kontrola konektoru,
 //  - jiná chyba čtení: výchozí hodnoty jen v paměti, soubor se nepřepíše
 //    a zápis takového nastavení writeCaptureSettings odmítne.
+// Poslední úspěšně přečtený API klíč – když složka dat zrovna chybí, ověří
+// se jím zprávy konektoru, které jdou do zálohy (captureSpool).
+const captureKeyCache = { key: null };
 function readCaptureSettings() {
+  const settings = readCaptureSettingsFile();
+  if (!settings._readFailed && settings.apiKey) captureKeyCache.key = settings.apiKey;
+  return settings;
+}
+function readCaptureSettingsFile() {
   ensureCaptureRoot();
   let raw;
   try {
@@ -2243,7 +2433,6 @@ function startCaptureServer() {
   captureServer = http.createServer((req, res) => {
     if (req.method === 'OPTIONS') return sendJson(res, 200, { ok: true });
     const url = new URL(req.url, `http://127.0.0.1:${CAPTURE_PORT}`);
-    const settings = readCaptureSettings();
 
     if (url.pathname === '/health' && req.method === 'GET') {
       return sendJson(res, 200, { ok: true, service: 'Futures Journal Trade Capture', version: '2.0', port: CAPTURE_PORT });
@@ -2251,6 +2440,9 @@ function startCaptureServer() {
     if (url.pathname === '/api/v1/events' && req.method === 'POST') {
       const key = req.headers['x-fj-api-key'] || url.searchParams.get('key');
       const source = String(req.headers['x-fj-source'] || '');
+      // Bez složky dat se klíč ověří poslední přečtenou kopií a zpráva jde do
+      // zálohy (NT8 neposílá znovu – odmítnutá zpráva by byla pryč).
+      const settings = dataDirAvailable() ? readCaptureSettings() : { apiKey: captureKeyCache.key, _readFailed: !captureKeyCache.key };
       // Nastavení se teď nepodařilo přečíst – klíč nejde ověřit, není to odmítnutí.
       if (settings._readFailed) return sendJson(res, 503, { ok: false, error: 'Nastavení nejde přečíst, zkus to znovu.' });
       if (key !== settings.apiKey) {
@@ -2269,7 +2461,22 @@ function startCaptureServer() {
         try {
           const payload = JSON.parse(raw || '{}');
           const source = payload.source || req.headers['x-fj-source'] || 'external';
-          const event = await processIncomingPayload(payload, source);
+          // Chybí složka dat, nebo se ze zálohy ještě přehrávají starší zprávy
+          // (pořadí fillů je důležité) → do zálohy.
+          if (!dataDirAvailable() || captureSpoolBusy()) {
+            spoolCapturePayload(payload, source);
+            sendJson(res, 202, { ok: true, spooled: true });
+            if (dataDirAvailable()) replayCaptureSpool().catch(error => logError('Záloha konektoru', error));
+            return;
+          }
+          let event;
+          try { event = await processIncomingPayload(payload, source); }
+          catch (error) {
+            // Složka zmizela právě během zpracování – zpráva do zálohy.
+            if (error?.code !== 'FJ_DATA_DIR_MISSING') throw error;
+            spoolCapturePayload(payload, source);
+            return sendJson(res, 202, { ok: true, spooled: true });
+          }
           sendJson(res, 201, { ok: true, id: event.id });
         } catch (error) {
           logError('Capture request', error);
@@ -2283,7 +2490,72 @@ function startCaptureServer() {
   captureServer.on('error', error => logError('Capture service', error));
   captureServer.listen(CAPTURE_PORT, '127.0.0.1');
 }
+// ---------- Záloha zpráv konektoru, když chybí složka dat ----------
+// Zprávy se přijmou (202) a připíšou do userData/capture-spool/pending.jsonl
+// (jedna zpráva = jeden řádek, pořadí zachované). Až je složka dat zpět,
+// replayCaptureSpool je zpracuje v původním pořadí přes processIncomingPayload
+// – stejně, jako kdyby právě přišly. Duplicitní fill po přerušeném přehrávání
+// zachytí kontrola executionIds.
+const captureSpoolDir = () => path.join(app.getPath('userData'), 'capture-spool');
+const captureSpoolPath = () => path.join(captureSpoolDir(), 'pending.jsonl');
+const captureSpool = { replaying: false };
+function spoolCapturePayload(payload, source) {
+  fs.mkdirSync(captureSpoolDir(), { recursive: true });
+  const now = new Date().toISOString();
+  const entry = { spooledAt: now, source, payload: { ...payload, receivedAt: payload.receivedAt || now } };
+  fs.appendFileSync(captureSpoolPath(), JSON.stringify(entry) + '\n', 'utf8');
+}
+function captureSpoolFiles() {
+  try { return fs.readdirSync(captureSpoolDir()).filter(n => n === 'pending.jsonl' || /^processing-.*\.jsonl$/.test(n)); }
+  catch { return []; }
+}
+function captureSpoolBusy() {
+  return captureSpool.replaying || captureSpoolFiles().length > 0;
+}
+async function replayCaptureSpool() {
+  if (captureSpool.replaying || !dataDirAvailable()) return { ok: true, count: 0, failed: 0 };
+  captureSpool.replaying = true;
+  let count = 0, failed = 0;
+  try {
+    const dir = captureSpoolDir();
+    // Dokud během přehrávání přibývají nové zprávy, přehrává se dál.
+    while (fs.existsSync(captureSpoolPath()) || captureSpoolFiles().some(n => n.startsWith('processing-'))) {
+      if (fs.existsSync(captureSpoolPath())) {
+        fs.renameSync(captureSpoolPath(), path.join(dir, `processing-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`));
+      }
+      for (const file of captureSpoolFiles().filter(n => n.startsWith('processing-')).sort()) {
+        const full = path.join(dir, file);
+        const lines = fs.readFileSync(full, 'utf8').split('\n').filter(Boolean);
+        for (let i = 0; i < lines.length; i++) {
+          let entry;
+          try { entry = JSON.parse(lines[i]); } catch (error) { failed++; fs.appendFileSync(path.join(dir, `failed-${file}`), lines[i] + '\n'); continue; }
+          try {
+            await processIncomingPayload(entry.payload || {}, entry.source || 'external');
+            count++;
+          } catch (error) {
+            if (error?.code === 'FJ_DATA_DIR_MISSING') {
+              // Složka zase zmizela: nezpracované řádky zůstanou na příště.
+              fs.writeFileSync(full, lines.slice(i).join('\n') + '\n', 'utf8');
+              logInfo('Záloha konektoru', `přehrávání přerušeno (složka dat chybí), zpracováno ${count}, zbývá ${lines.length - i}`);
+              return { ok: false, count, failed, error: error.message };
+            }
+            failed++;
+            fs.appendFileSync(path.join(dir, `failed-${file}`), lines[i] + '\n');
+            logError('Záloha konektoru – zprávu nejde zpracovat (zůstává v ' + `failed-${file})`, error);
+          }
+        }
+        fs.rmSync(full, { force: true });
+      }
+    }
+    if (count || failed) logInfo('Záloha konektoru', `zpracováno ${count} zpráv ze zálohy${failed ? `, ${failed} nešlo zpracovat (capture-spool/failed-*)` : ''}`);
+    return { ok: true, count, failed };
+  } finally {
+    captureSpool.replaying = false;
+  }
+}
 async function pollTradingViewRelay() {
+  // Relay drží zprávy, dokud je appka nepotvrdí – bez složky dat se nestahuje.
+  if (!dataDirAvailable()) return { ok: true, count: 0 };
   const settings = readCaptureSettings();
   if (!settings.relayEnabled || !settings.relayUrl || !settings.relayToken) return { ok: true, count: 0 };
   const base = settings.relayUrl.replace(/\/+$/, '');
@@ -3258,7 +3530,7 @@ function checkDataLocationAtStartup() {
       noLink: true
     });
     if (choice === 0) continue;
-    if (choice === 2) { logInfo('Umístění dat', `Nenalezeno ${custom}, tento běh používá výchozí složku.`); break; }
+    if (choice === 2) { dataDirState.sessionDefault = true; logInfo('Umístění dat', `Nenalezeno ${custom}, tento běh používá výchozí složku.`); break; }
     if (choice === 3) { app.exit(0); return false; }
     const picked = dialog.showOpenDialogSync({ title: 'Vyber složku s daty Futures Journal PRO', properties: ['openDirectory'] });
     if (!picked?.[0]) continue;
@@ -3305,8 +3577,13 @@ app.whenReady().then(() => {
     const named = nameStoredImages();
     if (named.renamed) logInfo('Start', `Pojmenováno obrázků: ${named.renamed}`);
   } catch (error) { logError('Pojmenování obrázků při startu', error); }
+  // API klíč do paměti hned – kdyby složka dat zmizela dřív, než přijde první zpráva.
+  try { readCaptureSettings(); } catch (error) { logError('Nastavení konektoru při startu', error); }
   startCaptureServer();
   startRelayPolling();
+  watchDataDir();
+  // Zprávy zadržené v minulém běhu (složka dat tehdy chyběla).
+  replayCaptureSpool().catch(error => logError('Záloha konektoru při startu', error));
   createTray();
   initAutoUpdate();
   const created = createWindow();

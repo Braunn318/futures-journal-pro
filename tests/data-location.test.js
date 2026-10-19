@@ -15,7 +15,7 @@ const path = require('path');
 
 const { loadMain } = require('./helpers/extract');
 
-const NAMES = ['dataLocationConfigPath', 'readDataLocationConfig', 'writeDataLocationConfig', 'installDir', 'isInsideInstallDir', 'INSTALL_DIR_ERROR', 'checkDataLocationAtStartup'];
+const NAMES = ['dataLocationConfigPath', 'readDataLocationConfig', 'writeDataLocationConfig', 'installDir', 'isInsideInstallDir', 'INSTALL_DIR_ERROR', 'dataDirState', 'checkDataLocationAtStartup'];
 
 function setup({ answers = [], picks = [] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-location-'));
@@ -84,6 +84,8 @@ test('chybějící složka: „Pokračovat s výchozí" nechá ukazatel beze zm�
   assert.equal(s.checkDataLocationAtStartup(), true);
   assert.equal(s.shown.length, 1);
   assert.equal(s.readDataLocationConfig().customDataDir, missing);
+  // Vědomá volba pro tenhle běh – resolveDataDir pak nehlásí chybějící složku.
+  assert.equal(s.dataDirState.sessionDefault, true);
 });
 
 test('chybějící složka: „Vybrat složku" přijme nadřazenou složku s FuturesJournalPRO-Data', () => {

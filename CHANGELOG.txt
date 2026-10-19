@@ -2,6 +2,24 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.93 - 2026-10-19
+Data folder safety: moving the data folder is safe against every failure found in a review, and a data folder that disappears while the app runs no longer sends data to AppData. No stored data changes.
+- Fixed: when the data folder disappeared while the app was running (USB disk unplugged, network drive dropped, folder deleted), the app silently switched to AppData. Trades saved meanwhile were invisible once the disk was back, and the connector created new settings there with a NEW API key (the cause of the 16. 10. incident). Now nothing is written anywhere else: saving and reading fail with a clear message ("Složka s daty není dostupná … Ukládání je pozastavené").
+- New: a warning when the data folder disappears – „Zkusit znovu", „Vybrat složku…" (if the folder was moved; it must contain journal-data, the app then restarts and loads it) and „Zavřít". A red bar stays at the top with „Zkusit znovu" until the folder is back. The app checks every 5 seconds and continues on its own when the disk is reconnected („Složka s daty je zpět, ukládání pokračuje").
+- New: NinjaTrader messages that arrive while the folder is missing are not lost. They are accepted, checked against the last known API key and held in AppData (capture-spool). When the folder is back – or at the next start – they are imported in their original order. A message that cannot be processed stays in capture-spool/failed-* and is logged. TradingView relay messages wait on the relay meanwhile.
+- „Pokračovat s výchozí" at start-up (folder missing when the app starts) still works as before: that run uses AppData on purpose until it ends.
+- The error log is written to AppData while the data folder is missing (diagnostics only). Nastavení → umístění dat shows „NENÍ DOSTUPNÁ".
+- Tests: 10 new in tests/data-missing.test.js. Verified in Electron: folder unplugged mid-run → banner, saving refused, nothing in AppData, 2 connector messages held; folder back → banner gone, messages imported in order, API key unchanged.
+- Fixed: the old data was deleted BEFORE the app was switched to the new folder. A crash or a failed write of data-location.json in between left the app pointing at an empty folder (empty journal, a new connector API key). Order now: copy → check → switch → only then delete the old copies. If anything fails before the switch, nothing is deleted and only what this move copied is removed from the target. The same applies to „Vrátit na výchozí".
+- Fixed: a target folder that already holds journal data (journal-data, trade-capture, backup-settings.json) was silently overwritten and mixed with old leftovers. Now the move is refused with an explanation. Only an old log (kept aside as …predchozi-<time>) and an old AI export (replaced) may already be there.
+- The copy is now checked file by file (list and size) before the switch, not only for existence.
+- The safety backup before the move now also covers the connector (API key, account mappings, executions, positions; without screenshots), backup-settings.json and the AI export manifest. If the backup fails, the move does not start.
+- The AI export (ai-export) now moves with the data. Before, Backtest Lab found an empty folder after a move, and a backtest journal was exported as live until its manifest was rewritten.
+- A custom image folder inside the moved data now points to its new place. An image folder outside the data folder is left as it is.
+- A target folder inside the data being moved is refused.
+- Checked: the move runs synchronously, so a journal save or connector message that arrives during it waits and is written to the new folder. Verified in Electron on a copy of the real data (286 MB, 1065 files): all files identical after the move and after the move back; 5 connector messages, 2 of them sent during the move, all in the new folder.
+- Tests: 11 new in tests/data-move.test.js.
+
 ## 4.8.92 - 2026-10-19
 NinjaTrader connector: a wrong API key no longer goes unnoticed, plus a reminder after a NinjaTrader update. No stored trades change; the NT8 connector itself is unchanged (still version 3).
 - Reported 2026-10-19: a trade was not imported. Cause: the API key in the NT8 connector (installed 27. 9.) no longer matched the app's key, so every message from NinjaTrader was refused (401) – silently, with nothing in the log or the app. No trade had been imported since 16. 10. evening. The two setups without a fill entered that day had nothing to do with it.

@@ -78,7 +78,7 @@ test('odmítnuté zprávy: počítají se, protokol jednou po každém přijetí
 function settingsHarness() {
   const dir = realFs.mkdtempSync(path.join(os.tmpdir(), 'fj-capture-'));
   const logs = [];
-  const m = loadMain(['defaultCaptureSettings', 'readCaptureSettings', 'writeCaptureSettings'], {
+  const m = loadMain(['defaultCaptureSettings', 'captureKeyCache', 'readCaptureSettings', 'readCaptureSettingsFile', 'writeCaptureSettings'], {
     path, fs: realFs, crypto: require('node:crypto'),
     ensureCaptureRoot: () => realFs.mkdirSync(dir, { recursive: true }),
     captureSettingsPath: () => path.join(dir, 'settings.json'),
