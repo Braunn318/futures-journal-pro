@@ -162,7 +162,7 @@ test('Deník: filtr stavu naplnění včetně setupů bez vstupu', () => {
 });
 
 test('tradeDraftFromSetup: formulář dostane, co setup zná', () => {
-  const r = load(['tradeDraftFromSetup']);
+  const r = load(['applySkippedReason', 'tradeDraftFromSetup']);
   const setup = {
     id: 'su1', recordType: 'SETUP_ONLY', date: '2026-10-03', entryTime: '16:43', instrument: 'ES', side: 'long',
     setupCode: 'M2_OF', entryLevels: ['VPOC_1M'], ofConfirm: [], fillStatus: 'NO_FILL',

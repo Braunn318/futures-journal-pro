@@ -431,6 +431,14 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 .account-more-filters>summary:hover{color:var(--blue)}
 .account-more-filters .account-filter-grid{margin-top:8px}
 .account-more-filters .field input[type=number]{width:90px}
+.account-month-row{display:flex;align-items:center;gap:6px}
+.account-month-row .btn{padding:5px 10px}
+.account-month-label{min-width:92px;text-align:center;font-size:12.5px;font-weight:700}
+.ov-user-hidden{display:none!important}
+@media(min-width:1001px){.ov-cols-1{grid-template-columns:minmax(0,1fr)}.ov-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.overview-section-settings{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:8px}
+.overview-section-settings .ov-sec-group{min-width:180px}
+.overview-section-settings .ov-sec-group b{display:block;font-size:11px;color:var(--muted);letter-spacing:.6px;margin:4px 0 2px}
 .optional-badge{font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 7px;vertical-align:middle}
 .money-dual{display:inline-flex;flex-direction:column;line-height:1.15}.money-dual .main-money{font-weight:inherit}.money-dual .secondary-money{font-size:10px;color:var(--muted);font-weight:600;margin-top:3px}.move-trade-info{margin-bottom:12px;color:var(--muted);font-size:13px}
 .trade-plan-editor{margin-top:10px}.trade-plan-details{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
@@ -593,6 +601,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <option value="day">Jeden den</option>
             <option value="interval">Interval datumů</option>
           </select></div>
+          <div class="field account-month-nav"><label>Měsíc</label><div class="account-month-row"><button class="btn" type="button" id="accountPrevMonth" title="Předchozí měsíc (nastaví interval na celý měsíc)">◀</button><span id="accountMonthLabel" class="account-month-label"></span><button class="btn" type="button" id="accountNextMonth" title="Další měsíc (nastaví interval na celý měsíc)">▶</button></div></div>
           <div class="field account-day-field"><label>Datum</label><input type="date" id="accountDay"></div>
           <div class="field account-interval-field"><label>Od</label><input type="date" id="accountFrom"></div>
           <div class="field account-interval-field"><label>Do</label><input type="date" id="accountTo"></div>
@@ -612,13 +621,18 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="field" data-ov-filter="mae"><label>MAE od <span class="sub">— ticky</span></label><input type="number" id="accountMaeMin" min="0" step="any"></div>
             <div class="field" data-ov-filter="mae"><label>MAE do <span class="sub">— ticky</span></label><input type="number" id="accountMaeMax" min="0" step="any"></div>
           </div>
-          <p class="sub" style="margin-top:6px">Prázdné pole = bez omezení. Při filtru MFE / MAE vypadnou obchody, které hodnotu nemají vyplněnou (0 je platná hodnota a filtrem projde). Číselné filtry se použijí tlačítkem „Zobrazit“. Které filtry se tu ukazují, nastavíš v Nastavení → Přizpůsobení → Filtry přehledu.</p>
+          <p class="sub" style="margin-top:6px">Prázdné pole = bez omezení. Při filtru MFE / MAE vypadnou obchody, které hodnotu nemají vyplněnou (0 je platná hodnota a filtrem projde). Číselné filtry se použijí tlačítkem „Zobrazit“. Které filtry se tu ukazují, nastavíš v Nastavení → Přizpůsobení → Přehled účtu.</p>
+        </details>
+        <details class="account-more-filters" id="accountSectionsBox">
+          <summary>Zobrazené sekce <span id="accountSectionsCount" class="sub"></span></summary>
+          <div class="overview-section-settings" data-ov-section-settings></div>
+          <p class="sub" style="margin-top:6px">Skrytá sekce nic nemaže a nemění výpočty ani exporty. Stejné volby jsou v Nastavení → Přizpůsobení → Přehled účtu.</p>
         </details>
       </div>
 
       <div id="limitAlert" class="alert red"></div>
 
-      <div class="kpi-strip">
+      <div class="kpi-strip" data-ov-section="kpi">
         <div class="kpi-item"><div class="kpi-label">Počáteční stav</div><div class="kpi-value" id="kpiStart">0</div></div>
         <div class="kpi-item"><div class="kpi-label">Čistý zisk</div><div class="kpi-value" id="kpiNet">0</div></div>
         <div class="kpi-item"><div class="kpi-label">Aktuální stav účtu</div><div class="kpi-value" id="accountValue">0</div></div>
@@ -626,20 +640,20 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="kpi-item"><div class="kpi-label">Profit factor</div><div class="kpi-value" id="kpiPf">0</div></div>
       </div>
 
-      <div class="section-divider"><span>CELKOVÝ PŘEHLED</span></div>
-      <div class="grid overview-row">
-        <div class="card">
+      <div class="section-divider" data-ov-divider="overview"><span>CELKOVÝ PŘEHLED</span></div>
+      <div class="grid overview-row" data-ov-row="overview">
+        <div class="card" data-ov-section="overall">
           <h3>Celková výkonnost</h3>
           <div id="overallStatsList" class="stat-list"></div>
           <div class="panel-subtitle">Top instrumenty dle P/L</div>
           <div id="topInstruments" class="bar-list"></div>
         </div>
-        <div class="card hist-card">
+        <div class="card hist-card" data-ov-section="hist">
           <h3>Rozložení zisků a ztrát</h3>
           <div class="panel-subtitle" style="margin-top:0">Počet obchodů podle výše zisku/ztráty ($)</div>
           <div class="chart-wrap sm"><canvas id="histChart"></canvas></div>
         </div>
-        <div class="card">
+        <div class="card" data-ov-section="tradeStats">
           <h3>Statistika obchodů</h3>
           <div class="gauge-row">
             <div class="gauge-wrap"><canvas id="gaugeWinrate"></canvas><div class="gauge-label"><span class="gauge-pct" id="gaugeWinrateLabel">0%</span><span class="gauge-name">Win Rate</span></div></div>
@@ -649,37 +663,53 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         </div>
       </div>
 
-      <div class="section-divider"><span>SETUPY A HYPOTETICKÉ OBCHODY</span></div>
-      <div class="grid groups-row">
-        <div class="card">
+      <div class="section-divider" data-ov-divider="movement"><span>POHYB CENY A DÉLKA OBCHODŮ</span></div>
+      <div class="grid overview-row movement-row" data-ov-row="movement">
+        <div class="card" data-ov-section="mfe">
+          <h3>MFE <span class="sub">— max. pohyb ve směru, ticky</span></h3>
+          <div id="mfeStatsBox" class="stat-list"></div>
+        </div>
+        <div class="card" data-ov-section="mae">
+          <h3>MAE <span class="sub">— max. pohyb proti, ticky</span></h3>
+          <div id="maeStatsBox" class="stat-list"></div>
+        </div>
+        <div class="card" data-ov-section="duration">
+          <h3>Délka obchodů <span class="sub">— vstup → poslední výstup</span></h3>
+          <div id="durationStatsBox" class="stat-list"></div>
+        </div>
+      </div>
+
+      <div class="section-divider" data-ov-divider="groups"><span>SETUPY A HYPOTETICKÉ OBCHODY</span></div>
+      <div class="grid groups-row" data-ov-row="groups">
+        <div class="card" data-ov-section="setups">
           <h3>Setupy a fill rate</h3>
           <div id="setupStatsBox" class="stat-list"></div>
         </div>
-        <div class="card" id="skipLiveStatsBlock">
+        <div class="card" id="skipLiveStatsBlock" data-ov-section="skipLive">
           <h3>Naživo bych nevzal <span class="sub">— evidováno zvlášť</span></h3>
           <div id="skipLiveStatsBox" class="stat-list"></div>
         </div>
-        <div class="card">
+        <div class="card" data-ov-section="noFill">
           <h3>No fill – hypoteticky <span class="sub">— nenaplněno / nestihnuto</span></h3>
           <div id="noFillStatsBox" class="stat-list"></div>
         </div>
-        <div class="card" id="skippedStatsBlock">
+        <div class="card" id="skippedStatsBlock" data-ov-section="skipped">
           <h3>Vědomě vynechané – hypoteticky <span class="sub">— evidováno zvlášť</span></h3>
           <div id="skippedStatsBox" class="stat-list"></div>
         </div>
       </div>
 
-      <div class="section-divider"><span>VÝKONNOST</span></div>
-      <div class="grid performance-row">
-        <div class="card">
+      <div class="section-divider" data-ov-divider="performance"><span>VÝKONNOST</span></div>
+      <div class="grid performance-row" data-ov-row="performance">
+        <div class="card" data-ov-section="period">
           <h3>Výkonnost dle období</h3>
           <div id="periodStats" class="stat-list"></div>
         </div>
-        <div class="card"><h3>Equity křivka</h3><div class="chart-wrap"><canvas id="equityChart"></canvas></div><div class="legend"><span><i style="background:var(--blue)"></i>Equity účtu</span><span><i style="background:var(--red)"></i>Výchozí stav (0 %)</span></div></div>
-        <div class="card"><h3>Týdenní výkonnost</h3><div class="chart-wrap sm"><canvas id="weeklyChart"></canvas></div></div>
+        <div class="card" data-ov-section="equity"><h3>Equity křivka</h3><div class="chart-wrap"><canvas id="equityChart"></canvas></div><div class="legend"><span><i style="background:var(--blue)"></i>Equity účtu</span><span><i style="background:var(--red)"></i>Výchozí stav (0 %)</span></div></div>
+        <div class="card" data-ov-section="weekly"><h3>Týdenní výkonnost</h3><div class="chart-wrap sm"><canvas id="weeklyChart"></canvas></div></div>
       </div>
 
-      <div class="card" style="margin-top:16px">
+      <div class="card" style="margin-top:16px" data-ov-section="tradeList">
         <h3>Vybrané obchody</h3>
         <div id="accountOverviewTrades" class="trade-list"></div>
       </div>
@@ -1072,9 +1102,13 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
         <details class="card settings-card" data-card="overviewFilters">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Filtry přehledu</h3></summary>
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Přehled účtu</h3></summary>
+          <div class="panel-subtitle" style="margin-top:0">Filtry</div>
           <p class="sub">Které „Další filtry“ se ukazují v Přehledu účtu. Skrytý filtr se nepoužije, i když v něm zůstala hodnota – data se nikdy nemažou.</p>
           <div id="overviewFilterSettings" style="margin-top:10px"></div>
+          <div class="panel-subtitle">Sekce</div>
+          <p class="sub">Které karty Přehled účtu ukazuje. Stejné volby jsou přímo v přehledu pod „Zobrazené sekce“. Skrytá karta nic nemaže a nemění výpočty ani exporty; když skryješ všechny karty jedné řady, zmizí i její nadpis.</p>
+          <div class="overview-section-settings" data-ov-section-settings></div>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
       </div>
@@ -1380,7 +1414,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="sfTarget1Type"></select></div>
       <div class="field"><label>Cena cílové hladiny 1</label><input id="sfTarget1Price" type="number" step="any"></div>
       <div class="field"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="sfMissedBy" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
-      <div class="field"><label>Důvod</label><input id="sfReason" placeholder="proč nebylo naplněno / proč vynecháno"></div>
+      <div class="field" id="sfSkippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— výběr, Nastavení → Číselníky</span></label><select id="sfSkippedReason"></select></div>
+      <div class="field"><label>Důvod <span class="sub">— text</span></label><input id="sfReason" placeholder="proč nebylo naplněno / proč vynecháno"></div>
       <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc</span></label><div id="sfEntryLevels" class="chip-grid"></div></div>
       <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="sfOfConfirm" class="chip-grid"></div></div>
       <div class="field"><label>Max. pohyb ve směru <span class="sub">— ticků, když doplňuješ výsledek</span></label><input id="sfMaxFav" type="number" step="any" min="0"></div>
@@ -1454,6 +1489,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
           <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
           <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="missedByTicks" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
+          <div class="field" id="skippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— jen u „vědomě vynechán“</span></label><select id="skippedReason"></select><input id="skippedReasonNote" placeholder="upřesnění textem (nepovinné)" style="margin-top:6px"></div>
           <div class="field full"><label>Trend 1m <span class="sub">— trend na 1min grafu</span></label><div id="trend" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="trendHtf"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="grade"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
@@ -1916,26 +1952,32 @@ function performanceRecords(rows,include=currentInclude()){
 const PERFORMANCE_GROUPS={
  skipLive:{test:isSkipLive,reasonOf:t=>t.wouldSkipReason||'',reasonLabel:k=>k?FJTaxonomy.labelOf('SKIP_REASON',k):'Bez důvodu',reasonTitle:'Podle důvodu',empty:'Žádný obchod označený „naživo bych nevzal“.'},
  noFill:{test:t=>hypotheticalGroup(t)==='noFill',reasonOf:t=>t.fillStatus||'',reasonLabel:k=>FJTaxonomy.labelOf('FILL_STATUS',k),reasonTitle:'Podle stavu',empty:'Žádný nenaplněný setup vyplněný jako obchod.'},
- skipped:{test:t=>hypotheticalGroup(t)==='skipped',reasonOf:t=>t.setupCode||'',reasonLabel:k=>k?FJTaxonomy.labelOf('SETUP',k):'Bez setupu',reasonTitle:'Podle setupu',empty:'Žádný vědomě vynechaný setup vyplněný jako obchod.'}
+ skipped:{test:t=>hypotheticalGroup(t)==='skipped',reasonOf:t=>t.setupCode||'',reasonLabel:k=>k?FJTaxonomy.labelOf('SETUP',k):'Bez setupu',reasonTitle:'Podle setupu',
+  reason2Of:t=>t.skippedReason||'',reason2Label:k=>k?FJTaxonomy.labelOf('SKIP_REASON',k):'Bez důvodu',reason2Title:'Podle důvodu vynechání',
+  empty:'Žádný vědomě vynechaný setup vyplněný jako obchod.'}
 };
 function computeGroupStats(rows,key){
  const def=PERFORMANCE_GROUPS[key];
  const all=tradeRecords(rows);
  const group=all.filter(def.test);
  const stats=computeOverallStats(group,true);
- const byReason={};
- for(const t of group){
-  const k=def.reasonOf(t);
-  const r=byReason[k]||(byReason[k]={key:k,count:0,wins:0,losses:0,pnl:0});
-  r.count++;r.pnl+=signed(t);
-  if(t.result==='target')r.wins++;else if(t.result==='stoploss')r.losses++;
- }
+ const breakdown=keyOf=>{
+  const by={};
+  for(const t of group){
+   const k=keyOf(t);
+   const r=by[k]||(by[k]={key:k,count:0,wins:0,losses:0,pnl:0});
+   r.count++;r.pnl+=signed(t);
+   if(t.result==='target')r.wins++;else if(t.result==='stoploss')r.losses++;
+  }
+  return Object.values(by).sort((a,b)=>b.count-a.count);
+ };
  const base=currentInclude();
  return {
   count:group.length,pnl:stats.netPnl,winRate:stats.winRate,expectancy:stats.expectancy,
   expectancyWithout:computeOverallStats(all,{...base,[key]:false}).expectancy,
   expectancyWith:computeOverallStats(all,{...base,[key]:true}).expectancy,
-  byReason:Object.values(byReason).sort((a,b)=>b.count-a.count)
+  byReason:breakdown(def.reasonOf),
+  ...(def.reason2Of?{byReason2:breakdown(def.reason2Of)}:{})
  };
 }
 function computeSkipLiveStats(rows){return computeGroupStats(rows,'skipLive')}
@@ -1952,8 +1994,11 @@ function renderGroupStats(boxId,key,stats){
   row('Expectancy',money(stats.expectancy),stats.expectancy>=0?'pos':'neg'),
   row('Expectancy bez nich / s nimi',`${money(stats.expectancyWithout)} / ${money(stats.expectancyWith)}`)
  ];
- const reasons=stats.byReason.map(r=>row(esc(def.reasonLabel(r.key)),`${r.count}× · ${r.wins}/${r.losses} · ${(r.pnl>=0?'+':'')+money(r.pnl)}`,r.pnl>=0?'pos':'neg'));
- el.innerHTML=lines.join('')+(reasons.length?`<div class="sub" style="margin-top:6px">${def.reasonTitle} (počet · zisk/ztráta · P/L)</div>`+reasons.join(''):'');
+ const table=(list,labelOf,title)=>{
+  const rows=(list||[]).map(r=>row(esc(labelOf(r.key)),`${r.count}× · ${r.wins}/${r.losses} · ${(r.pnl>=0?'+':'')+money(r.pnl)}`,r.pnl>=0?'pos':'neg'));
+  return rows.length?`<div class="sub" style="margin-top:6px">${title} (počet · zisk/ztráta · P/L)</div>`+rows.join(''):'';
+ };
+ el.innerHTML=lines.join('')+table(stats.byReason,def.reasonLabel,def.reasonTitle)+(def.reason2Of?table(stats.byReason2,def.reason2Label,def.reason2Title):'');
 }
 // Karty formuláře obchodu (Nastavení → Přizpůsobení): každá jde skrýt a každá
 // má vlastní „Upozorňovat na nevyplněné" (štítek „Neúplné" na kartě obchodu
@@ -2846,6 +2891,111 @@ function renderGauges(stats){
  drawGauge('gaugeProfitRate',profitRate,'--blue');
  if($('gaugeProfitRateLabel'))$('gaugeProfitRateLabel').textContent=(profitRate*100).toFixed(1)+'%';
 }
+// ---- Pohyb ceny a délka obchodů (Přehled účtu) ----
+// Jen měření: průměr, medián, rozsah a rozložení. Nic se nehodnotí. Prázdná
+// hodnota se vynechá a ukáže se zvlášť; 0 je naměřená hodnota a počítá se.
+// MFE / MAE se berou tak, jak jsou u obchodu uložené (ruční přepis má
+// přednost) – stejně jako filtr MFE / MAE v přehledu.
+function statNum(v){
+ if(v===undefined||v===null||String(v).trim()==='')return null;
+ const n=Number(v);return Number.isFinite(n)?n:null;
+}
+function medianOf(vals){
+ if(!vals.length)return null;
+ const s=[...vals].sort((a,b)=>a-b),m=Math.floor(s.length/2);
+ return s.length%2?s[m]:(s[m-1]+s[m])/2;
+}
+function avgOf(vals){return vals.length?vals.reduce((a,v)=>a+v,0)/vals.length:null}
+function summarizeValues(rows,valueOf){
+ const vals=[],win=[],loss=[];let missing=0;
+ for(const t of rows||[]){
+  const v=valueOf(t);
+  if(v===null){missing++;continue}
+  vals.push(v);
+  if(t.result==='target')win.push(v);else if(t.result==='stoploss')loss.push(v);
+ }
+ return {count:vals.length,missing,avg:avgOf(vals),median:medianOf(vals),
+  min:vals.length?Math.min(...vals):null,max:vals.length?Math.max(...vals):null,
+  avgWin:avgOf(win),avgLoss:avgOf(loss),values:vals};
+}
+// Rozložení tikových hodnot do 5 stejných rozsahů s „hezkým“ krokem (1, 2, 5 × 10^n).
+// Rozsah je od (včetně) do (bez), poslední bere i horní hranici.
+function tickBuckets(vals){
+ if(!vals.length)return [];
+ const max=Math.max(...vals);
+ if(max<=0)return [{lo:0,hi:0,label:'0',count:vals.length}];
+ const raw=max/5,p=Math.pow(10,Math.floor(Math.log10(raw)));
+ const step=[1,2,5,10].map(k=>k*p).find(x=>x>=raw-1e-12);
+ const n=x=>String(Math.round(x*100)/100).replace('.',',');
+ const out=[];
+ for(let i=0;i<5;i++)out.push({lo:i*step,hi:(i+1)*step,label:`${n(i*step)}–${n((i+1)*step)}`,count:0});
+ for(const v of vals){let i=Math.floor(v/step+1e-9);if(i>4)i=4;if(i<0)i=0;out[i].count++}
+ return out;
+}
+function computeTickStats(rows,key){
+ const s=summarizeValues(rows,t=>statNum(t?.[key]));
+ s.buckets=tickBuckets(s.values);
+ return s;
+}
+// Čas „HH:MM“ nebo „HH:MM:SS“ → minuty od půlnoci; jinak null.
+function clockMinutes(v){
+ const m=/^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(v??'').trim());
+ if(!m)return null;
+ const h=+m[1],mi=+m[2],s=+(m[3]||0);
+ if(h>23||mi>59||s>59)return null;
+ return h*60+mi+s/60;
+}
+// Délka obchodu v minutách: vstup → (poslední) výstup. Výstup dřív než vstup
+// = obchod přes půlnoc. Chybí-li některý čas, délka se nezná (null).
+function tradeDurationMinutes(t){
+ const a=clockMinutes(t?.entryTime),b=clockMinutes(t?.exitTime);
+ if(a===null||b===null)return null;
+ let d=b-a;if(d<0)d+=1440;
+ return d;
+}
+const DURATION_BUCKETS=[
+ {lo:0,hi:5,label:'< 5 min'},{lo:5,hi:15,label:'5–15 min'},{lo:15,hi:30,label:'15–30 min'},
+ {lo:30,hi:60,label:'30–60 min'},{lo:60,hi:240,label:'1–4 h'},{lo:240,hi:Infinity,label:'> 4 h'}
+];
+function computeDurationStats(rows){
+ const s=summarizeValues(rows,tradeDurationMinutes);
+ s.buckets=s.count?DURATION_BUCKETS.map(b=>({...b,count:s.values.filter(v=>v>=b.lo&&v<b.hi).length})):[];
+ return s;
+}
+function fmtDuration(min){
+ if(min===null||min===undefined)return '—';
+ const m=Math.round(min);
+ if(m<60)return `${m} min`;
+ const h=Math.floor(m/60),r=m%60;
+ return r?`${h} h ${r} min`:`${h} h`;
+}
+function fmtTicks(v){
+ if(v===null||v===undefined)return '—';
+ return (Math.round(v*10)/10).toLocaleString('cs-CZ')+' t';
+}
+function renderValueStatsBox(id,s,fmt,emptyText,missingLabel){
+ const el=$(id); if(!el)return;
+ const row=(label,val)=>`<div class="row"><span>${label}</span><b>${val}</b></div>`;
+ const miss=s.missing?`<div class="sub" style="margin-top:4px">${missingLabel}: ${s.missing}</div>`:'';
+ if(!s.count){el.innerHTML=`<div class="sub">${emptyText}</div>`+miss;return}
+ const maxN=Math.max(...s.buckets.map(b=>b.count),1);
+ el.innerHTML=
+  row('Obchodů s hodnotou',s.count)+
+  row('Průměr',fmt(s.avg))+
+  row('Medián',fmt(s.median))+
+  row('Nejméně – nejvíc',`${fmt(s.min)} – ${fmt(s.max)}`)+
+  row('Průměr u ziskových',fmt(s.avgWin))+
+  row('Průměr u ztrátových',fmt(s.avgLoss))+
+  miss+
+  `<div class="panel-subtitle">Rozložení <span class="sub">— počet obchodů</span></div><div class="bar-list">`+
+  s.buckets.map(b=>`<div class="bar-row"><div class="bar-name">${esc(b.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${b.count?Math.max(4,b.count/maxN*100):0}%;background:var(--blue)"></div></div><div class="bar-val">${b.count}</div></div>`).join('')+
+  '</div>';
+}
+function renderMovementStats(rows){
+ renderValueStatsBox('mfeStatsBox',computeTickStats(rows,'mfeTicks'),fmtTicks,'Žádný obchod s vyplněným MFE.','Bez MFE');
+ renderValueStatsBox('maeStatsBox',computeTickStats(rows,'maeTicks'),fmtTicks,'Žádný obchod s vyplněným MAE.','Bez MAE');
+ renderValueStatsBox('durationStatsBox',computeDurationStats(rows),fmtDuration,'Žádný obchod s časem vstupu i výstupu.','Bez času vstupu / výstupu');
+}
 function renderDashboard(rows=trades,setups=setupRecords){
  // Fill rate bere i obchody „naživo bych nevzal“ (mechanika vstupu), výkon ne.
  const allTrades=tradeRecords(rows);
@@ -2870,6 +3020,7 @@ function renderDashboard(rows=trades,setups=setupRecords){
  renderOverallStatsList(stats);
  renderTopInstruments(safeRows);
  renderTradeStatsTable(stats);
+ if(typeof renderMovementStats==='function')renderMovementStats(safeRows);
  renderPeriodStats(safeRows);
  if($('gaugeWinrate'))renderGauges(stats);
  if($('histChart'))drawHistogram(safeRows);
@@ -3963,6 +4114,8 @@ function tradeHTML(t){
  const entriesRow=entries.length>1?`<div class="sub" style="margin-top:2px" title="Vstupy pozice. Cíl označený „dokup“ zavírá dokoupené kontrakty a jeho body se počítají od ceny dokupu.">Vstupy: ${entries.map((e,i)=>`${i?'dokup ':''}${e.contracts} @ ${FJPoints.roundPoints(e.price)}${i&&e.time?` (${esc(e.time)})`:''}`).join(' · ')}</div>`:'';
  const setupInfo=[];
  if(t.missedByTicks!=null&&t.missedByTicks!=='')setupInfo.push(`minuto o ${esc(t.missedByTicks)} t`);
+ const skippedWhy=skippedReasonText(t);
+ if(skippedWhy)setupInfo.push(`vynecháno: ${esc(skippedWhy)}`);
  if(t.setupMaxFavorableTicks!=null&&t.setupMaxFavorableTicks!=='')setupInfo.push(`max ${esc(t.setupMaxFavorableTicks)} t ve směru`);
  if(t.maxLevel)setupInfo.push(`došlo na ${esc(FJTaxonomy.labelOf('TARGET_LEVEL',t.maxLevel))}`);
  return `<div class="card trade${skipLive?' skip-live':''}${hypo?' hypo-'+hypo.toLowerCase():''}">
@@ -4035,7 +4188,7 @@ function setupRowHTML(s){
    <div><b>${esc(s.instrument||'')}</b> ${esc(side)} ${esc(s.entryTime||'')} · <span class="pill">${esc(FJTaxonomy.labelOf('FILL_STATUS',s.fillStatus))}</span>${typeof dataCheckBadgeHTML==='function'?dataCheckBadgeHTML(s):''}</div>
    ${parts.length?`<div class="sub">${parts.join(' · ')}</div>`:''}
    ${price.length?`<div class="sub">${price.join(' · ')}</div>`:''}
-   ${s.reason||s.note?`<div class="sub">${esc([s.reason,s.note].filter(Boolean).join(' — '))}</div>`:''}
+   ${s.reason||s.note||(s.fillStatus==='SKIPPED'&&s.skippedReason)?`<div class="sub">${esc([s.fillStatus==='SKIPPED'&&s.skippedReason?FJTaxonomy.labelOf('SKIP_REASON',s.skippedReason):'',s.reason,s.note].filter(Boolean).join(' — '))}</div>`:''}
   </div>
   <div class="setup-actions"><button type="button" class="btn" onclick="convertSetupToTrade('${esc(s.id)}')" title="Doplnit hypotetický výstup a výsledek (co by to udělalo) – ve výchozím stavu mimo P/L a statistiky výkonu">Vyplnit jako obchod</button><button type="button" class="btn" onclick="editTrade('${esc(s.id)}')">Upravit</button><button type="button" class="btn" onclick="deleteTrade('${esc(s.id)}')">Smazat</button></div>
  </div>`;
@@ -4579,6 +4732,9 @@ function openModal(t=null,{title}={}){
  if($('setupCode'))$('setupCode').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode);
  if($('fillStatus'))$('fillStatus').value=FJTaxonomy.sanitizeSingle('FILL_STATUS',t&&t.fillStatus);
  if($('missedByTicks'))$('missedByTicks').value=(t&&t.missedByTicks!=null&&t.missedByTicks!=='')?t.missedByTicks:'';
+ fillContextSelect('skippedReason','SKIP_REASON','— nevyplněno —',t&&t.skippedReason);
+ if($('skippedReason'))$('skippedReason').value=FJTaxonomy.sanitizeSingle('SKIP_REASON',t&&t.skippedReason);
+ if($('skippedReasonNote'))$('skippedReasonNote').value=(t&&t.skippedReasonNote)||'';
  // Chování ceny po výstupu: ručně zadaná čísla v ticích. Prázdno se nenahrazuje
  // nulou – nula by v analýze znamenala „cena se nehnula", ne „nevyplněno".
  if($('postExitFavorableTicks'))$('postExitFavorableTicks').value=(t&&t.postExitFavorableTicks!=null&&t.postExitFavorableTicks!=='')?t.postExitFavorableTicks:'';
@@ -4828,12 +4984,15 @@ function tradeDraftFromSetup(s){
   entryLevels:FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',s.entryLevels),
   ofConfirm:FJTaxonomy.sanitizeMulti('OF_CONFIRM',s.ofConfirm),
   fillStatus:s.fillStatus==='SKIPPED'||s.fillStatus==='MISSED'?s.fillStatus:'NO_FILL',
-  comment:[s.reason,s.note].map(v=>String(v||'').trim()).filter(Boolean).join(' — '),
+  // U vědomě vynechaného setupu jde textový důvod do „Důvod vynechání“
+  // (skippedReasonNote), jinak jako dřív do komentáře.
+  comment:(s.fillStatus==='SKIPPED'?[s.note]:[s.reason,s.note]).map(v=>String(v||'').trim()).filter(Boolean).join(' — '),
   images:Array.isArray(s.images)?[...s.images]:[]
  };
  if(s.slPrice!=null&&s.slPrice!=='')draft.slPrice=s.slPrice;
  if(s.missedByTicks!=null&&s.missedByTicks!=='')draft.missedByTicks=s.missedByTicks;
  if(tg)draft.targetLevel1=tg;
+ if(draft.fillStatus==='SKIPPED')applySkippedReason(draft,'SKIPPED',s.skippedReason,s.reason??'');
  return draft;
 }
 // Při uložení převedeného setupu: přestane být SETUP_ONLY a pole, která
@@ -4943,6 +5102,26 @@ $('pnl')?.addEventListener('input',updateResultBadge);
 function missedByApplies(fillStatus){
  return !!fillStatus&&fillStatus!=='FILLED';
 }
+// Důvod vědomého vynechání (číselník SKIP_REASON, sdílený s „naživo bych
+// nevzal“, + volný text) – jen u stavu „vědomě vynechán“. U jiného stavu se
+// obě pole odeberou, ať důvod nevisí u obchodu, který vynechaný není.
+// note === undefined = text se nemění (záznam setupu má vlastní pole reason).
+function applySkippedReason(obj,fillStatus,reason,note){
+ if(fillStatus!=='SKIPPED'){delete obj.skippedReason;delete obj.skippedReasonNote;return obj}
+ const r=FJTaxonomy.sanitizeSingle('SKIP_REASON',reason);
+ if(r)obj.skippedReason=r;else delete obj.skippedReason;
+ if(note!==undefined){
+  const n=String(note??'').trim();
+  if(n)obj.skippedReasonNote=n;else delete obj.skippedReasonNote;
+ }
+ return obj;
+}
+// Popisek důvodu vynechání pro kartu / přehled; '' když nic není.
+function skippedReasonText(t){
+ if(t?.fillStatus!=='SKIPPED')return '';
+ const label=t.skippedReason?FJTaxonomy.labelOf('SKIP_REASON',t.skippedReason):'';
+ return [label,String(t.skippedReasonNote||'').trim()].filter(Boolean).join(' — ');
+}
 // --- Chování ceny po výstupu ve formuláři ---------------------------------
 // Blok se týká obchodu, který se naplnil: u setupu, který se nenaplnil, není
 // z čeho měřit – žádný výstup neexistuje. Nevyplněný stav se bere jako
@@ -5027,6 +5206,7 @@ function renderCourseHints(){
   fillHint.textContent=st&&st!=='FILLED'?'Hypotetický obchod: vyplň, co by se stalo (cena vstupu = plánovaná). Ve výchozím stavu mimo P/L a statistiky výkonu.':'';
  }
  if($('missedByField'))$('missedByField').style.display=missedByApplies($('fillStatus')?.value)?'':'none';
+ if($('skippedReasonField'))$('skippedReasonField').style.display=$('fillStatus')?.value==='SKIPPED'?'':'none';
  const block=$('postExitBlock');
  const applies=postExitApplies($('fillStatus')?.value,$('exitPrice')?.value);
  if(block)block.style.display=applies?'':'none';
@@ -5172,6 +5352,7 @@ function formContextDraft(){
  const d=postExitDraftFromForm();
  return {...d,
   setupCode:$('setupCode')?.value||'',fillStatus:$('fillStatus')?.value||'',missedByTicks:$('missedByTicks')?.value??'',
+  skippedReason:$('skippedReason')?.value||'',
   trend:readSingleChipGrid('trend','TREND'),entryLevels:readChipGrid('entryLevels','ENTRY_LEVEL'),
   nearLevels:readLevelRows(),nearLevelsNone:readNearNone(),
   ofConfirm:readChipGrid('ofConfirm','OF_CONFIRM'),
@@ -5205,6 +5386,7 @@ function renderTradeSections(){
  if(d.setupCode)setup.push(FJTaxonomy.labelOf('SETUP',d.setupCode));
  if(d.fillStatus&&d.fillStatus!=='FILLED')setup.push(FJTaxonomy.labelOf('FILL_STATUS',d.fillStatus));
  if(missedByApplies(d.fillStatus)&&val(d.missedByTicks))setup.push('minuto o '+d.missedByTicks+' t');
+ if(d.fillStatus==='SKIPPED'&&d.skippedReason)setup.push(FJTaxonomy.labelOf('SKIP_REASON',d.skippedReason));
  if(d.trend)setup.push('trend 1m '+FJTaxonomy.labelOf('TREND',d.trend));
  if($('setupSummary'))$('setupSummary').textContent=setup.length?'— '+setup.join(' · '):'';
  if($('psychSummary')){
@@ -5576,6 +5758,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   const missedRaw=missedByApplies(obj.fillStatus)?$('missedByTicks')?.value:'';
   if(missedRaw!==undefined&&String(missedRaw).trim()!==''&&Number.isFinite(Number(missedRaw)))obj.missedByTicks=Math.abs(Number(missedRaw));
   else delete obj.missedByTicks;
+  applySkippedReason(obj,obj.fillStatus,$('skippedReason')?.value,$('skippedReasonNote')?.value??'');
   // „Naživo bych nevzal“ je samostatná otázka, NE planFollowed. Bez příznaku
   // se důvod nedrží – visel by u obchodu, který se do výkonu počítá.
   applySkipLiveFromForm(obj,activeJournalMode(),$('wouldSkipLive')?.value,$('wouldSkipReason')?.value,skipLiveFieldShown(activeJournalMode(),formHadSkipLive));
@@ -6386,11 +6569,18 @@ function openSetupModal(rec){
  fillContextSelect('sfMaxLevel','TARGET_LEVEL','— nevyplněno —',s.maxLevel);
  $('sfMaxLevel').value=FJTaxonomy.sanitizeSingle('TARGET_LEVEL',s.maxLevel);
  $('sfReason').value=s.reason||'';
+ fillContextSelect('sfSkippedReason','SKIP_REASON','— nevyplněno —',s.skippedReason);
+ $('sfSkippedReason').value=FJTaxonomy.sanitizeSingle('SKIP_REASON',s.skippedReason);
+ syncSfSkippedReason();
  $('sfNote').value=s.note||'';
  renderChipGrid('sfEntryLevels','ENTRY_LEVEL',s.entryLevels);
  renderChipGrid('sfOfConfirm','OF_CONFIRM',s.ofConfirm);
  $('setupModal').classList.add('open');
 }
+function syncSfSkippedReason(){
+ if($('sfSkippedReasonField'))$('sfSkippedReasonField').style.display=$('sfFill').value==='SKIPPED'?'':'none';
+}
+$('sfFill').addEventListener('change',syncSfSkippedReason);
 async function saveSetupRecord(){
  const date=$('sfDate').value;
  if(!date){showToast('Doplň datum setupu.');return}
@@ -6416,6 +6606,7 @@ async function saveSetupRecord(){
  if(tg)rec.targetLevel1=tg;
  const maxLevel=FJTaxonomy.sanitizeSingle('TARGET_LEVEL',$('sfMaxLevel').value);
  if(maxLevel)rec.maxLevel=maxLevel;
+ applySkippedReason(rec,rec.fillStatus,$('sfSkippedReason').value);
  await commitJournal(journal=>{
   const rows=Array.isArray(journal.trades)?journal.trades:(journal.trades=[]);
   const idx=rows.findIndex(t=>t.id===id);
@@ -6612,6 +6803,9 @@ const CONTEXT_CSV_DAY=[['Open vůči value','openVsValue'],['Typ dne očekávan�
 // Hodnota je klíč škály (číslo), stejně jako u ostatních číselníků.
 const CONTEXT_CSV_PSYCH=[['Psychika – před vstupem','psychBefore'],['Psychika – v průběhu','psychDuring'],['Psychika – po výstupu','psychAfter']];
 const CONTEXT_CSV_DAY_PSYCH=[['Psychika – před seancí','before'],['Psychika – v průběhu','during'],['Psychika – po seanci','after']];
+// Důvod vědomého vynechání (4.8.95) – klíč číselníku SKIP_REASON a text; až na
+// konci, ať se stávající sloupce nepohnou.
+const CONTEXT_CSV_SKIPPED=[['Důvod vynechání','skippedReason'],['Důvod vynechání – text','skippedReasonNote']];
 function csvBool(v){return v==null?'':(v?'ano':'ne')}
 function contextCsvHeader(){
  const out=CONTEXT_CSV_MANUAL.map(([h])=>h);
@@ -6620,6 +6814,7 @@ function contextCsvHeader(){
  for(const [h] of CONTEXT_CSV_DAY)out.push('Den: '+h);
  for(const [h] of CONTEXT_CSV_PSYCH)out.push(h);
  for(const [h] of CONTEXT_CSV_DAY_PSYCH)out.push('Den: '+h);
+ for(const [h] of CONTEXT_CSV_SKIPPED)out.push(h);
  return out;
 }
 // ctx: { tickSize, config (číselníky deníku), dayOrder (FJContext.dayOrder
@@ -6640,6 +6835,7 @@ function contextCsvCells(t,ctx={}){
  for(const [,k] of CONTEXT_CSV_PSYCH)out.push(t[k]??'');
  const dp=ctx.dayPsych||{};
  for(const [,k] of CONTEXT_CSV_DAY_PSYCH)out.push(dp[k]||'');
+ for(const [,k] of CONTEXT_CSV_SKIPPED)out.push(t.fillStatus==='SKIPPED'?(t[k]??''):'');
  return out;
 }
 // Celá tabulka exportu Deníku (hlavička + řádky). dayNoteOf(date) vrací
@@ -8188,6 +8384,37 @@ function syncAccountDateFields(){
  const mode=$('accountRangeMode').value;
  document.querySelectorAll('.account-day-field').forEach(el=>el.style.display=mode==='day'?'block':'none');
  document.querySelectorAll('.account-interval-field').forEach(el=>el.style.display=mode==='interval'?'block':'none');
+ syncAccountMonthLabel();
+}
+// ---- Šipky ◀ ▶ v Přehledu účtu: posun po celých měsících ----
+// Výchozí měsíc = začátek intervalu, den v režimu „Jeden den“, jinak aktuální
+// měsíc. Šipka nastaví interval na celý měsíc; Od / Do jdou dál přepsat ručně.
+const CS_MONTHS=['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'];
+function isoDateParts(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+function shiftMonthRange(baseIso,delta,today=new Date()){
+ const m=/^(\d{4})-(\d{2})/.exec(String(baseIso||''));
+ let y=m?+m[1]:today.getFullYear(),mo=(m?+m[2]-1:today.getMonth())+delta;
+ y+=Math.floor(mo/12);mo=((mo%12)+12)%12;
+ return {from:isoDateParts(y,mo,1),to:isoDateParts(y,mo,new Date(y,mo+1,0).getDate())};
+}
+// Popisek „říjen 2026“, když interval je přesně jeden kalendářní měsíc; jinak ''.
+function monthRangeLabel(from,to){
+ const m=/^(\d{4})-(\d{2})-01$/.exec(String(from||''));
+ if(!m)return '';
+ const r=shiftMonthRange(from,0);
+ return r.to===to?`${CS_MONTHS[+m[2]-1]} ${m[1]}`:'';
+}
+function syncAccountMonthLabel(){
+ const el=$('accountMonthLabel');if(!el)return;
+ el.textContent=$('accountRangeMode').value==='interval'?monthRangeLabel($('accountFrom').value,$('accountTo').value):'';
+}
+function shiftAccountMonth(delta){
+ const mode=$('accountRangeMode').value;
+ const base=mode==='interval'?($('accountFrom').value||$('accountTo').value):mode==='day'?$('accountDay').value:'';
+ const r=shiftMonthRange(base,delta);
+ $('accountRangeMode').value='interval';$('accountFrom').value=r.from;$('accountTo').value=r.to;
+ syncAccountDateFields();
+ applyAccountOverview();
 }
 function filteredOverviewTrades(){
  return performanceRecords(filteredOverviewRecords());
@@ -8285,6 +8512,68 @@ function renderOverviewFilterSettings(){
   showToast(`Filtr „${OVERVIEW_FILTERS.find(x=>x.key===el.dataset.key)?.label}“ je ${el.checked?'zobrazený':'skrytý'}.`);
  });
 }
+// Sekce (karty) Přehledu účtu – každá jde skrýt. Volby jsou na dvou místech
+// (přímo v přehledu a v Nastavení → Přizpůsobení → Přehled účtu), zdroj je
+// jeden. Skrytí nic nemaže a nemění výpočty ani exporty.
+const OVERVIEW_SECTIONS=[
+ {key:'kpi',label:'Pruh KPI (stav účtu, čistý zisk, win rate, PF)',group:'Nahoře a dole'},
+ {key:'tradeList',label:'Vybrané obchody (seznam)',group:'Nahoře a dole'},
+ {key:'overall',label:'Celková výkonnost',group:'Celkový přehled'},
+ {key:'hist',label:'Rozložení zisků a ztrát',group:'Celkový přehled'},
+ {key:'tradeStats',label:'Statistika obchodů',group:'Celkový přehled'},
+ {key:'mfe',label:'MFE',group:'Pohyb ceny a délka obchodů'},
+ {key:'mae',label:'MAE',group:'Pohyb ceny a délka obchodů'},
+ {key:'duration',label:'Délka obchodů',group:'Pohyb ceny a délka obchodů'},
+ {key:'setups',label:'Setupy a fill rate',group:'Setupy a hypotetické obchody'},
+ {key:'skipLive',label:'Naživo bych nevzal',group:'Setupy a hypotetické obchody'},
+ {key:'noFill',label:'No fill – hypoteticky',group:'Setupy a hypotetické obchody'},
+ {key:'skipped',label:'Vědomě vynechané – hypoteticky',group:'Setupy a hypotetické obchody'},
+ {key:'period',label:'Výkonnost dle období',group:'Výkonnost'},
+ {key:'equity',label:'Equity křivka',group:'Výkonnost'},
+ {key:'weekly',label:'Týdenní výkonnost',group:'Výkonnost'}
+];
+const OVERVIEW_SECTIONS_KEY='FJ_overviewSections';
+function readOverviewSectionConfig(){
+ let saved={};
+ try{saved=JSON.parse(localStorage.getItem(OVERVIEW_SECTIONS_KEY)||'{}')||{}}catch{}
+ return Object.fromEntries(OVERVIEW_SECTIONS.map(s=>[s.key,saved[s.key]!==false]));
+}
+let overviewSectionConfig=readOverviewSectionConfig();
+function applyOverviewSectionVisibility(){
+ document.querySelectorAll('[data-ov-section]').forEach(el=>el.classList.toggle('ov-user-hidden',overviewSectionConfig[el.dataset.ovSection]===false));
+ // Řada bez viditelné karty zmizí i s nadpisem; pevné 3sloupcové řady se
+ // při skryté kartě rozdělí na tolik sloupců, kolik karet zbylo.
+ document.querySelectorAll('[data-ov-row]').forEach(row=>{
+  const cards=[...row.children].filter(c=>c.dataset.ovSection);
+  const shown=cards.filter(c=>!c.classList.contains('ov-user-hidden')&&c.style.display!=='none');
+  row.classList.toggle('ov-user-hidden',!shown.length);
+  const divider=document.querySelector(`[data-ov-divider="${row.dataset.ovRow}"]`);
+  if(divider)divider.classList.toggle('ov-user-hidden',!shown.length);
+  const partial=!row.classList.contains('groups-row')&&shown.length&&shown.length<cards.length;
+  row.classList.toggle('ov-cols-1',!!partial&&shown.length===1);
+  row.classList.toggle('ov-cols-2',!!partial&&shown.length===2);
+ });
+ const hidden=OVERVIEW_SECTIONS.filter(s=>overviewSectionConfig[s.key]===false).length;
+ if($('accountSectionsCount'))$('accountSectionsCount').textContent=hidden?`(skryto: ${hidden})`:'';
+}
+function renderOverviewSectionSettings(){
+ const groups=[...new Set(OVERVIEW_SECTIONS.map(s=>s.group))];
+ const html=groups.map(g=>`<div class="ov-sec-group"><b>${esc(g.toUpperCase())}</b>`+
+  OVERVIEW_SECTIONS.filter(s=>s.group===g).map(s=>`<label class="settings-check"><input type="checkbox" class="overview-section-show" data-key="${esc(s.key)}"${overviewSectionConfig[s.key]!==false?' checked':''}> ${esc(s.label)}</label>`).join('')+
+  '</div>').join('');
+ document.querySelectorAll('[data-ov-section-settings]').forEach(box=>{
+  box.innerHTML=html;
+  box.querySelectorAll('.overview-section-show').forEach(el=>el.onchange=()=>{
+   overviewSectionConfig={...overviewSectionConfig,[el.dataset.key]:el.checked};
+   try{localStorage.setItem(OVERVIEW_SECTIONS_KEY,JSON.stringify(overviewSectionConfig))}catch{}
+   renderOverviewSectionSettings();
+   applyOverviewSectionVisibility();
+   // Skrytý canvas má nulovou velikost – po zobrazení se grafy překreslí.
+   if(accountOverviewInitialized&&el.checked)applyAccountOverview();
+   showToast(`Sekce „${OVERVIEW_SECTIONS.find(x=>x.key===el.dataset.key)?.label}“ je ${el.checked?'zobrazená':'skrytá'}.`);
+  });
+ });
+}
 function applyAccountOverview(){
  // renderDashboard dostává VŠECHNY obchody: výkon si z nich vybere sám
  // (performanceRecords), fill rate a blok „naživo bych nevzal“ potřebují i ty
@@ -8295,8 +8584,14 @@ function applyAccountOverview(){
  if($('accountMoreFiltersCount'))$('accountMoreFiltersCount').textContent=moreCount?`(aktivní: ${moreCount})`:'';
  renderDashboard(rows,all.filter(isSetupRecord));
  $('accountOverviewTrades').innerHTML=rows.length?rows.slice().sort((a,b)=>(b.date+(b.entryTime||'')).localeCompare(a.date+(a.entryTime||''))).map(tradeHTML).join(''):'<div class="sub">Pro vybraný filtr nejsou žádné obchody.</div>';
+ // Bloky „naživo bych nevzal“ / „vědomě vynechané“ se schovávají i podle
+ // režimu deníku (renderDashboard) – nadpis řady se podle toho přepočítá.
+ applyOverviewSectionVisibility();
 }
 $('accountRangeMode').onchange=syncAccountDateFields;
+$('accountPrevMonth').onclick=()=>shiftAccountMonth(-1);
+$('accountNextMonth').onclick=()=>shiftAccountMonth(1);
+for(const id of ['accountFrom','accountTo'])$(id).addEventListener('input',syncAccountMonthLabel);
 $('accountJournal').onchange=()=>{refreshAccountInstrumentOptions();refreshAccountSetupOptions($('accountSetup').value);applyAccountOverview()};
 for(const id of ['accountSide','accountResult','accountSetup'])$(id).onchange=applyAccountOverview;
 $('accountInstrument').onchange=applyAccountOverview;
@@ -8309,6 +8604,8 @@ $('clearAccountFilters').onclick=()=>{
 syncAccountDateFields();
 renderOverviewFilterSettings();
 applyOverviewFilterVisibility();
+renderOverviewSectionSettings();
+applyOverviewSectionVisibility();
 
 let journalAppStarted=false;
 async function startJournalApplication(){

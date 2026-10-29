@@ -234,7 +234,7 @@
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
     { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' },
     { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' },
-    { name: 'SKIP_REASON', label: 'Důvod „naživo bych nevzal“', cardinality: 'single' },
+    { name: 'SKIP_REASON', label: 'Důvod vynechání / „naživo bych nevzal“', cardinality: 'single' },
     { name: 'TREND_HTF', label: 'Trend 30m', cardinality: 'single' },
     { name: 'ABS_LOCATION', label: 'Absorpce – kde', cardinality: 'single' },
     { name: 'ENTRY_TEST_NO', label: 'Kolikátý test vstupu', cardinality: 'single' },

@@ -156,7 +156,7 @@ test('Rychlý kontext: psychika obchodu se mění jen na přání a jde vymazat'
 
 test('export CSV: tři sloupce obchodu a tři sloupce dne na konci, hodnota = číslo škály', () => {
   const r = loadRenderer(['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'levelCsvCount', 'levelCsvHeader', 'levelCsvCells',
-    'tradeCsvHeader', 'tradeCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH',
+    'tradeCsvHeader', 'tradeCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH', 'CONTEXT_CSV_SKIPPED',
     'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable'],
   { settings: SETTINGS, activeJournalId: 'j1', journalProfiles: [] });
   const trades = [
@@ -166,7 +166,9 @@ test('export CSV: tři sloupce obchodu a tři sloupce dne na konci, hodnota = č
   const notes = { '2026-10-16': { comment: '', psych: { before: '7', during: '5' } } };
   const table = r.journalCsvTable(trades, d => notes[d] || null, { tickSizeOf: () => 0.25, config: {}, mode: 'LIVE' });
   const h = table[0];
-  assert.deepEqual(plain(h.slice(-6)), ['Psychika – před vstupem', 'Psychika – v průběhu', 'Psychika – po výstupu',
+  // Za psychikou jsou od 4.8.95 už jen dva sloupce důvodu vynechání.
+  assert.deepEqual(plain(h.slice(-2)), ['Důvod vynechání', 'Důvod vynechání – text']);
+  assert.deepEqual(plain(h.slice(-8, -2)), ['Psychika – před vstupem', 'Psychika – v průběhu', 'Psychika – po výstupu',
     'Den: Psychika – před seancí', 'Den: Psychika – v průběhu', 'Den: Psychika – po seanci']);
   const rec = row => Object.fromEntries(h.map((name, i) => [name, row[i]]));
   const a = rec(table[1]), b = rec(table[2]);

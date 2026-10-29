@@ -119,7 +119,7 @@ test('import bez automatického slučování: každá noha je obchod se svým vs
 function cardRenderer(globals = {}) {
   return loadRenderer([
     'esc', 'money', 'moneyCzk', 'dualMoney', 'signed', 'sideMeta', 'resultMeta',
-    'legPillHTML', 'hypotheticalGroup', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'formatLevelRow', 'contextPillsHTML', 'incompleteBadgeHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML', 'tradeHTML',
+    'legPillHTML', 'hypotheticalGroup', 'skippedReasonText', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'formatLevelRow', 'contextPillsHTML', 'incompleteBadgeHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML', 'tradeHTML',
     'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown'
   ], { settings: { ...SETTINGS, usdCzkRate: 23 }, activeJournalId: 'j1', Intl, document: { getElementById: () => null }, ...globals });
 }

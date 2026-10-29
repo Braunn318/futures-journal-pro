@@ -359,7 +359,7 @@ test('A7/7: smazaná pole nejsou ve slovníku polí, ve formuláři ani v export
   assert.ok(html.includes('id="nearLevels"') && html.includes('id="nearLevelsNone"'));
 
   const r = loadRenderer(['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'reportSigned', 'levelCsvCount', 'levelCsvHeader', 'levelCsvCells',
-    'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH',
+    'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH', 'CONTEXT_CSV_SKIPPED',
     'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable', 'reportCsvTable'],
   { settings: { templates: [] }, activeJournalId: 'j1', journalProfiles: [] });
   const trade = { ...LONG, date: '2026-10-09', entryTime: '15:31', result: 'target', pnlRaw: 18.1,

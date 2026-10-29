@@ -397,7 +397,7 @@ test('důvod „naživo bych nevzal“ je editovatelný číselník jako ostatn�
   assert.equal(FJTaxonomy.sanitizeSingle('SKIP_REASON', 'OTHER'), 'OTHER', 'skrytý důvod zůstává platný u starých obchodů');
   assert.equal(FJTaxonomy.sanitizeSingle('SKIP_REASON', 'CUSTOM_NEWS'), 'CUSTOM_NEWS', 'vlastní položka');
   assert.ok(!FJTaxonomy.visibleOptions('SKIP_REASON').some(o => o.key === 'OTHER'), 'skrytý se novým obchodům nenabízí');
-  assert.match(FJTaxonomy.describeConfig(cfg)[0], /^Důvod „naživo bych nevzal“: /);
+  assert.match(FJTaxonomy.describeConfig(cfg)[0], /^Důvod vynechání \/ „naživo bych nevzal“: /);
 });
 
 // Soubor číselníků z verze do 4.8.4 nese dvě kolonky SR. Očista je nezná –
