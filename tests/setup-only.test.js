@@ -11,6 +11,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+// Filtr přehledu účtu (4.8.94) – filteredOverviewRecords je volá.
+const OVERVIEW_FILTER_NAMES = ['OVERVIEW_FILTERS', 'OVERVIEW_FILTERS_KEY', 'readOverviewFilterConfig', 'overviewFilterConfig',
+  'overviewNum', 'readOverviewFilters', 'overviewRangeMatch', 'overviewFilterMatch'];
 const { loadRenderer } = require('./helpers/extract');
 
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -182,7 +185,7 @@ test('renderCalendar: den se setupem nemá P/L ani počet obchodů', () => {
 
 test('filteredOverviewTrades: vrací jen obchody', () => {
   const dom = domStub({ accountRangeMode: 'all' });
-  const r = loadRenderer([...BASE_NAMES, 'filteredOverviewTrades', 'filteredOverviewRecords'], {
+  const r = loadRenderer([...BASE_NAMES, 'filteredOverviewTrades', 'filteredOverviewRecords', ...OVERVIEW_FILTER_NAMES], {
     $: dom.$, overviewAllTrades: MIXED
   });
   assert.deepEqual(plain(r.filteredOverviewTrades()), plain(TRADES));

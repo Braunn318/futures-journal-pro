@@ -426,6 +426,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 .account-filter-grid .field label{font-size:12px;margin-bottom:4px}
 .account-filter-grid .field input,.account-filter-grid .field select,.account-filter-grid .btn{width:auto;padding:5px 9px;font-size:12.5px;border-radius:8px;height:30px;line-height:1.2}
 .account-filter-grid .include-field{flex-basis:100%}
+.account-more-filters{margin-top:10px}
+.account-more-filters>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);user-select:none}
+.account-more-filters>summary:hover{color:var(--blue)}
+.account-more-filters .account-filter-grid{margin-top:8px}
+.account-more-filters .field input[type=number]{width:90px}
 .optional-badge{font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 7px;vertical-align:middle}
 .money-dual{display:inline-flex;flex-direction:column;line-height:1.15}.money-dual .main-money{font-weight:inherit}.money-dual .secondary-money{font-size:10px;color:var(--muted);font-weight:600;margin-top:3px}.move-trade-info{margin-bottom:12px;color:var(--muted);font-size:13px}
 .trade-plan-editor{margin-top:10px}.trade-plan-details{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
@@ -596,6 +601,19 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>&nbsp;</label><button class="btn primary" id="applyAccountFilters">Zobrazit</button></div>
           <div class="field include-field"><span class="include-toggles" data-include-scope="overview"><label class="skip-live-toggle" title="Obchody označené „naživo bych nevzal“ jsou ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="skipLive" id="includeSkipLiveOverview"> včetně obchodů, které bych naživo nevzal</label><label class="skip-live-toggle" title="Nenaplněná limitka nebo nestihnutý setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu. Do fill rate patří vždy."><input type="checkbox" class="include-toggle" data-include="noFill" id="includeNoFillOverview"> včetně no fill obchodů</label><label class="skip-live-toggle" title="Vědomě vynechaný setup vyplněný jako obchod (co by to udělalo). Ve výchozím stavu mimo P/L, equity a statistiky výkonu."><input type="checkbox" class="include-toggle" data-include="skipped" id="includeSkippedOverview"> včetně vědomě vynechaných</label></span></div>
         </div>
+        <details class="account-more-filters" id="accountMoreFilters">
+          <summary>Další filtry <span id="accountMoreFiltersCount" class="sub"></span></summary>
+          <div class="account-filter-grid">
+            <div class="field" data-ov-filter="side"><label>Směr</label><select id="accountSide"><option value="">Oba směry</option><option value="long">Long</option><option value="short">Short</option><option value="none">Bez určeného směru</option></select></div>
+            <div class="field" data-ov-filter="result"><label>Výsledek</label><select id="accountResult"><option value="">Všechny výsledky</option><option value="target">Target (zisk)</option><option value="stoploss">Stop Loss (ztráta)</option><option value="breakeven">Break-even</option></select></div>
+            <div class="field" data-ov-filter="setup"><label>Setup</label><select id="accountSetup"><option value="">Všechny setupy</option></select></div>
+            <div class="field" data-ov-filter="mfe"><label>MFE od <span class="sub">— ticky</span></label><input type="number" id="accountMfeMin" min="0" step="any"></div>
+            <div class="field" data-ov-filter="mfe"><label>MFE do <span class="sub">— ticky</span></label><input type="number" id="accountMfeMax" min="0" step="any"></div>
+            <div class="field" data-ov-filter="mae"><label>MAE od <span class="sub">— ticky</span></label><input type="number" id="accountMaeMin" min="0" step="any"></div>
+            <div class="field" data-ov-filter="mae"><label>MAE do <span class="sub">— ticky</span></label><input type="number" id="accountMaeMax" min="0" step="any"></div>
+          </div>
+          <p class="sub" style="margin-top:6px">Prázdné pole = bez omezení. Při filtru MFE / MAE vypadnou obchody, které hodnotu nemají vyplněnou (0 je platná hodnota a filtrem projde). Číselné filtry se použijí tlačítkem „Zobrazit“. Které filtry se tu ukazují, nastavíš v Nastavení → Přizpůsobení → Filtry přehledu.</p>
+        </details>
       </div>
 
       <div id="limitAlert" class="alert red"></div>
@@ -1051,6 +1069,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <p class="sub">Známka zadaná do téhle lhůty od uložení obchodu (u pozice s víc cíli od posledního výstupu) se nepovažuje za doplněnou zpětně – importovanému obchodu ji dřív zadat nejde. Výchozí je 30 minut, 0 = hned po uložení. Platí pro aktivní deník, uloží se hned a stejně počítá i export (CSV, AI export). V backtest deníku se „doplněno zpětně“ neurčuje.</p>
           <p class="sub" style="margin-top:10px"><b>Psychika</b> (škála 1–8, 1 nejhorší, 8 nejlepší): tři pole obchodu jsou v kartě Psychika, tři pole dne v okně ☀ Kontext dne, v detailu dne v Kalendáři a v řádku „Psychika“ u dne v Deníku. U polí dne „Upozorňovat na nevyplněné“ říká, že se pole hlídá; <b>kde</b> se to ukáže, určují dva řádky „upozornění na dni“ (záhlaví dne v Deníku a kalendář, jen dny s obchody) a „upozornění u obchodů dne“ (štítek „⚠ Neúplné“ a Rychlý kontext). Popisky hodnot jdou přejmenovat v Nastavení → Číselníky.</p>
           <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
+        <details class="card settings-card" data-card="overviewFilters">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Filtry přehledu</h3></summary>
+          <p class="sub">Které „Další filtry“ se ukazují v Přehledu účtu. Skrytý filtr se nepoužije, i když v něm zůstala hodnota – data se nikdy nemažou.</p>
+          <div id="overviewFilterSettings" style="margin-top:10px"></div>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
       </div>
@@ -1908,7 +1932,7 @@ function computeGroupStats(rows,key){
  }
  const base=currentInclude();
  return {
-  count:group.length,pnl:stats.gainSum+stats.lossSum,winRate:stats.winRate,expectancy:stats.expectancy,
+  count:group.length,pnl:stats.netPnl,winRate:stats.winRate,expectancy:stats.expectancy,
   expectancyWithout:computeOverallStats(all,{...base,[key]:false}).expectancy,
   expectancyWith:computeOverallStats(all,{...base,[key]:true}).expectancy,
   byReason:Object.values(byReason).sort((a,b)=>b.count-a.count)
@@ -2730,6 +2754,9 @@ function computeOverallStats(rows,include=currentInclude()){
  rows=performanceRecords(rows,include);
  const wins=rows.filter(t=>t.result==='target'), losses=rows.filter(t=>t.result==='stoploss'), breakevens=rows.filter(t=>t.result==='breakeven');
  const gainSum=wins.reduce((a,t)=>a+signed(t),0), lossSum=losses.reduce((a,t)=>a+signed(t),0);
+ // Čistý P/L = všechny započtené obchody, i break-even s poplatkem (pnlRaw
+ // např. −4,20). Stejný součet jako „Celkem" v computePeriodStats.
+ const netPnl=rows.reduce((a,t)=>a+signed(t),0);
  const winrateDenom=wins.length+losses.length;
  const winRate=winrateDenom?wins.length/winrateDenom:0;
  const profitFactor=lossSum?Math.abs(gainSum/lossSum):(gainSum?Infinity:0);
@@ -2742,10 +2769,12 @@ function computeOverallStats(rows,include=currentInclude()){
  };
  return {
   wins,losses,breakevens,gainSum,lossSum,winRate,profitFactor,
+  netPnl,beSum:netPnl-gainSum-lossSum,
   totalTrades:rows.length,
   avgWin:wins.length?gainSum/wins.length:0,
   avgLoss:losses.length?lossSum/losses.length:0,
-  expectancy:rows.length?(gainSum+lossSum)/rows.length:0,
+  // Expectancy = průměrný čistý P/L na jeden započtený obchod.
+  expectancy:rows.length?netPnl/rows.length:0,
   longs:bySide('long'), shorts:bySide('short'),
   unknownSide:rows.filter(t=>t.side!=='long'&&t.side!=='short').length
  };
@@ -2763,7 +2792,7 @@ function renderOverallStatsList(stats){
  const rows=[
   ['Celkový zisk',stats.gainSum,'pos'],
   ['Celková ztráta',stats.lossSum,'neg'],
-  ['Poměr zisk/ztráta',ratioTxt,stats.gainSum+stats.lossSum>=0?'pos':'neg']
+  ['Poměr zisk/ztráta',ratioTxt,stats.netPnl>=0?'pos':'neg']
  ];
  el.innerHTML=rows.map(([label,val,cls])=>`<div class="row"><span>${label}</span><b class="${cls}">${typeof val==='number'?(val>=0?'+':'')+money(val):val}</b></div>`).join('');
 }
@@ -2793,7 +2822,7 @@ function renderTradeStatsTable(stats){
   row('Průměrný zisk',money(stats.avgWin),'pos')+
   row('Průměrná ztráta',money(stats.avgLoss),'neg')+
   row('Profit factor',stats.profitFactor===Infinity?'∞':stats.profitFactor.toFixed(2))+
-  row('Expectancy',money(stats.expectancy),stats.expectancy>=0?'pos':'neg')+
+  row('<span title="Čistý P/L všech započtených obchodů (ziskové + ztrátové + break-even) / jejich počet">Expectancy ⓘ</span>',money(stats.expectancy),stats.expectancy>=0?'pos':'neg')+
   dirRows;
 }
 function computePeriodStats(rows){
@@ -2836,7 +2865,7 @@ function renderDashboard(rows=trades,setups=setupRecords){
  renderGroupStats('skippedStatsBox','skipped',computeGroupStats(allTrades,'skipped'));
  renderSetupStats(computeSetupStats([...allTrades,...(Array.isArray(setups)?setups.filter(isSetupRecord):[])]));
  const stats=computeOverallStats(safeRows);
- const total=stats.gainSum+stats.lossSum, balance=Number(settings.startingBalance)+total;
+ const total=stats.netPnl, balance=Number(settings.startingBalance)+total;
  renderKpiStrip(total,balance,stats);
  renderOverallStatsList(stats);
  renderTopInstruments(safeRows);
@@ -4300,7 +4329,7 @@ function renderCalendarMonthSummary(rows,y,m){
  const prefix=`${y}-${String(m+1).padStart(2,'0')}-`;
  const monthRows=rows.filter(t=>String(t.date||'').startsWith(prefix));
  const stats=computeOverallStats(monthRows);
- const pnl=stats.gainSum+stats.lossSum;
+ const pnl=stats.netPnl;
  const byDay={};
  monthRows.forEach(t=>{byDay[t.date]=(byDay[t.date]||0)+signed(t)});
  const dayPnls=Object.values(byDay);
@@ -8146,11 +8175,12 @@ async function initAccountOverview(){
  for(const p of visibleJournalProfiles())overviewAllTrades.push(...await readTradesForOverview(p));
  // Při prvním otevření se filtr nastaví podle Nastavení → Deníky (poslední
  // aktivní deník / všechny). Potom se drží, co si uživatel vybral.
- const oldJ=accountOverviewInitialized?$('accountJournal').value:defaultOverviewJournal(),oldI=$('accountInstrument').value;
+ const oldJ=accountOverviewInitialized?$('accountJournal').value:defaultOverviewJournal(),oldI=$('accountInstrument').value,oldS=$('accountSetup')?.value||'';
  accountOverviewInitialized=true;
  $('accountJournal').innerHTML='<option value="">Všechny deníky</option>'+visibleJournalProfiles().map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
  $('accountJournal').value=visibleJournalProfiles().some(p=>p.id===oldJ)?oldJ:'';
  refreshAccountInstrumentOptions(oldI);
+ refreshAccountSetupOptions(oldS);
  syncAccountDateFields();
  applyAccountOverview();
 }
@@ -8160,22 +8190,99 @@ function syncAccountDateFields(){
  document.querySelectorAll('.account-interval-field').forEach(el=>el.style.display=mode==='interval'?'block':'none');
 }
 function filteredOverviewTrades(){
- const mode=$('accountRangeMode').value,day=$('accountDay').value,from=$('accountFrom').value,to=$('accountTo').value;
- const journal=$('accountJournal').value,instrument=$('accountInstrument').value;
  return performanceRecords(filteredOverviewRecords());
+}
+// „Další filtry" přehledu. Každý jde skrýt v Nastavení → Přizpůsobení → Filtry
+// přehledu; skrytý filtr se nepoužije, i když v něm zůstala hodnota.
+const OVERVIEW_FILTERS=[
+ {key:'side',label:'Směr'},
+ {key:'result',label:'Výsledek'},
+ {key:'setup',label:'Setup'},
+ {key:'mfe',label:'MFE (ticky od–do)'},
+ {key:'mae',label:'MAE (ticky od–do)'}
+];
+const OVERVIEW_FILTERS_KEY='FJ_overviewFilters';
+function readOverviewFilterConfig(){
+ let saved={};
+ try{saved=JSON.parse(localStorage.getItem(OVERVIEW_FILTERS_KEY)||'{}')||{}}catch{}
+ return Object.fromEntries(OVERVIEW_FILTERS.map(f=>[f.key,saved[f.key]!==false]));
+}
+let overviewFilterConfig=readOverviewFilterConfig();
+// Číslo z pole filtru; prázdné = bez omezení (null).
+function overviewNum(v){
+ if(v===undefined||v===null||String(v).trim()==='')return null;
+ const n=Number(v);return Number.isFinite(n)?n:null;
+}
+function readOverviewFilters(){
+ const val=id=>$(id)?.value??'';
+ const on=k=>overviewFilterConfig[k]!==false;
+ return {
+  mode:val('accountRangeMode'),day:val('accountDay'),from:val('accountFrom'),to:val('accountTo'),
+  journal:val('accountJournal'),instrument:val('accountInstrument'),
+  side:on('side')?val('accountSide'):'',
+  result:on('result')?val('accountResult'):'',
+  setup:on('setup')?val('accountSetup'):'',
+  mfeMin:on('mfe')?overviewNum(val('accountMfeMin')):null,mfeMax:on('mfe')?overviewNum(val('accountMfeMax')):null,
+  maeMin:on('mae')?overviewNum(val('accountMaeMin')):null,maeMax:on('mae')?overviewNum(val('accountMaeMax')):null
+ };
+}
+// Rozsah od–do pro tikovou hodnotu. Prázdná hodnota u obchodu při aktivním
+// rozsahu neprojde (nevíme ji); 0 je naměřená hodnota a projde normálně.
+function overviewRangeMatch(raw,min,max){
+ if(min===null&&max===null)return true;
+ const v=overviewNum(raw);
+ if(v===null)return false;
+ return (min===null||v>=min)&&(max===null||v<=max);
+}
+function overviewFilterMatch(t,f){
+ if(f.journal&&t.journalId!==f.journal)return false;
+ if(f.instrument&&t.instrument!==f.instrument)return false;
+ if(f.mode==='day'&&f.day&&t.date!==f.day)return false;
+ if(f.mode==='interval'&&f.from&&t.date<f.from)return false;
+ if(f.mode==='interval'&&f.to&&t.date>f.to)return false;
+ if(f.side==='none'){if(t.side==='long'||t.side==='short')return false}
+ else if(f.side&&t.side!==f.side)return false;
+ if(f.result&&t.result!==f.result)return false;
+ if(f.setup==='__none'){if(t.setupCode)return false}
+ else if(f.setup&&t.setupCode!==f.setup)return false;
+ if(!overviewRangeMatch(t.mfeTicks,f.mfeMin,f.mfeMax))return false;
+ if(!overviewRangeMatch(t.maeTicks,f.maeMin,f.maeMax))return false;
+ return true;
+}
+function activeMoreFilterCount(f){
+ return [f.side,f.result,f.setup].filter(Boolean).length
+  +((f.mfeMin!==null||f.mfeMax!==null)?1:0)+((f.maeMin!==null||f.maeMax!==null)?1:0);
 }
 // Všechny záznamy přehledu včetně setupů bez exekuce – jen pro četnost setupů
 // a fill rate. Agregace P/L berou výhradně filteredOverviewTrades.
 function filteredOverviewRecords(){
- const mode=$('accountRangeMode').value,day=$('accountDay').value,from=$('accountFrom').value,to=$('accountTo').value;
- const journal=$('accountJournal').value,instrument=$('accountInstrument').value;
- return overviewAllTrades.filter(t=>{
-  if(journal&&t.journalId!==journal)return false;
-  if(instrument&&t.instrument!==instrument)return false;
-  if(mode==='day'&&day&&t.date!==day)return false;
-  if(mode==='interval'&&from&&t.date<from)return false;
-  if(mode==='interval'&&to&&t.date>to)return false;
-  return true;
+ const f=readOverviewFilters();
+ return overviewAllTrades.filter(t=>overviewFilterMatch(t,f));
+}
+// Nabídka setupů podle dat ve vybraném deníku; popisky z číselníku SETUP.
+function refreshAccountSetupOptions(preferredValue=''){
+ const sel=$('accountSetup');if(!sel)return;
+ const journal=$('accountJournal').value;
+ const source=journal?overviewAllTrades.filter(t=>t.journalId===journal):overviewAllTrades;
+ const keys=[...new Set(source.map(t=>t.setupCode||'').filter(Boolean))]
+  .sort((a,b)=>FJTaxonomy.labelOf('SETUP',a).localeCompare(FJTaxonomy.labelOf('SETUP',b),'cs',{sensitivity:'base'}));
+ sel.innerHTML='<option value="">Všechny setupy</option>'+keys.map(k=>`<option value="${esc(k)}">${esc(FJTaxonomy.labelOf('SETUP',k))}</option>`).join('')+'<option value="__none">Bez setupu</option>';
+ sel.value=(keys.includes(preferredValue)||preferredValue==='__none')?preferredValue:'';
+}
+function applyOverviewFilterVisibility(){
+ document.querySelectorAll('[data-ov-filter]').forEach(el=>{el.style.display=overviewFilterConfig[el.dataset.ovFilter]===false?'none':''});
+ const box=$('accountMoreFilters');
+ if(box)box.style.display=OVERVIEW_FILTERS.some(f=>overviewFilterConfig[f.key]!==false)?'':'none';
+}
+function renderOverviewFilterSettings(){
+ const box=$('overviewFilterSettings');if(!box)return;
+ box.innerHTML=OVERVIEW_FILTERS.map(f=>`<label class="settings-check"><input type="checkbox" class="overview-filter-show" data-key="${esc(f.key)}"${overviewFilterConfig[f.key]!==false?' checked':''}> ${esc(f.label)}</label>`).join('');
+ box.querySelectorAll('.overview-filter-show').forEach(el=>el.onchange=()=>{
+  overviewFilterConfig={...overviewFilterConfig,[el.dataset.key]:el.checked};
+  try{localStorage.setItem(OVERVIEW_FILTERS_KEY,JSON.stringify(overviewFilterConfig))}catch{}
+  applyOverviewFilterVisibility();
+  if(accountOverviewInitialized)applyAccountOverview();
+  showToast(`Filtr „${OVERVIEW_FILTERS.find(x=>x.key===el.dataset.key)?.label}“ je ${el.checked?'zobrazený':'skrytý'}.`);
  });
 }
 function applyAccountOverview(){
@@ -8184,18 +8291,24 @@ function applyAccountOverview(){
  // vyloučené. Seznam pod tím ukazuje všechny, vyloučené jsou barevně odlišené.
  const all=filteredOverviewRecords();
  const rows=tradeRecords(all);
+ const moreCount=activeMoreFilterCount(readOverviewFilters());
+ if($('accountMoreFiltersCount'))$('accountMoreFiltersCount').textContent=moreCount?`(aktivní: ${moreCount})`:'';
  renderDashboard(rows,all.filter(isSetupRecord));
  $('accountOverviewTrades').innerHTML=rows.length?rows.slice().sort((a,b)=>(b.date+(b.entryTime||'')).localeCompare(a.date+(a.entryTime||''))).map(tradeHTML).join(''):'<div class="sub">Pro vybraný filtr nejsou žádné obchody.</div>';
 }
 $('accountRangeMode').onchange=syncAccountDateFields;
-$('accountJournal').onchange=()=>{refreshAccountInstrumentOptions();applyAccountOverview()};
+$('accountJournal').onchange=()=>{refreshAccountInstrumentOptions();refreshAccountSetupOptions($('accountSetup').value);applyAccountOverview()};
+for(const id of ['accountSide','accountResult','accountSetup'])$(id).onchange=applyAccountOverview;
 $('accountInstrument').onchange=applyAccountOverview;
 $('applyAccountFilters').onclick=applyAccountOverview;
 $('clearAccountFilters').onclick=()=>{
  $('accountRangeMode').value='all';$('accountDay').value='';$('accountFrom').value='';$('accountTo').value='';$('accountJournal').value=defaultOverviewJournal();$('accountInstrument').value='';
- refreshAccountInstrumentOptions();syncAccountDateFields();applyAccountOverview();
+ for(const id of ['accountSide','accountResult','accountSetup','accountMfeMin','accountMfeMax','accountMaeMin','accountMaeMax'])$(id).value='';
+ refreshAccountInstrumentOptions();refreshAccountSetupOptions();syncAccountDateFields();applyAccountOverview();
 };
 syncAccountDateFields();
+renderOverviewFilterSettings();
+applyOverviewFilterVisibility();
 
 let journalAppStarted=false;
 async function startJournalApplication(){

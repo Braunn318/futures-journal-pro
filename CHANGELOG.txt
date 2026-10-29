@@ -2,6 +2,15 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.94 - 2026-10-29
+Přehled účtu: more filters (direction, result, setup, MFE, MAE), and Expectancy / net P/L now include break-even trades. No stored data changes.
+- New: Přehled účtu → „Další filtry“ (collapsible, below the existing filter): Směr (long / short / no direction), Výsledek (target / Stop Loss / break-even), Setup (setups found in the selected journal, labels from the číselník, plus „Bez setupu“), MFE from–to and MAE from–to in ticks. They apply to all statistics, charts and the trade list below. The summary shows how many are active. „Vymazat filtry“ resets them too.
+- MFE / MAE filter: a trade without a value drops out while the filter is active; 0 is a valid measured value and passes.
+- New: Nastavení → Přizpůsobení → „Filtry přehledu“ – each new filter can be hidden. A hidden filter is not applied even if a value is left in it.
+- Fixed: Expectancy summed P/L of winning and losing trades only, but divided by the count of all trades (break-even included), so a break-even trade’s P/L (e.g. −4.20 NT8 fees) was missing. Now: Expectancy = net P/L of all counted trades (wins + losses + break-even) / their count. The formula is in the tooltip on the Expectancy row.
+- Fixed: the „Čistý zisk“ KPI in Přehled, „P/L měsíce“ in Kalendář and the group P/L („naživo bych nevzal“, no fill, skipped) left out break-even P/L and could differ from „Celkem“ and the sum of days. They now match. Total gain, total loss, average win / loss and profit factor are unchanged.
+- Tests: 6 new in tests/overview-filters.test.js. Verified in Electron on temporary data: net P/L = „Celkem“, Expectancy = net / count, each filter narrows correctly, hidden filter ignored, „Vymazat filtry“ restores everything.
+
 ## 4.8.93 - 2026-10-19
 Data folder safety: moving the data folder is safe against every failure found in a review, and a data folder that disappears while the app runs no longer sends data to AppData. No stored data changes.
 - Fixed: when the data folder disappeared while the app was running (USB disk unplugged, network drive dropped, folder deleted), the app silently switched to AppData. Trades saved meanwhile were invisible once the disk was back, and the connector created new settings there with a NEW API key (the cause of the 16. 10. incident). Now nothing is written anywhere else: saving and reading fail with a clear message ("Složka s daty není dostupná … Ukládání je pozastavené").

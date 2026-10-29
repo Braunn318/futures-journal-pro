@@ -14,6 +14,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+// Filtr přehledu účtu (4.8.94) – filteredOverviewRecords je volá.
+const OVERVIEW_FILTER_NAMES = ['OVERVIEW_FILTERS', 'OVERVIEW_FILTERS_KEY', 'readOverviewFilterConfig', 'overviewFilterConfig',
+  'overviewNum', 'readOverviewFilters', 'overviewRangeMatch', 'overviewFilterMatch'];
 const { loadRenderer } = require('./helpers/extract');
 
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -182,7 +185,7 @@ test('reporty a přehled účtu: bez nich; přepínač je vrátí', () => {
   assert.equal(Number(report(MIXED, true)), MIXED.length);
 
   const dom = domStub({ accountRangeMode: 'all' });
-  const r = load(['filteredOverviewTrades', 'filteredOverviewRecords'], { $: dom.$, overviewAllTrades: MIXED });
+  const r = load(['filteredOverviewTrades', 'filteredOverviewRecords', ...OVERVIEW_FILTER_NAMES], { $: dom.$, overviewAllTrades: MIXED });
   assert.deepEqual(plain(r.filteredOverviewTrades()), plain(LIVE));
   assert.equal(r.filteredOverviewRecords().length, MIXED.length, 'fill rate a evidence dostanou všechny');
 });
