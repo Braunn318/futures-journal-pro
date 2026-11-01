@@ -2147,7 +2147,10 @@ async function openPositionFromExecution(state, key, payload, { delta, price, co
     positionId,
     fromSnapshot: false,
     executionsApplied: true,
-    lots: [{ key: lotKeyOf(payload, executionId), time, price, qty: Math.abs(delta), commission }]
+    lots: [{ key: lotKeyOf(payload, executionId), time, price, qty: Math.abs(delta), commission }],
+    // VWAP v čase vstupu posílá konektor zvlášť (entry_vwap) podle ID téhle exekuce.
+    ...(executionId ? { entryExecutionId: executionId } : {}),
+    ...takeEarlyEntryVwap(executionId)
   };
   return ctx.emit({
     type: 'trade_opened',
@@ -2244,6 +2247,51 @@ function takeFromLots(lots, closeQty) {
     if (lot.qty === 0) lots.shift();
   }
   return chunks;
+}
+// ---- VWAP v čase vstupu (konektor NT8, událost entry_vwap) ----
+// Konektor po vstupní exekuci spočte VWAP seance do času vstupu a pošle ho
+// samostatnou zprávou s ID té exekuce. Hodnota se uloží k otevřené pozici a
+// odejde s každým trade_closed té pozice (entryVwap). Když zpráva dorazí až po
+// uzavření pozice, doplní se do ještě neimportovaných trade_closed událostí;
+// když dorazí dřív než exekuce, chvíli počká v paměti.
+const recentClosedEntries = new Map();   // entryExecutionId → positionId
+const earlyEntryVwaps = new Map();       // executionId → vwap (zpráva předběhla exekuci)
+function rememberClosedEntry(position) {
+  if (!position?.entryExecutionId || !position.positionId) return;
+  recentClosedEntries.set(position.entryExecutionId, position.positionId);
+  while (recentClosedEntries.size > 300) recentClosedEntries.delete(recentClosedEntries.keys().next().value);
+}
+function takeEarlyEntryVwap(executionId) {
+  if (!executionId || !earlyEntryVwaps.has(executionId)) return {};
+  const vwap = earlyEntryVwaps.get(executionId);
+  earlyEntryVwaps.delete(executionId);
+  return { entryVwap: vwap };
+}
+function processEntryVwap(payload) {
+  const executionId = String(payload.executionId || '');
+  const vwap = Number(payload.vwap);
+  if (!executionId || !Number.isFinite(vwap) || vwap <= 0) return false;
+  const state = readCaptureState();
+  const open = Object.values(state.positions || {}).find(p => p && p.entryExecutionId === executionId);
+  if (open) {
+    open.entryVwap = vwap;
+    writeCaptureState(state);
+    return true;
+  }
+  const positionId = recentClosedEntries.get(executionId);
+  if (positionId) {
+    const events = readCaptureEvents();
+    let changed = 0;
+    for (const e of events) {
+      if (e.type === 'trade_closed' && !e.imported && e.positionId === positionId && e.entryVwap === undefined) { e.entryVwap = vwap; changed++; }
+    }
+    if (changed) writeCaptureEvents(events);
+    if (!changed) logInfo('Capture', `VWAP vstupu ${executionId} dorazil až po importu obchodu – nedoplněn.`);
+    return changed > 0;
+  }
+  earlyEntryVwaps.set(executionId, vwap);
+  while (earlyEntryVwaps.size > 100) earlyEntryVwaps.delete(earlyEntryVwaps.keys().next().value);
+  return false;
 }
 // Živá exekuce z konektoru: stav pozic z positions.json, po zpracování zpět.
 async function processExecution(payload) {
@@ -2420,6 +2468,7 @@ async function applyExecution(state, payload, ctx = LIVE_CAPTURE) {
       screenshotPaths: [...(current.entryImages || []), ...exitImages],
       sourceExecutionId: executionId,
       positionId: current.positionId || '',
+      ...(Number.isFinite(Number(current.entryVwap)) && current.entryVwap !== null ? { entryVwap: Number(current.entryVwap) } : {}),
       ...excursionTicks(payload, current.side, current.entryRefPrice, price)
     }));
   }
@@ -2440,6 +2489,7 @@ async function applyExecution(state, payload, ctx = LIVE_CAPTURE) {
       positionId: crypto.randomUUID()
     }, ctx));
   } else {
+    rememberClosedEntry(current);
     delete state.positions[key];
     if (ctx.afterShot) ctx.afterShot({
       positionId: current.positionId, account: current.account, instrument: current.instrument,
@@ -2650,8 +2700,11 @@ async function processCTraderClose(payload) {
   });
 }
 async function processIncomingPayload(payload, source='external') {
-  const raw = appendCaptureEvent(payload, source, payload.type !== 'position_snapshot');
+  // Snímky pozic a VWAP vstupu se do logu událostí neukládají – nejsou to
+  // obchody a vytlačovaly by z kruhové paměti skutečnou historii.
+  const raw = appendCaptureEvent(payload, source, payload.type !== 'position_snapshot' && payload.type !== 'entry_vwap');
   if (payload.type === 'execution' && source === 'ninjatrader') await withCaptureLock(() => processExecution(payload));
+  if (payload.type === 'entry_vwap' && source === 'ninjatrader') await withCaptureLock(() => processEntryVwap(payload));
   if (payload.type === 'position_snapshot' && source === 'ninjatrader') await withCaptureLock(() => processPositionSnapshot(payload));
   if (payload.type === 'ctrader_position_opened' && source === 'ctrader') await withCaptureLock(() => processCTraderOpen(payload));
   if (payload.type === 'ctrader_trade_closed' && source === 'ctrader') await withCaptureLock(() => processCTraderClose(payload));
@@ -3371,6 +3424,47 @@ ipcMain.handle('capture:manualReplay', async (_event, payloads) => {
     return { ok: false, error: error.message };
   }
 });
+// ---- LTA Custom Levels (4.8.99): archiv verzí a levely k obchodu ----
+// Logika je v app/lta-store.js; tady jen IPC. Do složky LTA se nezapisuje.
+let ltaStoreInstance = null;
+function ltaStore() {
+  if (!ltaStoreInstance) {
+    const { createLtaStore } = require('./app/lta-store.js');
+    ltaStoreInstance = createLtaStore({
+      userDataDir: app.getPath('userData'),
+      documentsDir: app.getPath('documents'),
+      log: (level, message) => (level === 'info' ? logInfo('LTA', message) : logError('LTA', message))
+    });
+  }
+  return ltaStoreInstance;
+}
+ipcMain.handle('lta:status', async () => {
+  try { return await ltaStore().status(); } catch (error) { logError('lta:status', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('lta:setSettings', async (_event, patch) => {
+  try { return { ok: true, settings: ltaStore().setSettings(patch) }; } catch (error) { logError('lta:setSettings', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('lta:levelsFor', async (_event, query) => {
+  try { return await ltaStore().levelsFor(query || {}); } catch (error) { logError('lta:levelsFor', error); return { ok: false, error: error.message, levels: [] }; }
+});
+ipcMain.handle('lta:snapshot', async () => {
+  try { return { ok: true, ...(await ltaStore().snapshot()) }; } catch (error) { logError('lta:snapshot', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('lta:chooseFolder', async () => {
+  try {
+    const store = ltaStore();
+    const picked = await dialog.showOpenDialog(mainWindow, { title: 'Vyber složku CustomLevels z LiveTradingAsistent', defaultPath: store.folder(), properties: ['openDirectory'] });
+    if (picked.canceled || !picked.filePaths?.[0]) return { ok: false, canceled: true };
+    return { ok: true, settings: store.setSettings({ folder: picked.filePaths[0] }) };
+  } catch (error) { logError('lta:chooseFolder', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('lta:openFolder', async () => {
+  try {
+    const { shell } = require('electron');
+    const error = await shell.openPath(ltaStore().folder());
+    return error ? { ok: false, error } : { ok: true };
+  } catch (error) { return { ok: false, error: error.message }; }
+});
 ipcMain.handle('capture:openConnectorFolder', async () => {
   try {
     const { shell } = require('electron');
@@ -3928,6 +4022,7 @@ app.whenReady().then(() => {
   startCaptureServer();
   startRelayPolling();
   try { resumeAfterShotJobs(); } catch (error) { logError('Plánované snímky po obchodu při startu', error); }
+  try { ltaStore().start(); } catch (error) { logError('LTA levely při startu', error); }
   watchDataDir();
   // Zprávy zadržené v minulém běhu (složka dat tehdy chyběla).
   replayCaptureSpool().catch(error => logError('Záloha konektoru při startu', error));

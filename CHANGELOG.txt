@@ -2,6 +2,15 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.99 - 2026-11-01
+Import LTA Custom Levels (LiveTradingAsistent) do „Hladiny v blízkosti“ a VWAP vstupu z konektoru NT8. Žádná migrace dat; nové volby číselníku vznikají v `settings.taxonomy.LTA_LEVELS` (custom + sourceNames), archiv levelů v `<userData>/lta-levels/`.
+- New: levely z `Dokumenty\NinjaTrader 8\bin\LiveTradingAsistent\CustomLevels\{System,Local}\*.xml` se doplňují do „Hladiny v blízkosti“: N nejbližších nad a N pod cenou vstupu (výchozí 3 + 3), s cenou, bez test / netest. Automaticky u obchodů z konektoru NT8 a ve formuláři (po vyplnění instrumentu a ceny vstupu, jen při prázdném seznamu), ručně tlačítkem „⤓ Doplnit z LTA“. Zadané řádky se nikdy nemažou ani nepřepisují.
+- New: číselník „LTA Levels“ (Nastavení → Číselníky) se zakládá sám z doslovných názvů levelů (bez úvodního čísla LTA, např. „ID vPOC“, „Call Wall“, „LUDVIK“). Volbu jde přejmenovat, skrýt (pak se nedoplňuje), přeřadit i smazat; přejmenování nezaloží při dalším importu novou volbu. Ve výběru typu hladiny jsou LTA volby ve vlastní skupině.
+- New: archiv verzí levelů po dnech (LTA soubory drží jen aktuální stav) – obchod zapsaný později dostane levely platné v čase vstupu. Šetrné: jednou za 5 min jen kontrola času zápisu souborů, parsuje se jen změněný soubor, verze se uloží jen při skutečné změně levelů (~0,2 MB). Do složky LTA se nic nezapisuje.
+- New: Nastavení → Přizpůsobení → „LTA levely“: zapnutí, počet N, automaticky ve formuláři, VWAP, archiv + dny uchování (výchozí 90), složka LTA (změnit / výchozí / otevřít), zapnutí jednotlivých souborů.
+- New: konektor NT8 verze 4 – po vstupní exekuci spočte VWAP seance do času vstupu (1min bary, typická cena × objem, Trading Hours šablona instrumentu; jiná šablona jde nastavit konstantou VWAP_TRADING_HOURS) a pošle ho zprávou `entry_vwap`. Deník ho přidá jako řádek „VWAP“ (číselník LTA Levels) a počítá do N nejbližších. Pozdě doručená zpráva se doplní do ještě neimportovaného obchodu. Aplikace nabídne přeinstalaci konektoru.
+- Fixed: sloučení nohou pozice do jiného než otevřeného deníku čistí kontextová pole podle číselníku CÍLOVÉHO deníku (dřív mohly vlastní volby jiného deníku zmizet).
+
 ## 4.8.98 - 2026-11-01
 Automatické screenshoty: nastavení zvlášť pro každý deník a ošetření černých snímků oken. Žádná migrace dat; `trade-capture/settings.json` dostane klíče `screenshotByJournal` a `activeJournalId`.
 - New: režim snímání, pravidla oken, chybějící okno a „Po obchodu“ se nastavují zvlášť pro každý deník (Integrace → Stav a obecné, v popisku je vidět, pro který deník nastavení platí). Deník bez vlastního nastavení dědí dosavadní hodnoty; první změna v deníku uloží jeho vlastní kopii. Obchod se řídí nastavením deníku, na který je namapovaný jeho účet, jinak otevřeného deníku.

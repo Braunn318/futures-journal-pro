@@ -6,11 +6,12 @@ using System.Text;
 using System.Globalization;
 using System.Timers;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 #endregion
 
 // Futures Journal PRO – NinjaTrader 8 Execution + Position Sync Connector
-// FJ_CONNECTOR_VERSION: 3
+// FJ_CONNECTOR_VERSION: 4
 // (Zvyš při každé změně toho, co konektor posílá – aplikace podle toho pozná
 // zastaralou instalaci v NT a jednou nabídne přeinstalaci.)
 // Exekuce se posílají okamžitě. Úplný stav pozic se posílá při každé změně
@@ -23,6 +24,17 @@ namespace NinjaTrader.NinjaScript.AddOns
         private const string ENDPOINT = "http://127.0.0.1:17654/api/v1/events";
         private const string API_KEY = "SEM_VLOZ_API_KLIC_Z_APLIKACE";
         private static readonly HttpClient Client = new HttpClient();
+
+        // VWAP v čase vstupu (verze 4). Po každé vstupní exekuci se z 1min barů
+        // od začátku seance spočte VWAP = součet(typická cena × objem) / součet
+        // objemu a pošle se jako zpráva "entry_vwap". Běží mimo hlavní vlákno NT,
+        // jen jednou na vstup. Vypnutí: SEND_ENTRY_VWAP = false.
+        // Seance: prázdné VWAP_TRADING_HOURS = Trading Hours šablona instrumentu
+        // (stejná jako v grafu s výchozím nastavením). Aby čísla seděla s LTA
+        // VWAP v grafu, napiš sem název šablony, kterou má graf (např.
+        // "CME US Index Futures RTH").
+        private const bool SEND_ENTRY_VWAP = true;
+        private const string VWAP_TRADING_HOURS = "";
         private Timer syncTimer;
         // NinjaTrader umí znovu vyvolat ExecutionUpdate pro fill, který už jednou
         // proběhl – typicky po výpadku a obnovení spojení s brokerem/simulátorem.
@@ -200,6 +212,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 await PostJson(json);
                 if (x.Account != null) SendPositionSnapshot(x.Account);
+                if (x.IsEntry) SendEntryVwap(x);
             }
             catch (Exception ex)
             {
@@ -265,6 +278,99 @@ namespace NinjaTrader.NinjaScript.AddOns
             {
                 NinjaTrader.Code.Output.Process("FuturesJournalCapture excursion error: " + ex.Message, PrintTo.OutputTab1);
                 return "";
+            }
+        }
+
+        // VWAP seance do času vstupu. Bary se počítají ty, které skončily
+        // nejpozději v čase vstupu (čas baru = jeho konec); vstup v první minutě
+        // seance vezme první bar. Chyba nebo chybějící data = zpráva se nepošle,
+        // obchod se importuje normálně.
+        private void SendEntryVwap(Execution x)
+        {
+            try
+            {
+                if (!SEND_ENTRY_VWAP || x == null || x.Instrument == null || string.IsNullOrEmpty(x.ExecutionId)) return;
+                Instrument instrument = x.Instrument;
+                TradingHours hours = !string.IsNullOrEmpty(VWAP_TRADING_HOURS)
+                    ? TradingHours.Get(VWAP_TRADING_HOURS)
+                    : (instrument.MasterInstrument != null ? instrument.MasterInstrument.TradingHours : null);
+                if (hours == null) return;
+                DateTime entryTime = x.Time;
+                SessionIterator sessions = new SessionIterator(hours);
+                if (!sessions.GetNextSession(entryTime, true)) return;
+                DateTime sessionBegin = sessions.ActualSessionBegin;
+                if (sessionBegin > entryTime) return;
+
+                string executionId = x.ExecutionId;
+                string account = x.Account != null ? x.Account.Name : "";
+                string instrumentFull = instrument.FullName ?? "";
+                string hoursName = hours.Name ?? "";
+
+                BarsRequest request = new BarsRequest(instrument, sessionBegin, entryTime.AddMinutes(1));
+                request.BarsPeriod = new BarsPeriod { BarsPeriodType = BarsPeriodType.Minute, Value = 1 };
+                request.TradingHours = hours;
+                request.Request(async (req, code, message) =>
+                {
+                    try
+                    {
+                        if (code != ErrorCode.NoError || req.Bars == null)
+                        {
+                            NinjaTrader.Code.Output.Process("FuturesJournalCapture VWAP: data nejsou k dispozici (" + code + " " + message + ")", PrintTo.OutputTab1);
+                            return;
+                        }
+                        Bars bars = req.Bars;
+                        double pv = 0, volume = 0;
+                        int firstIndex = -1;
+                        for (int i = 0; i < bars.Count; i++)
+                        {
+                            DateTime t = bars.GetTime(i);
+                            if (t <= sessionBegin) continue;
+                            if (firstIndex < 0) firstIndex = i;
+                            if (t > entryTime) break;
+                            double v = bars.GetVolume(i);
+                            if (v <= 0) continue;
+                            pv += (bars.GetHigh(i) + bars.GetLow(i) + bars.GetClose(i)) / 3.0 * v;
+                            volume += v;
+                        }
+                        if (volume <= 0 && firstIndex >= 0)
+                        {
+                            double v = bars.GetVolume(firstIndex);
+                            if (v > 0)
+                            {
+                                pv = (bars.GetHigh(firstIndex) + bars.GetLow(firstIndex) + bars.GetClose(firstIndex)) / 3.0 * v;
+                                volume = v;
+                            }
+                        }
+                        if (volume <= 0) return;
+                        double vwap = pv / volume;
+                        if (!IsUsablePrice(vwap)) return;
+
+                        string json = "{" +
+                            "\"source\":\"ninjatrader\"," +
+                            "\"type\":\"entry_vwap\"," +
+                            "\"account\":\"" + Escape(account) + "\"," +
+                            "\"instrumentFull\":\"" + Escape(instrumentFull) + "\"," +
+                            "\"executionId\":\"" + Escape(executionId) + "\"," +
+                            "\"time\":\"" + entryTime.ToUniversalTime().ToString("o") + "\"," +
+                            "\"sessionBegin\":\"" + sessionBegin.ToUniversalTime().ToString("o") + "\"," +
+                            "\"tradingHours\":\"" + Escape(hoursName) + "\"," +
+                            "\"vwap\":" + vwap.ToString(CultureInfo.InvariantCulture) +
+                        "}";
+                        await PostJson(json);
+                    }
+                    catch (Exception ex)
+                    {
+                        NinjaTrader.Code.Output.Process("FuturesJournalCapture VWAP error: " + ex.Message, PrintTo.OutputTab1);
+                    }
+                    finally
+                    {
+                        req.Dispose();
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                NinjaTrader.Code.Output.Process("FuturesJournalCapture VWAP error: " + ex.Message, PrintTo.OutputTab1);
             }
         }
 

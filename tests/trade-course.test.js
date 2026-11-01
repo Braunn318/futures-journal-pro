@@ -738,7 +738,7 @@ function importer(journal, activeSettings) {
       writeJournal: async (_id, data) => { stored = data; return { ok: true }; }
     }
   };
-  const r = loadRenderer([...NAMES, 'courseTicksFromEvent', 'mapCapturedTrade', 'tradeHasSourceEventId', 'appendOrMergeCapturedTrade'],
+  const r = loadRenderer([...NAMES, 'courseTicksFromEvent', 'mapCapturedTrade', 'tradeHasSourceEventId', 'appendOrMergeCapturedTrade', 'ltaStatusCache', 'ltaSettings', 'ltaApplyToCapturedTrade'],
     { settings: activeSettings, Date, window });
   return { r, trades: () => stored.trades };
 }

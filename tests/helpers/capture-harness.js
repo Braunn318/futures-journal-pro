@@ -10,6 +10,8 @@ const CAPTURE_NAMES = [
   'POSITION_MISSING_GRACE_MS', 'SNAPSHOT_RACE_WINDOW_MS', 'positionIsMissing', 'openCapturePositions',
   'signedExecutionQuantity', 'positionKey', 'lotKeyOf', 'positionLots', 'applyLots', 'takeFromLots', 'LIVE_CAPTURE', 'openPositionFromExecution', 'excursionTicks',
   'applyExecution', 'processExecution',
+  // VWAP vstupu (4.8.99)
+  'recentClosedEntries', 'earlyEntryVwaps', 'rememberClosedEntry', 'takeEarlyEntryVwap', 'processEntryVwap',
   'normalizeSnapshotPosition', 'processPositionSnapshot'
 ];
 
@@ -33,6 +35,8 @@ function captureHarness({
     writeCaptureState: () => {},
     takeScreenshots: async label => [`${label}.png`],
     appendCaptureEvent: payload => { const e = { id: 'ev' + events.length, ...payload }; events.push(e); return e; },
+    readCaptureEvents: () => events,
+    writeCaptureEvents: () => {},
     crypto: { randomUUID: () => 'pos-' + (++ids) },
     logInfo: (context, message) => info.push(message),
     Date: FakeDate
@@ -41,10 +45,11 @@ function captureHarness({
   const flat = () => snapshot([]);
   const holding = (quantity, marketPosition, avgPrice) => snapshot([{ instrument, instrumentFull, quantity, marketPosition, avgPrice, pointValue }]);
   const exec = fields => main.processExecution({ ...base, ...fields });
+  const vwap = (executionId, value) => main.processEntryVwap({ source: 'ninjatrader', type: 'entry_vwap', account, instrumentFull, executionId, vwap: value });
   const closed = () => events.filter(e => e.type === 'trade_closed');
   const opened = () => events.filter(e => e.type === 'trade_opened');
   const open = () => Array.from(main.openCapturePositions(state));
-  return { main, state, events, info, clock, snapshot, flat, holding, exec, closed, opened, open, account, key: `${account}|${instrumentFull}` };
+  return { main, state, events, info, clock, snapshot, flat, holding, exec, vwap, closed, opened, open, account, key: `${account}|${instrumentFull}` };
 }
 
 module.exports = { captureHarness, CAPTURE_NAMES };

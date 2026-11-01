@@ -67,6 +67,13 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureExportTradingViewConnector: () => ipcRenderer.invoke('capture:exportTradingViewConnector'),
   captureExportTradingViewWorker: () => ipcRenderer.invoke('capture:exportTradingViewWorker'),
   captureOpenConnectorFolder: () => ipcRenderer.invoke('capture:openConnectorFolder'),
+  // LTA Custom Levels (4.8.99)
+  ltaStatus: () => ipcRenderer.invoke('lta:status'),
+  ltaSetSettings: patch => ipcRenderer.invoke('lta:setSettings', patch),
+  ltaLevelsFor: query => ipcRenderer.invoke('lta:levelsFor', query),
+  ltaSnapshot: () => ipcRenderer.invoke('lta:snapshot'),
+  ltaChooseFolder: () => ipcRenderer.invoke('lta:chooseFolder'),
+  ltaOpenFolder: () => ipcRenderer.invoke('lta:openFolder'),
   // Obrázky (4.8.7): čitelná jména podle obchodu, náhledy, vlastní složka.
   assignImageNames: (refs, record, owner) => ipcRenderer.invoke('image:assignNames', refs, record, owner),
   storeImageThumb: (ref, dataUrl) => ipcRenderer.invoke('image:storeThumb', ref, dataUrl),

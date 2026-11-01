@@ -45,7 +45,7 @@ const IMPORT_NAMES = [
   'getDefaultCommissionForInstrument', 'classifyResult', 'signed', 'tradeTotalPoints',
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
   'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'postExitFields', 'applyPostExitFields', 'postExitApplies', 'POST_EXIT_DERIVED_KEYS', 'combineTradeObjects', 'courseTicksFromEvent', 'mapCapturedTrade',
-  'tradeHasSourceEventId', 'appendOrMergeCapturedTrade'
+  'tradeHasSourceEventId', 'appendOrMergeCapturedTrade', 'ltaStatusCache', 'ltaSettings', 'ltaApplyToCapturedTrade'
 ];
 
 // Import přes skutečný appendOrMergeCapturedTrade; deník je objekt v paměti.

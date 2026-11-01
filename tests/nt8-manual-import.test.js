@@ -92,7 +92,8 @@ function replayer() {
   let ids = 0;
   return loadMain([
     'POSITION_MISSING_GRACE_MS', 'SNAPSHOT_RACE_WINDOW_MS', 'positionIsMissing', 'signedExecutionQuantity', 'positionKey', 'lotKeyOf',
-    'positionLots', 'applyLots', 'takeFromLots', 'LIVE_CAPTURE', 'openPositionFromExecution', 'excursionTicks', 'applyExecution', 'manualImportReplay'
+    'positionLots', 'applyLots', 'takeFromLots', 'LIVE_CAPTURE', 'openPositionFromExecution', 'excursionTicks', 'applyExecution', 'manualImportReplay',
+    'recentClosedEntries', 'earlyEntryVwaps', 'rememberClosedEntry', 'takeEarlyEntryVwap'
   ], {
     takeScreenshots: async () => { throw new Error('ruční import nesmí dělat screenshoty'); },
     appendCaptureEvent: () => { throw new Error('ruční import nesmí psát do historie událostí'); },

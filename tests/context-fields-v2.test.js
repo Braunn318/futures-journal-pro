@@ -213,7 +213,7 @@ function importer(journal) {
       writeJournal: async (_id, data) => { stored = data; return { ok: true }; }
     }
   };
-  const r = loadRenderer([...NAMES, 'tradeHasSourceEventId', 'appendOrMergeCapturedTrade'], { settings: SETTINGS, Date, window });
+  const r = loadRenderer([...NAMES, 'tradeHasSourceEventId', 'appendOrMergeCapturedTrade', 'ltaStatusCache', 'ltaSettings', 'ltaApplyToCapturedTrade'], { settings: SETTINGS, Date, window });
   return { r, trades: () => stored.trades };
 }
 const exitEvent = (id, extra) => ({

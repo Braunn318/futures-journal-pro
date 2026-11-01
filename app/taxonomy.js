@@ -230,7 +230,13 @@
     { name: 'SETUP', label: 'Setup', cardinality: 'single' },
     { name: 'TREND', label: 'Trend 1m', cardinality: 'single' },
     { name: 'ENTRY_LEVEL', label: 'Hladina vstupu', cardinality: 'multi' },
-    { name: 'NEAR_LEVEL', label: 'Hladiny v blízkosti', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL' },
+    { name: 'NEAR_LEVEL', label: 'Hladiny v blízkosti', cardinality: 'multi', optionsFrom: 'ENTRY_LEVEL', extraFrom: ['LTA_LEVELS'] },
+    // LTA Levels: názvy levelů z LiveTradingAsistent (app/lta-levels.js). Nemá
+    // výchozí volby – zakládají se samy při importu levelů jako vlastní volby
+    // (custom) a původní název z LTA si skupina pamatuje v `sourceNames`, aby
+    // přejmenování popisku nezaložilo při dalším importu novou volbu. Skrytá
+    // volba se nedoplňuje. Volby se nabízejí i u Hladin v blízkosti (extraFrom).
+    { name: 'LTA_LEVELS', label: 'LTA Levels', cardinality: 'multi' },
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
     { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' },
     { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' },
@@ -252,6 +258,26 @@
   // Skupina, ze které se berou volby a jejich popisky.
   function vocabularyOf(group) {
     return GROUP_BY_NAME[group]?.optionsFrom || group;
+  }
+
+  // Další skupiny, jejichž volby kolonka přijímá vedle své zdrojové (Hladiny
+  // v blízkosti berou i LTA Levels). Popisek, tag, skrytí a smazání se u těch
+  // voleb řídí jejich vlastní skupinou.
+  function extraGroupsOf(group) {
+    const extra = GROUP_BY_NAME[group]?.extraFrom;
+    return Array.isArray(extra) ? extra.filter(g => GROUP_BY_NAME[g] && g !== group) : [];
+  }
+
+  // Skupina, které volba patří: vlastní / zdrojová, jinak ta z extraFrom.
+  function ownerOf(group, key, config) {
+    const vocab = vocabularyOf(group);
+    if (Object.prototype.hasOwnProperty.call(DEFAULT_ENUMS[vocab] || {}, key)) return vocab;
+    for (const extra of extraGroupsOf(group)) {
+      const g = groupConfig(extra, config);
+      const custom = (g.custom && typeof g.custom === 'object') ? g.custom : {};
+      if (Object.prototype.hasOwnProperty.call(custom, key) || Object.prototype.hasOwnProperty.call(DEFAULT_ENUMS[extra] || {}, key)) return extra;
+    }
+    return vocab;
   }
 
   const TRADE_CONTEXT_FIELDS = [
@@ -338,7 +364,10 @@
     const custom = (g.custom && typeof g.custom === 'object') ? Object.keys(g.custom) : [];
     const base = Object.keys(DEFAULT_ENUMS[vocab] || {});
     const removed = removedKeys(group, config);
-    const merged = [...base, ...custom.filter(k => !base.includes(k))].filter(k => !removed.includes(k));
+    let merged = [...base, ...custom.filter(k => !base.includes(k))].filter(k => !removed.includes(k));
+    for (const extra of extraGroupsOf(group)) {
+      merged = [...merged, ...allKeys(extra, config).filter(k => !merged.includes(k))];
+    }
     const order = Array.isArray(g.order) ? g.order : [];
     if (!order.length) return merged;
     // Klíče neuvedené v pořadí (např. nově přidané do výchozího číselníku
@@ -358,7 +387,7 @@
   // Tag = krátká značka volby, kterou ukazuje číselník pod popiskem. Výchozí je
   // klíč; uživatel ji může přepsat. Mění se jen zobrazení, v datech zůstává klíč.
   function tagOf(group, key, config) {
-    const g = groupConfig(vocabularyOf(group), config);
+    const g = groupConfig(ownerOf(group, key, config), config);
     const tags = (g.tags && typeof g.tags === 'object') ? g.tags : {};
     return tags[key] || String(key);
   }
@@ -395,7 +424,10 @@
     // Výchozí skrytí odvozené kolonky (Hladiny v blízkosti) se bere ze zdrojové
     // skupiny – hladina skrytá u vstupu se ve výchozím stavu nenabízí ani tam.
     const defaults = DEFAULT_HIDDEN[group] || DEFAULT_HIDDEN[vocab] || [];
-    return new Set([...defaults, ...explicit, ...aliased].filter(k => !unhidden.includes(k)));
+    // Volba z extraFrom skupiny (LTA Levels) skrytá ve své skupině je skrytá
+    // i tady – kromě toho, co si kolonka výslovně zobrazila.
+    const extraHidden = extraGroupsOf(group).flatMap(extra => [...hiddenKeys(extra, config)]);
+    return new Set([...defaults, ...explicit, ...aliased, ...extraHidden].filter(k => !unhidden.includes(k)));
   }
 
   function isHidden(group, key, config) {
@@ -406,7 +438,7 @@
     if (!key) return '';
     // Popisek je vlastnost VOLBY, ne kolonky – přejmenovaná hladina se tak
     // stejně jmenuje u vstupu i u hladin v blízkosti.
-    const vocab = vocabularyOf(group);
+    const vocab = ownerOf(group, key, config);
     const g = groupConfig(vocab, config);
     const labels = (g.labels && typeof g.labels === 'object') ? g.labels : {};
     const custom = (g.custom && typeof g.custom === 'object') ? g.custom : {};
@@ -928,6 +960,67 @@
     return base + '_' + Date.now();
   }
 
+  // ------------------------------------------------- LTA Levels (import)
+
+  const LTA_GROUP = 'LTA_LEVELS';
+  const LTA_PREFIX = 'LTA_';
+
+  function ltaSlug(name) {
+    return String(name || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+      .slice(0, 48);
+  }
+
+  // Klíč existující LTA volby pro název z LTA, nebo null. Hledá se podle
+  // původního názvu (sourceNames), u ručně přidané volby podle popisku.
+  // Smazaná volba se najde taky – název pak ukazuje na smazaný klíč a nic se
+  // nedoplní, dokud ji uživatel sám neobnoví.
+  function ltaKeyFor(name, config) {
+    const wanted = String(name || '').trim();
+    if (!wanted) return null;
+    const g = groupConfig(LTA_GROUP, config);
+    const names = (g.sourceNames && typeof g.sourceNames === 'object') ? g.sourceNames : {};
+    const custom = (g.custom && typeof g.custom === 'object') ? g.custom : {};
+    for (const [key, n] of Object.entries(names)) if (n === wanted && Object.prototype.hasOwnProperty.call(custom, key)) return key;
+    for (const [key, label] of Object.entries(custom)) if (!names[key] && label === wanted) return key;
+    return null;
+  }
+
+  // Založí v konfiguraci LTA volby pro názvy, které ještě nemá. Vrací
+  // { config, keys: { název: klíč }, added: [klíče] }; `config` je NOVÝ objekt
+  // jen tehdy, když něco přibylo (jinak tentýž). Existující volba ani její
+  // popisek se nemění.
+  function registerLtaNames(names, config) {
+    const source = (config && typeof config === 'object') ? config : {};
+    const keys = {};
+    const added = [];
+    let next = source;
+    for (const raw of Array.isArray(names) ? names : []) {
+      const name = cleanLabel(raw);
+      if (!name || keys[name]) continue;
+      const found = ltaKeyFor(name, next);
+      if (found) { keys[name] = found; continue; }
+      if (next === source) {
+        const copy = { ...groupConfig(LTA_GROUP, source) };
+        copy.custom = { ...(copy.custom || {}) };
+        copy.sourceNames = { ...(copy.sourceNames || {}) };
+        next = { ...source, [LTA_GROUP]: copy };
+      }
+      const g = next[LTA_GROUP];
+      const taken = new Set([
+        ...Object.keys(g.custom), ...removedKeys(LTA_GROUP, next),
+        ...allKeys('ENTRY_LEVEL', next), ...Object.keys(DEFAULT_ENUMS.ENTRY_LEVEL)
+      ]);
+      const key = uniqueKey((LTA_PREFIX + (ltaSlug(name) || 'LEVEL')).slice(0, 60), taken);
+      g.custom[key] = name;
+      g.sourceNames[key] = name;
+      keys[name] = key;
+      added.push(key);
+    }
+    return { config: next, keys, added };
+  }
+
   // ------------------------------------------------- přenos mezi deníky
 
   // Očista importované konfigurace. Soubor může přijít odkudkoli, takže se
@@ -972,7 +1065,21 @@
       const sourceCustom = source !== group.name && raw[source]?.custom && typeof raw[source].custom === 'object'
         ? Object.keys(raw[source].custom).filter(k => CUSTOM_KEY_RE.test(k) && cleanLabel(raw[source].custom[k]))
         : [];
-      const valid = new Set([...Object.keys(defaults), ...Object.keys(custom), ...sourceCustom]);
+      const extraCustom = extraGroupsOf(group.name).flatMap(extra => {
+        const c = raw[extra]?.custom;
+        return c && typeof c === 'object' ? Object.keys(c).filter(k => CUSTOM_KEY_RE.test(k) && cleanLabel(c[k])) : [];
+      });
+      const valid = new Set([...Object.keys(defaults), ...Object.keys(custom), ...sourceCustom, ...extraCustom]);
+
+      // LTA Levels: původní názvy z LTA k vlastním volbám (viz GROUPS).
+      if (group.name === 'LTA_LEVELS' && g.sourceNames && typeof g.sourceNames === 'object') {
+        const names = {};
+        for (const key of Object.keys(g.sourceNames)) {
+          const name = cleanLabel(g.sourceNames[key]);
+          if (name && Object.prototype.hasOwnProperty.call(custom, key)) names[key] = name;
+        }
+        if (Object.keys(names).length) clean.sourceNames = names;
+      }
 
       if (g.labels && typeof g.labels === 'object') {
         const labels = {};
@@ -1069,7 +1176,9 @@
     // hladiny v blízkosti (kontext v3) a převod starého zápisu
     sanitizeNearLevels, nearLevelsFromLegacy, nearLevelsOf, nearLevelsNoneOf, setNearLevels,
     convertLegacyNear, stripRemovedV3, tradeToV3, migrateConfigV3, V3_REMOVED_KEYS,
-    ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, TRADE_CONTEXT_FIELDS,
+    ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, extraGroupsOf, TRADE_CONTEXT_FIELDS,
+    // LTA Levels
+    registerLtaNames, ltaKeyFor,
     // konfigurace
     applyConfig, getConfig, groupConfig,
     // dotazy
