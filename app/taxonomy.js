@@ -732,7 +732,10 @@
     { key: 'setup', label: 'Setup' },
     { key: 'levels', label: 'Hladiny' },
     { key: 'psych', label: 'Psychika' },
-    { key: 'comments', label: 'Komentáře', checks: false }
+    { key: 'comments', label: 'Komentáře', checks: false },
+    // Snímky pořízené N minut po obchodu (Nastavení → Integrace); jdou i ručně
+    // přidat a odebrat. Skrytí karty data nemaže.
+    { key: 'after', label: 'Po obchodu', checks: false }
   ];
   // Do které karty patří kontrolované pole. Cílová hladina 1 se dělí: typ
   // je v Hladinách, cena v SL / TP – tam se plánovaný cíl ručně přepisuje

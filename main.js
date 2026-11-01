@@ -1057,10 +1057,11 @@ function nameStoredImages() {
 const aiExportRoot = () => path.join(resolveDataDir(), 'ai-export');
 function aiExportPath(id) { return path.join(aiExportRoot(), `${safeJournalId(id)}.json`); }
 function stripImages(trade) {
-  const { images, legs, ...rest } = trade || {};
+  const { images, imagesAfter, legs, ...rest } = trade || {};
   return {
     ...rest,
     imageCount: Array.isArray(images) ? images.length : 0,
+    imageAfterCount: Array.isArray(imagesAfter) ? imagesAfter.length : 0,
     legs: Array.isArray(legs) ? legs.map(({ images: legImages, ...legRest }) => legRest) : undefined
   };
 }
@@ -1642,6 +1643,13 @@ function defaultCaptureSettings() {
     apiKey: crypto.randomBytes(24).toString('hex'),
     autoImport: true,
     screenshotMode: 'primary',
+    // Režim 'windows': pravidla { match: část názvu okna, enabled }, co dělat
+    // při chybějícím okně (skip | screen | none) a druhá sekce „Po obchodu“.
+    screenshotWindows: [],
+    screenshotMissing: 'skip',
+    afterShotEnabled: false,
+    afterShotMinutes: 15,
+    afterShotMax: 3,
     accountMappings: {},
     hiddenAccounts: [],
     deletedAccounts: [],
@@ -1816,21 +1824,66 @@ function withCaptureLock(fn) {
 function positionKey(payload) {
   return `${payload.account || 'UNKNOWN'}|${payload.instrumentFull || payload.instrument || payload.symbol || 'UNKNOWN'}`;
 }
+// Režim 'windows': fotí se jen okna, jejichž název obsahuje některé zapnuté
+// pravidlo (část názvu, bez ohledu na velikost písmen). Pravidla jsou na
+// názvu, ne na ID okna – NinjaTrader po restartu mění čísla oken i pořadí.
+function captureWindowRules(settings) {
+  return (Array.isArray(settings.screenshotWindows) ? settings.screenshotWindows : [])
+    .filter(rule => rule && rule.enabled !== false && String(rule.match || '').trim())
+    .map(rule => String(rule.match).trim().toLowerCase());
+}
+function pickCaptureWindows(sources, rules) {
+  return sources.filter(source => {
+    const name = String(source.name || '').toLowerCase();
+    return name && rules.some(rule => name.includes(rule));
+  });
+}
+async function captureScreenSources(settings) {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width: 1920, height: 1080 },
+    fetchWindowIcons: false
+  });
+  if (!sources.length) return [];
+  if (settings.screenshotMode === 'primary') {
+    const primaryId = String(screen.getPrimaryDisplay().id);
+    return [sources.find(s => String(s.display_id) === primaryId) || sources[0]];
+  }
+  return sources;
+}
+async function captureWindowSources(settings) {
+  const rules = captureWindowRules(settings);
+  if (!rules.length) {
+    logInfo('Automatic screenshot', 'Režim „Vybraná okna“ nemá žádné zapnuté pravidlo – nic se nevyfotilo.');
+    return [];
+  }
+  const sources = await desktopCapturer.getSources({
+    types: ['window'],
+    thumbnailSize: { width: 2560, height: 1440 },
+    fetchWindowIcons: false
+  });
+  const picked = pickCaptureWindows(sources, rules);
+  // Minimalizované okno vrací prázdný snímek – přeskočí se a zapíše do protokolu.
+  const usable = picked.filter(source => source.thumbnail && !source.thumbnail.isEmpty());
+  const matchedRules = new Set(picked.map(s => rules.find(r => String(s.name).toLowerCase().includes(r))));
+  const missing = rules.filter(r => !matchedRules.has(r));
+  if (picked.length > usable.length || missing.length) {
+    logInfo('Automatic screenshot', `Okna bez snímku: ${[...missing, ...picked.filter(s => !usable.includes(s)).map(s => s.name + ' (minimalizované)')].join(', ')}`);
+  }
+  if (!usable.length || missing.length) {
+    const fallback = settings.screenshotMissing;
+    if (fallback === 'screen' && !usable.length) return captureScreenSources({ ...settings, screenshotMode: 'primary' });
+    if (fallback === 'none' && missing.length) return [];
+  }
+  return usable;
+}
 async function takeScreenshots(label) {
   const settings = readCaptureSettings();
   if (settings.screenshotMode === 'none') return [];
   try {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width: 1920, height: 1080 },
-      fetchWindowIcons: false
-    });
-    if (!sources.length) return [];
-    let selected = sources;
-    if (settings.screenshotMode === 'primary') {
-      const primaryId = String(screen.getPrimaryDisplay().id);
-      selected = [sources.find(s => String(s.display_id) === primaryId) || sources[0]];
-    }
+    const selected = settings.screenshotMode === 'windows'
+      ? await captureWindowSources(settings)
+      : await captureScreenSources(settings);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const paths = [];
     selected.forEach((source, index) => {
@@ -1845,6 +1898,67 @@ async function takeScreenshots(label) {
     return [];
   }
 }
+// Druhá sekce snímků „Po obchodu“: N minut po úplném uzavření pozice se
+// vyfotí stejná okna jako při výstupu. Fronta je v pending-after.json, aby
+// přežila restart aplikace. Nový vstup do téhož instrumentu job neruší –
+// snímek je „N minut po výstupu“ bez ohledu na to, co se děje dál.
+const afterShotPath = () => path.join(captureRoot(), 'pending-after.json');
+const afterShotTimers = new Map();
+function readAfterShotJobs() {
+  try {
+    const jobs = JSON.parse(fs.readFileSync(afterShotPath(), 'utf8'));
+    return Array.isArray(jobs) ? jobs : [];
+  } catch { return []; }
+}
+function writeAfterShotJobs(jobs) {
+  ensureCaptureRoot();
+  fs.writeFileSync(afterShotPath(), JSON.stringify(jobs, null, 2), 'utf8');
+}
+function armAfterShot(job) {
+  clearTimeout(afterShotTimers.get(job.id));
+  const delay = Math.max(0, Number(job.dueAt) - Date.now());
+  afterShotTimers.set(job.id, setTimeout(() => { runAfterShot(job.id).catch(error => logError('Snímek po obchodu', error)); }, delay));
+}
+function scheduleAfterShot({ positionId, account, instrument, instrumentFull, source }) {
+  const settings = readCaptureSettings();
+  if (settings.afterShotEnabled !== true || settings.screenshotMode === 'none' || !positionId) return null;
+  const minutes = Math.min(240, Math.max(1, Number(settings.afterShotMinutes) || 15));
+  const job = {
+    id: crypto.randomUUID(), positionId, account: account || '', instrument: instrument || '', instrumentFull: instrumentFull || '',
+    source: source || 'ninjatrader', minutes, dueAt: Date.now() + minutes * 60000
+  };
+  writeAfterShotJobs([...readAfterShotJobs(), job]);
+  armAfterShot(job);
+  return job;
+}
+async function runAfterShot(id) {
+  afterShotTimers.delete(id);
+  const jobs = readAfterShotJobs();
+  const job = jobs.find(j => j.id === id);
+  if (!job) return;
+  writeAfterShotJobs(jobs.filter(j => j.id !== id));
+  const settings = readCaptureSettings();
+  if (settings.screenshotMode === 'none') return;
+  const max = Math.min(10, Math.max(1, Number(settings.afterShotMax) || 3));
+  const paths = (await takeScreenshots('after')).slice(0, max);
+  if (!paths.length) return;
+  appendCaptureEvent({
+    type: 'trade_after_screenshot', positionId: job.positionId, account: job.account,
+    instrument: job.instrument, instrumentFull: job.instrumentFull, afterMinutes: job.minutes, screenshotPaths: paths
+  }, job.source);
+}
+// Po startu: splatné joby se vyfotí hned, příliš staré (aplikace byla dlouho
+// zavřená) se zahodí – snímek by už neukazoval „po obchodu“.
+function resumeAfterShotJobs() {
+  const now = Date.now();
+  const jobs = readAfterShotJobs();
+  const keep = jobs.filter(job => now - Number(job.dueAt) <= Math.max(10, 2 * (Number(job.minutes) || 15)) * 60000);
+  if (keep.length !== jobs.length) {
+    logInfo('Snímek po obchodu', `Zahozeno ${jobs.length - keep.length} propadlých plánovaných snímků.`);
+    writeAfterShotJobs(keep);
+  }
+  keep.forEach(armAfterShot);
+}
 // Zapíše do stavu nově otevřenou pozici a vrátí odvozenou událost "trade_opened".
 // Používá se ze dvou míst: při běžném otevření z ploché pozice a při "převzetí"
 // pozice, kterou pár milisekund předtím založil snímek pozic (viz processExecution).
@@ -1854,6 +1968,7 @@ async function takeScreenshots(label) {
 // import z CSV (manualImportReplay) jádro pouští s vlastním ctx bez obojího.
 const LIVE_CAPTURE = {
   shots: label => takeScreenshots(label),
+  afterShot: info => { if (typeof scheduleAfterShot === 'function') scheduleAfterShot(info); },
   emit: event => appendCaptureEvent(event, 'ninjatrader')
 };
 async function openPositionFromExecution(state, key, payload, { delta, price, commission, rate, pointValue, time, executionId, positionId }, ctx = LIVE_CAPTURE) {
@@ -2174,6 +2289,10 @@ async function applyExecution(state, payload, ctx = LIVE_CAPTURE) {
     }, ctx));
   } else {
     delete state.positions[key];
+    if (ctx.afterShot) ctx.afterShot({
+      positionId: current.positionId, account: current.account, instrument: current.instrument,
+      instrumentFull: current.instrumentFull, source: 'ninjatrader'
+    });
   }
 
   return derived;
@@ -2373,6 +2492,10 @@ async function processCTraderClose(payload) {
     sourceExecutionId: dealId || undefined,
     positionId: payload.positionId || ''
   }, 'ctrader');
+  scheduleAfterShot({
+    positionId: payload.positionId, account: payload.account, instrument: payload.instrument,
+    instrumentFull: payload.instrumentFull || payload.instrument, source: 'ctrader'
+  });
 }
 async function processIncomingPayload(payload, source='external') {
   const raw = appendCaptureEvent(payload, source, payload.type !== 'position_snapshot');
@@ -2611,7 +2734,7 @@ ipcMain.handle('capture:status', async () => {
     health: `http://127.0.0.1:${CAPTURE_PORT}/health`,
     apiKey: settings.apiKey,
     autoImport: settings.autoImport,
-    screenshotMode: settings.screenshotMode,
+    ...screenshotSettingsView(settings),
     accountMappings: settings.accountMappings || {},
     hiddenAccounts: Array.isArray(settings.hiddenAccounts) ? settings.hiddenAccounts : [],
     deletedAccounts: Array.isArray(settings.deletedAccounts) ? settings.deletedAccounts : [],
@@ -2619,6 +2742,7 @@ ipcMain.handle('capture:status', async () => {
     relayUrl: settings.relayUrl,
     relayToken: settings.relayToken,
     pending: events.filter(e => !e.imported && e.type === 'trade_closed').length,
+    pendingAfter: events.filter(e => !e.imported && e.type === 'trade_after_screenshot').length,
     rejected: { count: captureRejected.count, lastAt: captureRejected.lastAt, active: captureRejectedActive(captureRejected) },
     accounts,
     openPositions: openCapturePositions(state)
@@ -2659,9 +2783,57 @@ ipcMain.handle('capture:setAutoImport', async (_event, value) => {
 });
 ipcMain.handle('capture:setScreenshotMode', async (_event, mode) => {
   const settings = readCaptureSettings();
-  settings.screenshotMode = ['none','primary','all'].includes(mode) ? mode : 'primary';
+  settings.screenshotMode = ['none','primary','all','windows'].includes(mode) ? mode : 'primary';
   writeCaptureSettings(settings);
   return { ok: true, screenshotMode: settings.screenshotMode };
+});
+function normalizeScreenshotSettings(input, current) {
+  const next = {};
+  if (input.screenshotMode !== undefined) next.screenshotMode = ['none','primary','all','windows'].includes(input.screenshotMode) ? input.screenshotMode : 'primary';
+  if (input.screenshotWindows !== undefined) {
+    const seen = new Set();
+    next.screenshotWindows = (Array.isArray(input.screenshotWindows) ? input.screenshotWindows : [])
+      .map(rule => ({ match: String(rule && rule.match || '').trim().slice(0, 200), enabled: !rule || rule.enabled !== false }))
+      .filter(rule => rule.match && !seen.has(rule.match.toLowerCase()) && seen.add(rule.match.toLowerCase()));
+  }
+  if (input.screenshotMissing !== undefined) next.screenshotMissing = ['skip','screen','none'].includes(input.screenshotMissing) ? input.screenshotMissing : 'skip';
+  if (input.afterShotEnabled !== undefined) next.afterShotEnabled = !!input.afterShotEnabled;
+  if (input.afterShotMinutes !== undefined) {
+    const minutes = Number(input.afterShotMinutes);
+    next.afterShotMinutes = Number.isFinite(minutes) ? Math.min(240, Math.max(1, Math.round(minutes))) : current.afterShotMinutes;
+  }
+  if (input.afterShotMax !== undefined) {
+    const max = Number(input.afterShotMax);
+    next.afterShotMax = Number.isFinite(max) ? Math.min(10, Math.max(1, Math.round(max))) : current.afterShotMax;
+  }
+  return next;
+}
+ipcMain.handle('capture:setScreenshotSettings', async (_event, input) => {
+  const settings = readCaptureSettings();
+  Object.assign(settings, normalizeScreenshotSettings(input && typeof input === 'object' ? input : {}, settings));
+  writeCaptureSettings(settings);
+  return { ok: true, ...screenshotSettingsView(settings) };
+});
+function screenshotSettingsView(settings) {
+  return {
+    screenshotMode: settings.screenshotMode,
+    screenshotWindows: Array.isArray(settings.screenshotWindows) ? settings.screenshotWindows : [],
+    screenshotMissing: settings.screenshotMissing || 'skip',
+    afterShotEnabled: settings.afterShotEnabled === true,
+    afterShotMinutes: Number(settings.afterShotMinutes) || 15,
+    afterShotMax: Number(settings.afterShotMax) || 3
+  };
+}
+// Otevřená okna k výběru v Nastavení. Vlastní okna deníku se vynechají.
+ipcMain.handle('capture:listWindows', async () => {
+  try {
+    const own = new Set(BrowserWindow.getAllWindows().map(w => { try { return w.getMediaSourceId(); } catch { return ''; } }));
+    const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: false });
+    const windows = sources
+      .filter(s => s.name && String(s.name).trim() && !own.has(s.id))
+      .map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : '' }));
+    return { ok: true, windows };
+  } catch (error) { return { ok: false, error: error.message, windows: [] }; }
 });
 ipcMain.handle('capture:setMappings', async (_event, mappings) => {
   const settings = readCaptureSettings();
@@ -3581,6 +3753,7 @@ app.whenReady().then(() => {
   try { readCaptureSettings(); } catch (error) { logError('Nastavení konektoru při startu', error); }
   startCaptureServer();
   startRelayPolling();
+  try { resumeAfterShotJobs(); } catch (error) { logError('Plánované snímky po obchodu při startu', error); }
   watchDataDir();
   // Zprávy zadržené v minulém běhu (složka dat tehdy chyběla).
   replayCaptureSpool().catch(error => logError('Záloha konektoru při startu', error));

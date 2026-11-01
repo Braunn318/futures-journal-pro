@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureSetAutoImport: (value) => ipcRenderer.invoke('capture:setAutoImport', value),
   captureRegenerateKey: () => ipcRenderer.invoke('capture:regenerateKey'),
   captureSetScreenshotMode: (mode) => ipcRenderer.invoke('capture:setScreenshotMode', mode),
+  captureSetScreenshotSettings: (settings) => ipcRenderer.invoke('capture:setScreenshotSettings', settings),
+  captureListWindows: () => ipcRenderer.invoke('capture:listWindows'),
   captureAddAccount: (account) => ipcRenderer.invoke('capture:addAccount', account),
   captureSetMappings: (mappings) => ipcRenderer.invoke('capture:setMappings', mappings),
   captureSetHiddenAccounts: (accounts) => ipcRenderer.invoke('capture:setHiddenAccounts', accounts),

@@ -2,6 +2,12 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.97 - 2026-11-01
+Automatické screenshoty: výběr oken a druhá sekce „Po obchodu“. Žádná migrace dat; nové pole obchodu `imagesAfter` vzniká jen u obchodů, které ho dostanou.
+- New: Nastavení → Integrace → Automatické screenshoty má volbu „Vybraná okna“. Fotí se jen okna, jejichž název obsahuje zapnuté pravidlo (část názvu, bez ohledu na velikost písmen – platí i po restartu NT8). „Načíst otevřená okna“ ukáže náhledy k výběru, pravidla jde ručně doplnit, vypnout i smazat. Pop-upy jiných aplikací se do snímku nedostanou. Okno, které chybí nebo je minimalizované, se přeskočí (volitelně: vzít hlavní monitor / nefotit nic).
+- New: druhá sekce snímků „Po obchodu“ – N minut po úplném uzavření pozice (výchozí 15, nastavitelné 1–240, max. počet snímků 1–10) se vyfotí stejná okna a uloží do `imagesAfter` obchodu. Funguje pro NT8 i cTrader. Fronta plánovaných snímků je v `trade-capture/pending-after.json` a přežije restart aplikace (propadlé se zahodí). Při částečném výstupu se nefotí, jen při zavření celé pozice.
+- New: karta „Po obchodu“ ve formuláři obchodu a na kartě obchodu; jde skrýt v Nastavení → Přizpůsobení a snímky jdou ručně přidat i odebrat. Zahrnuto v JSON záloze; ai-export nese jen `imageAfterCount`.
+
 ## 4.8.96 - 2026-11-01
 GitHub issues #11–#15. No stored-data migration; nothing is rewritten in trades.
 - Fixed (#11): Nastavení → Číselníky – „Skrýt“, přejmenování, posun i přidání volby už nezavřou rozbalenou sekci (dřív se po překreslení otevřela vždy jen „Hladina vstupu“). Zachová se i pozice scrollu.

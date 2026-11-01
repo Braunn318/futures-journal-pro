@@ -860,10 +860,38 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
               <option value="none">Vypnuto</option>
               <option value="primary">Hlavní monitor</option>
               <option value="all">Všechny monitory</option>
+              <option value="windows">Vybraná okna</option>
             </select>
           </div>
           <div class="field"><label>Automatický import</label>
             <select id="captureAutoImportSelect"><option value="ano">Zapnuto</option><option value="ne">Vypnuto</option></select>
+          </div>
+          <div class="field full" id="captureWindowsBox" style="display:none">
+            <label>Okna, která se mají fotit</label>
+            <div class="sub" style="margin-bottom:6px">Pravidlo se páruje podle části názvu okna (bez ohledu na velikost písmen), takže platí i po restartu NinjaTraderu. Nic jiného než tato okna se nevyfotí – pop-upy jiných aplikací se do snímku nedostanou.</div>
+            <div id="captureWindowRules"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+              <input id="captureWindowNew" placeholder="Část názvu okna, např. Chart -" style="flex:1;min-width:200px">
+              <button class="btn" type="button" id="captureWindowAdd">Přidat pravidlo</button>
+              <button class="btn" type="button" id="captureWindowLoad">Načíst otevřená okna</button>
+            </div>
+            <div id="captureWindowList" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"></div>
+          </div>
+          <div class="field" id="captureMissingBox" style="display:none"><label>Když vybrané okno chybí</label>
+            <select id="captureScreenshotMissing">
+              <option value="skip">Přeskočit okno, ostatní vyfotit</option>
+              <option value="screen">Když nejde nic vyfotit, vzít hlavní monitor</option>
+              <option value="none">Při chybějícím okně nefotit nic</option>
+            </select>
+          </div>
+          <div class="field"><label>Druhá sekce „Po obchodu“</label>
+            <select id="captureAfterEnabled"><option value="ne">Vypnuto</option><option value="ano">Zapnuto</option></select>
+          </div>
+          <div class="field"><label>Kolik minut po výstupu</label>
+            <input id="captureAfterMinutes" type="number" min="1" max="240" step="1" value="15">
+          </div>
+          <div class="field"><label>Max. snímků po obchodu</label>
+            <input id="captureAfterMax" type="number" min="1" max="10" step="1" value="3">
           </div>
         </div>
         <div class="integration-actions">
@@ -1505,6 +1533,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full"><label>Screenshots – maximálně 3 obrázky</label><input id="screenshots" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Obrázek jde i vložit ze schránky – zkopíruj screenshot (např. Win+Shift+S) a stiskni Ctrl+V, dokud je tohle okno otevřené.</div><div class="image-preview" id="imagePreview"></div></div>
         </div>
       </details>
+      <details class="trade-section" data-card="after">
+        <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Po obchodu</span><span class="sub trade-section-summary" id="afterSummary"></span></summary>
+        <div class="formgrid">
+          <div class="field full"><label>Screenshoty po obchodu – maximálně 3 obrázky</label><input id="screenshotsAfter" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Aplikace je doplní sama N minut po výstupu (Nastavení → Integrace). Tady je jde ručně přidat nebo odebrat.</div><div class="image-preview" id="imagePreviewAfter"></div></div>
+        </div>
+      </details>
       <div id="formAlert" class="alert red"></div>
       <button class="btn primary" type="submit" style="margin-top:16px">Uložit obchod</button>
     </form>
@@ -1540,7 +1574,7 @@ async function removeLegacyDefaultJournal(){
 }
 function currentDBName(){return 'FuturesJournalDB_'+activeJournalId}
 let db={data:{trades:[],settings:[]},close(){}}, trades=[], settings={startingBalance:100000,currency:'USD',usdCzkRate:23,dailyLossLimit:5000,dailyPointLimit:100,breakEvenEnabled:false,breakEvenThreshold:0,autoMergeLegs:true,templates:[],risk:{}};
-let editImages=[], calendarDate=new Date();
+let editImages=[], editImagesAfter=[], calendarDate=new Date();
 
 // ---------- Screenshoty: zmenšení a uložení mimo deník ----------
 // K obchodu se neukládá obrázek, ale krátký odkaz do úložiště screenshotů
@@ -1642,7 +1676,7 @@ function applyImageMapping(value,mapping,seen=new Set()){
  }
 }
 async function nameRecordImages(obj,owner,record=obj){
- const refs=(Array.isArray(obj?.images)?obj.images:[]).filter(r=>typeof r==='string'&&r.startsWith('fjimg://store/'));
+ const refs=[...(Array.isArray(obj?.images)?obj.images:[]),...(Array.isArray(obj?.imagesAfter)?obj.imagesAfter:[])].filter(r=>typeof r==='string'&&r.startsWith('fjimg://store/'));
  if(!refs.length||!window.desktopAPI?.assignImageNames)return;
  try{
   const meta={date:record.date,entryTime:record.entryTime,instrument:record.instrument,side:record.side,recordType:record.recordType,day:record.day===true};
@@ -1656,7 +1690,7 @@ function tradeFormSnapshot(){
  // Dlaždice (trend, známka, hladiny…) drží stav jen v DOM – bez nich by
  // změna dlaždice nebyla „neuložená změna".
  const chips=[...$('tradeForm').querySelectorAll('.chip.on')].map(c=>(c.parentElement?.id||'')+':'+c.dataset.key);
- return JSON.stringify(vals)+'|'+JSON.stringify(chips)+'|'+JSON.stringify(editImages);
+ return JSON.stringify(vals)+'|'+JSON.stringify(chips)+'|'+JSON.stringify(editImages)+'|'+JSON.stringify(editImagesAfter);
 }
 
 async function openDB(){
@@ -4187,7 +4221,8 @@ function tradeHTML(t){
  ${t.dailyPlan.psychology?`<div><b>Psychologie:</b> ${esc(t.dailyPlan.psychology)}</div>`:''}
  ${t.dailyPlan.note?`<div><b>Komentář k setupu:</b> ${esc(t.dailyPlan.note)}</div>`:''}
  </div></details>`:''}
- <div class="thumbs">${(t.images||[]).map(i=>thumbImgHTML(i,`onclick="openImage('${i}')"`)).join('')}</div></div>
+ <div class="thumbs">${(t.images||[]).map(i=>thumbImgHTML(i,`onclick="openImage('${i}')"`)).join('')}</div>
+ ${shown('after')&&(t.imagesAfter||[]).length?`<div class="sub" style="margin-top:6px">Po obchodu</div><div class="thumbs">${t.imagesAfter.map(i=>thumbImgHTML(i,`onclick="openImage('${i}')"`)).join('')}</div>`:''}</div>
  <div class="actions">${(!t.journalId||t.journalId===activeJournalId)?`<button class="icon" title="Přesunout obchod" onclick="openMoveTrade('${t.id}','${t.journalId||activeJournalId}')">↪️</button><button class="icon" onclick="editTrade('${t.id}')">✏️</button><button class="icon" onclick="deleteTrade('${t.id}')">🗑️</button>`:`<span class="sub" style="font-size:11px">jiný deník</span>`}</div></div>`
 }
 
@@ -4747,7 +4782,7 @@ $('imgSaveAsBtn').onclick=async()=>{
 };
 
 function openModal(t=null,{title}={}){
- $('tradeForm').reset();editImages=[];$('imagePreview').innerHTML='';$('tradeId').value=t?.id||'';
+ $('tradeForm').reset();editImages=[];editImagesAfter=[];$('imagePreview').innerHTML='';$('imagePreviewAfter').innerHTML='';$('tradeId').value=t?.id||'';
  $('modalTitle').textContent=title||(t?'Upravit obchod':'Nový obchod');
  resetLegRows();
  if($('templateHint'))$('templateHint').textContent='';
@@ -4895,7 +4930,8 @@ function openModal(t=null,{title}={}){
  $('tradePlanSetup').value=p.setup||'';
  $('tradePlanPsychology').value=p.psychology||'';
  $('tradePlanNote').value=p.note||'';
- editImages=[...(t.images||[])];showPreviews()}
+ editImages=[...(t.images||[])];showPreviews();
+ editImagesAfter=[...(t.imagesAfter||[])];showPreviewsAfter()}
  else{$('date').value=new Date().toISOString().slice(0,10);$('contracts').value=1;$('commission').value=0;
  ['tradePlanSetup','tradePlanPsychology','tradePlanNote'].forEach(id=>$(id).value='')}
  if($('formAlert')){$('formAlert').classList.remove('show');$('formAlert').textContent=''};$('tradeModal').classList.add('open')
@@ -5016,6 +5052,11 @@ function readLegRows(){
 if($('addLegBtn'))$('addLegBtn').onclick=()=>{addLegRow();renderPostExitHints()};
 function showPreviews(){$('imagePreview').innerHTML=editImages.map((src,i)=>`<div>${thumbImgHTML(src,`style="cursor:pointer" onclick="openImageFromForm('${src}')"`)}<button type="button" class="icon" onclick="removeImg(${i})">✕</button></div>`).join('')}
 window.removeImg=i=>{editImages.splice(i,1);showPreviews()}
+function showPreviewsAfter(){
+ $('imagePreviewAfter').innerHTML=editImagesAfter.map((src,i)=>`<div>${thumbImgHTML(src,`style="cursor:pointer" onclick="openImageFromForm('${src}')"`)}<button type="button" class="icon" onclick="removeImgAfter(${i})">✕</button></div>`).join('');
+ if($('afterSummary'))$('afterSummary').textContent=editImagesAfter.length?`— ${editImagesAfter.length} ${editImagesAfter.length===1?'screenshot':editImagesAfter.length<5?'screenshoty':'screenshotů'}`:'';
+}
+window.removeImgAfter=i=>{editImagesAfter.splice(i,1);showPreviewsAfter()}
 // ---- Setup bez vstupu → celý (hypotetický) obchod ----
 // Formulář obchodu dostane, co setup zná (plánovaný vstup jako cenu vstupu,
 // SL, cíl, kontext, stav naplnění); výstup a výsledek doplní uživatel – „co by
@@ -5650,6 +5691,14 @@ $('screenshots').addEventListener('change',async e=>{
   if(ref)editImages.push(ref)}
  showPreviews();e.target.value='';
 });
+$('screenshotsAfter').addEventListener('change',async e=>{
+ const files=[...e.target.files].slice(0,3-editImagesAfter.length);
+ for(const f of files){if(f.size>3_000_000){showToast('Jeden obrázek je větší než 3 MB. Zvol menší soubor.');continue}
+  const data=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});
+  const ref=await storeScreenshot(data);
+  if(ref)editImagesAfter.push(ref)}
+ showPreviewsAfter();e.target.value='';
+});
 $('dayShotInput').addEventListener('change',handleDayShotInputChange);
 document.addEventListener('paste',async e=>{
  const items=(e.clipboardData||window.clipboardData)?.items;
@@ -5707,6 +5756,7 @@ $('tradeForm').addEventListener('submit',async e=>{
    ...(existing||{}),
    id,
    images:[...editImages],
+   ...(editImagesAfter.length||existing?.imagesAfter?{imagesAfter:[...editImagesAfter]}:{}),
    createdAt:existing?.createdAt||Date.now(),
    updatedAt:Date.now()
   };
@@ -6106,6 +6156,7 @@ function combineTradeObjects(list,src=settings){
   // Bez opakování: nohy téže pozice nesou stejný screenshot vstupu a nohy téhož
   // výstupu i stejný screenshot výstupu (odkaz je daný obsahem souboru).
   images:[...new Set(list.flatMap(t=>t.images||[]))].slice(0,3),
+  ...(list.some(t=>(t.imagesAfter||[]).length)?{imagesAfter:[...new Set(list.flatMap(t=>t.imagesAfter||[]))].slice(0,3)}:{}),
   createdAt:list.reduce((min,t)=>Math.min(min,t.createdAt||Date.now()),Date.now()),
   updatedAt:Date.now(),
   legs,
@@ -6617,7 +6668,7 @@ async function restorableDayNotes(raw){
  }
  return out;
 }
-$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const raw of data.trades){const t=FJTaxonomy.tradeToV3(raw);if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings.taxonomy?{...data.settings,taxonomy:FJTaxonomy.migrateConfigV3(data.settings.taxonomy)}:data.settings});const notes=await restorableDayNotes(data.dayNotes);if(notes)await commitJournal(journal=>{journal.dayNotes=notes});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
+$('importJson').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.trades))throw new Error('Chybí seznam obchodů.');if(!(await showConfirm('Nahrání zálohy přepíše data aktuálního deníku. Pokračovat?')))return;await clearStore('trades');for(const raw of data.trades){const t=FJTaxonomy.tradeToV3(raw);if(Array.isArray(t.images)){const refs=[];for(const img of t.images){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.images=refs}if(Array.isArray(t.imagesAfter)){const refs=[];for(const img of t.imagesAfter){const ref=await storeScreenshot(img);if(ref)refs.push(ref)}t.imagesAfter=refs}await put('trades',t)}if(data.settings)await put('settings',{key:'main',value:data.settings.taxonomy?{...data.settings,taxonomy:FJTaxonomy.migrateConfigV3(data.settings.taxonomy)}:data.settings});const notes=await restorableDayNotes(data.dayNotes);if(notes)await commitJournal(journal=>{journal.dayNotes=notes});await load();showToast('Záloha aktuálního deníku byla obnovena.')}catch(err){showToast('Soubor zálohy není platný: '+err.message)}finally{e.target.value=''}};
 $('clearAll').onclick=async()=>{if(await showConfirm('Tato akce smaže všechny obchody a nastavení pouze v aktuálním deníku. Pokračovat?')){await clearStore('trades');await clearStore('settings');safeReload()}};
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 
@@ -7209,12 +7260,35 @@ async function refreshCaptureStatus(){
  $('captureEndpoint').value=r.endpoint;
  $('captureApiKey').value=r.apiKey;
  $('captureScreenshotMode').value=r.screenshotMode||'primary';
+ renderCaptureWindowSettings(r);
  $('captureAutoImportSelect').value=r.autoImport?'ano':'ne';
  $('relayUrl').value=r.relayUrl||'';
  $('relayToken').value=r.relayToken||'';
  $('relayEnabled').value=r.relayEnabled?'ano':'ne';
  renderCaptureMappings(r.accounts||[],r.accountMappings||{},r.hiddenAccounts||[]);
  renderOpenPositions(r.openPositions||[]);
+}
+// Nastavení snímání: pravidla oken, chybějící okno a druhá sekce „Po obchodu“.
+function renderCaptureWindowSettings(r){
+ const windows=r.screenshotMode==='windows';
+ $('captureWindowsBox').style.display=windows?'':'none';
+ $('captureMissingBox').style.display=windows?'':'none';
+ $('captureScreenshotMissing').value=r.screenshotMissing||'skip';
+ $('captureAfterEnabled').value=r.afterShotEnabled?'ano':'ne';
+ if(document.activeElement!==$('captureAfterMinutes'))$('captureAfterMinutes').value=r.afterShotMinutes||15;
+ if(document.activeElement!==$('captureAfterMax'))$('captureAfterMax').value=r.afterShotMax||3;
+ const rules=Array.isArray(r.screenshotWindows)?r.screenshotWindows:[];
+ $('captureWindowRules').innerHTML=rules.length?rules.map((rule,i)=>`<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><label style="display:flex;align-items:center;gap:6px;flex:1"><input type="checkbox" data-win-on="${i}" ${rule.enabled!==false?'checked':''}> <span>${esc(rule.match)}</span></label><button class="btn" type="button" data-win-del="${i}">Smazat</button></div>`).join(''):'<div class="sub">Zatím žádné pravidlo – bez pravidel se nevyfotí nic.</div>';
+ $('captureWindowRules').querySelectorAll('[data-win-on]').forEach(el=>el.onchange=()=>saveCaptureWindowRules(rules.map((x,i)=>i===Number(el.dataset.winOn)?{...x,enabled:el.checked}:x)));
+ $('captureWindowRules').querySelectorAll('[data-win-del]').forEach(el=>el.onclick=()=>saveCaptureWindowRules(rules.filter((_,i)=>i!==Number(el.dataset.winDel))));
+}
+async function saveCaptureWindowRules(rules){
+ await window.desktopAPI.captureSetScreenshotSettings({screenshotWindows:rules});
+ await refreshCaptureStatus();
+}
+async function saveCaptureShotSettings(patch){
+ await window.desktopAPI.captureSetScreenshotSettings(patch);
+ await refreshCaptureStatus();
 }
 function renderOpenPositions(rows){
  const target=$('captureOpenPositions');
@@ -7266,13 +7340,13 @@ function renderCaptureMappings(accounts,mappings,hiddenAccounts=[]){
   await window.desktopAPI.captureDeleteAccount(account);await refreshCaptureStatus();
  });
 }
-async function capturedImages(e){
+async function capturedImages(e,recordOverride=null){
  const paths=Array.isArray(e.screenshotPaths)?e.screenshotPaths:[];
  const images=[];
  // Jméno souboru podle obchodu, do kterého screenshot patří (stejné datum
  // a čas jako mapCapturedTrade).
  const exit=new Date(e.exitTime||e.receivedAt||Date.now()),entry=new Date(e.entryTime||e.receivedAt||Date.now());
- const record={date:exit.toISOString().slice(0,10),entryTime:entry.toTimeString().slice(0,5),instrument:e.instrument||e.instrumentFull||'',side:e.side||''};
+ const record=recordOverride||{date:exit.toISOString().slice(0,10),entryTime:entry.toTimeString().slice(0,5),instrument:e.instrument||e.instrumentFull||'',side:e.side||''};
  for(const p of paths.slice(0,3)){
   // Automatický screenshot už na disku je – hlavní proces si ho přebere
   // rovnou ze souboru a vrátí jen odkaz, přes IPC neteče žádný obrázek.
@@ -7422,10 +7496,39 @@ async function appendOrMergeCapturedTrade(journalId,event,images=[]){
  if(!w?.ok)throw new Error(w?.error||'Deník nelze uložit.');
  return true;
 }
+// Snímky „Po obchodu“ (událost trade_after_screenshot) se doplní do už uloženého
+// obchodu podle positionId. Když obchod v deníku ještě není (automatický import
+// vypnutý), událost čeká na další import; po týdnu se zahodí.
+async function attachAfterShots(events,mappings){
+ const done=[];
+ const max=Math.min(10,Math.max(1,Number(captureSnapshot?.afterShotMax)||3));
+ for(const e of events){
+  const journalId=mappings[e.account]||activeJournalId;
+  const r=await window.desktopAPI.readJournal(journalId);
+  if(!r?.ok)continue;
+  const data=r.data||{};
+  const trades=Array.isArray(data.trades)?data.trades:[];
+  const idx=e.positionId?trades.findIndex(t=>t.positionId&&t.positionId===e.positionId):-1;
+  if(idx<0){
+   if(Date.now()-Date.parse(e.receivedAt||0)>7*864e5)done.push(e.id);
+   continue;
+  }
+  const t=trades[idx];
+  const images=await capturedImages(e,{date:t.date,entryTime:t.entryTime,instrument:t.instrument||'',side:t.side||''});
+  if(images.length){
+   t.imagesAfter=[...new Set([...(t.imagesAfter||[]),...images])].slice(0,max);
+   const w=await window.desktopAPI.writeJournal(journalId,data);
+   if(!w?.ok)throw new Error(w?.error||'Deník nelze uložit.');
+  }
+  done.push(e.id);
+ }
+ return done;
+}
 async function importCapturedTrades(silent=false){
  const r=await window.desktopAPI.captureEvents(false);
  const pending=(r?.events||[]).filter(e=>e.type==='trade_closed');
- if(!pending.length){if(!silent)showToast('Nejsou připravené žádné uzavřené obchody.');return 0}
+ const afterEvents=(r?.events||[]).filter(e=>e.type==='trade_after_screenshot');
+ if(!pending.length&&!afterEvents.length){if(!silent)showToast('Nejsou připravené žádné uzavřené obchody.');return 0}
  const mappings=captureSnapshot?.accountMappings||{};
  const importedIds=[];
  let count=0;
@@ -7436,6 +7539,7 @@ async function importCapturedTrades(silent=false){
   if(added)count++;
   importedIds.push(e.id);
  }
+ importedIds.push(...await attachAfterShots(afterEvents,mappings));
  await window.desktopAPI.captureMarkImported(importedIds);
  calendarAllTrades=null;
  if(mappings&&Object.values(mappings).includes(activeJournalId)||!Object.keys(mappings).length){
@@ -8013,6 +8117,25 @@ $('captureNewKey').onclick=async()=>{
 };
 $('captureClear').onclick=async()=>{if(await showConfirm('Vymazat frontu zachycených událostí?')){await window.desktopAPI.captureClear();await refreshCaptureStatus()}};
 $('captureScreenshotMode').onchange=async e=>{await window.desktopAPI.captureSetScreenshotMode(e.target.value);await refreshCaptureStatus()};
+$('captureScreenshotMissing').onchange=e=>saveCaptureShotSettings({screenshotMissing:e.target.value});
+$('captureAfterEnabled').onchange=e=>saveCaptureShotSettings({afterShotEnabled:e.target.value==='ano'});
+$('captureAfterMinutes').onchange=e=>saveCaptureShotSettings({afterShotMinutes:e.target.value});
+$('captureAfterMax').onchange=e=>saveCaptureShotSettings({afterShotMax:e.target.value});
+$('captureWindowAdd').onclick=async()=>{
+ const match=$('captureWindowNew').value.trim();
+ if(!match)return;
+ const rules=[...(captureSnapshot?.screenshotWindows||[]),{match,enabled:true}];
+ $('captureWindowNew').value='';
+ await saveCaptureWindowRules(rules);
+};
+$('captureWindowLoad').onclick=async()=>{
+ const box=$('captureWindowList');
+ box.innerHTML='<span class="sub">Načítám…</span>';
+ const r=await window.desktopAPI.captureListWindows();
+ if(!r?.ok||!r.windows.length){box.innerHTML=`<span class="sub">${r?.ok?'Žádná otevřená okna.':esc(r?.error||'Okna nejdou načíst.')}</span>`;return}
+ box.innerHTML=r.windows.map((w,i)=>`<button type="button" class="btn" data-win-pick="${i}" title="Přidat pravidlo z tohoto názvu" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:170px;padding:6px;text-align:left">${w.thumb?`<img src="${w.thumb}" style="width:100%;border-radius:4px">`:''}<span style="font-size:11px;word-break:break-word">${esc(w.name)}</span></button>`).join('');
+ box.querySelectorAll('[data-win-pick]').forEach(btn=>btn.onclick=()=>{$('captureWindowNew').value=r.windows[Number(btn.dataset.winPick)].name;$('captureWindowNew').focus()});
+};
 $('captureAutoImportSelect').onchange=async e=>{await window.desktopAPI.captureSetAutoImport(e.target.value==='ano');await refreshCaptureStatus()};
 $('captureAddAccount').onclick=async()=>{
  const input=$('captureNewAccount');
@@ -8042,11 +8165,11 @@ $('pollRelay').onclick=async()=>{
 window.desktopAPI?.onCaptureEvent?.(async()=>{
  await refreshCaptureStatus();
  const s=await window.desktopAPI.captureStatus();
- if(s?.autoImport&&s.pending)await importCapturedTrades(true);
+ if(s?.autoImport&&(s.pending||s.pendingAfter))await importCapturedTrades(true);
 });
 setInterval(async()=>{
  const s=await window.desktopAPI?.captureStatus?.();
- if(s?.autoImport&&s.pending)await importCapturedTrades(true);
+ if(s?.autoImport&&(s.pending||s.pendingAfter))await importCapturedTrades(true);
 },5000);
 setTimeout(refreshCaptureStatus,800);
 
