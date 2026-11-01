@@ -2,7 +2,7 @@
 
 All notable changes are logged here (one file, newest first).
 
-## 4.8.99 - 2026-11-01
+## 4.8.100 - 2026-11-02
 Import LTA Custom Levels (LiveTradingAsistent) do „Hladiny v blízkosti“ a VWAP vstupu z konektoru NT8. Žádná migrace dat; nové volby číselníku vznikají v `settings.taxonomy.LTA_LEVELS` (custom + sourceNames), archiv levelů v `<userData>/lta-levels/`.
 - New: levely z `Dokumenty\NinjaTrader 8\bin\LiveTradingAsistent\CustomLevels\{System,Local}\*.xml` se doplňují do „Hladiny v blízkosti“: N nejbližších nad a N pod cenou vstupu (výchozí 3 + 3), s cenou, bez test / netest. Automaticky u obchodů z konektoru NT8 a ve formuláři (po vyplnění instrumentu a ceny vstupu, jen při prázdném seznamu), ručně tlačítkem „⤓ Doplnit z LTA“. Zadané řádky se nikdy nemažou ani nepřepisují.
 - New: číselník „LTA Levels“ (Nastavení → Číselníky) se zakládá sám z doslovných názvů levelů (bez úvodního čísla LTA, např. „ID vPOC“, „Call Wall“, „LUDVIK“). Volbu jde přejmenovat, skrýt (pak se nedoplňuje), přeřadit i smazat; přejmenování nezaloží při dalším importu novou volbu. Ve výběru typu hladiny jsou LTA volby ve vlastní skupině.
