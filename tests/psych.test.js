@@ -7,7 +7,7 @@
 //    vlastní hodnota nejde přidat ani přes import,
 //  - nic se ve výchozím stavu nehlásí (starší obchody nezčervenají); každé
 //    pole jde hlídat zvlášť, u dne zvlášť i místo upozornění (den / obchody),
-//  - sloučení nohou, Rychlý kontext a uložení dne hodnotu neztratí,
+//  - sloučení nohou a uložení dne hodnotu neztratí,
 //  - export CSV nese všech šest hodnot (sloupce až na konci),
 //  - „Nahrát zálohu JSON" obnoví i denní poznámky (do 4.8.6 je zahodila).
 
@@ -139,20 +139,6 @@ test('sloučení nohou: psychika se neztratí (první vyplněná hodnota)', () =
   assert.deepEqual([m.psychBefore, m.psychDuring, m.psychAfter], ['6', '4', '7']);
 });
 
-test('Rychlý kontext: psychika obchodu se mění jen na přání a jde vymazat', () => {
-  const q = loadRenderer(['QC_GROUPS', 'quickGroups', 'contextFieldShown', 'quickDraftFrom', 'quickContextApply'], {});
-  const stored = { ...COMPLETE, id: 't1', psychBefore: '5' };
-  const untouched = q.quickContextApply(stored, q.quickDraftFrom(stored), 'x');
-  assert.equal(JSON.stringify(untouched), JSON.stringify(stored), 'neupravený obchod zůstane stejný');
-  const d = q.quickDraftFrom(stored);
-  d.psychBefore = '';
-  d.psychAfter = '8';
-  const out = plain(q.quickContextApply(stored, d, 'x'));
-  assert.equal('psychBefore' in out, false);
-  assert.equal(out.psychAfter, '8');
-  const hidden = loadRenderer(['QC_GROUPS', 'quickGroups', 'contextFieldShown'], { tradeCardShown: key => key !== 'psych' });
-  assert.deepEqual(plain(hidden.quickGroups().map(g => g.key)).filter(k => k.startsWith('psych')), [], 'skrytá karta Psychika se v Rychlém kontextu nenabízí');
-});
 
 test('export CSV: tři sloupce obchodu a tři sloupce dne na konci, hodnota = číslo škály', () => {
   const r = loadRenderer(['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'levelCsvCount', 'levelCsvHeader', 'levelCsvCells',

@@ -136,12 +136,30 @@ test('skrytí jde vrátit zpět', () => {
   assert.ok(!FJTaxonomy.isHidden('ENTRY_LEVEL', 'VWAP'));
 });
 
-test('mazání volby v API vůbec není', () => {
-  // Pojistka proti tomu, aby někdo mazání časem doplnil: obchod s takovou
-  // hodnotou by zůstal s klíčem mimo číselník.
+test('smazání volby je jen záznam v nastavení; popisek zůstává a jde ji obnovit', () => {
+  // API nemá operaci, která by přepsala data obchodů – smazání je seznam
+  // `removed` v nastavení (UI před ním varuje).
   const api = Object.keys(FJTaxonomy);
-  assert.ok(!api.some(name => /^(delete|remove|drop)/i.test(name)),
-    'číselník nesmí mít mazací operaci, jen skrývání: ' + api.join(', '));
+  assert.ok(!api.some(name => /^(delete|drop)/i.test(name) || (/^remove/i.test(name) && name !== 'removedKeys')), api.join(', '));
+  const cfg = { SETUP: { custom: { CUSTOM_MOJE: 'Moje' }, removed: ['CUSTOM_MOJE', 'AVE'] } };
+  assert.ok(!FJTaxonomy.allKeys('SETUP', cfg).includes('CUSTOM_MOJE'));
+  assert.ok(!FJTaxonomy.allKeys('SETUP', cfg).includes('AVE'));
+  assert.equal(FJTaxonomy.isValidKey('SETUP', 'AVE', cfg), false);
+  assert.equal(FJTaxonomy.labelOf('SETUP', 'CUSTOM_MOJE', cfg), 'Moje', 'uložené obchody se dál zobrazí popiskem');
+  assert.deepEqual(FJTaxonomy.removedKeys('SETUP', cfg), ['CUSTOM_MOJE', 'AVE']);
+  assert.notEqual(FJTaxonomy.makeCustomKey('SETUP', 'Moje', cfg), 'CUSTOM_MOJE', 'smazaný klíč se znovu nepoužije');
+  const clean = FJTaxonomy.sanitizeConfig(cfg);
+  assert.deepEqual(clean.SETUP.removed, ['CUSTOM_MOJE', 'AVE']);
+  assert.ok(FJTaxonomy.allKeys('SETUP', { SETUP: { ...cfg.SETUP, removed: [] } }).includes('AVE'), 'obnovení vrátí volbu');
+});
+
+test('tag volby: výchozí je klíč, přepsání mění jen zobrazení', () => {
+  const cfg = { SETUP: { custom: { CUSTOM_VOLBA: 'Čínský setup' }, tags: { CUSTOM_VOLBA: 'CHINA', M2_OF: 'M2', NEZNAMY: 'x' } } };
+  assert.equal(FJTaxonomy.tagOf('SETUP', 'M2_PA', cfg), 'M2_PA');
+  assert.equal(FJTaxonomy.tagOf('SETUP', 'CUSTOM_VOLBA', cfg), 'CHINA');
+  const clean = FJTaxonomy.sanitizeConfig(cfg);
+  assert.deepEqual(clean.SETUP.tags, { CUSTOM_VOLBA: 'CHINA', M2_OF: 'M2' }, 'neznámý klíč se zahodí');
+  assert.ok(FJTaxonomy.allKeys('SETUP', cfg).includes('CUSTOM_VOLBA'), 'klíč v datech se nemění');
 });
 
 // -------------------------------------------------------------- vlastní volby

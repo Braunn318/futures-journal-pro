@@ -2,6 +2,14 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.96 - 2026-11-01
+GitHub issues #11–#15. No stored-data migration; nothing is rewritten in trades.
+- Fixed (#11): Nastavení → Číselníky – „Skrýt“, přejmenování, posun i přidání volby už nezavřou rozbalenou sekci (dřív se po překreslení otevřela vždy jen „Hladina vstupu“). Zachová se i pozice scrollu.
+- New (#12): hranice „SL nepravděpodobně daleko“ se nastavuje po instrumentech – Nastavení → Šablony podle instrumentu → sloupec „Max SL (t)“. Prázdné = dosavadních 40 ticků, 0 = nehlásit nikdy. Platí pro štítek na kartě obchodu i poznámku ve formuláři.
+- New (#13): v Číselnících má každá volba (kromě odvozených a pevných škál) tlačítka „Přejmenovat tag“ a „Smazat“ vedle „Skrýt“. Tag je značka pod popiskem (výchozí = klíč, např. CUSTOM_…); přepsání mění jen zobrazení, v datech obchodů zůstává klíč. „Smazat“ nejdřív varuje, že se data obchodů s touto volbou už nebudou číst správně; volba jde obnovit v seznamu „Smazané“ pod skupinou. Doporučeno raději „Skrýt“.
+- New (#14): volitelný „Setup – sekundární“ (pole setupCode2). Ve výchozím stavu vypnutý, zapíná se v Nastavení → Přizpůsobení → Pole kontextu. Ukazuje se ve formuláři, jako štítek „+ setup“ na kartě a v souhrnu; filtr Setup v Přehledu účtu bere primární i sekundární. Statistiky po setupech počítají jen primární. Do CSV zatím nejde (JSON export ho nese).
+- Removed (#15): karta / okno „Rychlý kontext“ (tlačítko v liště, ⚡ u obchodu, klávesové ovládání). Data se nemění; štítek „Neúplné“ a kontext dne zůstávají.
+
 ## 4.8.95 - 2026-10-29
 Přehled účtu: month arrows, new MFE / MAE / trade-length cards, choose which sections are shown; „Důvod vynechání“ for consciously skipped setups and trades. No stored-data migration.
 - New: Přehled účtu → ◀ ▶ arrows next to „Rozsah“. One click sets the date interval to the whole previous / next month (from the current interval, the selected day, or this month) and applies it right away. The month name (e.g. „říjen 2026“) shows while the interval is exactly one calendar month. Od / Do stay editable by hand.

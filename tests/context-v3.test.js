@@ -442,10 +442,12 @@ const fields = over => FJTaxonomy.normalizeFieldConfig(over);
 const missing = (trade, fieldCfg, opts) => FJTaxonomy.missingForCards(trade, {}, undefined, fieldCfg, opts);
 
 test('A4: pole kontextu – vše zobrazené; upozornění ve výchozím stavu jen u trendu 30m a známky', () => {
-  assert.deepEqual(FJTaxonomy.CONTEXT_FIELDS.map(f => f.key), ['trendHtf', 'grade', 'entryTestNo', 'absLocation', 'levelTestState', 'dayContext', 'derivedRow', 'entries',
+  assert.deepEqual(FJTaxonomy.CONTEXT_FIELDS.map(f => f.key), ['trendHtf', 'grade', 'setupCode2', 'entryTestNo', 'absLocation', 'levelTestState', 'dayContext', 'derivedRow', 'entries',
     'psychBefore', 'psychDuring', 'psychAfter', 'psychDayBefore', 'psychDayDuring', 'psychDayAfter', 'psychDayWarnDay', 'psychDayWarnTrades']);
   const cfg = fields(undefined);
-  for (const f of FJTaxonomy.CONTEXT_FIELDS) assert.equal(cfg[f.key].show, true, f.key);
+  // Sekundární setup je volitelný a ve výchozím stavu vypnutý.
+  for (const f of FJTaxonomy.CONTEXT_FIELDS) assert.equal(cfg[f.key].show, f.key !== 'setupCode2', f.key);
+  assert.equal(fields({ setupCode2: { show: true } }).setupCode2.show, true);
   // Dva řádky psychiky dne jen říkají, KDE se upozorňuje; pole psychiky
   // samotná upozornění ve výchozím stavu nemají, takže se nic nehlásí.
   assert.deepEqual(FJTaxonomy.CONTEXT_FIELDS.filter(f => FJTaxonomy.fieldWarns(cfg, f.key)).map(f => f.key), ['trendHtf', 'grade', 'psychDayWarnDay', 'psychDayWarnTrades']);
@@ -483,24 +485,6 @@ test('A7/8: formulář – skryté pole jen zmizí (display), jeho prvky s hodno
   assert.deepEqual(nodes.map(n => n.value), nodes.map(n => 'hodnota-' + n.dataset.ctxField), 'hodnoty se nemažou');
 });
 
-test('A7/8: data skrytého pole přežijí uložení obchodu (rychlý formulář)', () => {
-  const hidden = fields({ grade: { show: false }, trendHtf: { show: false }, entryTestNo: { show: false }, absLocation: { show: false }, levelTestState: { show: false } });
-  const q = loadRenderer(['QC_GROUPS', 'quickGroups', 'contextFieldShown', 'quickDraftFrom', 'quickContextApply'], { contextFieldConfig: hidden });
-  assert.deepEqual(plain(q.quickGroups().map(g => g.key)).filter(k => ['grade', 'trendHtf', 'entryTestNo', 'absLocation'].includes(k)), [], 'skrytá pole se v rychlém formuláři nenabízejí');
-  const stored = completeTrade({ gradeSetAt: '2026-10-09T13:00:00.000Z' });
-  const d = q.quickDraftFrom(stored);
-  d.setupCode = 'M2_PA';
-  d.nearLevels.push({ level: 'VAL', price: 7741 });
-  const out = plain(q.quickContextApply(stored, d, '2026-10-10T08:00:00.000Z'));
-  assert.equal(out.setupCode, 'M2_PA');
-  assert.equal(out.grade, 'A');
-  assert.equal(out.gradeSetAt, '2026-10-09T13:00:00.000Z');
-  assert.equal(out.gradeEdited, undefined, 'skrytá známka se nezměnila');
-  assert.equal(out.trendHtf, 'DOWN');
-  assert.equal(out.entryTestNo, '1');
-  assert.equal(out.absLocation, 'EXTREME');
-  assert.deepEqual(out.nearLevels, [{ level: 'VPOC_30M', price: 7730, testState: 'TESTED' }, { level: 'VAL', price: 7741 }], 'test/netest stávajícího řádku zůstal');
-});
 
 // --------------------------------------------------------- A7/9 sloučení
 

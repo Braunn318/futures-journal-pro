@@ -256,6 +256,7 @@
 
   const TRADE_CONTEXT_FIELDS = [
     { key: 'setupCode', cardinality: 'single', enumName: 'SETUP', label: 'Setup' },
+    { key: 'setupCode2', cardinality: 'single', enumName: 'SETUP', label: 'Setup – sekundární' },
     { key: 'trend', cardinality: 'single', enumName: 'TREND', label: 'Trend 1m' },
     { key: 'entryLevels', cardinality: 'multi', enumName: 'ENTRY_LEVEL', label: 'Hladina vstupu' },
     // Hladiny v blízkosti jsou ŘÁDKY { level, price, testState? } – jedna
@@ -336,13 +337,30 @@
     const g = vocab === group ? v : { ...groupConfig(group, config), custom: v.custom };
     const custom = (g.custom && typeof g.custom === 'object') ? Object.keys(g.custom) : [];
     const base = Object.keys(DEFAULT_ENUMS[vocab] || {});
-    const merged = [...base, ...custom.filter(k => !base.includes(k))];
+    const removed = removedKeys(group, config);
+    const merged = [...base, ...custom.filter(k => !base.includes(k))].filter(k => !removed.includes(k));
     const order = Array.isArray(g.order) ? g.order : [];
     if (!order.length) return merged;
     // Klíče neuvedené v pořadí (např. nově přidané do výchozího číselníku
     // aktualizací appky) se přidají na konec, nikdy nezmizí.
     const ordered = order.filter(k => merged.includes(k));
     return [...ordered, ...merged.filter(k => !ordered.includes(k))];
+  }
+
+  // Smazané volby (Nastavení → Číselníky → Smazat). Volba zmizí z nabídky i
+  // z platných hodnot; popisek zůstává v nastavení, takže ji jde obnovit.
+  // Obchody se nepřepisují – ukládají klíč. Seznam je vlastností slovníku.
+  function removedKeys(group, config) {
+    const g = groupConfig(vocabularyOf(group), config);
+    return Array.isArray(g.removed) ? g.removed : [];
+  }
+
+  // Tag = krátká značka volby, kterou ukazuje číselník pod popiskem. Výchozí je
+  // klíč; uživatel ji může přepsat. Mění se jen zobrazení, v datech zůstává klíč.
+  function tagOf(group, key, config) {
+    const g = groupConfig(vocabularyOf(group), config);
+    const tags = (g.tags && typeof g.tags === 'object') ? g.tags : {};
+    return tags[key] || String(key);
   }
 
   function aliasesFor(group, config) {
@@ -722,7 +740,7 @@
   const CARD_OF_FIELD = {
     slPrice: 'sltp',
     mfeTicks: 'course', maeTicks: 'course', postExitFavorableTicks: 'course', postExitAdverseTicks: 'course',
-    setupCode: 'setup', fillStatus: 'setup', trend: 'setup', trendHtf: 'setup', grade: 'setup',
+    setupCode: 'setup', setupCode2: 'setup', fillStatus: 'setup', trend: 'setup', trendHtf: 'setup', grade: 'setup',
     entryLevels: 'levels', nearLevels: 'levels', ofConfirm: 'levels',
     psychBefore: 'psych', psychDuring: 'psych', psychAfter: 'psych'
   };
@@ -738,6 +756,8 @@
   const CONTEXT_FIELDS = [
     { key: 'trendHtf', label: 'Trend 30m', warnDefault: true },
     { key: 'grade', label: 'Známka A/B/C', warnDefault: true },
+    // Volitelný druhý setup obchodu; ve výchozím stavu vypnutý.
+    { key: 'setupCode2', label: 'Setup – sekundární', checks: false, showDefault: false },
     { key: 'entryTestNo', label: 'Kolikátý test vstupu' },
     { key: 'absLocation', label: 'Absorpce – kde' },
     { key: 'levelTestState', label: 'Test / netest u hladin' },
@@ -752,7 +772,7 @@
     // Psychika dne. „Upozorňovat" u pole říká, že se jeho nevyplnění hlásí;
     // KDE se hlásí, určují dva řádky `warnOnly` (bez „Zobrazit"): na dni
     // (záhlaví dne v Deníku, kalendář) a u obchodů toho dne (štítek
-    // „Neúplné", Rychlý kontext). Obě místa jsou ve výchozím stavu zapnutá,
+    // „Neúplné"). Obě místa jsou ve výchozím stavu zapnutá,
     // pole samotná bez upozornění – dokud si ho uživatel nezapne, nic se
     // nehlásí.
     { key: 'psychDayBefore', label: 'Psychika dne – před seancí' },
@@ -770,15 +790,15 @@
   // nastavení. Chybějící položka nebo hodnota = výchozí: zobrazeno, upozornění
   // podle `warnDefault`. Čte se jen ta jedna položka – volá se při vykreslení
   // za každý obchod.
-  function toggleOf(raw, key, warnDefault) {
+  function toggleOf(raw, key, warnDefault, showDefault = true) {
     const c = raw && typeof raw === 'object' && raw[key] && typeof raw[key] === 'object' ? raw[key] : {};
-    return { show: c.show !== false, warn: typeof c.warn === 'boolean' ? c.warn : warnDefault };
+    return { show: typeof c.show === 'boolean' ? c.show : showDefault, warn: typeof c.warn === 'boolean' ? c.warn : warnDefault };
   }
   const normalizeToggles = (items, raw, toggle) => Object.fromEntries(items.map(item => [item.key, toggle(raw, item)]));
 
   // Nastavení polí: { trendHtf: { show, warn }, … }. Upozornění ve výchozím
   // stavu podle warnDefault.
-  const fieldToggle = (raw, field) => toggleOf(raw, field.key, field.warnDefault === true);
+  const fieldToggle = (raw, field) => toggleOf(raw, field.key, field.warnDefault === true, field.showDefault !== false);
   function normalizeFieldConfig(raw) { return normalizeToggles(CONTEXT_FIELDS, raw, fieldToggle); }
   function fieldShown(fieldConfig, key) {
     const field = CONTEXT_FIELD_BY_KEY[key];
@@ -890,7 +910,8 @@
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
       .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
       .slice(0, 32);
-    const taken = new Set(allKeys(group, config));
+    // I smazaná volba drží svůj klíč – nový stejný klíč by oživil staré obchody.
+    const taken = new Set([...allKeys(group, config), ...removedKeys(group, config)]);
     if (base === 'CUSTOM_') return uniqueKey('CUSTOM_VOLBA', taken);
     return uniqueKey(base, taken);
   }
@@ -960,10 +981,19 @@
         if (Object.keys(labels).length) clean.labels = labels;
       }
 
-      for (const field of ['hidden', 'visible', 'order']) {
+      for (const field of ['hidden', 'visible', 'order', 'removed']) {
         if (!Array.isArray(g[field])) continue;
         const list = [...new Set(g[field].filter(key => valid.has(key)))];
         if (list.length) clean[field] = list;
+      }
+
+      if (g.tags && typeof g.tags === 'object') {
+        const tags = {};
+        for (const key of Object.keys(g.tags)) {
+          const tag = cleanLabel(g.tags[key]);
+          if (valid.has(key) && tag && tag !== key) tags[key] = tag.slice(0, 64);
+        }
+        if (Object.keys(tags).length) clean.tags = tags;
       }
 
       // „Je to hladina" (jen slovník cílů): známé klíče, jen true / false.
@@ -1040,7 +1070,7 @@
     // konfigurace
     applyConfig, getConfig, groupConfig,
     // dotazy
-    allKeys, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey, isLevelKey, DEFAULT_NOT_LEVEL,
+    allKeys, removedKeys, tagOf, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey, isLevelKey, DEFAULT_NOT_LEVEL,
     visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     missingContextKeys, contextFieldLabel,
     TRADE_CARDS, missingContextItems, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingWarnItems, missingForCards,

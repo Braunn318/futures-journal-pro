@@ -52,7 +52,7 @@ function renderEditor(taxonomy) {
   const dom = makeDom(['taxonomyGroups', 'taxonomyCopyTarget', 'taxonomyCopyBtn', 'taxonomyTransferNote']);
   FJTaxonomy.applyConfig(taxonomy || {});
   const r = loadRenderer(
-    ['$', 'esc', 'wireTaxonomyEditor', 'renderTaxonomyEditor', 'renderTaxonomyTransfer', 'visibleJournalProfiles'],
+    ['$', 'esc', 'taxOpenGroups', 'wireTaxonomyEditor', 'renderTaxonomyEditor', 'renderTaxonomyTransfer', 'visibleJournalProfiles'],
     {
       document: dom.document,
       settings: { ...SETTINGS, taxonomy: taxonomy || {} },
@@ -78,13 +78,14 @@ test('editor číselníků se vykreslí a nespadne', () => {
     assert.ok(html.includes(group.label), `chybí sekce ${group.label}`);
   }
   // Ovládání, na kterém stojí požadavky: přejmenovat, skrýt, přeuspořádat,
-  // přidat. Mazání tam být nesmí.
+  // přidat, přejmenovat tag a smazat (s varováním v handleru).
   assert.match(html, /class="tax-label"/);
   assert.match(html, /tax-toggle/);
   assert.match(html, /tax-up/);
   assert.match(html, /tax-down/);
   assert.match(html, /tax-add/);
-  assert.ok(!/tax-delete|Smazat/.test(html), 'volba se nemaže, jen skrývá');
+  assert.match(html, /tax-tag/);
+  assert.match(html, /tax-delete/);
 });
 
 test('odvozená skupina má popisky jen ke čtení a poznámku o sdíleném seznamu', () => {

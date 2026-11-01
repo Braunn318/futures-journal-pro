@@ -116,6 +116,14 @@ test('slTicks > 40 je podezřelé, přesně 40 ne', () => {
   assert.equal(FJPoints.slTicksSuspicious(null), false);
 });
 
+test('slTicks: hranice z šablony instrumentu přebije výchozích 40', () => {
+  assert.equal(FJPoints.slTicksSuspicious(80, 100), false);
+  assert.equal(FJPoints.slTicksSuspicious(101, 100), true);
+  assert.equal(FJPoints.slTicksSuspicious(5000, 0), false, '0 = nehlásit');
+  assert.equal(FJPoints.slTicksSuspicious(41, ''), true, 'prázdná hranice = 40');
+  assert.equal(FJPoints.slTicksSuspicious(41, null), true);
+});
+
 test('neúplný kontext: naplněný obchod bez MFE nebo MAE', () => {
   assert.equal(FJPoints.contextIncomplete(course()), true);
   assert.equal(FJPoints.contextIncomplete(course({ mfeTicks: 5 })), true, 'chybí MAE');
@@ -375,8 +383,8 @@ test('chybějící MFE/MAE hlásí štítek „Neúplné", ne druhý štítek v 
   // Dřív: „neúplný kontext" jen v backtestovém deníku. Od 4.7.1 ho nahrazuje
   // obecný štítek „Neúplné" (incompleteBadgeHTML), který MFE/MAE kontroluje
   // taky – dva štítky pro totéž by se na kartě jen opakovaly.
-  const r = loadRenderer(['esc', 'contextPillsHTML', 'incompleteBadgeHTML'],
-    { journalProfiles: [{ id: 'j1', name: 'B', backtest: true }], activeJournalId: 'j1' });
+  const r = loadRenderer(['esc', 'findTemplate', 'contextPillsHTML', 'incompleteBadgeHTML'],
+    { journalProfiles: [{ id: 'j1', name: 'B', backtest: true }], activeJournalId: 'j1', settings: { templates: [] } });
   const trade = course();
   assert.ok(!r.contextPillsHTML(trade).includes('neúplný kontext'));
   assert.match(r.incompleteBadgeHTML(trade), /title="Chybí:[^"]*MFE, MAE/);

@@ -310,10 +310,14 @@
 
   // Soft validace: SL dál než 40 ticků (10 bodů u ES) je skoro jistě překlep
   // (živá data: slPrice 7338, slTicks 1607). Nikdy neblokuje uložení.
+  // Hranici si uživatel nastaví u šablony instrumentu (maxSlTicks); prázdná =
+  // 40, 0 = nehlásit nikdy (širší stopy u jiných instrumentů nejsou překlep).
   const SL_TICKS_SUSPICIOUS = 40;
-  function slTicksSuspicious(slTicks) {
+  function slTicksSuspicious(slTicks, limit) {
     const n = finiteOrNull(slTicks);
-    return n != null && n > SL_TICKS_SUSPICIOUS;
+    const max = limit === '' ? null : finiteOrNull(limit);
+    if (max === 0) return false;
+    return n != null && n > (max != null && max > 0 ? max : SL_TICKS_SUSPICIOUS);
   }
 
   // Obchod, který se naplnil, ale chybí mu průběh (MFE nebo MAE), má neúplný
