@@ -2,7 +2,7 @@
 
 Deník byl vytvořen pro členy komunity LTA- Live Trading Assistent, ale použít ho může každý.
 
-Reklama na začátek: Mrkni na Czechwealth a zvaž členství v LTA: https://www.czechwealth.cz/
+Mrkni na Czechwealth a zvaž členství v LTA: https://www.czechwealth.cz/
 
 Desktopový obchodní deník pro futures tradery (Windows). Obchody i screenshoty se do něj zapisují **samy**, všechna data zůstávají jen na tvém počítači.
 
