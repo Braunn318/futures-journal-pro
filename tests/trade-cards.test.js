@@ -141,7 +141,7 @@ test('štítek: bez upozornění u všech karet se neukáže', () => {
 // ---------- karta obchodu v Deníku ----------
 
 function pills(shown) {
-  return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML',
+  return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'targetTypesLabel', 'openTradeLevels', 'tradeLevelsBlockHTML',
     'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown'],
   { FJTaxonomy, settings: { templates: [] }, tradeCardShown: key => shown[key] !== false });
 }

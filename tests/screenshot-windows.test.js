@@ -169,3 +169,30 @@ test('černé snímky: prázdný / celý černý = blank, graf s černou plochou
   assert.equal(main.isMostlyBlackThumbnail(fakeImage(100, 100, i => (i % 10 === 0 ? 200 : 0))), true);
   assert.equal(main.isMostlyBlackThumbnail(fakeImage(100, 100, () => 120)), false);
 });
+
+test('per deník: účet namapovaný na deník má přednost před otevřeným deníkem', () => {
+  const { main } = harness();
+  const settings = { activeJournalId: 'live', accountMappings: { Playback101: 'bt' } };
+  assert.equal(main.screenshotJournalFor(settings, 'Playback101'), 'bt');
+  assert.equal(main.screenshotJournalFor(settings, 'Sim101'), 'live');
+  assert.equal(main.screenshotJournalFor({}, ''), '');
+});
+
+test('per deník: deník bez záznamu dědí globál, s záznamem má vlastní hodnoty', () => {
+  const { main } = harness();
+  const settings = { screenshotMode: 'primary', screenshotWindows: [], screenshotByJournal: { bt: { screenshotMode: 'windows', screenshotWindows: [{ match: 'Chart', enabled: true }] } } };
+  assert.equal(main.effectiveShotSettings(settings, 'live').screenshotMode, 'primary');
+  const bt = main.effectiveShotSettings(settings, 'bt');
+  assert.equal(bt.screenshotMode, 'windows');
+  assert.equal(bt.screenshotWindows[0].match, 'Chart');
+});
+
+test('per deník: první změna uloží celou kopii a jiný deník se nezmění', () => {
+  const { main } = harness();
+  const settings = { screenshotMode: 'primary', screenshotMissing: 'skip', afterShotEnabled: false, afterShotMinutes: 15, afterShotMax: 3, screenshotWindows: [] };
+  main.applyShotSettingsPatch(settings, 'bt', { screenshotMode: 'windows' });
+  assert.equal(settings.screenshotMode, 'primary');
+  assert.equal(settings.screenshotByJournal.bt.screenshotMode, 'windows');
+  assert.equal(settings.screenshotByJournal.bt.afterShotMinutes, 15);
+  assert.equal(main.effectiveShotSettings(settings, 'live').screenshotMode, 'primary');
+});

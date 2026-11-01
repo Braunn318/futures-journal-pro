@@ -173,7 +173,7 @@ test('tradeDraftFromSetup: formulář dostane, co setup zná', () => {
   assert.equal(d.id, 'su1', 'stejné id – obchod setup nahradí');
   assert.equal(d.entryPrice, 7788.75);
   assert.equal(d.slPrice, 7787.75);
-  assert.deepEqual(d.targetLevel1, { type: 'VWAP', price: 7792.75 });
+  assert.deepEqual(d.targetLevel1, { type: 'VWAP', types: ['VWAP'], price: 7792.75 });
   assert.equal(d.fillStatus, 'NO_FILL');
   assert.equal(d.setupCode, 'M2_OF');
   assert.equal(d.missedByTicks, 3, 'minutí limitky se ukáže ve formuláři obchodu');

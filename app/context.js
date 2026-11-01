@@ -76,12 +76,14 @@
   // cílů „je to hladina" (isLevel, uživatelské nastavení). Cena dopočtená
   // z výstupu není hladina, kterou Adam zadal. Bez typu nebo s klíčem, který
   // ve slovníku není, null.
+  // Cíl s víc typy (konfluence) leží na hladině, když je hladinou aspoň jeden
+  // z nich; jen ruční výstup / trail / pevné RRR = false.
   function targetOnLevel(trade, config) {
     const tax = FJTaxonomy();
-    const type = trade?.targetLevel1?.type;
-    if (!tax || !type || !tax.isValidKey('TARGET_LEVEL', type, config)) return null;
+    const types = tax ? tax.targetTypesOf(trade?.targetLevel1, config) : [];
+    if (!types.length) return null;
     if (trade?.targetLevel1PriceDerived === true) return false;
-    return tax.isLevelKey(type, config);
+    return types.some(type => tax.isLevelKey(type, config));
   }
 
   // ------------------------------------------- hladiny v blízkosti (v3 A3)

@@ -170,9 +170,9 @@ test('typ cílové hladiny jde přejmenovat, skrýt a doplnit vlastní volbou', 
 });
 
 test('sanitizeTargetLevel: typ + cena, neznámý typ se zahodí, prázdné je null', () => {
-  assert.deepEqual(FJTaxonomy.sanitizeTargetLevel({ type: 'VWAP', price: '7712.5' }), { type: 'VWAP', price: 7712.5 });
-  assert.deepEqual(FJTaxonomy.sanitizeTargetLevel({ type: 'VWAP', price: '' }), { type: 'VWAP', price: null });
-  assert.deepEqual(FJTaxonomy.sanitizeTargetLevel({ type: 'NENI', price: 7700 }), { type: '', price: 7700 });
+  assert.deepEqual(FJTaxonomy.sanitizeTargetLevel({ type: 'VWAP', price: '7712.5' }), { type: 'VWAP', types: ['VWAP'], price: 7712.5 });
+  assert.deepEqual(FJTaxonomy.sanitizeTargetLevel({ type: 'VWAP', price: '' }), { type: 'VWAP', types: ['VWAP'], price: null });
+  assert.deepEqual(FJTaxonomy.sanitizeTargetLevel({ type: 'NENI', price: 7700 }), { type: '', types: [], price: 7700 });
   assert.equal(FJTaxonomy.sanitizeTargetLevel({ type: '', price: '' }), null);
   assert.equal(FJTaxonomy.sanitizeTargetLevel(undefined), null);
 });
@@ -208,8 +208,8 @@ test('sloučení: cílové hladiny a doba sledování nezmizí', () => {
     targetLevel2: { type: 'LIQUIDITY', price: 7706 }, observedMinutes: 30
   });
   const merged = r.combineTradeObjects([tp1, tp2]);
-  assert.deepEqual(plain(merged.targetLevel1), { type: 'VWAP', price: 7703 });
-  assert.deepEqual(plain(merged.targetLevel2), { type: 'LIQUIDITY', price: 7706 });
+  assert.deepEqual(plain(merged.targetLevel1), { type: 'VWAP', types: ['VWAP'], price: 7703 });
+  assert.deepEqual(plain(merged.targetLevel2), { type: 'LIQUIDITY', types: ['LIQUIDITY'], price: 7706 });
   assert.equal(merged.observedMinutes, 30, 'z nohy s nejpozdějším výstupem');
 });
 

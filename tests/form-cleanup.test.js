@@ -103,8 +103,8 @@ test('formulář: pole jsou ve správných kartách', () => {
     setup: ['setupCode', 'fillStatus', 'missedByTicks', 'trend', 'trendHtf', 'grade', 'entryTestNo', 'planFollowed', 'wouldSkipLive'],
     // Od 4.7.2 samostatná karta Hladiny (jde skrýt a hlídat zvlášť). Od 4.8.5
     // jeden seznam „Hladiny v blízkosti"; z cíle je tu jen typ.
-    levels: ['entryLevels', 'nearLevels', 'nearLevelsNone', 'ofConfirm', 'absLocation', 'targetLevel1Type',
-      'targetLevel2Type', 'contextDerived', 'levelsSummary'],
+    levels: ['entryLevels', 'nearLevels', 'nearLevelsNone', 'ofConfirm', 'absLocation', 'targetLevel1Types',
+      'targetLevel2Types', 'contextDerived', 'levelsSummary'],
     comments: ['tradePlanSetup', 'tradePlanPsychology', 'tradePlanNote', 'comment', 'screenshots']
   };
   for (const [card, ids] of Object.entries(expected)) {
@@ -199,7 +199,7 @@ test('shrnutí počítá i s order flow, které je ve stejné položce', () => {
 // rozklikávací položku.
 
 function pills() {
-  return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML',
+  return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'targetTypesLabel', 'openTradeLevels', 'tradeLevelsBlockHTML',
     'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown'],
     { FJTaxonomy, settings: { templates: [] } });
 }

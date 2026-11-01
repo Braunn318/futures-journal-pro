@@ -109,9 +109,9 @@ test('sloučení: odvozená cena targetu z nohy se nepřebírá, typ ano', () =>
     { targetLevel1: { type: 'VPOC_1M', price: 7737.75 }, targetLevel1PriceDerived: true },
     { targetLevel1: { type: 'VPOC_1M', price: 7733 }, targetLevel1PriceDerived: true }
   ]);
-  eq(merged.targetLevel1, { type: 'VPOC_1M', price: null });
+  eq(merged.targetLevel1, { type: 'VPOC_1M', types: ['VPOC_1M'], price: null });
   const manual = r.mergeContextFields([{ targetLevel1: { type: 'VPOC_1M', price: 7730 } }]);
-  eq(manual.targetLevel1, { type: 'VPOC_1M', price: 7730 }, 'ruční cena zůstává');
+  eq(manual.targetLevel1, { type: 'VPOC_1M', types: ['VPOC_1M'], price: 7730 }, 'ruční cena zůstává');
 });
 
 // ---------------------------------------------------------------- plánované R

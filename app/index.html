@@ -1430,7 +1430,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="field"><label>Stav</label><select id="sfFill"></select><div class="sub">Do fill rate se počítá jen „nenaplněno“. „Vynechán“ se vykazuje zvlášť.</div></div>
       <div class="field"><label>Plánovaná cena vstupu</label><input id="sfPlannedEntry" type="number" step="any"></div>
       <div class="field"><label>Cena Stop Lossu</label><input id="sfSl" type="number" step="any"></div>
-      <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="sfTarget1Type"></select></div>
+      <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="sfTarget1Types" class="chip-grid"></div></div>
       <div class="field"><label>Cena cílové hladiny 1</label><input id="sfTarget1Price" type="number" step="any"></div>
       <div class="field"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="sfMissedBy" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
       <div class="field" id="sfSkippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— výběr, Nastavení → Číselníky</span></label><select id="sfSkippedReason"></select></div>
@@ -1526,8 +1526,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label><div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Přizpůsobení → LTA levely). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
-          <div class="field"><label>Cílová hladina 1 <span class="sub">— typ</span></label><select id="targetLevel1Type"></select></div>
-          <div class="field"><label>Cílová hladina 2 <span class="sub">— typ</span></label><select id="targetLevel2Type"></select></div>
+          <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
+          <div class="field full"><label>Cílová hladina 2 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel2Types" class="chip-grid"></div></div>
           <div class="field full sub" id="contextDerived" data-ctx-field="derivedRow" title="Dopočítáno z cen hladin, vstupu, SL a cíle – needituje se a do obchodu se neukládá."></div>
         </div>
       </details>
@@ -3519,6 +3519,10 @@ function fillContextSelect(id,enumName,emptyLabel,selected){
  el.innerHTML=`<option value="">${esc(emptyLabel)}</option>`
   +options.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}${o.hidden?' (skrytá)':''}</option>`).join('');
 }
+// Popisek vybraných typů cílové hladiny („VAL + Likvidita"), '?' když žádný.
+function targetTypesLabel(types){
+ return Array.isArray(types)&&types.length?types.map(k=>FJTaxonomy.labelOf('TARGET_LEVEL',k)).join(' + '):'?';
+}
 // Nová single-select pole kontextu v2 (A4): id prvku = klíč v obchodu.
 // Známka (grade) jde zvlášť přes FJContext.applyGrade.
 const NEW_SINGLE_FIELDS=[['trendHtf','TREND_HTF'],['entryTestNo','ENTRY_TEST_NO'],['absLocation','ABS_LOCATION'],
@@ -3780,8 +3784,8 @@ function updateLevelsSummary(){
   if(keys.length)parts.push(label+': '+keys.map(k=>FJTaxonomy.labelOf(enumName,k)).join(' + '));
  }
  for(const n of [1,2]){
-  const type=$('targetLevel'+n+'Type')?.value,price=$('targetLevel'+n+'Price')?.value;
-  if(type||(price!==undefined&&String(price).trim()!==''))parts.push(`Cíl ${n}: ${type?FJTaxonomy.labelOf('TARGET_LEVEL',type):'?'}${String(price||'').trim()?' @ '+price:''}`);
+  const types=readChipGrid('targetLevel'+n+'Types','TARGET_LEVEL'),price=$('targetLevel'+n+'Price')?.value;
+  if(types.length||(price!==undefined&&String(price).trim()!==''))parts.push(`Cíl ${n}: ${targetTypesLabel(types)}${String(price||'').trim()?' @ '+price:''}`);
  }
  out.textContent=parts.length?'— '+parts.join(' · '):'— nevyplněno';
 }
@@ -3836,15 +3840,15 @@ function mergeContextFields(list){
     if(source[field.key+'Source'])out[field.key+'Source']=source[field.key+'Source'];
    }
   }else if(field.cardinality==='target'){
+   // Typy (konfluence) se sjednocují přes všechny nohy jako multi-select.
    // Cena odvozená z výstupu nohy (targetLevelNPriceDerived) popisuje jen tu
-   // nohu – u sloučené pozice by target 1 nesl cenu libovolné nohy. Přebírá
-   // se jen typ; cenu formulář dopočítá z nohou znovu (deriveTargetPrices).
-   const first=list.map(t=>{
-    const tl=FJTaxonomy.sanitizeTargetLevel(t?.[field.key]);
-    if(tl&&t[field.key+'PriceDerived']===true)return tl.type?{type:tl.type,price:null}:null;
-    return tl;
-   }).find(Boolean);
-   if(first)out[field.key]=first;
+   // nohu – u sloučené pozice by target 1 nesl cenu libovolné nohy. Bere se
+   // jen ruční cena z první nohy, která ji má; jinak ji formulář dopočítá
+   // z nohou znovu (deriveTargetPrices).
+   const types=list.flatMap(t=>FJTaxonomy.targetTypesOf(t?.[field.key]));
+   const priced=list.find(t=>t?.[field.key+'PriceDerived']!==true&&FJTaxonomy.sanitizeTargetLevel(t?.[field.key])?.price!=null);
+   const merged=FJTaxonomy.sanitizeTargetLevel({types,price:priced?FJTaxonomy.sanitizeTargetLevel(priced[field.key]).price:null});
+   if(merged)out[field.key]=merged;
   }else if(field.merge==='lastExit'){
    // Skupina se bere z JEDNÉ nohy vcelku – jinak by se stalo, že čísla jsou
    // z jedné nohy a příznak z jiné, a popisovaly by dva různé okamžiky.
@@ -4102,7 +4106,7 @@ function levelPillsHTML(t,opts={}){
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
   if(!target)continue;
-  const name=target.type?FJTaxonomy.labelOf('TARGET_LEVEL',target.type):'?';
+  const name=targetTypesLabel(target.types);
   parts.push(`<span class="pill context-pill" title="Cílová hladina ${n}">Cíl ${n}: ${esc(name)}${target.price!=null?' @ '+esc(target.price):''}</span>`);
  }
  const of=FJTaxonomy.sanitizeMulti('OF_CONFIRM',t.ofConfirm);
@@ -4365,7 +4369,7 @@ function setupRowHTML(s){
  if(s.plannedEntryPrice!=null)price.push('vstup '+esc(s.plannedEntryPrice));
  if(s.slPrice!=null)price.push('SL '+esc(s.slPrice));
  const tg=FJTaxonomy.sanitizeTargetLevel(s.targetLevel1);
- if(tg)price.push('cíl '+esc(tg.type?FJTaxonomy.labelOf('TARGET_LEVEL',tg.type):'?')+(tg.price!=null?' @ '+esc(tg.price):''));
+ if(tg)price.push('cíl '+esc(targetTypesLabel(tg.types))+(tg.price!=null?' @ '+esc(tg.price):''));
  if(s.missedByTicks!=null)price.push('minuto o '+esc(s.missedByTicks)+' t');
  if(s.maxFavorableTicks!=null)price.push('max '+esc(s.maxFavorableTicks)+' t');
  if(s.maxLevel)price.push('došlo na '+esc(FJTaxonomy.labelOf('TARGET_LEVEL',s.maxLevel)));
@@ -4952,8 +4956,7 @@ function openModal(t=null,{title}={}){
  }
  for(const n of [1,2]){
   const target=FJTaxonomy.sanitizeTargetLevel(t&&t['targetLevel'+n]);
-  fillContextSelect('targetLevel'+n+'Type','TARGET_LEVEL','— nevyplněno —',target&&target.type);
-  if($('targetLevel'+n+'Type'))$('targetLevel'+n+'Type').value=target?target.type:'';
+  renderChipGrid('targetLevel'+n+'Types','TARGET_LEVEL',target?target.types:[]);
   const el=$('targetLevel'+n+'Price');
   if(el){
    el.value=(target&&target.price!=null)?target.price:'';
@@ -5519,7 +5522,7 @@ function renderContextDerived(){
   id,side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,
   date:$('date')?.value||'',entryTime:$('entryTime')?.value||'',
   nearLevels:rows,nearLevelsNone:readNearNone(),
-  targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price},
+  targetLevel1:{types:readChipGrid('targetLevel1Types','TARGET_LEVEL'),price:d.targetLevel1?.price},
   targetLevel1PriceDerived:$('targetLevel1Price')?.dataset?.derived==='1'
  };
  const order=formDayOrderFor(id,t.date,t.entryTime);
@@ -5553,7 +5556,7 @@ function formContextDraft(){
   entryTestNo:readSingleChipGrid('entryTestNo','ENTRY_TEST_NO'),absLocation:readSingleChipGrid('absLocation','ABS_LOCATION'),
   trendHtf:readSingleChipGrid('trendHtf','TREND_HTF'),grade:readSingleChipGrid('grade','GRADE'),
   psychBefore:readSingleChipGrid('psychBefore','PSYCH'),psychDuring:readSingleChipGrid('psychDuring','PSYCH'),psychAfter:readSingleChipGrid('psychAfter','PSYCH'),
-  targetLevel1:{type:$('targetLevel1Type')?.value||'',price:d.targetLevel1?.price}
+  targetLevel1:{types:readChipGrid('targetLevel1Types','TARGET_LEVEL'),price:d.targetLevel1?.price}
  };
 }
 function renderTradeSections(){
@@ -5770,7 +5773,8 @@ $('instrument')?.addEventListener('change',renderPostExitHints);
 ['entryPrice','instrument'].forEach(id=>$(id)?.addEventListener('input',renderLevelDistances));
 ['side','instrument'].forEach(id=>$(id)?.addEventListener('change',renderLevelDistances));
 $('wouldSkipLive')?.addEventListener('change',syncWouldSkipField);
-['targetLevel1Type','targetLevel1Price','targetLevel2Type','targetLevel2Price'].forEach(id=>{
+// Dlaždice typů cíle volají updateLevelsSummary samy (renderChipGrid).
+['targetLevel1Price','targetLevel2Price'].forEach(id=>{
  $(id)?.addEventListener('input',()=>updateLevelsSummary());
  $(id)?.addEventListener('change',()=>updateLevelsSummary());
 });
@@ -6043,13 +6047,13 @@ $('tradeForm').addEventListener('submit',async e=>{
   // spočítat, ale informace o typu se neztratí).
   // Cena targetu se chová jako cena SL: ruční má přednost, pole v režimu
   // dopočtu se bere čerstvě z nohou (deriveTargetPrices) s příznakem
-  // targetLevel{n}PriceDerived – sanitizeTargetLevel nese jen { type, price }.
+  // targetLevel{n}PriceDerived – sanitizeTargetLevel nese jen { type, types, price }.
   const derivedTargets=deriveTargetPrices(obj);
   for(const n of [1,2]){
    const el=$('targetLevel'+n+'Price');
    const isDerived=el?.dataset?.derived==='1';
    const price=isDerived?(derivedTargets[n-1]??''):el?.value;
-   const target=FJTaxonomy.sanitizeTargetLevel({type:$('targetLevel'+n+'Type')?.value,price});
+   const target=FJTaxonomy.sanitizeTargetLevel({types:readChipGrid('targetLevel'+n+'Types','TARGET_LEVEL'),price});
    if(target)obj['targetLevel'+n]=target;else delete obj['targetLevel'+n];
    if(isDerived&&target&&target.price!=null)obj['targetLevel'+n+'PriceDerived']=true;else delete obj['targetLevel'+n+'PriceDerived'];
   }
@@ -6469,8 +6473,7 @@ function openSetupModal(rec){
  $('sfFill').value=s.fillStatus==='SKIPPED'?'SKIPPED':'NO_FILL';
  for(const [id,val] of [['sfPlannedEntry',s.plannedEntryPrice],['sfSl',s.slPrice],['sfMissedBy',s.missedByTicks],['sfMaxFav',s.maxFavorableTicks]])$(id).value=val!=null?val:'';
  const tg=FJTaxonomy.sanitizeTargetLevel(s.targetLevel1);
- fillContextSelect('sfTarget1Type','TARGET_LEVEL','— nevyplněno —',tg&&tg.type);
- $('sfTarget1Type').value=tg?tg.type:'';
+ renderChipGrid('sfTarget1Types','TARGET_LEVEL',tg?tg.types:[]);
  $('sfTarget1Price').value=tg&&tg.price!=null?tg.price:'';
  fillContextSelect('sfMaxLevel','TARGET_LEVEL','— nevyplněno —',s.maxLevel);
  $('sfMaxLevel').value=FJTaxonomy.sanitizeSingle('TARGET_LEVEL',s.maxLevel);
@@ -6508,7 +6511,7 @@ async function saveSetupRecord(){
  if(sl!=null)rec.slPrice=sl;
  if(missed!=null)rec.missedByTicks=Math.abs(missed);
  if(maxFav!=null)rec.maxFavorableTicks=Math.abs(maxFav);
- const tg=FJTaxonomy.sanitizeTargetLevel({type:$('sfTarget1Type').value,price:$('sfTarget1Price').value});
+ const tg=FJTaxonomy.sanitizeTargetLevel({types:readChipGrid('sfTarget1Types','TARGET_LEVEL'),price:$('sfTarget1Price').value});
  if(tg)rec.targetLevel1=tg;
  const maxLevel=FJTaxonomy.sanitizeSingle('TARGET_LEVEL',$('sfMaxLevel').value);
  if(maxLevel)rec.maxLevel=maxLevel;
@@ -6685,7 +6688,7 @@ function tradeCsvHeader(count=1){
 }
 function tradeCsvRow(t,dn,count=1,tickSize){
  const p=t.dailyPlan||{};
- return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),FJTaxonomy.storedTargetTypes(t.targetLevel1).join('|'),t.targetLevel1?.price??'',FJTaxonomy.storedTargetTypes(t.targetLevel2).join('|'),t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 // Kontext v2 (A6): sloupce kontextu jdou ZA konec základního řádku. Dopočty
 // mají v hlavičce „(dopočet)". Klíče, ne popisky. Kontext dne jde na KAŽDÝ
@@ -7373,7 +7376,7 @@ function reportCsvHeader(count=1){
 }
 function reportCsvRow(t,dn,count=1,tickSize){
  const p=t.dailyPlan||{};
- return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),t.targetLevel1?.type||'',t.targetLevel1?.price??'',t.targetLevel2?.type||'',t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),FJTaxonomy.storedTargetTypes(t.targetLevel1).join('|'),t.targetLevel1?.price??'',FJTaxonomy.storedTargetTypes(t.targetLevel2).join('|'),t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('reportCsv').onclick=async()=>{
  // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()

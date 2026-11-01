@@ -117,7 +117,8 @@
   // Typ cílové hladiny: kam obchod mířil (targetLevel1 / targetLevel2). Vlastní
   // číselník, ne sdílený s hladinou vstupu – „Trail podle 1min M2" nebo „Ruční
   // výstup bez hladiny" nejsou místa vstupu. Cena hladiny se ukládá vedle typu,
-  // bez ní nejde spočítat, na kolika R hladina ležela.
+  // bez ní nejde spočítat, na kolika R hladina ležela. MULTI-SELECT (4.8.99) –
+  // i výstup může ležet na konfluenci hladin; vybrané typy jsou rovnocenné.
   const TARGET_LEVEL = {
     LIQUIDITY: 'Likvidita',
     VPOC_DAY: 'VPOC dne',
@@ -239,7 +240,7 @@
     { name: 'LTA_LEVELS', label: 'LTA Levels', cardinality: 'multi' },
     { name: 'OF_CONFIRM', label: 'Order flow potvrzení', cardinality: 'multi' },
     { name: 'FILL_STATUS', label: 'Stav naplnění', cardinality: 'single' },
-    { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'single' },
+    { name: 'TARGET_LEVEL', label: 'Typ cílové hladiny', cardinality: 'multi' },
     { name: 'SKIP_REASON', label: 'Důvod vynechání / „naživo bych nevzal“', cardinality: 'single' },
     { name: 'TREND_HTF', label: 'Trend 30m', cardinality: 'single' },
     { name: 'ABS_LOCATION', label: 'Absorpce – kde', cardinality: 'single' },
@@ -297,8 +298,10 @@
     { key: 'ofConfirm', cardinality: 'multi', enumName: 'OF_CONFIRM', label: 'Order flow potvrzení' },
     { key: 'fillStatus', cardinality: 'single', enumName: 'FILL_STATUS', label: 'Stav naplnění' },
     { key: 'slPrice', cardinality: 'number', enumName: null, label: 'Cena Stop Lossu' },
-    // Cílová hladina: { type: klíč z TARGET_LEVEL, price: číslo }. Bere se vcelku
-    // z prvního obchodu, který ji má – typ a cena patří k sobě.
+    // Cílová hladina: { type, types: [klíče z TARGET_LEVEL], price: číslo }.
+    // `types` je výběr (konfluence), `type` jen kopie prvního z nich kvůli
+    // starším čtenářům (Backtest Lab, export). Sloučený obchod sjednocuje
+    // typy všech nohou, cenu bere z první nohy, která ji má.
     { key: 'targetLevel1', cardinality: 'target', enumName: 'TARGET_LEVEL', label: 'Cílová hladina 1' },
     { key: 'targetLevel2', cardinality: 'target', enumName: 'TARGET_LEVEL', label: 'Cílová hladina 2' },
     // Průběh obchodu DO VÝSTUPU, od vstupní ceny, v ticích, vždy kladně.
@@ -489,16 +492,34 @@
     return isValidKey(group, value, config) ? value : '';
   }
 
-  // Cílová hladina { type, price }. Neznámý typ se zahazuje (ne opravuje);
-  // cena je nepovinná, ale bez ní se R hladiny nedá spočítat. Prázdné = null.
+  // Cílová hladina { type, types, price }. JEDINÉ místo, kde se čte starý tvar
+  // { type, price } (do 4.8.98 jeden typ): bez `types` se bere [type]. Typy
+  // jsou rovnocenné, v pořadí číselníku; `type` = první z nich, aby čtenáři
+  // starého tvaru (Backtest Lab, starší exporty) dál dostali platný klíč.
+  // Neznámý typ se zahazuje (ne opravuje), skrytý zůstává. Cena je nepovinná,
+  // ale bez ní se R hladiny nedá spočítat. Prázdné = null.
+  // Uložené typy cíle tak, jak jsou (bez kontroly číselníku) – pro export,
+  // který má vypsat přesně to, co je v souboru.
+  function storedTargetTypes(value) {
+    if (!value || typeof value !== 'object') return [];
+    if (Array.isArray(value.types)) return value.types.filter(k => typeof k === 'string' && k);
+    return value.type ? [value.type] : [];
+  }
+
   function sanitizeTargetLevel(value, config) {
     if (!value || typeof value !== 'object') return null;
-    const type = sanitizeSingle('TARGET_LEVEL', value.type, config);
+    const types = sanitizeMulti('TARGET_LEVEL', storedTargetTypes(value), config);
     const raw = value.price;
     const n = (raw === null || raw === undefined || String(raw).trim() === '') ? null : Number(raw);
     const price = Number.isFinite(n) ? n : null;
-    if (!type && price == null) return null;
-    return { type, price };
+    if (!types.length && price == null) return null;
+    return { type: types[0] || '', types, price };
+  }
+
+  // Vybrané typy cílové hladiny (i ze starého tvaru). Prázdné pole, když nic.
+  function targetTypesOf(value, config) {
+    const tl = sanitizeTargetLevel(value, config);
+    return tl ? tl.types : [];
   }
 
   // Netest / test: platný stav, nebo '' (nevyplněno).
@@ -737,7 +758,7 @@
     if (!sanitizeSingle('TREND_HTF', trade.trendHtf, config)) missing.push('trendHtf');
     if (!sanitizeSingle('GRADE', trade.grade, config)) missing.push('grade');
     const target = sanitizeTargetLevel(trade.targetLevel1, config);
-    if (!target || !target.type || target.price == null) missing.push('targetLevel1');
+    if (!target || !target.types.length || target.price == null) missing.push('targetLevel1');
     // Nenaplněný / vynechaný setup vyplněný jako celý hypotetický obchod (má
     // výstupní cenu) se posuzuje jako naplněný.
     const fill = trade.fillStatus;
@@ -878,7 +899,7 @@
       if (CONTEXT_FIELD_BY_KEY[key] && !fieldWarns(fieldConfig, key)) continue;
       if (key === 'targetLevel1') {
         const tl = (trade && trade.targetLevel1) || {};
-        if (!sanitizeSingle('TARGET_LEVEL', tl.type, config)) add(key, 'levels', contextFieldLabel(key) + ' (typ)', 'type');
+        if (!targetTypesOf(tl, config).length) add(key, 'levels', contextFieldLabel(key) + ' (typ)', 'type');
         if (numOrNull(tl.price) == null) add(key, 'sltp', 'Cena targetu', 'price');
         continue;
       }
@@ -1183,7 +1204,7 @@
     applyConfig, getConfig, groupConfig,
     // dotazy
     allKeys, removedKeys, tagOf, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey, isLevelKey, DEFAULT_NOT_LEVEL,
-    visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
+    visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, targetTypesOf, storedTargetTypes, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     missingContextKeys, contextFieldLabel,
     TRADE_CARDS, missingContextItems, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingWarnItems, missingForCards,
     CONTEXT_FIELDS, normalizeFieldConfig, fieldShown, fieldWarns,
