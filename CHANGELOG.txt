@@ -2,6 +2,12 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.98 - 2026-11-01
+Automatické screenshoty: nastavení zvlášť pro každý deník a ošetření černých snímků oken. Žádná migrace dat; `trade-capture/settings.json` dostane klíče `screenshotByJournal` a `activeJournalId`.
+- New: režim snímání, pravidla oken, chybějící okno a „Po obchodu“ se nastavují zvlášť pro každý deník (Integrace → Stav a obecné, v popisku je vidět, pro který deník nastavení platí). Deník bez vlastního nastavení dědí dosavadní hodnoty; první změna v deníku uloží jeho vlastní kopii. Obchod se řídí nastavením deníku, na který je namapovaný jeho účet, jinak otevřeného deníku.
+- Fixed: plocha grafu NT8 (DirectX) se přes snímání okna ukládala celá černá, i když byl graf na obrazovce vidět. Takové okno se teď pozná, na dobu snímání (cca 1 s) se vynese nahoru a vyřízne ze snímku obrazovky. Pokud se výřez nepodaří, platí volba „Když vybrané okno chybí“. V seznamu oken má černé okno štítek „černý snímek“. Okno může překrýt vlastní okno NT8 nad ním (např. Playback).
+- Fixed: „Načíst otevřená okna“ při chybě už nezůstane viset na „Načítám…“.
+
 ## 4.8.97 - 2026-11-01
 Automatické screenshoty: výběr oken a druhá sekce „Po obchodu“. Žádná migrace dat; nové pole obchodu `imagesAfter` vzniká jen u obchodů, které ho dostanou.
 - New: Nastavení → Integrace → Automatické screenshoty má volbu „Vybraná okna“. Fotí se jen okna, jejichž název obsahuje zapnuté pravidlo (část názvu, bez ohledu na velikost písmen – platí i po restartu NT8). „Načíst otevřená okna“ ukáže náhledy k výběru, pravidla jde ručně doplnit, vypnout i smazat. Pop-upy jiných aplikací se do snímku nedostanou. Okno, které chybí nebo je minimalizované, se přeskočí (volitelně: vzít hlavní monitor / nefotit nic).

@@ -10,7 +10,7 @@ const nodePath = require('node:path');
 const { loadMain } = require('./helpers/extract');
 
 const NAMES = [
-  'captureWindowRules', 'pickCaptureWindows', 'normalizeScreenshotSettings', 'screenshotSettingsView',
+  'isBlankThumbnail', 'isMostlyBlackThumbnail', 'SHOT_SETTING_KEYS', 'screenshotJournalFor', 'effectiveShotSettings', 'applyShotSettingsPatch', 'captureWindowRules', 'pickCaptureWindows', 'normalizeScreenshotSettings', 'screenshotSettingsView',
   'afterShotPath', 'afterShotTimers', 'readAfterShotJobs', 'writeAfterShotJobs', 'armAfterShot', 'scheduleAfterShot', 'runAfterShot', 'resumeAfterShotJobs'
 ];
 
@@ -126,4 +126,46 @@ test('po restartu: splatné se naplánují hned, příliš staré se zahodí', (
   assert.deepEqual(Array.from(h.main.readAfterShotJobs(), j => j.positionId), ['fresh']);
   assert.equal(h.timers.size, 1);
   assert.equal([...h.timers.values()][0].ms, 0);
+});
+
+test('per deník: účet namapovaný na deník má přednost před otevřeným deníkem', () => {
+  const { main } = harness();
+  const settings = { activeJournalId: 'live', accountMappings: { Playback101: 'bt' } };
+  assert.equal(main.screenshotJournalFor(settings, 'Playback101'), 'bt');
+  assert.equal(main.screenshotJournalFor(settings, 'Sim101'), 'live');
+  assert.equal(main.screenshotJournalFor({}, ''), '');
+});
+
+test('per deník: deník bez záznamu dědí globál, s záznamem má vlastní hodnoty', () => {
+  const { main } = harness();
+  const settings = { screenshotMode: 'primary', screenshotWindows: [], screenshotByJournal: { bt: { screenshotMode: 'windows', screenshotWindows: [{ match: 'Chart', enabled: true }] } } };
+  assert.equal(main.effectiveShotSettings(settings, 'live').screenshotMode, 'primary');
+  const bt = main.effectiveShotSettings(settings, 'bt');
+  assert.equal(bt.screenshotMode, 'windows');
+  assert.equal(bt.screenshotWindows[0].match, 'Chart');
+});
+
+test('per deník: první změna uloží celou kopii a jiný deník se nezmění', () => {
+  const { main } = harness();
+  const settings = { screenshotMode: 'primary', screenshotMissing: 'skip', afterShotEnabled: false, afterShotMinutes: 15, afterShotMax: 3, screenshotWindows: [] };
+  main.applyShotSettingsPatch(settings, 'bt', { screenshotMode: 'windows' });
+  assert.equal(settings.screenshotMode, 'primary');
+  assert.equal(settings.screenshotByJournal.bt.screenshotMode, 'windows');
+  assert.equal(settings.screenshotByJournal.bt.afterShotMinutes, 15);
+  assert.equal(main.effectiveShotSettings(settings, 'live').screenshotMode, 'primary');
+});
+
+function fakeImage(width, height, fill) {
+  const bitmap = Buffer.alloc(width * height * 4);
+  for (let i = 0; i < width * height; i++) { const v = fill(i); bitmap[i * 4] = v; bitmap[i * 4 + 1] = v; bitmap[i * 4 + 2] = v; bitmap[i * 4 + 3] = 255; }
+  return { isEmpty: () => false, getSize: () => ({ width, height }), toBitmap: () => bitmap };
+}
+
+test('černé snímky: prázdný / celý černý = blank, graf s černou plochou = jen podezřelý', () => {
+  const { main } = harness();
+  assert.equal(main.isBlankThumbnail(null), true);
+  assert.equal(main.isBlankThumbnail(fakeImage(100, 100, () => 0)), true);
+  assert.equal(main.isBlankThumbnail(fakeImage(100, 100, i => (i % 10 === 0 ? 200 : 0))), false);
+  assert.equal(main.isMostlyBlackThumbnail(fakeImage(100, 100, i => (i % 10 === 0 ? 200 : 0))), true);
+  assert.equal(main.isMostlyBlackThumbnail(fakeImage(100, 100, () => 120)), false);
 });

@@ -855,7 +855,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Uzavřené obchody čekající na import</label><input id="capturePendingCount" readonly></div>
           <div class="field full"><label>Lokální endpoint</label><input id="captureEndpoint" readonly></div>
           <div class="field full"><label>API klíč pro NinjaTrader</label><input id="captureApiKey" readonly></div>
-          <div class="field"><label>Automatické screenshoty</label>
+          <div class="field"><label>Automatické screenshoty – deník: <span id="captureShotJournal"></span></label>
             <select id="captureScreenshotMode">
               <option value="none">Vypnuto</option>
               <option value="primary">Hlavní monitor</option>
@@ -6703,6 +6703,8 @@ function saveJournalProfiles(){
  // → Export pro AI/Cowork) – ať jde podle názvu poznat, který soubor patří kterému
  // deníku, i když je název souboru jen náhodné ID.
  window.desktopAPI?.writeAiExportManifest?.(journalProfiles)?.catch?.(()=>{});
+ // Hlavní proces podle aktivního deníku vybírá nastavení snímání.
+ window.desktopAPI?.captureSetActiveJournal?.(activeJournalId)?.catch?.(()=>{});
 }
 function safeReload(){
  // Reload stránky, zatímco má nějaké pole fokus, může v Electronu/Chromiu
@@ -7251,7 +7253,7 @@ let captureSnapshot=null;
 
 async function refreshCaptureStatus(){
  if(!window.desktopAPI?.captureStatus)return;
- const r=await window.desktopAPI.captureStatus();
+ const r=await window.desktopAPI.captureStatus(activeJournalId);
  if(!r?.ok)return;
  captureSnapshot=r;
  $('captureStatusText').value=(r.running?`Běží na portu ${r.port}`:'Neběží')+(r.rejected?.active?` · odmítnuté zprávy: ${r.rejected.count} – neplatný API klíč, přeinstaluj konektor`:'');
@@ -7279,15 +7281,17 @@ function renderCaptureWindowSettings(r){
  if(document.activeElement!==$('captureAfterMax'))$('captureAfterMax').value=r.afterShotMax||3;
  const rules=Array.isArray(r.screenshotWindows)?r.screenshotWindows:[];
  $('captureWindowRules').innerHTML=rules.length?rules.map((rule,i)=>`<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><label style="display:flex;align-items:center;gap:6px;flex:1"><input type="checkbox" data-win-on="${i}" ${rule.enabled!==false?'checked':''}> <span>${esc(rule.match)}</span></label><button class="btn" type="button" data-win-del="${i}">Smazat</button></div>`).join(''):'<div class="sub">Zatím žádné pravidlo – bez pravidel se nevyfotí nic.</div>';
+ const journalName=journalProfiles.find(j=>j.id===activeJournalId)?.name||'';
+ $('captureShotJournal').textContent=journalName;
  $('captureWindowRules').querySelectorAll('[data-win-on]').forEach(el=>el.onchange=()=>saveCaptureWindowRules(rules.map((x,i)=>i===Number(el.dataset.winOn)?{...x,enabled:el.checked}:x)));
  $('captureWindowRules').querySelectorAll('[data-win-del]').forEach(el=>el.onclick=()=>saveCaptureWindowRules(rules.filter((_,i)=>i!==Number(el.dataset.winDel))));
 }
 async function saveCaptureWindowRules(rules){
- await window.desktopAPI.captureSetScreenshotSettings({screenshotWindows:rules});
+ await window.desktopAPI.captureSetScreenshotSettings({screenshotWindows:rules},activeJournalId);
  await refreshCaptureStatus();
 }
 async function saveCaptureShotSettings(patch){
- await window.desktopAPI.captureSetScreenshotSettings(patch);
+ await window.desktopAPI.captureSetScreenshotSettings(patch,activeJournalId);
  await refreshCaptureStatus();
 }
 function renderOpenPositions(rows){
@@ -8116,7 +8120,7 @@ $('captureNewKey').onclick=async()=>{
  await window.desktopAPI.captureRegenerateKey();await refreshCaptureStatus();void refreshNinjaConnectorState();
 };
 $('captureClear').onclick=async()=>{if(await showConfirm('Vymazat frontu zachycených událostí?')){await window.desktopAPI.captureClear();await refreshCaptureStatus()}};
-$('captureScreenshotMode').onchange=async e=>{await window.desktopAPI.captureSetScreenshotMode(e.target.value);await refreshCaptureStatus()};
+$('captureScreenshotMode').onchange=async e=>{await window.desktopAPI.captureSetScreenshotMode(e.target.value,activeJournalId);await refreshCaptureStatus()};
 $('captureScreenshotMissing').onchange=e=>saveCaptureShotSettings({screenshotMissing:e.target.value});
 $('captureAfterEnabled').onchange=e=>saveCaptureShotSettings({afterShotEnabled:e.target.value==='ano'});
 $('captureAfterMinutes').onchange=e=>saveCaptureShotSettings({afterShotMinutes:e.target.value});
@@ -8131,9 +8135,10 @@ $('captureWindowAdd').onclick=async()=>{
 $('captureWindowLoad').onclick=async()=>{
  const box=$('captureWindowList');
  box.innerHTML='<span class="sub">Načítám…</span>';
- const r=await window.desktopAPI.captureListWindows();
+ let r;
+ try{r=await window.desktopAPI.captureListWindows()}catch(e){r={ok:false,error:'Okna nejdou načíst: '+(e?.message||e)}}
  if(!r?.ok||!r.windows.length){box.innerHTML=`<span class="sub">${r?.ok?'Žádná otevřená okna.':esc(r?.error||'Okna nejdou načíst.')}</span>`;return}
- box.innerHTML=r.windows.map((w,i)=>`<button type="button" class="btn" data-win-pick="${i}" title="Přidat pravidlo z tohoto názvu" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:170px;padding:6px;text-align:left">${w.thumb?`<img src="${w.thumb}" style="width:100%;border-radius:4px">`:''}<span style="font-size:11px;word-break:break-word">${esc(w.name)}</span></button>`).join('');
+ box.innerHTML=r.windows.map((w,i)=>`<button type="button" class="btn" data-win-pick="${i}" title="Přidat pravidlo z tohoto názvu" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:170px;padding:6px;text-align:left">${w.thumb?`<img src="${w.thumb}" style="width:100%;border-radius:4px">`:''}<span style="font-size:11px;word-break:break-word">${esc(w.name)}</span>${w.blank?'<span class="sub" style="font-size:10px">černý snímek – okno se nepodaří vyfotit</span>':''}</button>`).join('');
  box.querySelectorAll('[data-win-pick]').forEach(btn=>btn.onclick=()=>{$('captureWindowNew').value=r.windows[Number(btn.dataset.winPick)].name;$('captureWindowNew').focus()});
 };
 $('captureAutoImportSelect').onchange=async e=>{await window.desktopAPI.captureSetAutoImport(e.target.value==='ano');await refreshCaptureStatus()};
@@ -8171,6 +8176,7 @@ setInterval(async()=>{
  const s=await window.desktopAPI?.captureStatus?.();
  if(s?.autoImport&&(s.pending||s.pendingAfter))await importCapturedTrades(true);
 },5000);
+window.desktopAPI?.captureSetActiveJournal?.(activeJournalId)?.catch?.(()=>{});
 setTimeout(refreshCaptureStatus,800);
 
 

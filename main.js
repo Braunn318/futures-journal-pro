@@ -1650,6 +1650,10 @@ function defaultCaptureSettings() {
     afterShotEnabled: false,
     afterShotMinutes: 15,
     afterShotMax: 3,
+    // Nastavení snímání zvlášť pro každý deník: { [id deníku]: { screenshotMode, … } }.
+    // Bez záznamu platí hodnoty výše. activeJournalId hlásí renderer.
+    screenshotByJournal: {},
+    activeJournalId: '',
     accountMappings: {},
     hiddenAccounts: [],
     deletedAccounts: [],
@@ -1824,6 +1828,135 @@ function withCaptureLock(fn) {
 function positionKey(payload) {
   return `${payload.account || 'UNKNOWN'}|${payload.instrumentFull || payload.instrument || payload.symbol || 'UNKNOWN'}`;
 }
+// Nastavení snímání je zvlášť pro každý deník (settings.screenshotByJournal).
+// Deník bez vlastního záznamu dědí globální hodnoty. Událost patří deníku,
+// na který je namapovaný její účet, jinak deníku, který je právě otevřený
+// (settings.activeJournalId – renderer ho hlásí při startu a přepnutí).
+const SHOT_SETTING_KEYS = ['screenshotMode', 'screenshotWindows', 'screenshotMissing', 'afterShotEnabled', 'afterShotMinutes', 'afterShotMax'];
+function screenshotJournalFor(settings, account) {
+  const mapped = account && settings.accountMappings && settings.accountMappings[account];
+  return mapped || settings.activeJournalId || '';
+}
+function effectiveShotSettings(settings, journalId) {
+  const own = journalId && settings.screenshotByJournal && settings.screenshotByJournal[journalId];
+  if (!own || typeof own !== 'object') return settings;
+  const merged = { ...settings };
+  for (const key of SHOT_SETTING_KEYS) if (own[key] !== undefined) merged[key] = own[key];
+  return merged;
+}
+// Okno NT8 vykreslené přes DirectX vrací desktopCapturer někdy celé černé.
+// Vzorkuje se bitmapa; skoro samé černé pixely = snímek je k ničemu.
+function isBlankThumbnail(image) {
+  if (!image || image.isEmpty()) return true;
+  const { width, height } = image.getSize();
+  const bitmap = image.toBitmap();
+  const pixels = width * height;
+  if (!pixels || bitmap.length < pixels * 4) return true;
+  const step = Math.max(1, Math.floor(pixels / 20000));
+  let seen = 0;
+  for (let i = 0; i < pixels; i += step) {
+    const o = i * 4;
+    if (bitmap[o] > 12 || bitmap[o + 1] > 12 || bitmap[o + 2] > 12) return false;
+    seen++;
+  }
+  return seen > 0;
+}
+// Plocha grafu NT8 (DirectX) se přes desktopCapturer ani PrintWindow nezachytí:
+// rámeček okna je vidět, graf je černý. Snímek CELÉ obrazovky ho ale zachytí
+// správně, proto se takové okno krátce vynese nahoru a vyřízne z obrazovky.
+function isMostlyBlackThumbnail(image) {
+  if (!image || image.isEmpty()) return true;
+  const { width, height } = image.getSize();
+  const bitmap = image.toBitmap();
+  const pixels = width * height;
+  if (!pixels || bitmap.length < pixels * 4) return true;
+  const step = Math.max(1, Math.floor(pixels / 20000));
+  let black = 0, seen = 0;
+  for (let i = 0; i < pixels; i += step) {
+    const o = i * 4;
+    if (bitmap[o] <= 3 && bitmap[o + 1] <= 3 && bitmap[o + 2] <= 3) black++;
+    seen++;
+  }
+  return seen > 0 && black / seen > 0.5;
+}
+const WINDOW_RECT_SCRIPT = `
+Add-Type @"
+using System; using System.Runtime.InteropServices; using System.Text; using System.Collections.Generic;
+public class FJW {
+ public delegate bool EP(IntPtr h, IntPtr l);
+ [DllImport("user32.dll")] static extern bool EnumWindows(EP p, IntPtr l);
+ [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+ [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+ [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);
+ [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int a, out RECT r, int n);
+ [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+ public static string Run(string[] titles, string mode) {
+  var parts = new List<string>();
+  EnumWindows((h, x) => {
+   if (!IsWindowVisible(h) || IsIconic(h)) return true;
+   var sb = new StringBuilder(256); GetWindowText(h, sb, 256); var t = sb.ToString();
+   if (Array.IndexOf(titles, t) < 0) return true;
+   RECT r; if (DwmGetWindowAttribute(h, 9, out r, 16) != 0) return true;
+   if (r.R - r.L < 100 || r.B - r.T < 100) return true;
+   if (mode == "raise") SetWindowPos(h, (IntPtr)(-1), 0, 0, 0, 0, 0x53);
+   if (mode == "lower") SetWindowPos(h, (IntPtr)(-2), 0, 0, 0, 0, 0x53);
+   parts.Add(r.L + "|" + r.T + "|" + (r.R - r.L) + "|" + (r.B - r.T) + "|" + t);
+   return true;
+  }, IntPtr.Zero);
+  return string.Join(((char)10).ToString(), parts);
+ }
+}
+"@
+$out = [FJW]::Run(($env:FJ_TITLES -split [char]1), $env:FJ_MODE)
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+Write-Output $out
+`;
+// Vrátí [{ title, x, y, w, h }] viditelných oken s přesným názvem (fyzické pixely).
+// mode 'raise' je navíc nechá nahoře (TOPMOST, nad vlastním Playback oknem NT8),
+// 'lower' to vrátí zpět – okno tak zůstane nahoře jen po dobu snímání.
+function listWindowRects(titles, mode) {
+  return new Promise(resolve => {
+    if (process.platform !== 'win32' || !titles.length) return resolve([]);
+    const { execFile } = require('child_process');
+    const encoded = Buffer.from(WINDOW_RECT_SCRIPT, 'utf16le').toString('base64');
+    execFile('powershell', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+      windowsHide: true, timeout: 15000, env: { ...process.env, FJ_TITLES: titles.join(String.fromCharCode(1)), FJ_MODE: mode || 'list' }
+    }, (error, stdout) => {
+      if (error) { logError('Automatic screenshot – pozice oken', error); return resolve([]); }
+      resolve(String(stdout).split(/\r?\n/).filter(Boolean).map(line => {
+        const p = line.split('|');
+        return { x: Number(p[0]), y: Number(p[1]), w: Number(p[2]), h: Number(p[3]), title: p.slice(4).join('|') };
+      }).filter(r => r.w > 0 && r.h > 0));
+    });
+  });
+}
+// Okno, jehož obsah se přes desktopCapturer nezachytí, se vyřízne z obrazovky.
+// Vrací { name, thumbnail } nebo null, když se okno nepodařilo najít / vyříznout.
+async function cropWindowFromScreen(source, rect) {
+  try {
+    const displays = screen.getAllDisplays();
+    const physical = displays.map(d => screen.dipToScreenRect(null, d.bounds));
+    const screens = await desktopCapturer.getSources({
+      types: ['screen'], fetchWindowIcons: false,
+      thumbnailSize: { width: Math.max(...physical.map(p => p.width)), height: Math.max(...physical.map(p => p.height)) }
+    });
+    const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+    for (const display of displays) {
+      const phys = screen.dipToScreenRect(null, display.bounds);
+      if (cx < phys.x || cx >= phys.x + phys.width || cy < phys.y || cy >= phys.y + phys.height) continue;
+      const shot = screens.find(s => String(s.display_id) === String(display.id));
+      if (!shot || shot.thumbnail.isEmpty()) return null;
+      const size = shot.thumbnail.getSize();
+      const kx = size.width / phys.width, ky = size.height / phys.height;
+      const x = Math.max(0, Math.round((rect.x - phys.x) * kx)), y = Math.max(0, Math.round((rect.y - phys.y) * ky));
+      const w = Math.min(size.width - x, Math.round(rect.w * kx)), h = Math.min(size.height - y, Math.round(rect.h * ky));
+      if (w < 50 || h < 50) return null;
+      return { id: source.id, name: source.name, thumbnail: shot.thumbnail.crop({ x, y, width: w, height: h }) };
+    }
+  } catch (error) { logError('Automatic screenshot – výřez okna', error); }
+  return null;
+}
 // Režim 'windows': fotí se jen okna, jejichž název obsahuje některé zapnuté
 // pravidlo (část názvu, bez ohledu na velikost písmen). Pravidla jsou na
 // názvu, ne na ID okna – NinjaTrader po restartu mění čísla oken i pořadí.
@@ -1863,12 +1996,28 @@ async function captureWindowSources(settings) {
     fetchWindowIcons: false
   });
   const picked = pickCaptureWindows(sources, rules);
-  // Minimalizované okno vrací prázdný snímek – přeskočí se a zapíše do protokolu.
-  const usable = picked.filter(source => source.thumbnail && !source.thumbnail.isEmpty());
+  // Minimalizované okno vrací prázdný snímek, DirectX okno černý – obojí se
+  // přeskočí a zapíše do protokolu.
+  let usable = picked.filter(source => !isBlankThumbnail(source.thumbnail));
+  // Okno s černou plochou grafu: krátce se vynese nahoru a vyřízne z obrazovky.
+  const suspect = usable.filter(source => isMostlyBlackThumbnail(source.thumbnail));
+  if (suspect.length) {
+    const suspectNames = [...new Set(suspect.map(s => s.name))];
+    const rects = await listWindowRects(suspectNames, 'raise');
+    if (rects.length) await new Promise(r => setTimeout(r, 300));
+    const fixed = new Map();
+    for (const source of suspect) {
+      const rect = rects.find(r => r.title === source.name);
+      const cropped = rect ? await cropWindowFromScreen(source, rect) : null;
+      if (cropped && !isBlankThumbnail(cropped.thumbnail)) fixed.set(source, cropped);
+    }
+    usable = usable.map(source => fixed.get(source) || source);
+    if (rects.length) await listWindowRects(suspectNames, 'lower');
+  }
   const matchedRules = new Set(picked.map(s => rules.find(r => String(s.name).toLowerCase().includes(r))));
   const missing = rules.filter(r => !matchedRules.has(r));
   if (picked.length > usable.length || missing.length) {
-    logInfo('Automatic screenshot', `Okna bez snímku: ${[...missing, ...picked.filter(s => !usable.includes(s)).map(s => s.name + ' (minimalizované)')].join(', ')}`);
+    logInfo('Automatic screenshot', `Okna bez snímku: ${[...missing, ...picked.filter(s => !usable.includes(s)).map(s => s.name + ' (minimalizované nebo černý snímek)')].join(', ')}`);
   }
   if (!usable.length || missing.length) {
     const fallback = settings.screenshotMissing;
@@ -1877,8 +2026,9 @@ async function captureWindowSources(settings) {
   }
   return usable;
 }
-async function takeScreenshots(label) {
-  const settings = readCaptureSettings();
+async function takeScreenshots(label, account) {
+  const global = readCaptureSettings();
+  const settings = effectiveShotSettings(global, screenshotJournalFor(global, account));
   if (settings.screenshotMode === 'none') return [];
   try {
     const selected = settings.screenshotMode === 'windows'
@@ -1920,7 +2070,8 @@ function armAfterShot(job) {
   afterShotTimers.set(job.id, setTimeout(() => { runAfterShot(job.id).catch(error => logError('Snímek po obchodu', error)); }, delay));
 }
 function scheduleAfterShot({ positionId, account, instrument, instrumentFull, source }) {
-  const settings = readCaptureSettings();
+  const global = readCaptureSettings();
+  const settings = effectiveShotSettings(global, screenshotJournalFor(global, account));
   if (settings.afterShotEnabled !== true || settings.screenshotMode === 'none' || !positionId) return null;
   const minutes = Math.min(240, Math.max(1, Number(settings.afterShotMinutes) || 15));
   const job = {
@@ -1937,10 +2088,11 @@ async function runAfterShot(id) {
   const job = jobs.find(j => j.id === id);
   if (!job) return;
   writeAfterShotJobs(jobs.filter(j => j.id !== id));
-  const settings = readCaptureSettings();
+  const global = readCaptureSettings();
+  const settings = effectiveShotSettings(global, screenshotJournalFor(global, job.account));
   if (settings.screenshotMode === 'none') return;
   const max = Math.min(10, Math.max(1, Number(settings.afterShotMax) || 3));
-  const paths = (await takeScreenshots('after')).slice(0, max);
+  const paths = (await takeScreenshots('after', job.account)).slice(0, max);
   if (!paths.length) return;
   appendCaptureEvent({
     type: 'trade_after_screenshot', positionId: job.positionId, account: job.account,
@@ -1967,12 +2119,12 @@ function resumeAfterShotJobs() {
 // Živý konektor: screenshoty obrazovky a událost do historie i do okna. Ruční
 // import z CSV (manualImportReplay) jádro pouští s vlastním ctx bez obojího.
 const LIVE_CAPTURE = {
-  shots: label => takeScreenshots(label),
+  shots: (label, account) => takeScreenshots(label, account),
   afterShot: info => { if (typeof scheduleAfterShot === 'function') scheduleAfterShot(info); },
   emit: event => appendCaptureEvent(event, 'ninjatrader')
 };
 async function openPositionFromExecution(state, key, payload, { delta, price, commission, rate, pointValue, time, executionId, positionId }, ctx = LIVE_CAPTURE) {
-  const images = await ctx.shots('entry');
+  const images = await ctx.shots('entry', payload.account);
   const side = delta > 0 ? 'long' : 'short';
   const instrument = payload.instrument || payload.symbol || '';
   const instrumentFull = payload.instrumentFull || payload.instrument || payload.symbol || '';
@@ -2239,7 +2391,7 @@ async function applyExecution(state, payload, ctx = LIVE_CAPTURE) {
   // pozice, i ty, které zavírají až dokoupené kontrakty.
   if (!(Number(current.entryRefPrice) > 0)) current.entryRefPrice = lots[0].price;
   const exitCommissionShare = commission * (closeQty / Math.abs(delta));
-  const exitImages = await ctx.shots('exit');
+  const exitImages = await ctx.shots('exit', payload.account);
 
   for (const chunk of takeFromLots(lots, closeQty)) {
     const pointsSigned = (price - chunk.price) * direction;
@@ -2440,7 +2592,7 @@ function processPositionSnapshot(payload) {
 }
 
 async function processCTraderOpen(payload) {
-  const images = await takeScreenshots('entry');
+  const images = await takeScreenshots('entry', payload.account);
   appendCaptureEvent({
     type: 'trade_opened',
     account: payload.account || '',
@@ -2469,7 +2621,7 @@ async function processCTraderClose(payload) {
   }
   const quantity = Math.abs(Number(payload.quantity || 0));
   writeCaptureState(state);
-  const images = await takeScreenshots('exit');
+  const images = await takeScreenshots('exit', payload.account);
   const netPnl = Number(payload.pnl || 0);
   appendCaptureEvent({
     type: 'trade_closed',
@@ -2721,8 +2873,9 @@ ipcMain.handle('capture:addAccount', async (_event, account) => {
   writeCaptureSettings(settings);
   return { ok: true, account: name };
 });
-ipcMain.handle('capture:status', async () => {
+ipcMain.handle('capture:status', async (_event, journalId) => {
   const settings = readCaptureSettings();
+  const shotJournal = String(journalId || settings.activeJournalId || '');
   const events = readCaptureEvents();
   const state = readCaptureState();
   const accounts = captureAccountList(settings, events);
@@ -2734,7 +2887,7 @@ ipcMain.handle('capture:status', async () => {
     health: `http://127.0.0.1:${CAPTURE_PORT}/health`,
     apiKey: settings.apiKey,
     autoImport: settings.autoImport,
-    ...screenshotSettingsView(settings),
+    ...screenshotSettingsView(effectiveShotSettings(settings, shotJournal)),
     accountMappings: settings.accountMappings || {},
     hiddenAccounts: Array.isArray(settings.hiddenAccounts) ? settings.hiddenAccounts : [],
     deletedAccounts: Array.isArray(settings.deletedAccounts) ? settings.deletedAccounts : [],
@@ -2781,11 +2934,30 @@ ipcMain.handle('capture:clearPositions', async () => { const state = readCapture
 ipcMain.handle('capture:setAutoImport', async (_event, value) => {
   const settings = readCaptureSettings(); settings.autoImport = !!value; writeCaptureSettings(settings); return { ok: true };
 });
-ipcMain.handle('capture:setScreenshotMode', async (_event, mode) => {
+// Uloží změnu nastavení snímání do záznamu deníku. První změna deníku zapíše
+// celý aktuální stav (zděděný z globálu), aby pozdější změny jiných deníků
+// ani globálu jeho hodnoty neposunuly.
+function applyShotSettingsPatch(settings, journalId, patch) {
+  if (!journalId) { Object.assign(settings, patch); return settings; }
+  const map = settings.screenshotByJournal && typeof settings.screenshotByJournal === 'object' ? settings.screenshotByJournal : {};
+  const base = effectiveShotSettings(settings, journalId);
+  const next = {};
+  for (const key of SHOT_SETTING_KEYS) next[key] = base[key];
+  settings.screenshotByJournal = { ...map, [journalId]: { ...next, ...patch } };
+  return settings;
+}
+ipcMain.handle('capture:setActiveJournal', async (_event, journalId) => {
   const settings = readCaptureSettings();
-  settings.screenshotMode = ['none','primary','all','windows'].includes(mode) ? mode : 'primary';
+  const id = String(journalId || '');
+  if (settings.activeJournalId !== id) { settings.activeJournalId = id; writeCaptureSettings(settings); }
+  return { ok: true };
+});
+ipcMain.handle('capture:setScreenshotMode', async (_event, mode, journalId) => {
+  const settings = readCaptureSettings();
+  const screenshotMode = ['none','primary','all','windows'].includes(mode) ? mode : 'primary';
+  applyShotSettingsPatch(settings, String(journalId || settings.activeJournalId || ''), { screenshotMode });
   writeCaptureSettings(settings);
-  return { ok: true, screenshotMode: settings.screenshotMode };
+  return { ok: true, screenshotMode };
 });
 function normalizeScreenshotSettings(input, current) {
   const next = {};
@@ -2808,11 +2980,13 @@ function normalizeScreenshotSettings(input, current) {
   }
   return next;
 }
-ipcMain.handle('capture:setScreenshotSettings', async (_event, input) => {
+ipcMain.handle('capture:setScreenshotSettings', async (_event, input, journalId) => {
   const settings = readCaptureSettings();
-  Object.assign(settings, normalizeScreenshotSettings(input && typeof input === 'object' ? input : {}, settings));
+  const id = String(journalId || settings.activeJournalId || '');
+  const patch = normalizeScreenshotSettings(input && typeof input === 'object' ? input : {}, effectiveShotSettings(settings, id));
+  applyShotSettingsPatch(settings, id, patch);
   writeCaptureSettings(settings);
-  return { ok: true, ...screenshotSettingsView(settings) };
+  return { ok: true, ...screenshotSettingsView(effectiveShotSettings(settings, id)) };
 });
 function screenshotSettingsView(settings) {
   return {
@@ -2831,7 +3005,7 @@ ipcMain.handle('capture:listWindows', async () => {
     const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: false });
     const windows = sources
       .filter(s => s.name && String(s.name).trim() && !own.has(s.id))
-      .map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : '' }));
+      .map(s => ({ id: s.id, name: s.name, blank: isBlankThumbnail(s.thumbnail), thumb: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : '' }));
     return { ok: true, windows };
   } catch (error) { return { ok: false, error: error.message, windows: [] }; }
 });
