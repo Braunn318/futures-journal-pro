@@ -546,6 +546,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="topbar-actions">
         <button class="btn primary" id="addTradeBtn" style="display:none">＋ Přidat obchod</button>
         <button class="btn" id="addSetupBtn" style="display:none" title="Setup, který byl, ale nedošlo k exekuci – do P/L nevstupuje; do fill rate jen stav „nenaplněno“">＋ Setup bez vstupu</button>
+        <button class="btn" id="distanceUnitBtn" type="button" data-distance-unit-btn>📏 Ticky</button>
         <button class="btn" id="newsCalendarBtn" type="button" title="Otevře kalendář makro zpráv v prohlížeči (adresa jde změnit v Nastavení → Obecné → Kalendář zpráv)">📰 Kalendář zpráv</button>
       </div>
     </div>
@@ -604,10 +605,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="field" data-ov-filter="side"><label>Směr</label><select id="accountSide"><option value="">Oba směry</option><option value="long">Long</option><option value="short">Short</option><option value="none">Bez určeného směru</option></select></div>
             <div class="field" data-ov-filter="result"><label>Výsledek</label><select id="accountResult"><option value="">Všechny výsledky</option><option value="target">Target (zisk)</option><option value="stoploss">Stop Loss (ztráta)</option><option value="breakeven">Break-even</option></select></div>
             <div class="field" data-ov-filter="setup"><label>Setup</label><select id="accountSetup"><option value="">Všechny setupy</option></select></div>
-            <div class="field" data-ov-filter="mfe"><label>MFE od <span class="sub">— ticky</span></label><input type="number" id="accountMfeMin" min="0" step="any"></div>
-            <div class="field" data-ov-filter="mfe"><label>MFE do <span class="sub">— ticky</span></label><input type="number" id="accountMfeMax" min="0" step="any"></div>
-            <div class="field" data-ov-filter="mae"><label>MAE od <span class="sub">— ticky</span></label><input type="number" id="accountMaeMin" min="0" step="any"></div>
-            <div class="field" data-ov-filter="mae"><label>MAE do <span class="sub">— ticky</span></label><input type="number" id="accountMaeMax" min="0" step="any"></div>
+            <div class="field" data-ov-filter="mfe"><label>MFE od <span class="sub">— <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></label><input type="number" id="accountMfeMin" min="0" step="any"></div>
+            <div class="field" data-ov-filter="mfe"><label>MFE do <span class="sub">— <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></label><input type="number" id="accountMfeMax" min="0" step="any"></div>
+            <div class="field" data-ov-filter="mae"><label>MAE od <span class="sub">— <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></label><input type="number" id="accountMaeMin" min="0" step="any"></div>
+            <div class="field" data-ov-filter="mae"><label>MAE do <span class="sub">— <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></label><input type="number" id="accountMaeMax" min="0" step="any"></div>
           </div>
           <p class="sub" style="margin-top:6px">Prázdné pole = bez omezení. Při filtru MFE / MAE vypadnou obchody, které hodnotu nemají vyplněnou (0 je platná hodnota a filtrem projde). Číselné filtry se použijí tlačítkem „Zobrazit“. Které filtry se tu ukazují, nastavíš v Nastavení → Přizpůsobení → Přehled účtu.</p>
         </details>
@@ -654,11 +655,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="section-divider" data-ov-divider="movement"><span>POHYB CENY A DÉLKA OBCHODŮ</span></div>
       <div class="grid overview-row movement-row" data-ov-row="movement">
         <div class="card" data-ov-section="mfe">
-          <h3>MFE <span class="sub">— max. pohyb ve směru, ticky</span></h3>
+          <h3>MFE <span class="sub">— max. pohyb ve směru, <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></h3>
           <div id="mfeStatsBox" class="stat-list"></div>
         </div>
         <div class="card" data-ov-section="mae">
-          <h3>MAE <span class="sub">— max. pohyb proti, ticky</span></h3>
+          <h3>MAE <span class="sub">— max. pohyb proti, <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></h3>
           <div id="maeStatsBox" class="stat-list"></div>
         </div>
         <div class="card" data-ov-section="duration">
@@ -1053,6 +1054,17 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
       <div class="subsection" id="settingsCustomize">
       <div class="settings-grid">
+        <details class="card settings-card" data-card="distanceUnit">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Jednotka vzdáleností</h3></summary>
+          <p class="sub">MFE, MAE, pohyb po výstupu, vzdálenosti hladin a dopočty v ticích, nebo v bodech (např. 17 t = 4,25 b u ES/MES/NQ/MNQ). V bodech se i zadává. Uložená data zůstávají v ticích, exporty taky. Instrument bez známé velikosti ticku (Nastavení → Šablony) se ukazuje dál v ticích. Stejný přepínač je v horní liště.</p>
+          <div class="field" style="margin-top:10px">
+            <label>Jednotka</label>
+            <select id="distanceUnitSelect">
+              <option value="ticks">Ticky (výchozí)</option>
+              <option value="points">Body</option>
+            </select>
+          </div>
+        </details>
         <details class="card settings-card" data-card="theme">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Vzhled (téma)</h3></summary>
           <p class="sub">Platí pro celou aplikaci na tomto počítači, nezávisle na deníku. Uloží se jen v tomto zařízení.</p>
@@ -1432,12 +1444,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="field"><label>Cena Stop Lossu</label><input id="sfSl" type="number" step="any"></div>
       <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="sfTarget1Types" class="chip-grid"></div></div>
       <div class="field"><label>Cena cílové hladiny 1</label><input id="sfTarget1Price" type="number" step="any"></div>
-      <div class="field"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="sfMissedBy" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
+      <div class="field"><label>Minuto o <span class="sub">— <span data-unit-t="ticků" data-unit-b="bodů" data-unit-for="sfInstrument">ticků</span>, nepovinné</span></label><input id="sfMissedBy" type="number" step="any" min="0" placeholder="o kolik cena limitku minula" data-tick-input data-tick-instrument="sfInstrument"></div>
       <div class="field" id="sfSkippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— výběr, Nastavení → Číselníky</span></label><select id="sfSkippedReason"></select></div>
       <div class="field"><label>Důvod <span class="sub">— text</span></label><input id="sfReason" placeholder="proč nebylo naplněno / proč vynecháno"></div>
       <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc</span></label><div id="sfEntryLevels" class="chip-grid"></div></div>
       <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="sfOfConfirm" class="chip-grid"></div></div>
-      <div class="field"><label>Max. pohyb ve směru <span class="sub">— ticků od plánovaného vstupu, nepovinné</span></label><input id="sfMaxFav" type="number" step="any" min="0"></div>
+      <div class="field"><label>Max. pohyb ve směru <span class="sub">— <span data-unit-t="ticků" data-unit-b="bodů" data-unit-for="sfInstrument">ticků</span> od plánovaného vstupu, nepovinné</span></label><input id="sfMaxFav" type="number" step="any" min="0" data-tick-input data-tick-instrument="sfInstrument"></div>
       <div class="field"><label>Nejdál došlá hladina <span class="sub">— typ, nepovinné</span></label><select id="sfMaxLevel"></select></div>
       <div class="field full"><label>Poznámka</label><textarea id="sfNote"></textarea></div>
     </div>
@@ -1490,13 +1502,13 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="formgrid">
           <div class="field full" id="postExitBlock">
           <div class="formgrid">
-          <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="mfeTicks" type="number" step="any" min="0" placeholder="např. 20"><div class="derived-readonly" id="mfeTicksView" style="display:none"><b id="mfeTicksViewValue"></b> t <span class="sub" id="mfeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('mfeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="mfeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('mfeTicks')"></a><div class="sub" id="mfeTicksSourceNote"></div><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
-          <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— ticky od vstupu</span></label><input id="maeTicks" type="number" step="any" min="0" placeholder="např. 6"><div class="derived-readonly" id="maeTicksView" style="display:none"><b id="maeTicksViewValue"></b> t <span class="sub" id="maeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('maeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="maeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('maeTicks')"></a><div class="sub" id="maeTicksSourceNote"></div><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
-          <div class="field"><label><svg class="dir-icon up" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Ticky po výstupu — ve směru zisku <span class="sub">— od výstupní ceny</span></label><input id="postExitFavorableTicks" type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
-          <div class="field"><label><svg class="dir-icon down" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Ticky po výstupu — proti <span class="sub">— od výstupní ceny</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
+          <div class="field"><label>MFE — nejdál ve směru do výstupu <span class="sub">— <span data-unit-t="ticky" data-unit-b="body" data-unit-for="instrument">ticky</span> od vstupu</span></label><input id="mfeTicks" data-tick-input type="number" step="any" min="0" placeholder="např. 20"><div class="derived-readonly" id="mfeTicksView" style="display:none"><b id="mfeTicksViewValue"></b> <span id="mfeTicksViewUnit" data-unit-t="t" data-unit-b="b" data-unit-for="instrument">t</span> <span class="sub" id="mfeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('mfeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="mfeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('mfeTicks')"></a><div class="sub" id="mfeTicksSourceNote"></div><div class="sub post-exit-warn" id="mfeTicksHint"></div></div>
+          <div class="field"><label>MAE — nejdál proti směru do výstupu <span class="sub">— <span data-unit-t="ticky" data-unit-b="body" data-unit-for="instrument">ticky</span> od vstupu</span></label><input id="maeTicks" data-tick-input type="number" step="any" min="0" placeholder="např. 6"><div class="derived-readonly" id="maeTicksView" style="display:none"><b id="maeTicksViewValue"></b> <span id="maeTicksViewUnit" data-unit-t="t" data-unit-b="b" data-unit-for="instrument">t</span> <span class="sub" id="maeTicksViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('maeTicks')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="maeTicksRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('maeTicks')"></a><div class="sub" id="maeTicksSourceNote"></div><div class="sub post-exit-warn" id="maeTicksHint"></div></div>
+          <div class="field"><label><svg class="dir-icon up" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-unit-t="Ticky" data-unit-b="Body" data-unit-for="instrument">Ticky</span> po výstupu — ve směru zisku <span class="sub">— od výstupní ceny</span></label><input id="postExitFavorableTicks" data-tick-input type="number" step="any" min="0" placeholder="např. 8"><div class="sub post-exit-warn" id="postExitFavorableHint"></div></div>
+          <div class="field"><label><svg class="dir-icon down" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-unit-t="Ticky" data-unit-b="Body" data-unit-for="instrument">Ticky</span> po výstupu — proti <span class="sub">— od výstupní ceny</span></label><input id="postExitAdverseTicks" data-tick-input type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
           <div class="field"><label>Protipohyb přišel dřív? <span class="sub">— než pohyb ve směru zisku</span></label><select id="postExitAdverseFirst"><option value="ne">Ne</option><option value="ano">Ano</option></select></div>
           <div class="field"><label>Sledováno po výstupu <span class="sub">— minut, nepovinné</span></label><input id="observedMinutes" type="number" step="any" min="0" placeholder="např. 30"></div>
-          <div class="field full sub" id="postExitRuleHint">Vše v ticích, vždy kladně. MFE/MAE měř za dobu trvání obchodu (od vstupní ceny), ticky po výstupu od výstupní ceny. Vyplň, co jsi sledoval — prázdné pole je v pořádku, nula znamená „cena nešla ani o tick", což je jiná informace.<br>U obchodu ukončeného na Stop Lossu je „proti" to, <i>o kolik cena za SL ještě došla</i> – tedy o kolik širší SL by obchod přežil (o tick víc). „Ve směru zisku" je pohyb od výstupu zpátky ve směru obchodu.</div>
+          <div class="field full sub" id="postExitRuleHint">Vše <span data-unit-t="v ticích" data-unit-b="v bodech" data-unit-for="instrument">v ticích</span>, vždy kladně. MFE/MAE měř za dobu trvání obchodu (od vstupní ceny), pohyb po výstupu od výstupní ceny. Vyplň, co jsi sledoval — prázdné pole je v pořádku, nula znamená „cena nešla ani o tick", což je jiná informace.<br>U obchodu ukončeného na Stop Lossu je „proti" to, <i>o kolik cena za SL ještě došla</i> – tedy o kolik širší SL by obchod přežil (o tick víc). „Ve směru zisku" je pohyb od výstupu zpátky ve směru obchodu.</div>
           <div class="field" id="postExitDerivedField"><label>Dopočítá se <span class="sub">— needitovatelné</span></label><div class="sub" id="postExitDerivedHint">—</div></div>
           </div>
           </div>
@@ -1509,7 +1521,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
           <div class="field" data-ctx-field="setupCode2"><label>Setup – sekundární <span class="sub">— volitelný druhý setup</span></label><select id="setupCode2"></select></div>
           <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
-          <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— ticků, nepovinné</span></label><input id="missedByTicks" type="number" step="any" min="0" placeholder="o kolik ticků cena limitku minula"></div>
+          <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— <span data-unit-t="ticků" data-unit-b="bodů" data-unit-for="instrument">ticků</span>, nepovinné</span></label><input id="missedByTicks" data-tick-input type="number" step="any" min="0" placeholder="o kolik cena limitku minula"></div>
           <div class="field" id="skippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— jen u „vědomě vynechán“</span></label><select id="skippedReason"></select><input id="skippedReasonNote" placeholder="upřesnění textem (nepovinné)" style="margin-top:6px"></div>
           <div class="field full"><label>Trend 1m <span class="sub">— trend na 1min grafu</span></label><div id="trend" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="trendHtf"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
@@ -2477,6 +2489,109 @@ const BUILTIN_TICK_SIZES=FJPoints.BUILTIN_TICK_SIZES;
 function getTickSizeForInstrument(instrument,src=settings){
  return FJPoints.tickSizeFor(instrument,src?.templates);
 }
+// Jednotka vzdáleností (ticky / body) pro zobrazení a zadávání. Ukládá se vždy
+// v ticích – přepínač mění jen to, co uživatel vidí a píše. Body = tiky ×
+// velikost ticku; bez známé velikosti ticku zůstává hodnota v ticích.
+const DISTANCE_UNIT_KEY='FJ_distanceUnit';
+function readDistanceUnit(){try{return FJPoints.normalizeDistanceUnit(localStorage.getItem(DISTANCE_UNIT_KEY))}catch{return 'ticks'}}
+let distanceUnit=readDistanceUnit();
+function currentDistanceUnit(){return typeof distanceUnit==='undefined'?'ticks':distanceUnit}
+// "17 t" / "4,25 b" – tik size podle instrumentu (šablona, jinak vestavěná tabulka).
+function distText(ticks,instrument,opts){
+ return FJPoints.fmtDistance(ticks,getTickSizeForInstrument(instrument),currentDistanceUnit(),opts);
+}
+// Tiky obchodu ve zvolené jednotce; v režimu bodů bez známé velikosti ticku null
+// (filtry a statistiky v bodech takový obchod nemohou porovnat).
+function ticksInUnit(ticks,instrument,unit=currentDistanceUnit()){
+ const n=ticks===null||ticks===undefined||ticks===''?null:Number(ticks);
+ if(n===null||!Number.isFinite(n))return null;
+ if(unit!=='points')return n;
+ const ts=getTickSizeForInstrument(instrument);
+ return ts?FJPoints.ticksToUnit(n,ts,'points'):null;
+}
+// Pole formulářů, kam se píšou tiky (data-tick-input). Pole si pamatuje, v jaké
+// jednotce a s jakou velikostí ticku je jeho hodnota zobrazená (unitShown /
+// tickShown), takže změna instrumentu nebo přepínače hodnotu přepočítá beze
+// ztráty. Instrument pole určuje data-tick-instrument (výchozí „instrument").
+function tickInputInstrument(el){return $(el?.dataset?.tickInstrument||'instrument')?.value||''}
+function tickInputTarget(el){
+ const ts=getTickSizeForInstrument(tickInputInstrument(el));
+ return {tickSize:ts,unit:FJPoints.effectiveDistanceUnit(currentDistanceUnit(),ts)};
+}
+// Hodnota pole v ticích jako text. Prázdno zůstane prázdné, nečíslo se vrátí
+// beze změny (ať ho měkká validace ukáže).
+function tickInputValue(id){
+ const el=$(id); if(!el)return undefined;
+ const raw=String(el.value??'').trim();
+ const ds=el.dataset||{};
+ if(raw===''||ds.unitShown!=='points')return el.value;
+ const t=FJPoints.unitToTicks(raw,ds.tickShown,'points');
+ return t==null?el.value:String(t);
+}
+// Zapíše tiky do pole v jednotce, kterou pole teď má ukazovat.
+function setTickInput(id,ticks){
+ const el=$(id); if(!el)return;
+ const ds=el.dataset||(el.dataset={});
+ const {tickSize,unit}=tickInputTarget(el);
+ ds.unitShown=unit;ds.tickShown=tickSize==null?'':String(tickSize);
+ const n=ticks===null||ticks===undefined||ticks===''?null:Number(ticks);
+ el.value=n===null?'':(Number.isFinite(n)?String(FJPoints.ticksToUnit(n,tickSize,unit)):String(ticks));
+}
+// Tiky → číslo v jednotce pole (pro dopočty ukázané u pole).
+function ticksForInput(id,ticks){
+ if(ticks===null||ticks===undefined)return ticks;
+ const {tickSize,unit}=tickInputTarget($(id));
+ return FJPoints.ticksToUnit(ticks,tickSize,unit);
+}
+function tickInputSuffix(id){return tickInputTarget($(id)).unit==='points'?'b':'t'}
+// Přepočítá pole, jejichž zobrazená jednotka / velikost ticku už neplatí,
+// a srovná popisky jednotek (data-unit-t / data-unit-b).
+function syncDistanceInputs(){
+ if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
+ document.querySelectorAll('input[data-tick-input]').forEach(el=>{
+  const ds=el.dataset;
+  const {tickSize,unit}=tickInputTarget(el);
+  const shownTick=tickSize==null?'':String(tickSize);
+  if((ds.unitShown||'ticks')===unit&&(ds.tickShown||'')===shownTick)return;
+  const t=tickInputValue(el.id);
+  const n=t===undefined||String(t).trim()===''?null:Number(t);
+  if(n!==null&&Number.isFinite(n))setTickInput(el.id,n);
+  else{ds.unitShown=unit;ds.tickShown=shownTick}
+ });
+ applyDistanceUnitLabels();
+}
+// Popisky jednotek: text z data-unit-t (ticky) nebo data-unit-b (body). U polí
+// formuláře (data-unit-for = id instrumentu) podle jednotky, kterou pole
+// opravdu ukazuje; jinde podle přepínače.
+function applyDistanceUnitLabels(){
+ if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
+ document.querySelectorAll('[data-unit-t]').forEach(el=>{
+  const forId=el.dataset.unitFor;
+  const unit=forId?FJPoints.effectiveDistanceUnit(currentDistanceUnit(),getTickSizeForInstrument($(forId)?.value||'')):currentDistanceUnit();
+  el.textContent=unit==='points'?el.dataset.unitB:el.dataset.unitT;
+ });
+ document.querySelectorAll('[data-distance-unit-btn]').forEach(btn=>{
+  const pts=currentDistanceUnit()==='points';
+  btn.textContent=pts?'📏 Body':'📏 Ticky';
+  btn.classList.toggle('active',pts);
+  btn.title=pts?'Vzdálenosti v bodech (např. 4,25 b). Klikni pro ticky.':'Vzdálenosti v ticích (např. 17 t). Klikni pro body.';
+ });
+ const sel=$('distanceUnitSelect');if(sel)sel.value=currentDistanceUnit();
+}
+function setDistanceUnit(value){
+ distanceUnit=FJPoints.normalizeDistanceUnit(value);
+ try{localStorage.setItem(DISTANCE_UNIT_KEY,distanceUnit)}catch{}
+ // Filtry MFE/MAE na Přehledu nemají instrument, číslo v jiné jednotce by
+ // změnilo význam – vyprázdní se.
+ let clearedFilter=false;
+ for(const id of ['accountMfeMin','accountMfeMax','accountMaeMin','accountMaeMax'])if($(id)&&$(id).value!==''){$(id).value='';clearedFilter=true}
+ syncDistanceInputs();
+ renderAll();
+ if($('tradeModal')?.classList.contains('open')&&typeof renderPostExitHints==='function')renderPostExitHints();
+ if(typeof applyAccountOverview==='function'&&typeof overviewAllTrades!=='undefined'&&overviewAllTrades.length)applyAccountOverview();
+ if(typeof reportRows!=='undefined'&&reportRows&&typeof generateReportView==='function')generateReportView();
+ if(clearedFilter)showToast('Filtry MFE/MAE se při změně jednotky vyprázdnily.');
+}
 // `src` je zdroj nastavení. Ve výchozím stavu globální `settings` aktivního
 // deníku; automatický import ale zapisuje do deníku podle mapování účtů a běží
 // i před přihlášením (kdy `settings` ještě nejsou načtené), takže si tam předává
@@ -2963,8 +3078,19 @@ function tickBuckets(vals){
  for(const v of vals){let i=Math.floor(v/step+1e-9);if(i>4)i=4;if(i<0)i=0;out[i].count++}
  return out;
 }
-function computeTickStats(rows,key){
- const s=summarizeValues(rows,t=>statNum(t?.[key]));
+// Statistika tikové hodnoty ve zvolené jednotce. Body se převádějí po
+// obchodech (každý nástroj má svou velikost ticku), až pak se průměruje. Když
+// některý obchod s hodnotou velikost ticku nemá, zůstane celý blok v ticích.
+function computeTickStats(rows,key,unit){
+ const want=unit||(typeof currentDistanceUnit==='function'?currentDistanceUnit():'ticks');
+ const tickOf=t=>getTickSizeForInstrument(t?.instrument);
+ const usePoints=want==='points'&&(rows||[]).every(t=>statNum(t?.[key])===null||!!tickOf(t));
+ const s=summarizeValues(rows,t=>{
+  const v=statNum(t?.[key]);
+  return v===null||!usePoints?v:FJPoints.ticksToUnit(v,tickOf(t),'points');
+ });
+ s.unit=usePoints?'points':'ticks';
+ s.unitFallback=want==='points'&&!usePoints;
  s.buckets=tickBuckets(s.values);
  return s;
 }
@@ -3000,14 +3126,16 @@ function fmtDuration(min){
  const h=Math.floor(m/60),r=m%60;
  return r?`${h} h ${r} min`:`${h} h`;
 }
-function fmtTicks(v){
+function fmtTicks(v,unit){
  if(v===null||v===undefined)return '—';
+ if(unit==='points')return FJPoints.czNumber(v,2)+' b';
  return (Math.round(v*10)/10).toLocaleString('cs-CZ')+' t';
 }
 function renderValueStatsBox(id,s,fmt,emptyText,missingLabel){
  const el=$(id); if(!el)return;
  const row=(label,val)=>`<div class="row"><span>${label}</span><b>${val}</b></div>`;
- const miss=s.missing?`<div class="sub" style="margin-top:4px">${missingLabel}: ${s.missing}</div>`:'';
+ const miss=(s.missing?`<div class="sub" style="margin-top:4px">${missingLabel}: ${s.missing}</div>`:'')
+  +(s.unitFallback?'<div class="sub" style="margin-top:4px">V ticích – některý instrument nemá známou velikost ticku (Nastavení → Šablony).</div>':'');
  if(!s.count){el.innerHTML=`<div class="sub">${emptyText}</div>`+miss;return}
  const maxN=Math.max(...s.buckets.map(b=>b.count),1);
  el.innerHTML=
@@ -3023,8 +3151,9 @@ function renderValueStatsBox(id,s,fmt,emptyText,missingLabel){
   '</div>';
 }
 function renderMovementStats(rows){
- renderValueStatsBox('mfeStatsBox',computeTickStats(rows,'mfeTicks'),fmtTicks,'Žádný obchod s vyplněným MFE.','Bez MFE');
- renderValueStatsBox('maeStatsBox',computeTickStats(rows,'maeTicks'),fmtTicks,'Žádný obchod s vyplněným MAE.','Bez MAE');
+ const mfe=computeTickStats(rows,'mfeTicks'),mae=computeTickStats(rows,'maeTicks');
+ renderValueStatsBox('mfeStatsBox',mfe,v=>fmtTicks(v,mfe.unit),'Žádný obchod s vyplněným MFE.','Bez MFE');
+ renderValueStatsBox('maeStatsBox',mae,v=>fmtTicks(v,mae.unit),'Žádný obchod s vyplněným MAE.','Bez MAE');
  renderValueStatsBox('durationStatsBox',computeDurationStats(rows),fmtDuration,'Žádný obchod s časem vstupu i výstupu.','Bez času vstupu / výstupu');
 }
 function renderDashboard(rows=trades,setups=setupRecords){
@@ -3594,9 +3723,15 @@ function readChipGrid(id,enumName){
 // proti S/L) si v dataset pamatuje původní stranu a ticky; doplněním ceny
 // o ně přijde (FJTaxonomy.sanitizeNearLevels) – cena je jediný zdroj pravdy.
 const NEAR_LEVELS_ID='nearLevels';
-function formatLevelRow(r,geometry){
+// Formát vzdáleností hladin pro FJContext (opts.dist) podle přepínače
+// jednotky. V ticích (nebo bez velikosti ticku) undefined = výchozí ticky.
+function levelDistOpts(tickSize){
+ if(typeof currentDistanceUnit!=='function'||FJPoints.effectiveDistanceUnit(currentDistanceUnit(),tickSize)!=='points')return {};
+ return {dist:(n,plus)=>{const v=FJPoints.ticksToUnit(n,tickSize,'points');return (v>0&&plus?'+':v<0?'−':'')+FJPoints.czNumber(Math.abs(v),2)+' b'}};
+}
+function formatLevelRow(r,geometry,tickSize){
  const test=r.testState&&contextFieldShown('levelTestState')?' ('+FJTaxonomy.TEST_STATE[r.testState]+')':'';
- const dist=FJContext.levelDistanceText(geometry);
+ const dist=FJContext.levelDistanceText(geometry,levelDistOpts(tickSize));
  return FJTaxonomy.labelOf('NEAR_LEVEL',r.level)+(r.price!=null?' @ '+r.price:'')+test+(dist?' · '+dist:'');
 }
 // Vstup, směr, SL a cíl z formuláře pro dopočty hladin (stejné hodnoty, jaké
@@ -3885,7 +4020,7 @@ function contextPillsHTML(t){
  // Chybějící kontext (dřív štítek „neúplný kontext" jen pro MFE/MAE
  // v backtestovém deníku) hlásí štítek „Neúplné" v titulku karty
  // (incompleteBadgeHTML) – zapíná se v Nastavení → Obecné.
- if(FJPoints.slTicksSuspicious(t.slTicks,findTemplate(t.instrument)?.maxSlTicks))parts.push(`<span class="pill context-pill post-exit-warn" title="SL nepravděpodobně daleko, překlep?">SL ${esc(t.slTicks)} t?</span>`);
+ if(FJPoints.slTicksSuspicious(t.slTicks,findTemplate(t.instrument)?.maxSlTicks))parts.push(`<span class="pill context-pill post-exit-warn" title="SL nepravděpodobně daleko, překlep?">SL ${esc(distText(t.slTicks,t.instrument))}?</span>`);
  // Psychika (karta Psychika) má vlastní pilulku na konci; skrytá karta nebo
  // skrytá pole ji schovají, data zůstávají.
  const psych=typeof psychTradeParts==='function'&&(typeof tradeCardShown!=='function'||tradeCardShown('psych'))?psychTradeParts(t):[];
@@ -4033,6 +4168,9 @@ function fillNewsSettings(){
  $('newsFeedUrl').value=newsSettings.feedUrl||'';
  renderNewsStatus();
 }
+if($('distanceUnitBtn'))$('distanceUnitBtn').onclick=()=>setDistanceUnit(currentDistanceUnit()==='points'?'ticks':'points');
+if($('distanceUnitSelect'))$('distanceUnitSelect').addEventListener('change',e=>setDistanceUnit(e.target.value));
+applyDistanceUnitLabels();
 if($('newsCalendarBtn'))$('newsCalendarBtn').onclick=async()=>{
  const url=String(newsSettings.url||'').trim()||NEWS_DEFAULTS.url;
  if(window.desktopAPI?.openExternal){
@@ -4111,7 +4249,7 @@ function levelPillsHTML(t,opts={}){
  // a žádná hladina tu nedostává roli. Obchod ve starém tvaru se čte převodem.
  const tick=getTickSizeForInstrument(t.instrument);
  const near=FJTaxonomy.nearLevelsOf(t);
- if(near.length)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti (cena · od vstupu · od SL · do cíle, v ticích)">Hladiny: ${esc(near.map(r=>formatLevelRow(r,FJContext.levelGeometry(r,t,tick))).join(', '))}</span>`);
+ if(near.length)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti (cena · od vstupu · od SL · do cíle)">Hladiny: ${esc(near.map(r=>formatLevelRow(r,FJContext.levelGeometry(r,t,tick),tick)).join(', '))}</span>`);
  else if(FJTaxonomy.nearLevelsNoneOf(t))parts.push('<span class="pill context-pill" title="Hladiny v blízkosti: žádná">Hladiny: žádná</span>');
  for(const n of FJTaxonomy.targetLevelNumbers(t)){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
@@ -4126,7 +4264,7 @@ function levelPillsHTML(t,opts={}){
  // počet říká, jestli má obchod co rozbalovat.
  const count=parts.length;
  const derived=count&&!opts.countOnly&&contextFieldShown('derivedRow')
-  ?FJContext.derivedSummaryParts(typeof tradeDerived==='function'?tradeDerived(t):FJContext.derivedFields(t,{tickSize:tick}),{levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',near[i]?.level)})
+  ?FJContext.derivedSummaryParts(typeof tradeDerived==='function'?tradeDerived(t):FJContext.derivedFields(t,{tickSize:tick}),{...levelDistOpts(tick),levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',near[i]?.level)})
   :[];
  if(derived.length)parts.push(`<span class="pill context-pill derived-pill" title="Dopočítáno z cen – needituje se">${esc(derived.join(' · '))}</span>`);
  return {html:parts.join(' '),count};
@@ -4275,7 +4413,7 @@ function applyPostExitFields(t,src=settings,{deriveCourse=true}={}){
 function postExitTicksWarning(raw){
  if(raw===undefined||raw===null||String(raw).trim()==='')return '';
  const n=Number(raw);
- if(!Number.isFinite(n))return 'Zadej číslo v ticích.';
+ if(!Number.isFinite(n))return 'Zadej číslo.';
  if(n<0)return 'Zadávej kladně, směr určuje pole.';
  return '';
 }
@@ -4346,10 +4484,10 @@ function tradeHTML(t){
  const entries=(typeof contextFieldShown!=='function'||contextFieldShown('entries'))?FJPoints.entriesOf(t):[];
  const entriesRow=entries.length>1?`<div class="sub" style="margin-top:2px" title="Vstupy pozice. Cíl označený „dokup“ zavírá dokoupené kontrakty a jeho body se počítají od ceny dokupu.">Vstupy: ${entries.map((e,i)=>`${i?'dokup ':''}${e.contracts} @ ${FJPoints.roundPoints(e.price)}${i&&e.time?` (${esc(e.time)})`:''}`).join(' · ')}</div>`:'';
  const setupInfo=[];
- if(t.missedByTicks!=null&&t.missedByTicks!=='')setupInfo.push(`minuto o ${esc(t.missedByTicks)} t`);
+ if(t.missedByTicks!=null&&t.missedByTicks!=='')setupInfo.push(`minuto o ${esc(distText(t.missedByTicks,t.instrument))}`);
  const skippedWhy=skippedReasonText(t);
  if(skippedWhy)setupInfo.push(`vynecháno: ${esc(skippedWhy)}`);
- if(t.setupMaxFavorableTicks!=null&&t.setupMaxFavorableTicks!=='')setupInfo.push(`max ${esc(t.setupMaxFavorableTicks)} t ve směru`);
+ if(t.setupMaxFavorableTicks!=null&&t.setupMaxFavorableTicks!=='')setupInfo.push(`max ${esc(distText(t.setupMaxFavorableTicks,t.instrument))} ve směru`);
  if(t.maxLevel)setupInfo.push(`došlo na ${esc(FJTaxonomy.labelOf('TARGET_LEVEL',t.maxLevel))}`);
  return `<div class="card trade${skipLive?' skip-live':''}${hypo?' hypo-'+hypo.toLowerCase():''}">
  <div><div class="title">${(!t.journalId||t.journalId===activeJournalId)?`<span class="trade-select-wrap"><input type="checkbox" class="trade-select" data-id="${t.id}" title="Vybrat ke sloučení"></span>`:''}${esc(t.instrument)} <span class="pill ${m.cls}">${m.label}</span>${sm?` <span class="pill side-pill ${sm.cls}" title="Směr obchodu">${sm.label}</span>`:''}${incompleteBadge?' '+incompleteBadge:''}${t.journalName?` <span class="pill journal-pill" title="Deník">📁 ${esc(t.journalName)}</span>`:''}</div>
@@ -4413,8 +4551,8 @@ function setupRowHTML(s){
  if(s.slPrice!=null)price.push('SL '+esc(s.slPrice));
  const tg=FJTaxonomy.sanitizeTargetLevel(s.targetLevel1);
  if(tg)price.push('cíl '+esc(targetTypesLabel(tg.types))+(tg.price!=null?' @ '+esc(tg.price):''));
- if(s.missedByTicks!=null)price.push('minuto o '+esc(s.missedByTicks)+' t');
- if(s.maxFavorableTicks!=null)price.push('max '+esc(s.maxFavorableTicks)+' t');
+ if(s.missedByTicks!=null)price.push('minuto o '+esc(distText(s.missedByTicks,s.instrument)));
+ if(s.maxFavorableTicks!=null)price.push('max '+esc(distText(s.maxFavorableTicks,s.instrument)));
  if(s.maxLevel)price.push('došlo na '+esc(FJTaxonomy.labelOf('TARGET_LEVEL',s.maxLevel)));
  return `<div class="setup-row" data-setup="${esc(s.id)}">
   <div class="setup-icon" title="Setup bez exekuce – nevstupuje do P/L">◌</div>
@@ -4966,18 +5104,17 @@ function openModal(t=null,{title}={}){
  if($('setupCode'))$('setupCode').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode);
  if($('setupCode2'))$('setupCode2').value=FJTaxonomy.sanitizeSingle('SETUP',t&&t.setupCode2);
  if($('fillStatus'))$('fillStatus').value=FJTaxonomy.sanitizeSingle('FILL_STATUS',t&&t.fillStatus);
- if($('missedByTicks'))$('missedByTicks').value=(t&&t.missedByTicks!=null&&t.missedByTicks!=='')?t.missedByTicks:'';
+ setTickInput('missedByTicks',(t&&t.missedByTicks!=null&&t.missedByTicks!=='')?t.missedByTicks:'');
  fillContextSelect('skippedReason','SKIP_REASON','— nevyplněno —',t&&t.skippedReason);
  if($('skippedReason'))$('skippedReason').value=FJTaxonomy.sanitizeSingle('SKIP_REASON',t&&t.skippedReason);
  if($('skippedReasonNote'))$('skippedReasonNote').value=(t&&t.skippedReasonNote)||'';
  // Chování ceny po výstupu: ručně zadaná čísla v ticích. Prázdno se nenahrazuje
  // nulou – nula by v analýze znamenala „cena se nehnula", ne „nevyplněno".
- if($('postExitFavorableTicks'))$('postExitFavorableTicks').value=(t&&t.postExitFavorableTicks!=null&&t.postExitFavorableTicks!=='')?t.postExitFavorableTicks:'';
- if($('postExitAdverseTicks'))$('postExitAdverseTicks').value=(t&&t.postExitAdverseTicks!=null&&t.postExitAdverseTicks!=='')?t.postExitAdverseTicks:'';
+ setTickInput('postExitFavorableTicks',(t&&t.postExitFavorableTicks!=null&&t.postExitFavorableTicks!=='')?t.postExitFavorableTicks:'');
+ setTickInput('postExitAdverseTicks',(t&&t.postExitAdverseTicks!=null&&t.postExitAdverseTicks!=='')?t.postExitAdverseTicks:'');
  if($('postExitAdverseFirst'))$('postExitAdverseFirst').value=(t&&t.postExitAdverseFirst)?'ano':'ne';
- for(const id of ['mfeTicks','maeTicks','observedMinutes']){
-  if($(id))$(id).value=(t&&t[id]!=null&&t[id]!=='')?t[id]:'';
- }
+ for(const id of ['mfeTicks','maeTicks'])setTickInput(id,(t&&t[id]!=null&&t[id]!=='')?t[id]:'');
+ if($('observedMinutes'))$('observedMinutes').value=(t&&t.observedMinutes!=null&&t.observedMinutes!=='')?t.observedMinutes:'';
  // Uložená ruční hodnota drží pole v ručním režimu – ani po smazání se pak
  // nepřepne zpátky na dopočet uprostřed psaní. Odvozenou hodnotu ukáže
  // renderPostExitHints jako read-only text.
@@ -5386,10 +5523,10 @@ function postExitDraftFromForm(){
   entryPrice:$('entryPrice')?.value,
   exitPrice:$('exitPrice')?.value,
   result:$('result')?.value||'',
-  postExitFavorableTicks:$('postExitFavorableTicks')?.value,
-  postExitAdverseTicks:$('postExitAdverseTicks')?.value,
-  mfeTicks:$('mfeTicks')?.value,
-  maeTicks:$('maeTicks')?.value
+  postExitFavorableTicks:tickInputValue('postExitFavorableTicks'),
+  postExitAdverseTicks:tickInputValue('postExitAdverseTicks'),
+  mfeTicks:tickInputValue('mfeTicks'),
+  maeTicks:tickInputValue('maeTicks')
  };
  // Další cíle z formuláře jako nohy, stejně jako je sestaví uložení. Bez nich
  // by dopočty viděly jen první cíl: MFE/MAE by se odvodily z jeho výstupu
@@ -5414,13 +5551,17 @@ function postExitDraftFromForm(){
  else{const derived=deriveStopLossPrice(draft);if(derived!=null)draft.slPrice=derived}
  return draft;
 }
-function formatTicks(v){
- return v==null?'—':String(v);
+// Dopočet v ticích → text ve zvolené jednotce ("12 t" / "3 b").
+function formatTicks(v,instrument){
+ if(v==null)return '—';
+ return typeof distText==='function'?distText(v,instrument):String(v)+' t';
 }
 // Dopočty vedle vstupů. Nic se tu needituje – jen se ukazuje, co se uloží.
 // Jediný vstup pro všechny dopočty formuláře – volá ho každá změna, která
 // může dopočty posunout.
 function renderPostExitHints(){
+ // Změna instrumentu / jednotky přepočítá pole zadávaná v ticích nebo bodech.
+ if(typeof syncDistanceInputs==='function')syncDistanceInputs();
  // Cena SL u obchodu ukončeného na SL je výstupní cena (u víc cílů cena nohy,
  // která šla na SL), cena targetu u obchodu na targetu také (TP1 → target 1,
  // TP2 → target 2) – read-only dopočet jako MFE/MAE. Karta SL / TP nezávisí
@@ -5487,10 +5628,10 @@ function renderCourseHints(){
  }
  const d=FJPoints.postExitTickFields(draft,tickSize);
  const parts=[
-  `SL: ${formatTicks(d.slTicks)} t`,
-  `výstup: ${formatTicks(d.exitTicks)} t`,
-  `max ve směru: ${formatTicks(d.maxFavorableTicks)} t`,
-  `max proti: ${formatTicks(d.maxAdverseTicks)} t`
+  `SL: ${formatTicks(d.slTicks,draft.instrument)}`,
+  `výstup: ${formatTicks(d.exitTicks,draft.instrument)}`,
+  `max ve směru: ${formatTicks(d.maxFavorableTicks,draft.instrument)}`,
+  `max proti: ${formatTicks(d.maxAdverseTicks,draft.instrument)}`
  ];
  if(d.touchedEntry!=null)parts.push(`zpět na vstup: ${d.touchedEntry?'ano':'ne'}`);
  if(d.touchedSl!=null)parts.push(`až na SL: ${d.touchedSl?'ano':'ne'}`);
@@ -5528,7 +5669,7 @@ function renderLevelDistances(){
   const box=el.querySelector('.sr-dist'); if(!box)return;
   const row=rowFromElement(el);
   const hasPrice=String(row.price??'').trim()!=='';
-  const text=FJContext.levelDistanceText(FJContext.levelGeometry(hasPrice?{price:row.price}:row,draft,tick));
+  const text=FJContext.levelDistanceText(FJContext.levelGeometry(hasPrice?{price:row.price}:row,draft,tick),levelDistOpts(tick));
   const legacy=!hasPrice&&row.legacySide?'starší zápis bez ceny ('+(row.legacySide==='TG'?'směrem k cíli':'směrem k SL')+') – doplň cenu':'';
   box.textContent=[text,legacy].filter(Boolean).join(' · ');
  });
@@ -5573,8 +5714,9 @@ function renderContextDerived(){
   targetLevel1PriceDerived:$('targetLevel1Price')?.dataset?.derived==='1'
  };
  const order=formDayOrderFor(id,t.date,t.entryTime);
- const derived=FJContext.derivedFields(t,{tickSize:getTickSizeForInstrument(d.instrument),dayOrder:order});
- const parts=FJContext.derivedSummaryParts(derived,{levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',rows[i]?.level)});
+ const formTick=getTickSizeForInstrument(d.instrument);
+ const derived=FJContext.derivedFields(t,{tickSize:formTick,dayOrder:order});
+ const parts=FJContext.derivedSummaryParts(derived,{...levelDistOpts(formTick),levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',rows[i]?.level)});
  box.textContent=parts.length?'Dopočet: '+parts.join(' · '):'';
 }
 // ---- Karty formuláře obchodu (SL / TP, Pohyb ceny, Setup, Hladiny, Komentáře) ----
@@ -5595,7 +5737,7 @@ function applyTradeSectionsOpenState(){
 function formContextDraft(){
  const d=postExitDraftFromForm();
  return {...d,
-  setupCode:$('setupCode')?.value||'',setupCode2:$('setupCode2')?.value||'',fillStatus:$('fillStatus')?.value||'',missedByTicks:$('missedByTicks')?.value??'',
+  setupCode:$('setupCode')?.value||'',setupCode2:$('setupCode2')?.value||'',fillStatus:$('fillStatus')?.value||'',missedByTicks:tickInputValue('missedByTicks')??'',
   skippedReason:$('skippedReason')?.value||'',
   trend:readSingleChipGrid('trend','TREND'),entryLevels:readChipGrid('entryLevels','ENTRY_LEVEL'),
   nearLevels:readLevelRows(),nearLevelsNone:readNearNone(),
@@ -5619,17 +5761,18 @@ function renderTradeSections(){
  const course=[];
  if(!postExitApplies(d.fillStatus,d.exitPrice))course.push('nenaplněný setup');
  else{
-  if(val(d.mfeTicks))course.push('MFE '+d.mfeTicks);
-  if(val(d.maeTicks))course.push('MAE '+d.maeTicks);
-  if(val(d.postExitFavorableTicks))course.push('↑ '+d.postExitFavorableTicks);
-  if(val(d.postExitAdverseTicks))course.push('↓ '+d.postExitAdverseTicks);
+  const dd=v=>typeof distText==='function'?distText(v,d.instrument):String(v);
+  if(val(d.mfeTicks))course.push('MFE '+dd(d.mfeTicks));
+  if(val(d.maeTicks))course.push('MAE '+dd(d.maeTicks));
+  if(val(d.postExitFavorableTicks))course.push('↑ '+dd(d.postExitFavorableTicks));
+  if(val(d.postExitAdverseTicks))course.push('↓ '+dd(d.postExitAdverseTicks));
  }
  if($('courseSummary'))$('courseSummary').textContent=course.length?'— '+course.join(' · '):'';
  const setup=[];
  if(d.setupCode)setup.push(FJTaxonomy.labelOf('SETUP',d.setupCode));
  if(d.setupCode2&&contextFieldShown('setupCode2'))setup.push(FJTaxonomy.labelOf('SETUP',d.setupCode2));
  if(d.fillStatus&&d.fillStatus!=='FILLED')setup.push(FJTaxonomy.labelOf('FILL_STATUS',d.fillStatus));
- if(missedByApplies(d.fillStatus)&&val(d.missedByTicks))setup.push('minuto o '+d.missedByTicks+' t');
+ if(missedByApplies(d.fillStatus)&&val(d.missedByTicks))setup.push('minuto o '+(typeof distText==='function'?distText(d.missedByTicks,d.instrument):d.missedByTicks+' t'));
  if(d.fillStatus==='SKIPPED'&&d.skippedReason)setup.push(FJTaxonomy.labelOf('SKIP_REASON',d.skippedReason));
  if(d.trend)setup.push('trend 1m '+FJTaxonomy.labelOf('TREND',d.trend));
  if($('setupSummary'))$('setupSummary').textContent=setup.length?'— '+setup.join(' · '):'';
@@ -5735,6 +5878,16 @@ function ensureTargetFields(count,reset){
 function syncCourseField(key,derivedValue,origin='z výstupní ceny',unit=' t'){
  const el=$(key); if(!el)return;
  const ds=el.dataset||(el.dataset={});
+ // Pole v ticích (data-tick-input): dopočet v ticích se ukáže i zapíše
+ // v jednotce pole (ticky / body); uloží se zase v ticích (tickInputValue).
+ if(ds.tickInput!==undefined&&typeof ticksForInput==='function'){
+  if(derivedValue!=null){
+   ds.unitShown=tickInputTarget(el).unit;
+   const tk=tickInputTarget(el).tickSize;ds.tickShown=tk==null?'':String(tk);
+   derivedValue=ticksForInput(key,derivedValue);
+  }
+  unit=' '+tickInputSuffix(key);
+ }
  const view=$(key+'View'),revert=$(key+'Revert');
  const value=String(el.value??'').trim();
  const measured=!!ds.source&&ds.manual!=='1'&&value!=='';
@@ -5746,13 +5899,14 @@ function syncCourseField(key,derivedValue,origin='z výstupní ceny',unit=' t'){
  const locked=measured||showDerived;
  el.style.display=locked?'none':'';
  if(view)view.style.display=locked?'':'none';
- if($(key+'ViewValue'))$(key+'ViewValue').textContent=measured?value:(showDerived?String(derivedValue):'');
+ const shown=v=>ds.tickInput!==undefined?FJPoints.czNumber(v,4):String(v);
+ if($(key+'ViewValue'))$(key+'ViewValue').textContent=measured?shown(value):(showDerived?shown(derivedValue):'');
  if($(key+'ViewNote'))$(key+'ViewNote').textContent=measured?'— '+sourceLabel(ds.source):'— dopočítáno '+origin;
  if($(key+'SourceNote'))$(key+'SourceNote').textContent=manual&&ds.source?sourceLabel(ds.source):'';
  if(revert){
   const offer=manual&&!ds.source&&derivedValue!=null&&String(el.value??'').trim()!==String(derivedValue);
   revert.style.display=offer?'':'none';
-  revert.textContent=offer?`použít dopočet ${origin} (${derivedValue}${unit})`:'';
+  revert.textContent=offer?`použít dopočet ${origin} (${shown(derivedValue)}${unit})`:'';
  }
 }
 // „upravit ručně": dopočet se přesune do pole jako výchozí hodnota a od té
@@ -6066,7 +6220,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   obj.fillStatus=FJTaxonomy.sanitizeSingle('FILL_STATUS',$('fillStatus')?.value);
   // Minutí limitky v ticích (vždy kladně) – jen u nenaplněného / vynechaného
   // setupu; u naplněného obchodu by tvrdilo, že limitka minula.
-  const missedRaw=missedByApplies(obj.fillStatus)?$('missedByTicks')?.value:'';
+  const missedRaw=missedByApplies(obj.fillStatus)?tickInputValue('missedByTicks'):'';
   if(missedRaw!==undefined&&String(missedRaw).trim()!==''&&Number.isFinite(Number(missedRaw)))obj.missedByTicks=Math.abs(Number(missedRaw));
   else delete obj.missedByTicks;
   applySkippedReason(obj,obj.fillStatus,$('skippedReason')?.value,$('skippedReasonNote')?.value??'');
@@ -6112,8 +6266,8 @@ $('tradeForm').addEventListener('submit',async e=>{
   //
   // Záporné zadání formulář nezablokuje (měkká validace), ale do dat se ukládá
   // v absolutní hodnotě – směr nese název pole, ne znaménko.
-  const postExitFav=postExitApplies(obj.fillStatus,obj.exitPrice)?$('postExitFavorableTicks')?.value:'';
-  const postExitAdv=postExitApplies(obj.fillStatus,obj.exitPrice)?$('postExitAdverseTicks')?.value:'';
+  const postExitFav=postExitApplies(obj.fillStatus,obj.exitPrice)?tickInputValue('postExitFavorableTicks'):'';
+  const postExitAdv=postExitApplies(obj.fillStatus,obj.exitPrice)?tickInputValue('postExitAdverseTicks'):'';
   const hasPostExit=[postExitFav,postExitAdv].some(v=>v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v)));
   if(hasPostExit){
    if(postExitFav!==undefined&&String(postExitFav).trim()!==''&&Number.isFinite(Number(postExitFav)))obj.postExitFavorableTicks=Math.abs(Number(postExitFav));
@@ -6128,7 +6282,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   // jako u čísel po výstupu: prázdné se neukládá, záporné jde v absolutní
   // hodnotě, u nenaplněného setupu se neukládá nic.
   for(const key of ['mfeTicks','maeTicks','observedMinutes']){
-   const raw=postExitApplies(obj.fillStatus,obj.exitPrice)?$(key)?.value:'';
+   const raw=postExitApplies(obj.fillStatus,obj.exitPrice)?(key==='observedMinutes'?$(key)?.value:tickInputValue(key)):'';
    if(raw!==undefined&&String(raw).trim()!==''&&Number.isFinite(Number(raw)))obj[key]=Math.abs(Number(raw));
    else delete obj[key];
    // Příznak odvození přežije jen u hodnoty, kterou uživatel nepřepsal. Platí
@@ -6572,7 +6726,9 @@ function openSetupModal(rec){
  // Backtest deník nenabízí „vědomě vynechán“ (kromě záznamu, který ho už má).
  $('sfFill').innerHTML=FJContext.allowedFillStatus(activeJournalMode(),['NO_FILL','SKIPPED'],s.fillStatus).map(k=>`<option value="${k}">${esc(FJTaxonomy.labelOf('FILL_STATUS',k))}</option>`).join('');
  $('sfFill').value=s.fillStatus==='SKIPPED'?'SKIPPED':'NO_FILL';
- for(const [id,val] of [['sfPlannedEntry',s.plannedEntryPrice],['sfSl',s.slPrice],['sfMissedBy',s.missedByTicks],['sfMaxFav',s.maxFavorableTicks]])$(id).value=val!=null?val:'';
+ for(const [id,val] of [['sfPlannedEntry',s.plannedEntryPrice],['sfSl',s.slPrice]])$(id).value=val!=null?val:'';
+ for(const [id,val] of [['sfMissedBy',s.missedByTicks],['sfMaxFav',s.maxFavorableTicks]])setTickInput(id,val!=null?val:'');
+ applyDistanceUnitLabels();
  const tg=FJTaxonomy.sanitizeTargetLevel(s.targetLevel1);
  renderChipGrid('sfTarget1Types','TARGET_LEVEL',tg?tg.types:[]);
  $('sfTarget1Price').value=tg&&tg.price!=null?tg.price:'';
@@ -6591,6 +6747,8 @@ function syncSfSkippedReason(){
  if($('sfSkippedReasonField'))$('sfSkippedReasonField').style.display=$('sfFill').value==='SKIPPED'?'':'none';
 }
 $('sfFill').addEventListener('change',syncSfSkippedReason);
+// Jiný instrument = jiná velikost ticku: pole v bodech se přepočítají.
+$('sfInstrument').addEventListener('input',syncDistanceInputs);
 async function saveSetupRecord(){
  const date=$('sfDate').value;
  if(!date){showToast('Doplň datum setupu.');return}
@@ -6607,7 +6765,8 @@ async function saveSetupRecord(){
   reason:$('sfReason').value.trim(),note:$('sfNote').value.trim(),
   createdAt:existing?.createdAt||Date.now(),updatedAt:Date.now()
  };
- const planned=num('sfPlannedEntry'),sl=num('sfSl'),missed=num('sfMissedBy'),maxFav=num('sfMaxFav');
+ const tickNum=id=>{const v=tickInputValue(id);return v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null};
+ const planned=num('sfPlannedEntry'),sl=num('sfSl'),missed=tickNum('sfMissedBy'),maxFav=tickNum('sfMaxFav');
  if(planned!=null)rec.plannedEntryPrice=planned;
  if(sl!=null)rec.slPrice=sl;
  if(missed!=null)rec.missedByTicks=Math.abs(missed);
@@ -8551,8 +8710,8 @@ const OVERVIEW_FILTERS=[
  {key:'side',label:'Směr'},
  {key:'result',label:'Výsledek'},
  {key:'setup',label:'Setup'},
- {key:'mfe',label:'MFE (ticky od–do)'},
- {key:'mae',label:'MAE (ticky od–do)'}
+ {key:'mfe',label:'MFE (od–do)'},
+ {key:'mae',label:'MAE (od–do)'}
 ];
 const OVERVIEW_FILTERS_KEY='FJ_overviewFilters';
 function readOverviewFilterConfig(){
@@ -8576,7 +8735,8 @@ function readOverviewFilters(){
   result:on('result')?val('accountResult'):'',
   setup:on('setup')?val('accountSetup'):'',
   mfeMin:on('mfe')?overviewNum(val('accountMfeMin')):null,mfeMax:on('mfe')?overviewNum(val('accountMfeMax')):null,
-  maeMin:on('mae')?overviewNum(val('accountMaeMin')):null,maeMax:on('mae')?overviewNum(val('accountMaeMax')):null
+  maeMin:on('mae')?overviewNum(val('accountMaeMin')):null,maeMax:on('mae')?overviewNum(val('accountMaeMax')):null,
+  unit:typeof currentDistanceUnit==='function'?currentDistanceUnit():'ticks'
  };
 }
 // Rozsah od–do pro tikovou hodnotu. Prázdná hodnota u obchodu při aktivním
@@ -8586,6 +8746,10 @@ function overviewRangeMatch(raw,min,max){
  const v=overviewNum(raw);
  if(v===null)return false;
  return (min===null||v>=min)&&(max===null||v<=max);
+}
+// MFE/MAE obchodu v jednotce filtru (ticky / body podle přepínače).
+function overviewTickValue(t,key,unit){
+ return typeof ticksInUnit==='function'?ticksInUnit(t?.[key],t?.instrument,unit):overviewNum(t?.[key]);
 }
 function overviewFilterMatch(t,f){
  if(f.journal&&t.journalId!==f.journal)return false;
@@ -8598,8 +8762,8 @@ function overviewFilterMatch(t,f){
  if(f.result&&t.result!==f.result)return false;
  if(f.setup==='__none'){if(t.setupCode)return false}
  else if(f.setup&&t.setupCode!==f.setup&&t.setupCode2!==f.setup)return false;
- if(!overviewRangeMatch(t.mfeTicks,f.mfeMin,f.mfeMax))return false;
- if(!overviewRangeMatch(t.maeTicks,f.maeMin,f.maeMax))return false;
+ if(!overviewRangeMatch(overviewTickValue(t,'mfeTicks',f.unit),f.mfeMin,f.mfeMax))return false;
+ if(!overviewRangeMatch(overviewTickValue(t,'maeTicks',f.unit),f.maeMin,f.maeMax))return false;
  return true;
 }
 function activeMoreFilterCount(f){

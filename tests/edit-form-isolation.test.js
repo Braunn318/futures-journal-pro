@@ -66,6 +66,7 @@ function tradeForm() {
     renderLevelRows() {},
     syncWouldSkipField() {},
     isSkipLive: t => t?.wouldSkipLive === true,
+    getTickSizeForInstrument: () => null,
     updateConfluenceHint() {},
     updateLevelsSummary() {},
     applyTradeSectionsOpenState() {},

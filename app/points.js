@@ -458,7 +458,69 @@
     return code && BUILTIN_TICK_SIZES[code] !== undefined ? BUILTIN_TICK_SIZES[code] : null;
   }
 
+  // Jednotka vzdálenosti pro zobrazení a zadávání: 'ticks' nebo 'points'.
+  // Ukládá se vždy v ticích; body = tiky × velikost ticku. Bez známé velikosti
+  // ticku zůstává hodnota v ticích (nehádá se).
+  const DISTANCE_UNITS = ['ticks', 'points'];
+  function normalizeDistanceUnit(unit) {
+    return unit === 'points' ? 'points' : 'ticks';
+  }
+  function validTickSize(tickSize) {
+    if (tickSize === null || tickSize === undefined || tickSize === '') return null;
+    const t = Number(tickSize);
+    return Number.isFinite(t) && t > 0 ? t : null;
+  }
+  // Skutečně použitá jednotka: body jen se známou velikostí ticku.
+  function effectiveDistanceUnit(unit, tickSize) {
+    return normalizeDistanceUnit(unit) === 'points' && validTickSize(tickSize) != null ? 'points' : 'ticks';
+  }
+  function distanceUnitSuffix(unit, tickSize) {
+    return effectiveDistanceUnit(unit, tickSize) === 'points' ? 'b' : 't';
+  }
+  // Tiky → číslo ve zvolené jednotce (body zaokrouhlené na 4 desetinná místa).
+  function ticksToUnit(ticks, tickSize, unit) {
+    const n = finiteOrNull(ticks);
+    if (n == null) return null;
+    if (effectiveDistanceUnit(unit, tickSize) !== 'points') return n;
+    return Math.round(n * validTickSize(tickSize) * 10000) / 10000;
+  }
+  // Číslo ve zvolené jednotce → tiky. Přijímá i desetinnou čárku ("4,25").
+  function unitToTicks(value, tickSize, unit) {
+    if (value === null || value === undefined) return null;
+    const raw = typeof value === 'string' ? value.replace(/\s+/g, '').replace(',', '.') : value;
+    if (raw === '') return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    if (effectiveDistanceUnit(unit, tickSize) !== 'points') return n;
+    return roundTicks(n / validTickSize(tickSize));
+  }
+  // Číslo s desetinnou čárkou, max. `digits` desetinných míst, bez zbytečných nul.
+  function czNumber(n, digits) {
+    const f = Math.pow(10, digits == null ? 2 : digits);
+    const r = Math.round(Number(n) * f) / f;
+    return (Object.is(r, -0) ? 0 : r).toString().replace('.', ',');
+  }
+  // "17 t" / "4,25 b"; signed: true přidá "+" u kladných, noSuffix vynechá jednotku.
+  function fmtDistance(ticks, tickSize, unit, opts) {
+    const n = finiteOrNull(ticks);
+    if (n == null) return '';
+    const o = opts || {};
+    const eff = effectiveDistanceUnit(unit, tickSize);
+    const value = eff === 'points' ? ticksToUnit(n, tickSize, 'points') : n;
+    const text = czNumber(value, o.digits != null ? o.digits : 2);
+    const sign = o.signed && value > 0 ? '+' : '';
+    return o.noSuffix ? sign + text : `${sign}${text} ${eff === 'points' ? 'b' : 't'}`;
+  }
+
   return {
+    DISTANCE_UNITS,
+    normalizeDistanceUnit,
+    effectiveDistanceUnit,
+    distanceUnitSuffix,
+    ticksToUnit,
+    unitToTicks,
+    czNumber,
+    fmtDistance,
     findTemplateIn,
     BUILTIN_TICK_SIZES,
     tickSizeFor,

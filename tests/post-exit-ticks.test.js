@@ -166,7 +166,7 @@ test('měkká validace: záporné číslo varuje, ale uloží se kladně', () =>
   assert.equal(r.postExitTicksWarning(''), '', 'prázdné pole není chyba – všechno je nepovinné');
   assert.equal(r.postExitTicksWarning(8), '');
   assert.equal(r.postExitTicksWarning(-8), 'Zadávej kladně, směr určuje pole.');
-  assert.equal(r.postExitTicksWarning('nesmysl'), 'Zadej číslo v ticích.');
+  assert.equal(r.postExitTicksWarning('nesmysl'), 'Zadej číslo.');
   // Do výpočtu jde záporná hodnota v absolutní hodnotě – směr nese název pole.
   assert.equal(FJPoints.postExitTickFields(specTrade({ postExitFavorableTicks: -8 }), 0.25).maxTicks, 32);
 });

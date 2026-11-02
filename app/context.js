@@ -394,12 +394,21 @@
 
   // Vzdálenosti jednoho řádku hladiny pro formulář a kartu obchodu, např.
   // „+5 t od vstupu · 3 t od SL · 11 t do cíle". Jen čísla – žádný štítek role.
-  function levelDistanceText(g) {
+  // Vzdálenost v tikách → text s jednotkou. Výchozí jsou ticky; volající může
+  // přes `opts.dist(n, plus)` dodat jiný formát (body podle přepínače jednotky).
+  function tickDistance(n, plus) {
+    return signedTicks(n, plus) + ' t';
+  }
+  function distFn(opts) {
+    return opts && typeof opts.dist === 'function' ? opts.dist : tickDistance;
+  }
+  function levelDistanceText(g, opts) {
     if (!g) return '';
+    const dist = distFn(opts);
     const parts = [];
-    if (g.fromEntry != null) parts.push(signedTicks(g.fromEntry, true) + ' t od vstupu');
-    if (g.fromStop != null) parts.push(signedTicks(g.fromStop) + ' t od SL');
-    if (g.toTarget != null) parts.push(signedTicks(g.toTarget) + ' t do cíle');
+    if (g.fromEntry != null) parts.push(dist(g.fromEntry, true) + ' od vstupu');
+    if (g.fromStop != null) parts.push(dist(g.fromStop) + ' od SL');
+    if (g.toTarget != null) parts.push(dist(g.toTarget) + ' do cíle');
     return parts.join(' · ');
   }
 
@@ -409,15 +418,16 @@
   // `opts.levelName(i)` vrací popisek i-tého řádku hladin (číselník zná volající).
   function derivedSummaryParts(d, opts = {}) {
     if (!d) return [];
+    const dist = distFn(opts);
     const parts = [];
     const rows = Array.isArray(d.nearLevels) ? d.nearLevels : [];
     if (d.nearestAheadTicks != null) {
-      parts.push('Nejbližší hladina ve směru: ' + signedTicks(d.nearestAheadTicks, true) + ' t' + (d.nearestAheadR != null ? ' (' + cz(d.nearestAheadR) + ' R)' : ''));
+      parts.push('Nejbližší hladina ve směru: ' + dist(d.nearestAheadTicks, true) + (d.nearestAheadR != null ? ' (' + cz(d.nearestAheadR) + ' R)' : ''));
     }
     if (d.stopBehindTicks != null) {
       const i = stopBehindIndex(rows);
       const name = i >= 0 && typeof opts.levelName === 'function' ? opts.levelName(i) : '';
-      parts.push('SL ' + cz(d.stopBehindTicks) + ' t za ' + (name || 'nejbližší hladinou'));
+      parts.push('SL ' + dist(d.stopBehindTicks) + ' za ' + (name || 'nejbližší hladinou'));
     }
     if (d.levelsStopToEntry != null && d.levelsEntryToTarget != null) {
       parts.push(rows.length ? 'mezi SL a vstupem ' + d.levelsStopToEntry + ', před cílem ' + d.levelsEntryToTarget : 'žádná hladina v blízkosti');

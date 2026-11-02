@@ -177,12 +177,26 @@ function loadFromSource(source, names, globals = {}) {
 // s funkcí, která je potřebuje, ať se nemusí dopisovat do každého testu.
 // (Cíle 3+ – pole formuláře a CSV sloupce TP3, TP4 …)
 const TARGET_FORM = ['formTargetFieldCount', 'targetCountOf', 'deriveTargetPrices', 'ensureTargetFields', 'targetFieldFilled', 'buildTargetField', 'wireTargetPriceInput', 'readChipGrid'];
+// Jednotka vzdáleností (ticky / body): pole formulářů a texty vzdáleností.
+const DIST_INPUT = ['currentDistanceUnit', 'tickInputInstrument', 'tickInputTarget', 'tickInputValue', 'setTickInput',
+  'ticksForInput', 'tickInputSuffix', 'syncDistanceInputs', 'applyDistanceUnitLabels', 'distText'];
+const DIST_TEXT = ['currentDistanceUnit', 'levelDistOpts', 'distText'];
 const RENDERER_COMPANIONS = {
-  postExitDraftFromForm: TARGET_FORM,
-  renderPostExitHints: TARGET_FORM,
-  openModal: TARGET_FORM,
-  updateLevelsSummary: TARGET_FORM,
-  formContextDraft: TARGET_FORM,
+  postExitDraftFromForm: [...TARGET_FORM, ...DIST_INPUT],
+  renderPostExitHints: [...TARGET_FORM, ...DIST_INPUT],
+  openModal: [...TARGET_FORM, ...DIST_INPUT],
+  updateLevelsSummary: [...TARGET_FORM, ...DIST_TEXT],
+  formContextDraft: [...TARGET_FORM, ...DIST_INPUT],
+  syncCourseField: DIST_INPUT,
+  openSetupModal: DIST_INPUT,
+  saveSetupRecord: DIST_INPUT,
+  saveTrade: DIST_INPUT,
+  formatLevelRow: DIST_TEXT,
+  contextPillsHTML: DIST_TEXT,
+  renderLevelDistances: DIST_TEXT,
+  renderTradeSections: DIST_INPUT,
+  overviewFilterMatch: ['overviewTickValue', 'ticksInUnit', 'currentDistanceUnit'],
+  computeTickStats: ['currentDistanceUnit'],
   plannedTargetPrices: ['targetCountOf', 'deriveTargetPrices'],
   journalCsvTable: ['extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells'],
   reportCsvTable: ['extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells']
