@@ -296,7 +296,9 @@
     const same = price => Math.abs(price - exit) < tick / 2;
     const result = String(trade?.result);
     if (result === 'target') {
-      const prices = [trade?.targetLevel1?.price, trade?.targetLevel2?.price]
+      // Všechny cíle obchodu (targetLevel1, 2, 3 …), ne jen první dva.
+      const prices = Object.keys(trade || {}).filter(k => /^targetLevel\d+$/.test(k))
+        .map(k => trade[k]?.price)
         .map(finiteOrNull).filter(p => p != null);
       if (prices.length && !prices.some(same)) return out;
       if (exitTicks > 0) out.mfeTicks = exitTicks;

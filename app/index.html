@@ -1481,6 +1481,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="derived-readonly" id="slPriceView" style="display:none"><b id="slPriceViewValue"></b> <span class="sub" id="slPriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('slPrice')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="slPriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('slPrice')"></a><div class="sub" id="slPriceHint"></div><div class="sub block-note" id="slPriceBlockNote"></div></div>
           <div class="field" id="targetLevel1PriceField"><label>Cena targetu <span class="sub">— pro plánované R</span></label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"><div class="derived-readonly" id="targetLevel1PriceView" style="display:none"><b id="targetLevel1PriceViewValue"></b> <span class="sub" id="targetLevel1PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel1Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel1PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel1Price')"></a><div class="sub block-note" id="targetLevel1PriceBlockNote"></div></div>
           <div class="field" id="targetLevel2PriceField"><label>Cena targetu 2 <span class="sub">— druhý cíl</span></label><input id="targetLevel2Price" type="number" step="any" placeholder="např. 7720"><div class="derived-readonly" id="targetLevel2PriceView" style="display:none"><b id="targetLevel2PriceViewValue"></b> <span class="sub" id="targetLevel2PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel2Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel2PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel2Price')"></a></div>
+          <div id="targetPriceExtra" style="display:contents"></div>
           <div class="field full sub" id="riskInfo"></div>
         </div>
       </details>
@@ -1528,6 +1529,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
           <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
           <div class="field full"><label>Cílová hladina 2 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel2Types" class="chip-grid"></div></div>
+          <div id="targetLevelTypesExtra" style="display:contents"></div>
           <div class="field full sub" id="contextDerived" data-ctx-field="derivedRow" title="Dopočítáno z cen (hladiny, vstup, SL, cíl), data a času – needituje se a do obchodu se neukládá."></div>
         </div>
       </details>
@@ -3783,7 +3785,7 @@ function updateLevelsSummary(){
   const keys=readChipGrid(id,enumName);
   if(keys.length)parts.push(label+': '+keys.map(k=>FJTaxonomy.labelOf(enumName,k)).join(' + '));
  }
- for(const n of [1,2]){
+ for(let n=1;n<=formTargetFieldCount;n++){
   const types=readChipGrid('targetLevel'+n+'Types','TARGET_LEVEL'),price=$('targetLevel'+n+'Price')?.value;
   if(types.length||(price!==undefined&&String(price).trim()!==''))parts.push(`Cíl ${n}: ${targetTypesLabel(types)}${String(price||'').trim()?' @ '+price:''}`);
  }
@@ -3801,6 +3803,21 @@ function mergeContextFields(list){
  const hasValue=(t,key)=>t&&t[key]!==undefined&&t[key]!==null&&t[key]!=='';
  const lastExitKeys=FJTaxonomy.TRADE_CONTEXT_FIELDS.filter(f=>f.merge==='lastExit').map(f=>f.key);
  const lastExitSource=byExitDesc.find(t=>lastExitKeys.some(k=>hasValue(t,k)))||null;
+ // Cílová hladina (targetLevel1, 2, 3 …). Typy (konfluence) se sjednocují přes
+ // všechny nohy jako multi-select. Cena odvozená z výstupu nohy
+ // (targetLevelNPriceDerived) popisuje jen tu nohu – u sloučené pozice by
+ // target 1 nesl cenu libovolné nohy. Bere se jen ruční cena z první nohy,
+ // která ji má; jinak ji formulář dopočítá z nohou znovu (deriveTargetPrices).
+ const mergeTarget=key=>{
+  const types=list.flatMap(t=>FJTaxonomy.targetTypesOf(t?.[key]));
+  const priced=list.find(t=>t?.[key+'PriceDerived']!==true&&FJTaxonomy.sanitizeTargetLevel(t?.[key])?.price!=null);
+  return FJTaxonomy.sanitizeTargetLevel({types,price:priced?FJTaxonomy.sanitizeTargetLevel(priced[key]).price:null});
+ };
+ // TP3+ nejsou v TRADE_CONTEXT_FIELDS (počet cílů není pevný).
+ for(const n of new Set(list.flatMap(t=>FJTaxonomy.targetLevelNumbers(t).filter(n=>n>2)))){
+  const merged=mergeTarget('targetLevel'+n);
+  if(merged)out['targetLevel'+n]=merged;
+ }
  for(const field of FJTaxonomy.TRADE_CONTEXT_FIELDS){
   if(field.cardinality==='levelRows'){
    // Hladiny v blízkosti: sjednocení ŘÁDKŮ všech nohou. Shodné řádky (typ +
@@ -3840,14 +3857,7 @@ function mergeContextFields(list){
     if(source[field.key+'Source'])out[field.key+'Source']=source[field.key+'Source'];
    }
   }else if(field.cardinality==='target'){
-   // Typy (konfluence) se sjednocují přes všechny nohy jako multi-select.
-   // Cena odvozená z výstupu nohy (targetLevelNPriceDerived) popisuje jen tu
-   // nohu – u sloučené pozice by target 1 nesl cenu libovolné nohy. Bere se
-   // jen ruční cena z první nohy, která ji má; jinak ji formulář dopočítá
-   // z nohou znovu (deriveTargetPrices).
-   const types=list.flatMap(t=>FJTaxonomy.targetTypesOf(t?.[field.key]));
-   const priced=list.find(t=>t?.[field.key+'PriceDerived']!==true&&FJTaxonomy.sanitizeTargetLevel(t?.[field.key])?.price!=null);
-   const merged=FJTaxonomy.sanitizeTargetLevel({types,price:priced?FJTaxonomy.sanitizeTargetLevel(priced[field.key]).price:null});
+   const merged=mergeTarget(field.key);
    if(merged)out[field.key]=merged;
   }else if(field.merge==='lastExit'){
    // Skupina se bere z JEDNÉ nohy vcelku – jinak by se stalo, že čísla jsou
@@ -4103,7 +4113,7 @@ function levelPillsHTML(t,opts={}){
  const near=FJTaxonomy.nearLevelsOf(t);
  if(near.length)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti (cena · od vstupu · od SL · do cíle, v ticích)">Hladiny: ${esc(near.map(r=>formatLevelRow(r,FJContext.levelGeometry(r,t,tick))).join(', '))}</span>`);
  else if(FJTaxonomy.nearLevelsNoneOf(t))parts.push('<span class="pill context-pill" title="Hladiny v blízkosti: žádná">Hladiny: žádná</span>');
- for(const n of [1,2]){
+ for(const n of FJTaxonomy.targetLevelNumbers(t)){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
   if(!target)continue;
   const name=targetTypesLabel(target.types);
@@ -4177,14 +4187,32 @@ function riskFields(t){
   plannedRMultiple:FJPoints.plannedRMultipleOf(t,plannedTargetPrices(t))};
  return out;
 }
-// Všechny targety pozice pro plánované R: target 1 a 2 z polí (ruční hodnota
-// má přednost, jinak dopočet), TP3 a dál z cen ziskových nohou. Bez nich by
-// plán R u pozice s dokupy / víc cíli končil na TP2.
-function extraTargetPrices(t){
- return deriveTargetPrices(t).slice(2);
+// Počet cílů pozice: target 1 a 2 vždy, další podle ziskových nohou
+// (deriveTargetPrices) a uložených targetLevelN. TP3, TP4 … mají vlastní
+// cenu targetu i cílovou hladinu stejně jako TP2.
+function targetCountOf(t){
+ const tt=t||{};
+ const stored=FJTaxonomy.targetLevelNumbers(tt).filter(n=>FJTaxonomy.sanitizeTargetLevel(tt['targetLevel'+n]));
+ return Math.max(2,deriveTargetPrices(tt).length,...stored);
 }
+// Všechny targety pozice pro plánované R: target 1 a 2 z polí (ruční hodnota
+// má přednost, jinak dopočet), TP3 a dál z polí targetLevelN, a kde pole
+// cenu nemá, z cen ziskových nohou. Bez nich by plán R u pozice s dokupy /
+// víc cíli končil na TP2.
 function plannedTargetPrices(t){
- return [t?.targetLevel1?.price,t?.targetLevel2?.price,...extraTargetPrices(t||{})];
+ const tt=t||{};
+ const derived=deriveTargetPrices(tt);
+ const out=[];
+ for(let n=1;n<=targetCountOf(tt);n++){
+  const own=tt['targetLevel'+n]?.price;
+  const has=own!==undefined&&own!==null&&String(own).trim()!=='';
+  out.push(n<=2||has?own:derived[n-1]);
+ }
+ return out;
+}
+// TP3 a dál (pro souhrn karty SL / TP).
+function extraTargetPrices(t){
+ return plannedTargetPrices(t).slice(2);
 }
 // Plánované R pro zobrazení a export – počítá se čerstvě, aby i starší obchody
 // (uložené s plánem jen do TP2) ukazovaly R do posledního targetu. Když se
@@ -4969,7 +4997,9 @@ function openModal(t=null,{title}={}){
   ds.manual=has&&!derived&&!ds.source?'1':'';
   ds.mergedDerived=multiLeg&&derived?String(t[key]):'';
  }
- for(const n of [1,2]){
+ // Pole pro každý cíl pozice (TP3+ se vytvoří), pole předchozího obchodu pryč.
+ const targetCount=ensureTargetFields(targetCountOf(t),true);
+ for(let n=1;n<=targetCount;n++){
   const target=FJTaxonomy.sanitizeTargetLevel(t&&t['targetLevel'+n]);
   renderChipGrid('targetLevel'+n+'Types','TARGET_LEVEL',target?target.types:[]);
   const el=$('targetLevel'+n+'Price');
@@ -5373,7 +5403,7 @@ function postExitDraftFromForm(){
  // Ceny targetů stejně jako cena SL: pole v režimu dopočtu se nebere, ale
  // počítá se čerstvě z výstupu / nohou.
  const derivedTargets=deriveTargetPrices(draft);
- for(const n of [1,2]){
+ for(let n=1;n<=formTargetFieldCount;n++){
   const el=$('targetLevel'+n+'Price');
   draft['targetLevel'+n]={price:el?.dataset?.derived==='1'?(derivedTargets[n-1]??''):el?.value};
  }
@@ -5398,7 +5428,9 @@ function renderPostExitHints(){
  const draft=postExitDraftFromForm();
  syncCourseField('slPrice',deriveStopLossPrice(draft),'z výstupní ceny','');
  const targets=deriveTargetPrices(draft);
- for(const n of [1,2])syncCourseField('targetLevel'+n+'Price',targets[n-1]??null,'z výstupní ceny','');
+ // TP3, TP4 … dostanou vlastní pole, jakmile je pozice má (další cíl v nohách).
+ const targetCount=ensureTargetFields(targetCountOf(draft));
+ for(let n=1;n<=targetCount;n++)syncCourseField('targetLevel'+n+'Price',targets[n-1]??null,'z výstupní ceny','');
  // Target 2 jen tam, kde dává smysl: obchod má další cíl, nebo už cenu.
  const t2=$('targetLevel2PriceField');
  if(t2){
@@ -5580,9 +5612,7 @@ function renderTradeSections(){
  const val=v=>String(v??'').trim();
  const sltp=[];
  if(val(d.slPrice))sltp.push('SL '+d.slPrice);
- if(val(d.targetLevel1?.price))sltp.push('TP '+d.targetLevel1.price);
- if(val(d.targetLevel2?.price))sltp.push('TP2 '+d.targetLevel2.price);
- extraTargetPrices(d).forEach((p,i)=>sltp.push('TP'+(i+3)+' '+p));
+ plannedTargetPrices(d).forEach((p,i)=>{if(val(p))sltp.push((i?'TP'+(i+1):'TP')+' '+p)});
  const planned=FJPoints.plannedRMultipleOf(d,plannedTargetPrices(d));
  if(planned!=null)sltp.push('plán R '+planned);
  $('sltpSummary').textContent=sltp.length?'— '+sltp.join(' · '):'';
@@ -5646,6 +5676,61 @@ function renderTradeSections(){
 // – jen bez jednotky „t", proto `unit`.
 function sourceLabel(source){
  return source==='nt8'?'importováno z NinjaTraderu':`naměřeno konektorem (${source})`;
+}
+// ---- Cíle 3+ (TP3, TP4 …) ve formuláři ----
+// Target 1 a 2 jsou v HTML napevno. Pro každý další cíl pozice se pole
+// vytvoří stejně jako target 2: „Cena targetu N" v kartě SL / TP (dopočet
+// z výstupu nohy, „upravit ručně") a „Cílová hladina N" v Hladinách.
+// Pole s ruční cenou nebo vybraným typem se nikdy neodebere.
+let formTargetFieldCount=2;
+// Listenery ceny targetu: co uživatel napíše, je ruční hodnota
+// (targetLevelNPriceDerived = false); pak přepočet dopočtů a souhrnu Hladin.
+function wireTargetPriceInput(id){
+ const el=$(id); if(!el?.addEventListener)return;
+ el.addEventListener('input',()=>{const ds=el.dataset||(el.dataset={});ds.derived='';ds.manual='1'});
+ el.addEventListener('input',renderPostExitHints);
+ el.addEventListener('input',()=>updateLevelsSummary());
+ el.addEventListener('change',()=>updateLevelsSummary());
+}
+function targetFieldFilled(n){
+ const el=$('targetLevel'+n+'Price');
+ const price=el&&el.dataset?.derived!=='1'?String(el.value??'').trim():'';
+ return price!==''||readChipGrid('targetLevel'+n+'Types','TARGET_LEVEL').length>0;
+}
+function buildTargetField(n){
+ const id='targetLevel'+n;
+ const priceHost=$('targetPriceExtra'),typesHost=$('targetLevelTypesExtra');
+ if(priceHost&&!$(id+'PriceField')){
+  const wrap=document.createElement('div');
+  wrap.className='field';wrap.id=id+'PriceField';
+  wrap.innerHTML=`<label>Cena targetu ${n} <span class="sub">— ${n}. cíl</span></label><input id="${id}Price" type="number" step="any"><div class="derived-readonly" id="${id}PriceView" style="display:none"><b id="${id}PriceViewValue"></b> <span class="sub" id="${id}PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="${id}PriceRevert" style="display:none"></a>`;
+  wrap.querySelector('#'+id+'PriceView .derived-edit').onclick=e=>{e.preventDefault();editCourseManually(id+'Price')};
+  wrap.querySelector('#'+id+'PriceRevert').onclick=e=>{e.preventDefault();useDerivedCourse(id+'Price')};
+  priceHost.appendChild(wrap);
+  wireTargetPriceInput(id+'Price');
+ }
+ if(typesHost&&!$(id+'TypesField')){
+  const wrap=document.createElement('div');
+  wrap.className='field full';wrap.id=id+'TypesField';
+  wrap.innerHTML=`<label>Cílová hladina ${n} <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="${id}Types" class="chip-grid"></div>`;
+  typesHost.appendChild(wrap);
+  renderChipGrid(id+'Types','TARGET_LEVEL',[]);
+ }
+}
+// Zajistí pole pro cíle 1..count a vrátí jejich skutečný počet (vyplněné
+// pole za `count` zůstává). `reset` (otevření formuláře): pole navíc se
+// odeberou bez ohledu na obsah – patří předchozímu obchodu.
+function ensureTargetFields(count,reset){
+ let want=Math.max(2,Number(count)||2);
+ if(!reset)for(let n=formTargetFieldCount;n>want;n--)if(targetFieldFilled(n)){want=n;break}
+ if(typeof document!=='undefined'&&typeof document.createElement==='function'){
+  for(let n=3;n<=Math.max(want,formTargetFieldCount);n++){
+   if(n<=want)buildTargetField(n);
+   else{$('targetLevel'+n+'PriceField')?.remove();$('targetLevel'+n+'TypesField')?.remove()}
+  }
+ }
+ formTargetFieldCount=want;
+ return want;
 }
 function syncCourseField(key,derivedValue,origin='z výstupní ceny',unit=' t'){
  const el=$(key); if(!el)return;
@@ -5756,10 +5841,11 @@ function useDerivedCourse(key){
 }));
 // Stejně u ceny SL a cen targetů: co uživatel napíše, je ruční hodnota
 // (slDerived / targetLevelNPriceDerived = false).
-['slPrice','targetLevel1Price','targetLevel2Price'].forEach(id=>$(id)?.addEventListener('input',()=>{
- const ds=$(id).dataset||($(id).dataset={});ds.derived='';ds.manual='1';
-}));
-['targetLevel1Price','targetLevel2Price'].forEach(id=>$(id)?.addEventListener('input',renderPostExitHints));
+$('slPrice')?.addEventListener('input',()=>{
+ const ds=$('slPrice').dataset||($('slPrice').dataset={});ds.derived='';ds.manual='1';
+});
+// Target 1 a 2 (v HTML); další cíle dostanou totéž při vytvoření (buildTargetField).
+['targetLevel1Price','targetLevel2Price'].forEach(wireTargetPriceInput);
 // Hlavičky karet (shrnutí, „chybí N") a vzdálenosti SR od SL / targetu
 // sledují každou změnu ve formuláři – i klik na dlaždici, který „input"
 // nevyvolá. Jednou za snímek, ať psaní nezdržuje.
@@ -5789,11 +5875,8 @@ $('instrument')?.addEventListener('change',renderPostExitHints);
 ['entryPrice','instrument'].forEach(id=>$(id)?.addEventListener('input',renderLevelDistances));
 ['side','instrument'].forEach(id=>$(id)?.addEventListener('change',renderLevelDistances));
 $('wouldSkipLive')?.addEventListener('change',syncWouldSkipField);
-// Dlaždice typů cíle volají updateLevelsSummary samy (renderChipGrid).
-['targetLevel1Price','targetLevel2Price'].forEach(id=>{
- $(id)?.addEventListener('input',()=>updateLevelsSummary());
- $(id)?.addEventListener('change',()=>updateLevelsSummary());
-});
+// Dlaždice typů cíle volají updateLevelsSummary samy (renderChipGrid); ceny
+// targetů ho volají z wireTargetPriceInput.
 $(NEAR_LEVELS_ID+'None')?.addEventListener('change',()=>updateLevelsSummary());
 // Automatické doplnění z LTA, když uživatel vyplní instrument / vstup / čas.
 ['instrument','entryPrice','date','entryTime'].forEach(id=>$(id)?.addEventListener('change',()=>{fillNearLevelsFromLta({auto:true}).catch(err=>console.warn('LTA',err))}));
@@ -6065,7 +6148,9 @@ $('tradeForm').addEventListener('submit',async e=>{
   // dopočtu se bere čerstvě z nohou (deriveTargetPrices) s příznakem
   // targetLevel{n}PriceDerived – sanitizeTargetLevel nese jen { type, types, price }.
   const derivedTargets=deriveTargetPrices(obj);
-  for(const n of [1,2]){
+  // Cíl za posledním polem formuláře (např. smazaná noha TP3) se z obchodu odebere.
+  for(const n of FJTaxonomy.targetLevelNumbers(obj))if(n>formTargetFieldCount){delete obj['targetLevel'+n];delete obj['targetLevel'+n+'PriceDerived']}
+  for(let n=1;n<=formTargetFieldCount;n++){
    const el=$('targetLevel'+n+'Price');
    const isDerived=el?.dataset?.derived==='1';
    const price=isDerived?(derivedTargets[n-1]??''):el?.value;
@@ -6699,6 +6784,23 @@ function levelCsvCells(t,count=1,tickSize){
  }
  return out;
 }
+// Cíle 3+ (TP3, TP4 …): sloupce „Cíl N typ / Cíl N cena" na úplném konci
+// řádku, jen když je některý exportovaný obchod má – stávající sloupce se
+// neposouvají a export bez TP3 zůstává beze změny. Vypisuje se uložená
+// hodnota, stejně jako u cíle 1 a 2.
+function extraTargetCsvCount(rows){
+ return Math.max(2,...(rows||[]).map(t=>Math.max(...FJTaxonomy.targetLevelNumbers(t))))-2;
+}
+function extraTargetCsvHeader(extra){
+ const out=[];
+ for(let n=3;n<3+extra;n++)out.push(`Cíl ${n} typ`,`Cíl ${n} cena`);
+ return out;
+}
+function extraTargetCsvCells(t,extra){
+ const out=[];
+ for(let n=3;n<3+extra;n++)out.push(FJTaxonomy.storedTargetTypes(t['targetLevel'+n]).join('|'),t['targetLevel'+n]?.price??'');
+ return out;
+}
 function tradeCsvHeader(count=1){
  return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru po výstupu (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
@@ -6770,13 +6872,14 @@ function journalCsvTable(rows,dayNoteOf,opts={}){
  const count=levelCsvCount(rows);
  const firstIdByDate=firstTradeIdPerDate(rows);
  const order=FJContext.dayOrder(rows);
- const out=[[...tradeCsvHeader(count),...contextCsvHeader()]];
+ const extra=extraTargetCsvCount(rows);
+ const out=[[...tradeCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra)]];
  for(const t of rows){
   const note=t.date?dayNoteOf(t.date):null;
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?(note||emptyDayNoteCells()):null;
   const tickSize=opts.tickSizeOf?.(t.instrument);
-  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych})]);
+  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra)]);
  }
  return out;
 }
@@ -6791,14 +6894,15 @@ function reportCsvTable(rows,allRows,dayNoteOf,journals={}){
  rows.forEach(t=>{if(t.date){const k=t.journalId+'|'+t.date;const cur=first[k];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)first[k]=t}});
  const orders={};
  for(const id of new Set(rows.map(t=>t.journalId)))orders[id]=FJContext.dayOrder((allRows||rows).filter(t=>t.journalId===id));
- const out=[[...reportCsvHeader(count),...contextCsvHeader()]];
+ const extra=extraTargetCsvCount(rows);
+ const out=[[...reportCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra)]];
  for(const t of rows){
   const key=t.journalId+'|'+t.date;
   const note=t.date?dayNoteOf(key):null;
   const dn=t.date&&first[key]===t?(note||{}):null;
   const j=journals[t.journalId]||{};
   const tickSize=FJPoints.tickSizeFor(t.instrument,j.templates);
-  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych})]);
+  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra)]);
  }
  return out;
 }

@@ -173,9 +173,33 @@ function loadFromSource(source, names, globals = {}) {
   return out;
 }
 
+// Pomocníci, které renderer volá z mnoha funkcí – načtou se automaticky
+// s funkcí, která je potřebuje, ať se nemusí dopisovat do každého testu.
+// (Cíle 3+ – pole formuláře a CSV sloupce TP3, TP4 …)
+const TARGET_FORM = ['formTargetFieldCount', 'targetCountOf', 'deriveTargetPrices', 'ensureTargetFields', 'targetFieldFilled', 'buildTargetField', 'wireTargetPriceInput', 'readChipGrid'];
+const RENDERER_COMPANIONS = {
+  postExitDraftFromForm: TARGET_FORM,
+  renderPostExitHints: TARGET_FORM,
+  openModal: TARGET_FORM,
+  updateLevelsSummary: TARGET_FORM,
+  formContextDraft: TARGET_FORM,
+  plannedTargetPrices: ['targetCountOf', 'deriveTargetPrices'],
+  journalCsvTable: ['extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells'],
+  reportCsvTable: ['extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells']
+};
+function withCompanions(names, globals) {
+  const out = [...names];
+  for (const n of names) {
+    for (const dep of RENDERER_COMPANIONS[n] || []) {
+      if (!out.includes(dep) && !Object.prototype.hasOwnProperty.call(globals, dep)) out.push(dep);
+    }
+  }
+  return out;
+}
+
 // Načte funkce z rendereru (inline script v app/index.html).
 function loadRenderer(names, globals = {}) {
-  return loadFromSource(inlineScripts(readRepoFile(path.join('app', 'index.html'))), names, globals);
+  return loadFromSource(inlineScripts(readRepoFile(path.join('app', 'index.html'))), withCompanions(names, globals), globals);
 }
 
 // Načte funkce z main procesu (main.js).

@@ -516,6 +516,21 @@
     return { type: types[0] || '', types, price };
   }
 
+  // Čísla cílů uložených na obchodu: targetLevel1 a targetLevel2 vždy, další
+  // (targetLevel3, targetLevel4 …) jen když na obchodu jsou – pozice s víc
+  // cíli (TP3+) má pro každý cíl vlastní cenu i typy hladiny.
+  const TARGET_KEY_RE = /^targetLevel(\d+)$/;
+  function targetLevelNumbers(trade) {
+    const nums = new Set([1, 2]);
+    if (trade && typeof trade === 'object') {
+      for (const key of Object.keys(trade)) {
+        const m = TARGET_KEY_RE.exec(key);
+        if (m && Number(m[1]) >= 1 && trade[key] && typeof trade[key] === 'object') nums.add(Number(m[1]));
+      }
+    }
+    return [...nums].sort((a, b) => a - b);
+  }
+
   // Vybrané typy cílové hladiny (i ze starého tvaru). Prázdné pole, když nic.
   function targetTypesOf(value, config) {
     const tl = sanitizeTargetLevel(value, config);
@@ -1204,7 +1219,7 @@
     applyConfig, getConfig, groupConfig,
     // dotazy
     allKeys, removedKeys, tagOf, aliasesFor, canonicalKey, hiddenKeys, isHidden, labelOf, isValidKey, isLevelKey, DEFAULT_NOT_LEVEL,
-    visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, targetTypesOf, storedTargetTypes, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
+    visibleOptions, sanitizeMulti, sanitizeSingle, sanitizeTargetLevel, targetTypesOf, storedTargetTypes, targetLevelNumbers, sanitizeLevelRows, hasLegacyLevelRows, confluenceCount,
     missingContextKeys, contextFieldLabel,
     TRADE_CARDS, missingContextItems, missingContextByCard, normalizeCardConfig, cardShown, cardWarns, missingWarnItems, missingForCards,
     CONTEXT_FIELDS, normalizeFieldConfig, fieldShown, fieldWarns,

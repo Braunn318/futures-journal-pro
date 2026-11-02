@@ -228,6 +228,62 @@ test('formulář s druhým cílem: TP2 → target 2; stejná cena → target 2 z
   assert.ok(shown(same.get('targetLevel2Price')));
 });
 
+// ------------------------------------------------ cíle 3+ (TP3, TP4 …)
+
+test('TP3: počet cílů z nohou i z uložených targetLevelN, nejméně 2', () => {
+  const r = loadRenderer(['targetCountOf', 'deriveTargetPrices'], { settings: SETTINGS });
+  assert.equal(r.targetCountOf(null), 2);
+  assert.equal(r.targetCountOf(exec()), 2, 'jeden target → pořád pole 1 a 2');
+  assert.equal(r.targetCountOf({ legs: [
+    { exitPrice: 7737.75, result: 'target' }, { exitPrice: 7733, result: 'target' }, { exitPrice: 7728.5, result: 'target' }] }), 3);
+  assert.equal(r.targetCountOf({ targetLevel4: { types: ['VAH'], price: null } }), 4, 'uložený cíl 4 bez nohou');
+  assert.equal(FJTaxonomy.targetLevelNumbers({ targetLevel3: { price: 1 }, targetLevel3PriceDerived: true }).join(), '1,2,3');
+});
+
+test('TP3: plánované R bere ruční cenu targetu 3 před cenou nohy', () => {
+  const r = loadRenderer(['plannedTargetPrices', 'riskFields'], { settings: SETTINGS });
+  const t = {
+    side: 'short', entryPrice: 7742.25, slPrice: 7746,
+    targetLevel1: { price: 7737.75 }, targetLevel2: { price: 7733 }, targetLevel3: { types: ['VAL'], price: 7725 },
+    legs: [{ exitPrice: 7737.75, result: 'target' }, { exitPrice: 7733, result: 'target' }, { exitPrice: 7728.5, result: 'target' }]
+  };
+  eq(r.plannedTargetPrices(t), [7737.75, 7733, 7725]);
+  eq(r.plannedTargetPrices({ ...t, targetLevel3: { types: ['VAL'], price: null } }), [7737.75, 7733, 7728.5], 'bez ceny → noha');
+});
+
+test('formulář se třemi cíli: TP3 → Cena targetu 3 (dopočet), jde přepsat ručně', () => {
+  const f = targetForm(TP_FORM, null, [{ exitPrice: '7733', pnl: '44' }, { exitPrice: '7728.5', pnl: '60' }]);
+  assert.equal(f.get('targetLevel3PriceViewValue').textContent, '7728.5');
+  assert.equal(f.get('targetLevel3Price').dataset.derived, '1');
+  assert.equal(f.r.postExitDraftFromForm().targetLevel3.price, 7728.5);
+  f.r.editCourseManually('targetLevel3Price');
+  f.get('targetLevel3Price').value = '7725';
+  f.r.renderPostExitHints();
+  assert.equal(f.r.postExitDraftFromForm().targetLevel3.price, '7725', 'ruční hodnota má přednost');
+  assert.equal(f.get('targetLevel3PriceRevert').textContent, 'použít dopočet z výstupní ceny (7728.5)');
+});
+
+test('sloučení: typy cíle 3 se sjednotí, odvozená cena nohy se nepřebírá', () => {
+  const r = merging();
+  const merged = r.mergeContextFields([
+    { targetLevel3: { types: ['VAH'], price: 7728.5 }, targetLevel3PriceDerived: true },
+    { targetLevel3: { types: ['LVN'], price: 7728.5 }, targetLevel3PriceDerived: true }
+  ]);
+  eq(merged.targetLevel3, { type: 'VAH', types: ['VAH', 'LVN'], price: null });
+  assert.equal(r.mergeContextFields([{ targetLevel1: { type: 'VAH', price: 1 } }]).targetLevel3, undefined);
+});
+
+test('CSV: cíle 3+ jako koncové sloupce, jen když je některý obchod má', () => {
+  const r = loadRenderer(['extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells'], { settings: SETTINGS });
+  assert.equal(r.extraTargetCsvCount([exec()]), 0);
+  assert.equal(r.extraTargetCsvCount([]), 0);
+  const t3 = { targetLevel3: { type: 'VAH', types: ['VAH', 'LVN'], price: 7728.5 } };
+  assert.equal(r.extraTargetCsvCount([exec(), t3]), 1);
+  eq(r.extraTargetCsvHeader(1), ['Cíl 3 typ', 'Cíl 3 cena']);
+  eq(r.extraTargetCsvCells(t3, 1), ['VAH|LVN', 7728.5]);
+  eq(r.extraTargetCsvCells(exec(), 1), ['', '']);
+});
+
 // ------------------------------- vzdálenosti hladiny od vstupu, SL a cíle
 
 test('hladina v blízkosti: vzdálenosti od vstupu, od SL a do cíle v ticích', () => {

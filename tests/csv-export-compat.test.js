@@ -37,7 +37,9 @@ const OLD_NAMES = ['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta
   'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable', 'reportCsvTable'];
 // Sloupce psychiky (4.8.7) jsou nové a jsou až na konci – starý kód je nemá.
 const NEW_NAMES = [...OLD_NAMES.map(n => ({ srCsvCounts: 'levelCsvCount', srCsvHeader: 'levelCsvHeader', srCsvCells: 'levelCsvCells' })[n] || n),
-  'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH', 'CONTEXT_CSV_SKIPPED'];
+  'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH', 'CONTEXT_CSV_SKIPPED',
+  // Cíle 3+ (TP3, TP4 …) – koncové sloupce jen u obchodů, které je mají.
+  'targetCountOf', 'extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells'];
 const plain = v => JSON.parse(JSON.stringify(v));
 
 const REPLACED = /^SR→(TG|SL) \d+ /;
