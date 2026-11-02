@@ -545,7 +545,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div><h1 id="pageTitle">Přehled účtu</h1><div class="sub">Obchodní deník pro futures</div></div>
       <div class="topbar-actions">
         <button class="btn primary" id="addTradeBtn" style="display:none">＋ Přidat obchod</button>
-        <button class="btn" id="addSetupBtn" style="display:none" title="Setup, který byl, ale nedošlo k exekuci – vstupuje do fill rate, ne do P/L">＋ Setup bez vstupu</button>
+        <button class="btn" id="addSetupBtn" style="display:none" title="Setup, který byl, ale nedošlo k exekuci – do P/L nevstupuje; do fill rate jen stav „nenaplněno“">＋ Setup bez vstupu</button>
         <button class="btn" id="newsCalendarBtn" type="button" title="Otevře kalendář makro zpráv v prohlížeči (adresa jde změnit v Nastavení → Obecné → Kalendář zpráv)">📰 Kalendář zpráv</button>
       </div>
     </div>
@@ -1104,7 +1104,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <p class="sub">Které karty se ukazují ve formuláři obchodu a u obchodu v Deníku, a u kterých upozorňovat na nevyplněná pole (štítek „⚠ Neúplné“ na kartě obchodu a „chybí N“ v hlavičce karty). Skrytá karta jen zmizí – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí karty se zase ukážou.</p>
           <div id="tradeCardSettings" style="margin-top:10px"></div>
           <p class="sub" style="margin-top:10px"><b>Psychika</b> – před vstupem, v průběhu a po výstupu, ale jen pole, která mají v „Pole kontextu“ zapnuté upozornění (ve výchozím stavu žádné).</p>
-          <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend 1m, trend 30m, známka; <b>Hladiny</b> – hladina vstupu, hladiny v blízkosti (hladina, nebo „žádná hladina v blízkosti“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U výslovně nenaplněného setupu se pole průběhu a výstupu nekontrolují.</p>
+          <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend 1m, trend 30m, známka; <b>Hladiny</b> – hladina vstupu, hladiny v blízkosti (hladina, nebo „žádná hladina v blízkosti“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U nenaplněného / vynechaného setupu bez výstupní ceny se cena SL, MFE, MAE ani ticky po výstupu nekontrolují; s vyplněným hypotetickým výstupem ano.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
         <details class="card settings-card" data-card="contextFields">
@@ -1114,7 +1114,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" style="margin-top:14px;max-width:560px"><label>Známka – „doplněno zpětně“ až po <span class="sub">— minut od uložení obchodu do deníku</span></label><input type="number" id="gradeRetroGraceMinutes" min="0" step="1" placeholder="30"></div>
           <p class="sub">Známka zadaná do téhle lhůty od uložení obchodu (u pozice s víc cíli od posledního výstupu) se nepovažuje za doplněnou zpětně – importovanému obchodu ji dřív zadat nejde. Výchozí je 30 minut, 0 = hned po uložení. Platí pro aktivní deník, uloží se hned a stejně počítá i export (CSV, AI export). V backtest deníku se „doplněno zpětně“ neurčuje.</p>
           <p class="sub" style="margin-top:10px"><b>Psychika</b> (škála 1–8, 1 nejhorší, 8 nejlepší): tři pole obchodu jsou v kartě Psychika, tři pole dne v okně ☀ Kontext dne, v detailu dne v Kalendáři a v řádku „Psychika“ u dne v Deníku. U polí dne „Upozorňovat na nevyplněné“ říká, že se pole hlídá; <b>kde</b> se to ukáže, určují dva řádky „upozornění na dni“ (záhlaví dne v Deníku a kalendář, jen dny s obchody) a „upozornění u obchodů dne“ (štítek „⚠ Neúplné“). Popisky hodnot jdou přejmenovat v Nastavení → Číselníky.</p>
-          <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
+          <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše kromě <b>Setup – sekundární</b> zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
         <details class="card settings-card" data-card="ltaLevels" id="ltaSettingsCard">
@@ -1183,13 +1183,13 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <input id="tplNewInstrument" placeholder="např. MES">
             <select id="tplNewPlan"><option value="">—</option><option value="ano">Ano</option><option value="ne">Ne</option></select>
             <input id="tplNewPointValue" type="number" step="any" min="0" placeholder="5,00">
-            <input id="tplNewTickSize" type="number" step="any" min="0" placeholder="0,25" title="Velikost ticku – nejmenší pohyb ceny. Potřebná pro dopočty chování ceny po výstupu.">
+            <input id="tplNewTickSize" type="number" step="any" min="0" placeholder="0,25" title="Velikost ticku – nejmenší pohyb ceny. Potřebná pro všechny tikové dopočty (SL v ticích, MFE/MAE z výstupu, po výstupu, vzdálenosti hladin).">
             <input id="tplNewCommission" type="number" step="any" min="0" placeholder="1,90">
             <input id="tplNewMaxSl" type="number" step="1" min="0" placeholder="40" title="Nejvyšší SL v tickech, který ještě nehlásí „nepravděpodobně daleko“. Prázdné = 40, 0 = nehlásit.">
             <input id="tplNewComment" placeholder="Komentář">
             <button class="btn primary" id="addTemplate" style="padding:8px 10px">＋</button>
           </div>
-          <div class="sub" style="margin-top:8px">Pár běžných kontraktů má hodnotu bodu předvyplněnou automaticky, i bez šablony: ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5. Přidáním šablony pro daný instrument (i jen s vyplněným polem "Bod") si můžeš tuhle vestavěnou hodnotu přepsat vlastní. Komise ve výchozím stavu vestavěnou hodnotu nemá – dokud ji nevyplníš, nic se nemění. Sloupec <b>Tick</b> je velikost ticku (nejmenší pohyb ceny) – potřebuje ji dopočet chování ceny po výstupu. Vestavěně ji mají též kontrakty: ES/MES/NQ/MNQ 0,25, YM/MYM 1, RTY/M2K 0,1. U jiného instrumentu se NEHÁDÁ – bez vyplněné hodnoty zůstanou tikové dopočty prázdné.</div>
+          <div class="sub" style="margin-top:8px">Pár běžných kontraktů má hodnotu bodu předvyplněnou automaticky, i bez šablony: ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5. Přidáním šablony pro daný instrument (i jen s vyplněným polem "Bod") si můžeš tuhle vestavěnou hodnotu přepsat vlastní. Komise ve výchozím stavu vestavěnou hodnotu nemá – dokud ji nevyplníš, nic se nemění. Sloupec <b>Tick</b> je velikost ticku (nejmenší pohyb ceny) – potřebují ji všechny tikové dopočty (SL v ticích, MFE/MAE z výstupu, po výstupu, vzdálenosti hladin). Vestavěně ji mají též kontrakty: ES/MES/NQ/MNQ 0,25, YM/MYM 1, RTY/M2K 0,1. U jiného instrumentu se NEHÁDÁ – bez vyplněné hodnoty zůstanou tikové dopočty prázdné.</div>
           <div id="templateList" style="margin-top:12px"></div>
           <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
             <label>Komise u nových importovaných obchodů (NinjaTrader / cTrader)</label>
@@ -1219,7 +1219,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="settings-grid">
         <details class="card settings-card" data-card="taxonomy">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Číselníky kontextu obchodu</h3></summary>
-          <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volba se nemaže, jen skrývá: skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových.</p>
+          <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volbu jde skrýt – skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových – nebo smazat; smazanou jde obnovit.</p>
           <div id="taxonomyGroups"></div>
           <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
             <h3 style="margin-top:0">Přenos číselníků</h3>
@@ -1419,7 +1419,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <div class="modal" id="setupModal">
   <div class="modalbox">
     <div class="modalhead"><h2 id="setupModalTitle">Setup bez vstupu</h2><button class="icon" id="closeSetupModal">✕</button></div>
-    <div class="sub" style="margin-bottom:12px">Setup, který byl, ale nedošlo k exekuci. Nevstupuje do P/L, equity ani risk managementu – jen do četnosti setupů a fill rate. Když chceš vědět, co by to udělalo, použij „Vyplnit jako celý obchod“.</div>
+    <div class="sub" style="margin-bottom:12px">Setup, který byl, ale nedošlo k exekuci. Nevstupuje do P/L, equity ani risk managementu – jen do četnosti setupů; do fill rate jen stav „nenaplněno“. Když chceš vědět, co by to udělalo, použij „Vyplnit jako celý obchod“.</div>
     <input type="hidden" id="sfId">
     <div class="formgrid">
       <div class="field"><label>Datum</label><input id="sfDate" type="date"></div>
@@ -1437,7 +1437,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="field"><label>Důvod <span class="sub">— text</span></label><input id="sfReason" placeholder="proč nebylo naplněno / proč vynecháno"></div>
       <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc</span></label><div id="sfEntryLevels" class="chip-grid"></div></div>
       <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="sfOfConfirm" class="chip-grid"></div></div>
-      <div class="field"><label>Max. pohyb ve směru <span class="sub">— ticků, když doplňuješ výsledek</span></label><input id="sfMaxFav" type="number" step="any" min="0"></div>
+      <div class="field"><label>Max. pohyb ve směru <span class="sub">— ticků od plánovaného vstupu, nepovinné</span></label><input id="sfMaxFav" type="number" step="any" min="0"></div>
       <div class="field"><label>Nejdál došlá hladina <span class="sub">— typ, nepovinné</span></label><select id="sfMaxLevel"></select></div>
       <div class="field full"><label>Poznámka</label><textarea id="sfNote"></textarea></div>
     </div>
@@ -1470,7 +1470,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <div class="field full" id="pnlCalcHint" style="margin-top:-6px"></div>
         <div class="field" id="extraLegsField" style="grid-column:1/-1">
           <label>Více cílů u téhož obchodu (TP2, Break Even…) <span class="sub">— nepovinné</span></label>
-          <div class="sub">Pole nahoře (Výsledek/Body/Zisk) je vždy první cíl. Přidej sem další, pokud pozice měla víc výstupů (ať už ručně zadaných, nebo z NinjaTraderu) – uloží se jako jeden obchod s legy, stejně jako u „Sloučit vybrané". U každého cíle stačí vyplnit cenu výstupu (body i zisk/ztráta se dopočítají automaticky ze společné ceny vstupu a hodnoty bodu instrumentu) — pole lze i tak kdykoliv přepsat ručně.</div>
+          <div class="sub">Pole nahoře (Výsledek/Body/Zisk) je vždy první cíl. Přidej sem další, pokud pozice měla víc výstupů (ať už ručně zadaných, nebo z NinjaTraderu) – uloží se jako jeden obchod s legy, stejně jako u „Sloučit vybrané". U každého cíle stačí vyplnit cenu výstupu (body i zisk/ztráta se dopočítají automaticky z ceny vstupu (u dokupu z jeho vlastní vstupní ceny) a hodnoty bodu instrumentu) — pole lze i tak kdykoliv přepsat ručně.</div>
           <div id="extraLegsList" style="margin-top:8px"></div>
           <button type="button" class="btn" id="addLegBtn" style="margin-top:8px">＋ Přidat další cíl</button>
         </div>
@@ -1479,7 +1479,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">SL / TP</span><span class="sub trade-section-summary" id="sltpSummary"></span><span class="trade-section-missing" id="sltpMissing"></span></summary>
         <div class="formgrid">
           <div class="field"><label>Cena Stop Lossu <span class="sub">— pro výpočet R</span></label><input id="slPrice" type="number" step="any" placeholder="např. 7672.50"><div class="derived-readonly" id="slPriceView" style="display:none"><b id="slPriceViewValue"></b> <span class="sub" id="slPriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('slPrice')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="slPriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('slPrice')"></a><div class="sub" id="slPriceHint"></div><div class="sub block-note" id="slPriceBlockNote"></div></div>
-          <div class="field" id="targetLevel1PriceField"><label>Cena targetu <span class="sub">— pro výpočet R</span></label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"><div class="derived-readonly" id="targetLevel1PriceView" style="display:none"><b id="targetLevel1PriceViewValue"></b> <span class="sub" id="targetLevel1PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel1Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel1PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel1Price')"></a><div class="sub block-note" id="targetLevel1PriceBlockNote"></div></div>
+          <div class="field" id="targetLevel1PriceField"><label>Cena targetu <span class="sub">— pro plánované R</span></label><input id="targetLevel1Price" type="number" step="any" placeholder="např. 7712.50"><div class="derived-readonly" id="targetLevel1PriceView" style="display:none"><b id="targetLevel1PriceViewValue"></b> <span class="sub" id="targetLevel1PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel1Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel1PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel1Price')"></a><div class="sub block-note" id="targetLevel1PriceBlockNote"></div></div>
           <div class="field" id="targetLevel2PriceField"><label>Cena targetu 2 <span class="sub">— druhý cíl</span></label><input id="targetLevel2Price" type="number" step="any" placeholder="např. 7720"><div class="derived-readonly" id="targetLevel2PriceView" style="display:none"><b id="targetLevel2PriceViewValue"></b> <span class="sub" id="targetLevel2PriceViewNote">— dopočítáno z výstupní ceny</span><a href="#" class="derived-edit" onclick="event.preventDefault();editCourseManually('targetLevel2Price')">upravit ručně</a></div><a href="#" class="derived-edit derived-revert" id="targetLevel2PriceRevert" style="display:none" onclick="event.preventDefault();useDerivedCourse('targetLevel2Price')"></a></div>
           <div class="field full sub" id="riskInfo"></div>
         </div>
@@ -1495,7 +1495,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field"><label><svg class="dir-icon down" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Ticky po výstupu — proti <span class="sub">— od výstupní ceny</span></label><input id="postExitAdverseTicks" type="number" step="any" min="0" placeholder="např. 30"><div class="sub post-exit-warn" id="postExitAdverseHint"></div></div>
           <div class="field"><label>Protipohyb přišel dřív? <span class="sub">— než pohyb ve směru zisku</span></label><select id="postExitAdverseFirst"><option value="ne">Ne</option><option value="ano">Ano</option></select></div>
           <div class="field"><label>Sledováno po výstupu <span class="sub">— minut, nepovinné</span></label><input id="observedMinutes" type="number" step="any" min="0" placeholder="např. 30"></div>
-          <div class="field full sub" id="postExitRuleHint">Vše v ticích, vždy kladně. MFE/MAE měř za dobu trvání obchodu (od vstupní ceny), ticky po výstupu od výstupní ceny. Vyplň, co jsi sledoval — prázdné pole je v pořádku, nula znamená „cena nešla ani o tick", což je jiná informace.<br>U obchodu ukončeného na Stop Lossu čti „ve směru zisku" jako <i>o kolik by širší SL vyšel</i>.</div>
+          <div class="field full sub" id="postExitRuleHint">Vše v ticích, vždy kladně. MFE/MAE měř za dobu trvání obchodu (od vstupní ceny), ticky po výstupu od výstupní ceny. Vyplň, co jsi sledoval — prázdné pole je v pořádku, nula znamená „cena nešla ani o tick", což je jiná informace.<br>U obchodu ukončeného na Stop Lossu je „proti" to, <i>o kolik cena za SL ještě došla</i> – tedy o kolik širší SL by obchod přežil (o tick víc). „Ve směru zisku" je pohyb od výstupu zpátky ve směru obchodu.</div>
           <div class="field" id="postExitDerivedField"><label>Dopočítá se <span class="sub">— needitovatelné</span></label><div class="sub" id="postExitDerivedHint">—</div></div>
           </div>
           </div>
@@ -1528,7 +1528,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
           <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
           <div class="field full"><label>Cílová hladina 2 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel2Types" class="chip-grid"></div></div>
-          <div class="field full sub" id="contextDerived" data-ctx-field="derivedRow" title="Dopočítáno z cen hladin, vstupu, SL a cíle – needituje se a do obchodu se neukládá."></div>
+          <div class="field full sub" id="contextDerived" data-ctx-field="derivedRow" title="Dopočítáno z cen (hladiny, vstup, SL, cíl), data a času – needituje se a do obchodu se neukládá."></div>
         </div>
       </details>
       <details class="trade-section" data-card="psych">
@@ -3287,7 +3287,7 @@ function renderTaxonomyEditor(){
   }).join('');
   return `<details style="margin-bottom:14px" data-group="${esc(group.name)}"${taxOpenGroups.has(group.name)?' open':''}>
    <summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">${esc(group.label)} <span class="sub">(${keys.length} voleb)</span></summary>
-   ${sourceLabel?`<p class="sub" style="margin-top:8px">Používá stejný seznam voleb jako <b>${esc(sourceLabel)}</b> – hladina je hladina, ať se na ni koukáš jako na místo vstupu, nebo jako na překážku. Přejmenovat volbu a přidat novou jde u „${esc(sourceLabel)}" a platí to pro obě kolonky. Skrýt a přeuspořádat si tady můžeš zvlášť.</p>`:''}
+   ${sourceLabel?`<p class="sub" style="margin-top:8px">Používá stejný seznam voleb jako <b>${esc(sourceLabel)}</b> – hladina je hladina, ať je to hladina vstupu, nebo hladina v blízkosti. Přejmenovat volbu a přidat novou jde u „${esc(sourceLabel)}" a platí to pro obě kolonky. Skrýt a přeuspořádat si tady můžeš zvlášť.</p>`:''}
    <div style="margin-top:10px">${rows}</div>
    ${(()=>{
     const gone=sourceLabel||group.fixed?[]:FJTaxonomy.removedKeys(group.name);
@@ -4173,10 +4173,25 @@ function deriveTargetPrices(t){
 // Plánované R = nejvzdálenější target ÷ riziko (FJPoints.plannedRMultipleOf).
 function riskFields(t){
  const slPoints=FJPoints.slPointsOf(t.entryPrice,t.slPrice);
- const targets=[t.targetLevel1?.price,t.targetLevel2?.price];
  const out={slPoints,rMultiple:FJPoints.rMultipleOf(t.pointsPerContract,slPoints),
-  plannedRMultiple:FJPoints.plannedRMultipleOf(t,targets)};
+  plannedRMultiple:FJPoints.plannedRMultipleOf(t,plannedTargetPrices(t))};
  return out;
+}
+// Všechny targety pozice pro plánované R: target 1 a 2 z polí (ruční hodnota
+// má přednost, jinak dopočet), TP3 a dál z cen ziskových nohou. Bez nich by
+// plán R u pozice s dokupy / víc cíli končil na TP2.
+function extraTargetPrices(t){
+ return deriveTargetPrices(t).slice(2);
+}
+function plannedTargetPrices(t){
+ return [t?.targetLevel1?.price,t?.targetLevel2?.price,...extraTargetPrices(t||{})];
+}
+// Plánované R pro zobrazení a export – počítá se čerstvě, aby i starší obchody
+// (uložené s plánem jen do TP2) ukazovaly R do posledního targetu. Když se
+// spočítat nedá (chybí SL / směr), zůstává uložená hodnota.
+function plannedRFor(t){
+ const fresh=FJPoints.plannedRMultipleOf(t,plannedTargetPrices(t));
+ return fresh!=null?fresh:(t?.plannedRMultiple??null);
 }
 // Dopočítaná tiková pole k chování ceny po výstupu. Ukládají se NA OBCHOD
 // (ne jen zobrazují), protože je potřebuje pozdější analýza – SL sweep
@@ -4313,7 +4328,7 @@ function tradeHTML(t){
  <div class="meta">${t.date} · ${t.entryTime} @ ${t.entryPrice} → ${t.exitTime} @ ${t.exitPrice}</div>
  <div style="margin-top:8px;font-weight:800" class="${m.moneyCls}">${pointsDisplay} bodů${totalPointsDisplay} · ${dualMoney(pnlVal,true)}</div>
  ${Number(t.commission)>0?`<div class="sub" style="margin-top:2px">Komise: ${dualMoney(-Math.abs(Number(t.commission)),false)}</div>`:''}
- ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}${t.plannedRMultiple!=null&&shown('sltp')?` · <span title="Plánované R: nejvzdálenější target ÷ riziko">plán R <b>${Number(t.plannedRMultiple).toFixed(2)}</b></span>`:''}</div>`:''}
+ ${t.rMultiple!=null?`<div class="sub" style="margin-top:2px" title="Body na kontrakt ÷ riziko v bodech${t.slDerived?' · cena SL odvozena z výstupní ceny':''}">R: <b>${Number(t.rMultiple).toFixed(2)}</b>${t.slDerived?` <i>(SL odvozen)</i>`:''}${plannedRFor(t)!=null&&shown('sltp')?` · <span title="Plánované R: nejvzdálenější target ÷ riziko">plán R <b>${Number(plannedRFor(t)).toFixed(2)}</b></span>`:''}</div>`:''}
  ${setupInfo.length?`<div class="sub" style="margin-top:2px" title="Ze záznamu setupu bez vstupu">${setupInfo.join(' · ')}</div>`:''}
  ${Array.isArray(t.legs)&&t.legs.length>1?`<div class="trade-legs">${t.legs.map((l,i)=>legPillHTML(l,i,t)).join('')}</div>`:''}
  ${entriesRow}
@@ -5465,7 +5480,7 @@ function renderRiskInfo(){
   slDerived:slEl?.dataset?.derived==='1'||String(slEl?.value??'').trim()==='',
   targetLevel1PriceDerived:tgEl?.dataset?.derived==='1'}));
  const slPoints=FJPoints.slPointsOf(d.entryPrice,d.slPrice);
- const planned=FJPoints.plannedRMultipleOf(d,[d.targetLevel1?.price,d.targetLevel2?.price]);
+ const planned=FJPoints.plannedRMultipleOf(d,plannedTargetPrices(d));
  if(slPoints==null){out.textContent='Bez ceny Stop Lossu se R nepočítá.';return}
  out.textContent=`Riziko ${slPoints} b na kontrakt`+(planned!=null?` · plánované R ${planned}`:' · plánované R: doplň cenu targetu');
 }
@@ -5567,7 +5582,8 @@ function renderTradeSections(){
  if(val(d.slPrice))sltp.push('SL '+d.slPrice);
  if(val(d.targetLevel1?.price))sltp.push('TP '+d.targetLevel1.price);
  if(val(d.targetLevel2?.price))sltp.push('TP2 '+d.targetLevel2.price);
- const planned=FJPoints.plannedRMultipleOf(d,[d.targetLevel1?.price,d.targetLevel2?.price]);
+ extraTargetPrices(d).forEach((p,i)=>sltp.push('TP'+(i+3)+' '+p));
+ const planned=FJPoints.plannedRMultipleOf(d,plannedTargetPrices(d));
  if(planned!=null)sltp.push('plán R '+planned);
  $('sltpSummary').textContent=sltp.length?'— '+sltp.join(' · '):'';
  const course=[];
@@ -6684,11 +6700,11 @@ function levelCsvCells(t,count=1,tickSize){
  return out;
 }
 function tradeCsvHeader(count=1){
- return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru po výstupu (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
 function tradeCsvRow(t,dn,count=1,tickSize){
  const p=t.dailyPlan||{};
- return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),FJTaxonomy.storedTargetTypes(t.targetLevel1).join('|'),t.targetLevel1?.price??'',FJTaxonomy.storedTargetTypes(t.targetLevel2).join('|'),t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',plannedRFor(t)??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),FJTaxonomy.storedTargetTypes(t.targetLevel1).join('|'),t.targetLevel1?.price??'',FJTaxonomy.storedTargetTypes(t.targetLevel2).join('|'),t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',signed(t,'pnl'),Number(t.commission||0),t.contracts,t.strategy,t.planFollowed,t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 // Kontext v2 (A6): sloupce kontextu jdou ZA konec základního řádku. Dopočty
 // mají v hlavičce „(dopočet)". Klíče, ne popisky. Kontext dne jde na KAŽDÝ
@@ -7372,11 +7388,11 @@ $('reportPrint').onclick=()=>window.print();
 // Sloupce CSV exportu Reportů (přes deníky). Stejný důvod pro dvě funkce
 // jako u exportu deníku: hlavička a řádek se nesmí rozejít.
 function reportCsvHeader(count=1){
- return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
+ return ['Deník','Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru po výstupu (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L','Komise','Kontrakty','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
 function reportCsvRow(t,dn,count=1,tickSize){
  const p=t.dailyPlan||{};
- return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',t.plannedRMultiple??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),FJTaxonomy.storedTargetTypes(t.targetLevel1).join('|'),t.targetLevel1?.price??'',FJTaxonomy.storedTargetTypes(t.targetLevel2).join('|'),t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
+ return [t.journalName,t.instrument,t.date,t.entryTime,t.entryPrice,t.exitTime,t.exitPrice,sideMeta(t.side)?.text||'',t.result,displayPointsTotal(t),t.pointsPerContract??'',t.slPrice??'',t.rMultiple??'',plannedRFor(t)??'',t.postExitFavorableTicks??'',t.postExitAdverseTicks??'',t.postExitAdverseFirst==null?'':(t.postExitAdverseFirst?'ano':'ne'),t.mfeTicks??'',t.maeTicks??'',t.observedMinutes??'',t.slTicks??'',t.exitTicks??'',t.maxTicks??'',t.maxFavorableTicks??'',t.maxAdverseTicks??'',t.touchedEntry==null?'':(t.touchedEntry?'ano':'ne'),t.touchedSl==null?'':(t.touchedSl?'ano':'ne'),t.setupCode||'',t.trend||'',(t.entryLevels||[]).join('|'),...levelCsvCells(t,count,tickSize),(t.ofConfirm||[]).join('|'),FJTaxonomy.storedTargetTypes(t.targetLevel1).join('|'),t.targetLevel1?.price??'',FJTaxonomy.storedTargetTypes(t.targetLevel2).join('|'),t.targetLevel2?.price??'',FJPoints.contextIncomplete(t)?'ano':'ne',t.confluenceCount??'',t.fillStatus||'',t.wouldSkipLive===true?'ano':'ne',t.wouldSkipReason||'',reportSigned(t),Number(t.commission||0),t.contracts??'',t.comment,p.instrument,p.maxTrades,p.lossLimit,p.profitTarget,p.fromTime,p.toTime,p.setup,p.psychology,p.note,dn?.comment||'',dn?.preview||'',dn?.notes||''];
 }
 $('reportCsv').onclick=async()=>{
  // Body: dřív se tu volalo reportSigned({...t,pnl:t.points}), jenže signed()

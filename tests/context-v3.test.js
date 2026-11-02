@@ -360,7 +360,7 @@ test('A7/7: smazaná pole nejsou ve slovníku polí, ve formuláři ani v export
 
   const r = loadRenderer(['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'reportSigned', 'levelCsvCount', 'levelCsvHeader', 'levelCsvCells',
     'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH', 'CONTEXT_CSV_SKIPPED',
-    'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable', 'reportCsvTable'],
+    'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable', 'reportCsvTable', 'deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor'],
   { settings: { templates: [] }, activeJournalId: 'j1', journalProfiles: [] });
   const trade = { ...LONG, date: '2026-10-09', entryTime: '15:31', result: 'target', pnlRaw: 18.1,
     liquiditySwept: 'YES', pathProfile: 'LVN', entryLevelTests: { VAH: 'UNTESTED' },

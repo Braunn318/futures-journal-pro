@@ -126,6 +126,27 @@ test('plánované R = nejvzdálenější target ÷ riziko', () => {
   assert.equal(FJPoints.plannedRMultipleOf(t, ['', null]), null);
 });
 
+test('plánované R u víc cílů jde do posledního targetu (TP3+ z nohou), ne jen do TP2', () => {
+  const r = loadRenderer(['deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor', 'riskFields'], { settings: SETTINGS });
+  const t = {
+    side: 'short', entryPrice: 7742.25, slPrice: 7746,
+    targetLevel1: { price: 7737.75 }, targetLevel2: { price: 7733 },
+    legs: [
+      { exitPrice: 7737.75, result: 'target', contracts: 1 },
+      { exitPrice: 7733, result: 'target', contracts: 1 },
+      { exitPrice: 7728.5, result: 'target', contracts: 1 }
+    ],
+    plannedRMultiple: 2.47
+  };
+  eq(r.plannedTargetPrices(t), [7737.75, 7733, 7728.5]);
+  assert.equal(r.riskFields(t).plannedRMultiple, 3.67, 'TP3 ÷ riziko');
+  assert.equal(r.plannedRFor(t), 3.67, 'starší uložená hodnota (do TP2) se při čtení přepočítá');
+  // Ruční target 2 dál platí – TP3 z nohou se jen přidává.
+  eq(r.plannedTargetPrices({ ...t, targetLevel2: { price: 7720 } }), [7737.75, 7720, 7728.5]);
+  // Bez SL se nedá spočítat – zůstává uložená hodnota.
+  assert.equal(r.plannedRFor({ ...t, slPrice: null }), 2.47);
+});
+
 // -------------------------------------------------- formulář: cena targetu
 
 function targetForm(values, datasets, legs) {

@@ -31,7 +31,7 @@ const NAMES = [
   'classifyResult', 'signed', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal',
   'weightedExitFields', 'legFromTrade', 'mergeSamePriceLegs', 'labelLegs',
   'mergeContextFields', 'combineTradeObjects', 'sideMeta', 'reportSigned',
-  'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
+  'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor'
 ];
 
 const renderer = () => loadRenderer(NAMES, { settings: SETTINGS, Date });

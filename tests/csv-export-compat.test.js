@@ -33,7 +33,7 @@ const FJTaxonomy = require('../app/taxonomy.js');
 const BASE = '1eaef56';
 const SETTINGS = { templates: [{ instrument: 'MES', pointValue: 5, defaultCommission: 1.9 }] };
 const OLD_NAMES = ['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'reportSigned',
-  'srCsvCounts', 'srCsvHeader', 'srCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'firstTradeIdPerDate',
+  'srCsvCounts', 'srCsvHeader', 'srCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor', 'firstTradeIdPerDate',
   'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable', 'reportCsvTable'];
 // Sloupce psychiky (4.8.7) jsou nové a jsou až na konci – starý kód je nemá.
 const NEW_NAMES = [...OLD_NAMES.map(n => ({ srCsvCounts: 'levelCsvCount', srCsvHeader: 'levelCsvHeader', srCsvCells: 'levelCsvCells' })[n] || n),

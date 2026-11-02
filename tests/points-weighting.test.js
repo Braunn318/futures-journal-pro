@@ -116,7 +116,7 @@ test('karta obchodu ukazuje celkové body, ne body na kontrakt', () => {
     'esc', 'money', 'moneyCzk', 'dualMoney', 'signed', 'sideMeta', 'resultMeta',
     'legPillHTML', 'hypotheticalGroup', 'skippedReasonText', 'tradeTotalPoints', 'tradePointsTotal', 'displayPointsTotal', 'formatLevelRow', 'contextPillsHTML', 'incompleteBadgeHTML', 'levelPillsHTML', 'openTradeLevels', 'tradeLevelsBlockHTML', 'tradeHTML',
     'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown'
-  ], {
+  , 'deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor'], {
     settings: { ...SETTINGS, usdCzkRate: 23 },
     activeJournalId: 'j1',
     Intl,

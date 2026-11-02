@@ -239,7 +239,7 @@ test('sloučení: příznak i důvod se neztratí a planFollowed zůstává samo
 
 test('CSV exporty nesou příznak a klíč důvodu, sloupce se neposunou', () => {
   const r = loadRenderer(['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'reportSigned',
-    'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'], { settings: SETTINGS });
+    'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor'], { settings: SETTINGS });
   const t = { ...SKIPPED[0], journalName: 'Backtest', fillStatus: 'FILLED' };
   for (const [header, row, label] of [
     [r.tradeCsvHeader(), r.tradeCsvRow(t, null), 'deník'],

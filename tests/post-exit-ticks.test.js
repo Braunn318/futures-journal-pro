@@ -32,7 +32,7 @@ const NAMES = [
   'tradePointsTotal', 'displayPointsTotal', 'weightedExitFields', 'legFromTrade',
   'mergeSamePriceLegs', 'labelLegs', 'mergeContextFields', 'combineTradeObjects',
   'sideMeta', 'reportSigned', 'postExitApplies',
-  'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow'
+  'levelCsvHeader', 'levelCsvCells', 'tradeCsvHeader', 'tradeCsvRow', 'reportCsvHeader', 'reportCsvRow', 'deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor'
 ];
 
 function renderer(settings = SETTINGS) {
@@ -261,7 +261,7 @@ test('oba CSV exporty mají nová pole včetně dopočtených', () => {
     assert.equal(rec['Protipohyb po výstupu (ticky)'], 30, label);
     assert.equal(rec['Protipohyb dřív'], 'ne', label);
     assert.equal(rec['SL (ticky)'], 12, label);
-    assert.equal(rec['Max ve směru (ticky)'], 32, label);
+    assert.equal(rec['Max ve směru po výstupu (ticky)'], 32, label);
     assert.equal(rec['Max proti (ticky)'], 6, label);
     assert.equal(rec['Zpět na vstup'], 'ano', label);
     assert.equal(rec['Až na SL'], 'ne', label);
@@ -376,7 +376,7 @@ test('CSV: nevyplněné pole zůstane prázdné, nevypíše se nula', () => {
   const row = r.tradeCsvRow(bare, null);
   const rec = Object.fromEntries(header.map((name, i) => [name, row[i]]));
   for (const col of ['Pokračování po výstupu (ticky)', 'Protipohyb po výstupu (ticky)', 'Protipohyb dřív',
-    'SL (ticky)', 'Max ve směru (ticky)', 'Max proti (ticky)', 'Zpět na vstup', 'Až na SL']) {
+    'SL (ticky)', 'Max ve směru po výstupu (ticky)', 'Max proti (ticky)', 'Zpět na vstup', 'Až na SL']) {
     assert.equal(rec[col], '', col + ' má zůstat prázdný');
   }
 });

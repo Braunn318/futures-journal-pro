@@ -143,7 +143,7 @@ test('sloučení nohou: psychika se neztratí (první vyplněná hodnota)', () =
 test('export CSV: tři sloupce obchodu a tři sloupce dne na konci, hodnota = číslo škály', () => {
   const r = loadRenderer(['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta', 'levelCsvCount', 'levelCsvHeader', 'levelCsvCells',
     'tradeCsvHeader', 'tradeCsvRow', 'firstTradeIdPerDate', 'CONTEXT_CSV_MANUAL', 'CONTEXT_CSV_DERIVED', 'CONTEXT_CSV_DAY', 'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH', 'CONTEXT_CSV_SKIPPED',
-    'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable'],
+    'csvBool', 'emptyDayNoteCells', 'contextCsvHeader', 'contextCsvCells', 'journalCsvTable', 'deriveTargetPrices', 'extraTargetPrices', 'plannedTargetPrices', 'plannedRFor'],
   { settings: SETTINGS, activeJournalId: 'j1', journalProfiles: [] });
   const trades = [
     { ...COMPLETE, id: 'a', side: 'short', result: 'target', pnl: 10, pnlRaw: 10, points: 2, contracts: 1, psychBefore: '6', psychAfter: '2' },
