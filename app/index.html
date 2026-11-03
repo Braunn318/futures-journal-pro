@@ -1142,7 +1142,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           </div>
           <div class="field full" style="margin-top:10px"><label>Složka LTA</label><div class="sub" id="ltaFolderInfo"></div>
             <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="ltaChooseFolder">Změnit složku…</button><button type="button" class="btn" id="ltaResetFolder">Výchozí složka</button><button type="button" class="btn" id="ltaOpenFolder">Otevřít složku</button><button type="button" class="btn" id="ltaRefresh">Obnovit</button></div></div>
-          <div class="field full" style="margin-top:10px"><label>Soubory <span class="sub">— vypnutý soubor se nečte (např. stará kopie v Local)</span></label><div id="ltaFiles"></div></div>
+          <div class="field full" style="margin-top:10px"><label>Soubory a levely <span class="sub">— vypnutý soubor se nečte (např. stará kopie v Local); u souboru rozbal „levely“ a odškrtni ty, které se nemají doplňovat (OPEN, SETT, gamma Combo L2…)</span></label><div id="ltaFiles"></div></div>
+          <div class="field full" style="margin-top:10px"><label>Vyloučit názvy obsahující… <span class="sub">— jeden text na řádek, bez ohledu na velikost písmen; hodí se na názvy, které se mění každý den (např. „/“ vyloučí popisek s datem „11/02 - 00:“ z gamma souboru)</span></label><textarea id="ltaExcludePatterns" rows="3" placeholder="např. CLOSE"></textarea></div>
+          <p class="sub" style="margin-top:6px">Vyloučený level se jen nedoplňuje (automaticky ani tlačítkem „Doplnit z LTA“). V archivu i v číselníku LTA Levels zůstává a ve formuláři ho jde vybrat ručně. Skrytá volba v Číselnících se navíc nenabízí vůbec.</p>
           <p class="sub" id="ltaArchiveInfo" style="margin-top:8px"></p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Do složky LTA se nikdy nic nezapisuje.</p>
         </details>
@@ -2142,7 +2144,6 @@ function setIncludeSkipLive(value){setInclude('skipLive',value)}
 async function onIncludeChange(key,value){
  setInclude(key,value);
  renderAll();
- if(typeof applyAccountOverview==='function'&&overviewAllTrades.length)applyAccountOverview();
  if(typeof drawInstrumentPortfolio==='function')drawInstrumentPortfolio();
  if(typeof reportRows!=='undefined'&&reportRows)generateReportView();
 }
@@ -2588,7 +2589,6 @@ function setDistanceUnit(value){
  syncDistanceInputs();
  renderAll();
  if($('tradeModal')?.classList.contains('open')&&typeof renderPostExitHints==='function')renderPostExitHints();
- if(typeof applyAccountOverview==='function'&&typeof overviewAllTrades!=='undefined'&&overviewAllTrades.length)applyAccountOverview();
  if(typeof reportRows!=='undefined'&&reportRows&&typeof generateReportView==='function')generateReportView();
  if(clearedFilter)showToast('Filtry MFE/MAE se při změně jednotky vyprázdnily.');
 }
@@ -2823,7 +2823,7 @@ function displayPoints(t){
  if(t.result==='breakeven')return p;
  return t.result==='stoploss'?-p:p;
 }
-function renderAll(){renderDashboard();renderTrades();renderCalendar();refreshInstrumentPortfolioCard()}
+function renderAll(){renderOverviewCurrent();renderTrades();renderCalendar();refreshInstrumentPortfolioCard()}
 
 let instrumentPortfolioRows=[];
 
@@ -3809,7 +3809,7 @@ async function ltaRowsFor({instrument,instrumentFull,entryISO,entryPrice,vwap,co
  const res=await window.desktopAPI.ltaLevelsFor({root:normalizeInstrumentCode(instrument),instrumentFull:instrumentFull||'',entryISO});
  const levels=(res?.levels||[]).map(l=>({name:l.name,price:l.price}));
  const vw=FJLta.roundPrice(vwap);
- if(s.vwapRow&&vw!=null&&vw>0)levels.push({name:FJLta.VWAP_NAME,price:vw});
+ if(s.vwapRow&&vw!=null&&vw>0&&!FJLta.isExcluded(FJLta.VWAP_NAME,s))levels.push({name:FJLta.VWAP_NAME,price:vw});
  out.source=res?.source||'none';
  out.count=levels.length;
  if(!levels.length)return out;
@@ -6664,12 +6664,34 @@ async function renderLtaSettings(){
  $('ltaRetentionDays').value=s.retentionDays;
  $('ltaFolderInfo').innerHTML=`${esc(st.folder)}${s.folder?'':' <span class="sub">(výchozí)</span>'}${st.folderExists?` · ${st.levelCount} levelů`:' · <b>složka nenalezena</b>'}`;
  const fmt=ms=>new Date(ms).toLocaleString('cs-CZ');
- $('ltaFiles').innerHTML=st.files.length?st.files.map(f=>`<label class="settings-check sub" style="margin-top:4px"><input type="checkbox" class="lta-file" data-rel="${esc(f.rel)}"${f.enabled?' checked':''}> ${esc(f.rel)} · ${f.enabled?(f.count??'?')+' levelů · ':''}změněno ${esc(fmt(f.mtimeMs))}${f.error?' · <b>nejde přečíst</b>':''}</label>`).join(''):'<span class="sub">Žádné soubory.</span>';
+ // Rozbalené seznamy levelů zůstanou po uložení rozbalené.
+ const openNames=new Set([...document.querySelectorAll('#ltaFiles details[data-rel][open]')].map(d=>d.dataset.rel));
+ const excludedNames=new Set(s.excludedNames||[]);
+ const nameRow=(n)=>{
+  const pat=FJLta.excludingPattern(n,s);
+  return pat!==null
+   ?`<label class="settings-check sub" style="margin-top:2px;opacity:.55" title="Vyloučeno vzorem"><input type="checkbox" disabled> ${esc(n)} <span class="sub">— vyloučeno vzorem „${esc(pat)}“</span></label>`
+   :`<label class="settings-check sub" style="margin-top:2px"><input type="checkbox" class="lta-name" data-name="${esc(n)}"${excludedNames.has(n)?'':' checked'}> ${esc(n)}</label>`;
+ };
+ $('ltaFiles').innerHTML=st.files.length?st.files.map(f=>{
+  const names=Array.isArray(f.names)?f.names:[];
+  const off=names.filter(n=>FJLta.isExcluded(n,s)).length;
+  const head=`<label class="settings-check sub" style="margin-top:4px"><input type="checkbox" class="lta-file" data-rel="${esc(f.rel)}"${f.enabled?' checked':''}> ${esc(f.rel)} · ${f.enabled?(f.count??'?')+' levelů · ':''}změněno ${esc(fmt(f.mtimeMs))}${f.error?' · <b>nejde přečíst</b>':''}</label>`;
+  const list=f.enabled&&names.length?`<details data-rel="${esc(f.rel)}" style="margin:2px 0 6px 26px"${openNames.has(f.rel)?' open':''}><summary class="sub" style="cursor:pointer;font-size:12px">levely (${names.length}${off?` · nedoplňuje se ${off}`:''})</summary><div style="margin-left:4px">${names.map(nameRow).join('')}</div></details>`:'';
+  return head+list;
+ }).join(''):'<span class="sub">Žádné soubory.</span>';
  document.querySelectorAll('#ltaFiles .lta-file').forEach(box=>box.onchange=async()=>{
   const off=new Set(ltaStatusCache?.settings?.disabledFiles||[]);
   if(box.checked)off.delete(box.dataset.rel);else off.add(box.dataset.rel);
   await saveLtaSettings({disabledFiles:[...off]});
  });
+ // Stejný název ve více souborech má jeden přepínač (číselník je podle názvu).
+ document.querySelectorAll('#ltaFiles .lta-name').forEach(box=>box.onchange=async()=>{
+  const ex=new Set(ltaStatusCache?.settings?.excludedNames||[]);
+  if(box.checked)ex.delete(box.dataset.name);else ex.add(box.dataset.name);
+  await saveLtaSettings({excludedNames:[...ex]});
+ });
+ if(document.activeElement!==$('ltaExcludePatterns'))$('ltaExcludePatterns').value=(s.excludePatterns||[]).join('\n');
  const a=st.archive;
  const snap=st.lastSnapshot?` Poslední kontrola ${fmt(st.lastSnapshot.at)}${st.lastSnapshot.written?' (uložena nová verze)':''}.`:'';
  $('ltaArchiveInfo').textContent=s.archive
@@ -6689,6 +6711,7 @@ async function saveLtaSettings(patch){
  const num=(id,key)=>$(id)?.addEventListener('change',()=>saveLtaSettings({[key]:Number($(id).value)}));
  bool('ltaEnabled','enabled');bool('ltaAutoInForm','autoInForm');bool('ltaVwapRow','vwapRow');bool('ltaArchive','archive');
  num('ltaNearestCount','nearestCount');num('ltaRetentionDays','retentionDays');
+ $('ltaExcludePatterns')?.addEventListener('change',()=>saveLtaSettings({excludePatterns:$('ltaExcludePatterns').value.split(/\r?\n/)}));
  $('ltaChooseFolder')?.addEventListener('click',async()=>{const r=await window.desktopAPI.ltaChooseFolder();if(r?.ok)await renderLtaSettings()});
  $('ltaResetFolder')?.addEventListener('click',()=>saveLtaSettings({folder:''}));
  $('ltaOpenFolder')?.addEventListener('click',async()=>{const r=await window.desktopAPI.ltaOpenFolder();if(!r?.ok)showToast('Složku nejde otevřít: '+(r?.error||''))});
@@ -7129,7 +7152,12 @@ $('factoryReset').onclick=async()=>{
  }
 };
 
-window.addEventListener('resize',()=>{if($('accountOverview').classList.contains('active'))renderDashboard()});
+// Překreslení po změně velikosti okna drží filtry přehledu (měsíc, deník…).
+let overviewResizeTimer=null;
+window.addEventListener('resize',()=>{
+ clearTimeout(overviewResizeTimer);
+ overviewResizeTimer=setTimeout(()=>{if($('accountOverview').classList.contains('active'))renderOverviewCurrent()},150);
+});
 
 function saveJournalProfiles(){
  localStorage.setItem(JOURNAL_LIST_KEY,JSON.stringify(journalProfiles));
@@ -8004,6 +8032,9 @@ async function importCapturedTrades(silent=false){
   const current=await window.desktopAPI.readJournal(activeJournalId);
   if(current?.ok){db.data=current.data;setRecords(db.data.trades||[]);renderAll()}
  }
+ // Přehled účtu čte všechny deníky z vlastní cache – po importu se načte znovu
+ // (vybrané filtry zůstanou).
+ if(importedIds.length&&accountOverviewInitialized)initAccountOverview().catch(e=>console.warn(e));
  await refreshCaptureStatus();
  if(!silent)showToast(`Importováno obchodů: ${count}`);
  return count;
@@ -8184,6 +8215,7 @@ async function nt8RunImport(){
   calendarAllTrades=null;
   const current=await window.desktopAPI.readJournal(activeJournalId);
   if(current?.ok){db.data=current.data;setRecords(db.data.trades||[]);renderAll()}
+  if(accountOverviewInitialized)initAccountOverview().catch(e=>console.warn(e));
   $('nt8ImportModal').classList.remove('open');
   showToast(`Ruční import z NT8: zapsáno nohou ${count} v ${chosen.length} obchodech. Záloha deníku je v safety-backups.`);
  }catch(err){
@@ -8863,6 +8895,14 @@ function renderOverviewSectionSettings(){
    showToast(`Sekce „${OVERVIEW_SECTIONS.find(x=>x.key===el.dataset.key)?.label}“ je ${el.checked?'zobrazená':'skrytá'}.`);
   });
  });
+}
+// Překreslí Přehled účtu podle filtrů, které jsou v něm vybrané. renderDashboard()
+// bez argumentů by ukázal všechny obchody aktivního deníku, i když filtr (např.
+// měsíc) zůstal nastavený.
+function renderOverviewCurrent(){
+ // try: renderAll může běžet dřív, než skript dojde k deklaraci (let).
+ let ready=false;try{ready=accountOverviewInitialized}catch{}
+ if(ready)applyAccountOverview();else renderDashboard();
 }
 function applyAccountOverview(){
  // renderDashboard dostává VŠECHNY obchody: výkon si z nich vybere sám

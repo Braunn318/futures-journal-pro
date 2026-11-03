@@ -181,7 +181,9 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
       source = 'live';
     }
     const disabled = new Set(settings.disabledFiles);
-    const list = FJLta.levelsForInstrument((levels || []).filter(l => !disabled.has(l.source)), instrumentRoot, instrumentFull, new Date(t).toISOString());
+    // Vyloučené názvy (Nastavení → LTA levely) se nedoplňují; archiv je drží
+    // dál, takže zrušení vyloučení platí i pro starší dny.
+    const list = FJLta.levelsForInstrument((levels || []).filter(l => !disabled.has(l.source) && !FJLta.isExcluded(l.name, settings)), instrumentRoot, instrumentFull, new Date(t).toISOString());
     return { ok: true, levels: list, source: levels ? source : 'none', day, versionFrom };
   }
 
@@ -196,7 +198,11 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
     for (const name of days) { try { bytes += fs.statSync(path.join(root, name)).size; } catch { /* ignore */ } }
     return {
       ok: true, settings, folder: base, defaultFolder: defaultFolder(), folderExists,
-      files: files.map(({ abs, ...f }) => f), levelCount: levels.length,
+      // `names` = názvy levelů v souboru – pro výběr, co se doplňuje.
+      files: files.map(({ abs, ...f }) => {
+        const cached = f.enabled ? fileCache.get(abs) : null;
+        return cached ? { ...f, names: [...new Set(cached.levels.map(l => l.name))].sort((a, b) => a.localeCompare(b)) } : f;
+      }), levelCount: levels.length,
       archive: { days: days.length, first: days[0]?.slice(0, 10) || null, last: days[days.length - 1]?.slice(0, 10) || null, bytes },
       lastSnapshot
     };

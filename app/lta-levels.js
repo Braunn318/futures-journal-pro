@@ -36,7 +36,9 @@
     archive: true,         // ukládat verze levelů po dnech
     retentionDays: 90,
     vwapRow: true,         // přidat VWAP v čase vstupu (z konektoru NT8)
-    disabledFiles: []      // relativní cesty souborů, které se nečtou (System/ATR_NT8.xml)
+    disabledFiles: [],     // relativní cesty souborů, které se nečtou (System/ATR_NT8.xml)
+    excludedNames: [],     // názvy levelů z LTA, které se nedoplňují (OPEN, Combo L2…)
+    excludePatterns: []    // level se nedoplní, když jeho název obsahuje text (bez ohledu na velikost)
   });
 
   function cleanSettings(raw) {
@@ -55,8 +57,36 @@
       vwapRow: s.vwapRow !== false,
       disabledFiles: Array.isArray(s.disabledFiles)
         ? [...new Set(s.disabledFiles.filter(f => typeof f === 'string' && f).map(normalizeRelPath))]
-        : []
+        : [],
+      excludedNames: cleanTextList(s.excludedNames),
+      excludePatterns: cleanTextList(s.excludePatterns)
     };
+  }
+
+  function cleanTextList(list) {
+    return Array.isArray(list)
+      ? [...new Set(list.filter(v => typeof v === 'string').map(v => v.trim()).filter(Boolean))]
+      : [];
+  }
+
+  // Vzor, kterým je název vyloučený (první shoda), jinak null.
+  function excludingPattern(name, settings) {
+    const n = String(name || '').toLowerCase();
+    if (!n) return null;
+    for (const p of (settings && settings.excludePatterns) || []) {
+      const t = String(p || '').trim().toLowerCase();
+      if (t && n.includes(t)) return p;
+    }
+    return null;
+  }
+
+  // Level se nedoplňuje: název je v seznamu vyloučených nebo obsahuje vzor.
+  // Týká se jen doplňování – v archivu i v číselníku level zůstává.
+  function isExcluded(name, settings) {
+    const n = String(name || '').trim();
+    if (!n || !settings) return false;
+    if ((settings.excludedNames || []).includes(n)) return true;
+    return excludingPattern(n, settings) !== null;
   }
 
   function normalizeRelPath(p) {
@@ -253,7 +283,7 @@
 
   return {
     GROUP, KEY_PREFIX, VWAP_NAME, DEFAULT_SUBDIR, DEFAULT_SETTINGS,
-    cleanSettings, normalizeRelPath,
+    cleanSettings, normalizeRelPath, isExcluded, excludingPattern,
     parseLtaXml, levelName, instrumentRoot, contractMonth, levelsSignature,
     versionAt, levelsForInstrument,
     slug, keyForName, nearestRows, mergeRows, roundPrice

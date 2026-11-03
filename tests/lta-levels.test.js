@@ -265,6 +265,55 @@ test('archiv vypnutý: dnešní obchod z aktuálních souborů, nic se neuklád�
   } finally { h.cleanup(); }
 });
 
+// ------------------------------------------- vyloučené levely (4.8.100)
+
+test('vyloučení: nastavení se čistí, přesný název i vzor bez ohledu na velikost písmen', () => {
+  const s = FJLta.cleanSettings({ excludedNames: [' OPEN ', 'OPEN', '', 5, 'Combo L2'], excludePatterns: ['close', '  ', '/'] });
+  assert.deepEqual(s.excludedNames, ['OPEN', 'Combo L2']);
+  assert.deepEqual(s.excludePatterns, ['close', '/']);
+  assert.deepEqual(FJLta.cleanSettings({}).excludedNames, []);
+  assert.equal(FJLta.isExcluded('OPEN', s), true);
+  assert.equal(FJLta.isExcluded('open', s), false, 'seznam názvů je přesný');
+  assert.equal(FJLta.isExcluded('Combo L2', s), true);
+  assert.equal(FJLta.isExcluded('Combo L1', s), false);
+  assert.equal(FJLta.isExcluded('ID CLOSE', s), true, 'vzor „close“');
+  assert.equal(FJLta.isExcluded('11/02 - 00:', s), true, 'vzor „/“ na popisek s datem');
+  assert.equal(FJLta.excludingPattern('ID CLOSE', s), 'close');
+  assert.equal(FJLta.excludingPattern('OPEN', s), null, 'vyloučený názvem, ne vzorem');
+  assert.equal(FJLta.isExcluded('SETT', FJLta.cleanSettings({})), false);
+});
+
+test('vyloučení: levelsFor vyloučené nevrací, archiv je drží, status ukazuje názvy souboru', async () => {
+  const h = tempStore();
+  try {
+    h.write('System/GammaEsNq.xml', xml(
+      level('ES 12-26', '7529', '2 Combo L1'), level('ES 12-26', '7430', '2 Combo L2'), level('ES 12-26', '7612', '2 11/02 - 00:')));
+    h.write('System/OPEN_NT8.xml', xml(level('ES 12-26', '7700', '30 OPEN')));
+    h.store.setSettings({ excludedNames: ['OPEN', 'Combo L2'], excludePatterns: ['/'] });
+    h.store.stop();
+    const iso = new Date(h.clock.t).toISOString();
+    assert.deepEqual((await h.store.levelsFor({ root: 'ES', entryISO: iso })).levels.map(l => l.name), ['Combo L1']);
+    const day = JSON.parse(fs.readFileSync(path.join(h.store.root, localDate(h.clock.t) + '.json'), 'utf8'));
+    assert.equal(day.versions[0].levels.length, 4, 'archiv ukládá všechny levely');
+    h.store.setSettings({ excludedNames: [], excludePatterns: [] });
+    h.store.stop();
+    assert.equal((await h.store.levelsFor({ root: 'ES', entryISO: iso })).levels.length, 4, 'zrušení vyloučení platí hned');
+    const st = await h.store.status();
+    assert.deepEqual(st.files.find(f => f.rel === 'System/GammaEsNq.xml').names, ['11/02 - 00:', 'Combo L1', 'Combo L2']);
+  } finally { h.cleanup(); }
+});
+
+test('renderer ltaRowsFor: vyloučený VWAP se nepřidá', async () => {
+  const r = loadRenderer(['ltaRowsFor'], {
+    FJLta,
+    normalizeInstrumentCode: i => String(i || '').trim().toUpperCase(),
+    window: { desktopAPI: { ltaLevelsFor: async () => ({ ok: true, levels: [{ name: 'SETT', price: 7700 }], source: 'archive' }) } }
+  });
+  const s = FJLta.cleanSettings({ nearestCount: 2, excludedNames: ['VWAP'] });
+  const out = await r.ltaRowsFor({ instrument: 'ES', entryPrice: 7750, vwap: 7751, config: {}, s });
+  assert.deepEqual(plain(out.rows), [{ level: 'LTA_SETT', price: 7700 }]);
+});
+
 // ----------------------------------------------------- VWAP z konektoru
 
 const ENTRY = { executionId: 'E1', time: '2026-11-02T14:28:20.000Z', orderAction: 'Sell', orderName: 'Entry', quantity: 1, price: 7854.25, positionAfter: -1, marketPosition: 'Short', commission: 1 };
