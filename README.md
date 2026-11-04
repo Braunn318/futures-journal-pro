@@ -1,5 +1,9 @@
 # Futures Journal PRO
 
+Deník byl vytvořen pro členy komunity LTA- Live Trading Assistent, ale použít ho může každý.
+
+Mrkni na Czechwealth a zvaž členství v LTA: https://www.czechwealth.cz/
+
 Desktopový obchodní deník pro futures tradery (Windows). Obchody i screenshoty se do něj zapisují **samy**, všechna data zůstávají jen na tvém počítači.
 
 ## Co umí
@@ -11,7 +15,7 @@ Desktopový obchodní deník pro futures tradery (Windows). Obchody i screenshot
 ## ⚡ Automatický import obchodů
 - **NinjaTrader 8** – konektor přenáší účet, instrument, vstup a výstup, částečné vstupy, otočení pozice, komise i MFE / MAE. Aplikace ho nainstaluje jedním kliknutím.
 - **cTrader** a **TradingView** (přes relay) jako další zdroje.
-- Import hladin a VWAPu z **LiveTradingAsistent** do „Hladin v blízkosti“.
+- Import hladin a VWAPu z **LiveTradingAsistent** do „Hladin v blízkosti“. Nejlépe využijí členové LTA.
 - Když automat selže, jde obchody nahrát **ručním importem** z NinjaTraderu.
 
 ## 📸 Automatické screenshoty
