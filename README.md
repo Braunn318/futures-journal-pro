@@ -32,6 +32,6 @@ Desktopový obchodní deník pro futures tradery (Windows). Obchody i screenshot
 Stáhni instalátor `Futures-Journal-PRO-Setup-X.Y.Z.exe` ze stránky [Releases](https://github.com/Braunn318/futures-journal-pro/releases) a spusť ho. Další verze si aplikace hlídá sama a nabídne aktualizaci.
 
 ## 📖 Návod
-- [Kompletní návod (DOCX)](Kompletni_navod_Futures_Journal_PRO_4.8.100.docx)
+- [Kompletní návod (DOCX)](Kompletni_navod_Futures_Journal_PRO_4.8.101.docx)
 - [Automatizace – NinjaTrader, TradingView, screenshoty](NAVOD_AUTOMATIZACE.txt)
 - [Seznam změn](CHANGELOG.txt)

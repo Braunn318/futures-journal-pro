@@ -530,7 +530,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       </div>
     </div>
     <div class="nav">
-      <button data-section="openPositions">📈 Otevřené pozice</button>
+      <button data-section="openPositions">📈 Pozice/Příkazy</button>
       <button class="active" data-section="accountOverview">📊 Přehled účtu</button>
       <button data-section="journal">📒 Deník</button>
       <button data-section="calendar">📅 Kalendář</button>
@@ -556,21 +556,46 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <div class="card">
         <div class="instrument-section-head">
           <div>
-            <h2>Otevřené pozice</h2>
-            <p class="sub">Aktuálně otevřené pozice zachycené z NinjaTraderu.</p>
+            <h2>Pozice</h2>
+            <p class="sub futures-only">Aktuálně otevřené pozice zachycené z konektorů (NinjaTrader, cTrader cBot).</p>
+            <p class="sub swing-only">Otevřené swing pozice z deníku – přidat výstup, posunout SL.</p>
           </div>
-          <button class="btn danger" id="clearInvalidPositions">Vymazat neplatné pozice</button>
+          <button class="btn danger futures-only" id="clearInvalidPositions">Vymazat neplatné pozice</button>
+          <button class="btn primary swing-only" id="addSwingPositionBtn">＋ Otevřít pozici</button>
         </div>
-        <div class="table-scroll" style="margin-top:16px">
+        <div class="table-scroll swing-only" style="margin-top:16px">
+          <table>
+            <thead><tr><th>Symbol</th><th>Směr</th><th>Otevřeno · věk</th><th>Vstup</th><th>SL při otevření</th><th>Objem</th><th>Riziko</th><th></th></tr></thead>
+            <tbody id="swingOpenPositions"><tr><td colspan="8" class="sub">Žádná otevřená swing pozice.</td></tr></tbody>
+          </table>
+        </div>
+        <div class="table-scroll futures-only" style="margin-top:16px">
           <table>
             <thead><tr><th>Instrument</th><th>Pozice</th><th>Čas vstupu</th><th>Cena vstupu</th><th>Aktuální cena</th><th>Zisk / ztráta</th></tr></thead>
             <tbody id="captureOpenPositions"><tr><td colspan="6" class="sub">Žádné otevřené pozice.</td></tr></tbody>
           </table>
         </div>
       </div>
+      <div class="card" style="margin-top:16px">
+        <div class="instrument-section-head">
+          <div>
+            <h2>Příkazy</h2>
+            <p class="sub">Čekající limitky – zadané ručně a z cTraderu (MCP, jen čtení). Naplněno / Nenaplněno jen předvyplní formulář, nic se neuloží samo.</p>
+            <div class="sub" id="mcpOrdersStatus"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-start"><button class="btn" id="refreshOrdersBtn">↻ Obnovit</button><button class="btn primary" id="addManualOrderBtn">＋ Ruční limitka</button></div>
+        </div>
+        <div class="table-scroll" style="margin-top:16px">
+          <table>
+            <thead><tr><th>Zdroj</th><th>Symbol</th><th>Směr</th><th>Typ</th><th>Cena</th><th>SL</th><th>TP</th><th>Objem</th><th>Zadáno</th><th>Expirace</th><th></th></tr></thead>
+            <tbody id="pendingOrdersRows"><tr><td colspan="11" class="sub">Žádné čekající příkazy.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <section id="accountOverview" class="section active">
+      <div class="alert" id="swingOverviewNote" style="display:none;margin-bottom:12px">Swing · CFD deník: obchody najdeš v Deníku, otevřené pozice a limitky v záložce Pozice/Příkazy. Statistiky, equity a kalendář swingu (P/L podle dne výstupu) přijdou v další verzi – přehled níže zatím swing obchody nepočítá.</div>
 
       <div class="subtab-bar">
         <button class="active" data-subtab="dashOverview">Přehled</button>
@@ -1320,6 +1345,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     <div class="modalhead"><h2 id="journalNameModalTitle">Nový deník</h2><button class="icon" id="closeJournalNameModal">✕</button></div>
     <div class="field"><label id="journalNameLabel">Název deníku</label><input id="journalNameInput" maxlength="60" placeholder="Např. NQ, ES nebo GC"></div>
     <div class="field"><label for="journalMode">Režim deníku</label><select id="journalMode"><option value="LIVE">Živý</option><option value="BACKTEST">Backtest</option></select><div class="sub">Živý: bez „Naživo bych to vzal?“. Backtest: bez stavu „vědomě vynechán“. Jde změnit i v Nastavení → Obecné → Deníky.</div></div>
+    <div class="field"><label for="journalTypeSelect">Typ deníku</label><select id="journalTypeSelect"><option value="FUTURES_INTRADAY">Futures intraday</option><option value="CFD_SWING">Swing · CFD</option></select><div class="sub">Swing · CFD: obchod trvá dny a končí po částech, P/L se opisuje z výpisu brokera, R z cen. Bez importu z konektorů a bez intraday risk modulu. Změna typu nemění data obchodů.</div></div>
     <div id="journalNameError" class="alert red"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="btn" id="cancelJournalName">Zrušit</button>
@@ -1582,6 +1608,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <script src="lta-levels.js"></script>
 <script src="points.js"></script>
 <script src="context.js"></script>
+<script src="swing.js"></script>
 <script src="journals.js"></script>
 <script src="nt8import.js"></script>
 <script>
@@ -1949,7 +1976,12 @@ function dualMoneyText(n,withSign=false){const v=Number(n)||0,sign=withSign&&v>0
 // aby nespoléhala na to, co jí kdo předal.
 let setupRecords=[];
 function isSetupRecord(t){return t?.recordType==='SETUP_ONLY'}
-function tradeRecords(rows){return Array.isArray(rows)?rows.filter(t=>!isSetupRecord(t)):[]}
+// Swing obchod (kind 'SWING', docs/ZADANI_SWING_CFD.md) nemá futures P/L ani body – do futures
+// agregací nepatří NIKDY (ani jako setup). Swing deník má vlastní seznam (app/swing-ui.js);
+// kalendář a statistiky swingu přijdou v kroku 5 swing zadání.
+function isSwingJournalId(id){const p=(typeof journalProfiles!=='undefined'?journalProfiles:[]).find(j=>j.id===id);return !!p&&p.journalType==='CFD_SWING'}
+function isSwingRecordRow(t){return t?.kind==='SWING'}
+function tradeRecords(rows){return Array.isArray(rows)?rows.filter(t=>!isSetupRecord(t)&&t?.kind!=='SWING'):[]}
 // Obchod „naživo bych nevzal“ (wouldSkipLive): v backtestu vzatý jen kvůli
 // měření. Ve VÝCHOZÍM STAVU nesmí do equity, P/L, win rate, expectancy ani
 // žádné jiné statistiky výkonu – to hlídá performanceRecords(), kterou volá
@@ -2203,7 +2235,7 @@ function syncJournalModeFilters(states){
 function setRecords(all){
  const rows=Array.isArray(all)?all:[];
  trades=tradeRecords(rows);
- setupRecords=rows.filter(isSetupRecord);
+ setupRecords=rows.filter(t=>isSetupRecord(t)&&t?.kind!=='SWING');
 }
 // Četnost setupů a fill rate. Bere VŠECHNY záznamy (obchody i setupy bez exekuce).
 //   fill rate = FILLED / (FILLED + NO_FILL)
@@ -2430,6 +2462,7 @@ async function load(){
  // Uživatelská úprava číselníků se musí projevit dřív, než se cokoli
  // vykreslí – jinak by seznam obchodů ukázal výchozí popisky.
  FJTaxonomy.applyConfig(settings.taxonomy);
+ if(typeof applyJournalTypeUi==='function')applyJournalTypeUi();
  fillSettings(); renderAll();
  setTimeout(initAccountOverview,60);
  // load() běží až po přihlášení, takže okno nepřekryje přihlašovací obrazovku;
@@ -2823,7 +2856,7 @@ function displayPoints(t){
  if(t.result==='breakeven')return p;
  return t.result==='stoploss'?-p:p;
 }
-function renderAll(){renderOverviewCurrent();renderTrades();renderCalendar();refreshInstrumentPortfolioCard()}
+function renderAll(){renderOverviewCurrent();renderTrades();renderCalendar();refreshInstrumentPortfolioCard();if(typeof renderPositionsTab==='function')renderPositionsTab()}
 
 let instrumentPortfolioRows=[];
 
@@ -4721,6 +4754,7 @@ async function clearSkipLiveInActiveJournal(){
 }
 if($('clearSkipLiveBtn'))$('clearSkipLiveBtn').onclick=clearSkipLiveInActiveJournal;
 function renderTrades(){
+ if(typeof isSwingJournalActive==='function'&&isSwingJournalActive()){renderSwingTrades();return}
  if(typeof refreshIncludeToggles==='function')syncJournalModeFilters(refreshIncludeToggles('journal',includeJournalsFor(trades,[activeJournalId])));
  const q=$('search').value.toLowerCase(),r=$('filterResult').value,d=$('filterDate').value,s=$('filterSide')?.value||'',sk=$('filterSkipLive')?.value||'',fl=$('filterFill')?.value||'';
  const sideOk=t=>!s||(s==='none'?(t.side!=='long'&&t.side!=='short'):t.side===s);
@@ -6734,11 +6768,11 @@ if($('gradeRetroGraceMinutes'))$('gradeRetroGraceMinutes').onchange=async e=>{
  showToast(`Známka: „doplněno zpětně“ až po ${minutes} min od uložení obchodu.`);
 };
 $('refreshInstrumentPortfolio').onclick=drawInstrumentPortfolio;
-$('addTradeBtn').onclick=()=>openModal();
+$('addTradeBtn').onclick=()=>(typeof isSwingJournalActive==='function'&&isSwingJournalActive())?openSwingModal(null):openModal();
 // ---- Setup bez exekuce (recordType SETUP_ONLY) ----
 function openSetupModal(rec){
  const s=rec||{};
- $('setupModalTitle').textContent=rec?'Upravit setup bez vstupu':'Setup bez vstupu';
+ $('setupModalTitle').textContent=rec?.id?'Upravit setup bez vstupu':'Setup bez vstupu';
  $('sfId').value=s.id||'';
  $('sfDate').value=s.date||new Date().toISOString().slice(0,10);
  $('sfTime').value=s.entryTime||'';
@@ -7192,7 +7226,7 @@ function renderJournalSelector(){
  $('deleteJournalBtn').disabled=false;
  // Režim deníku je vidět rovnou ve výběru – backtest deník má jiná pravidla
  // formuláře (Nastavení → Obecné → Deníky).
- select.innerHTML=visibleJournalProfiles().map(j=>`<option value="${esc(j.id)}">${esc(j.name)}${FJContext.journalMode(j)==='BACKTEST'?' · backtest':''}</option>`).join('');
+ select.innerHTML=visibleJournalProfiles().map(j=>`<option value="${esc(j.id)}">${esc(j.name)}${FJContext.journalMode(j)==='BACKTEST'?' · backtest':''}${FJSwing.isSwingType(j)?' · swing':''}</option>`).join('');
  select.value=activeJournalId;
 }
 async function switchJournal(id){
@@ -7211,6 +7245,7 @@ function openJournalNameModal(mode){
  $('journalNameModalTitle').textContent=mode==='new'?'Nový deník':'Přejmenovat deník';
  $('journalNameInput').value=mode==='rename'&&current?current.name:'';
  $('journalMode').value=mode==='rename'&&current?FJContext.journalMode(current):'LIVE';
+ if($('journalTypeSelect'))$('journalTypeSelect').value=mode==='rename'&&current?FJSwing.journalTypeOf(current):'FUTURES_INTRADAY';
  $('journalNameError').textContent='';
  $('journalNameError').style.display='none';
  $('journalNameModal').classList.add('open');
@@ -7224,11 +7259,16 @@ async function saveJournalNameFromModal(){
  if(journalNameMode==='new'){
   if(journalProfiles.some(j=>j.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
   const id='journal_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-  journalProfiles.push({id,name:clean,backtest:$('journalMode').value==='BACKTEST'});rememberPreviousJournal();activeJournalId=id;saveJournalProfiles();closeJournalNameModal();safeReload();
+  journalProfiles.push({id,name:clean,backtest:$('journalMode').value==='BACKTEST',journalType:FJSwing.journalTypeOf({journalType:$('journalTypeSelect')?.value})});rememberPreviousJournal();activeJournalId=id;saveJournalProfiles();closeJournalNameModal();safeReload();
  }else{
   const j=journalProfiles.find(x=>x.id===activeJournalId);if(!j)return;
   if(journalProfiles.some(x=>x.id!==j.id&&x.name.toLowerCase()===clean.toLowerCase())){err.textContent='Deník s tímto názvem už existuje.';err.style.display='block';return}
-  j.name=clean;j.backtest=$('journalMode').value==='BACKTEST';saveJournalProfiles();closeJournalNameModal();journalsChanged();showToast('Deník byl uložen.');
+  const nextType=FJSwing.journalTypeOf({journalType:$('journalTypeSelect')?.value});
+  const typeChanged=nextType!==FJSwing.journalTypeOf(j);
+  if(typeChanged&&!(await changeActiveJournalType(nextType)))return;
+  j.name=clean;j.backtest=$('journalMode').value==='BACKTEST';saveJournalProfiles();closeJournalNameModal();
+  if(typeChanged){safeReload();return}
+  journalsChanged();showToast('Deník byl uložen.');
  }
 }
 $('newJournalBtn').onclick=()=>openJournalNameModal('new');
@@ -7600,7 +7640,8 @@ refreshAiExportInfo();
 async function readJournalTrades(profile){
  const result=await window.desktopAPI.readJournal(profile.id);
  if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
- return (result.data?.trades||[]).map(t=>({...t,journalId:profile.id,journalName:profile.name}));
+ // Swing obchody do futures reportů a CSV nepatří (swing zadání §0.1, export swingu je krok 7).
+ return (result.data?.trades||[]).filter(t=>t?.kind!=='SWING').map(t=>({...t,journalId:profile.id,journalName:profile.name}));
 }
 async function readJournalDayNotes(profile){
  const result=await window.desktopAPI.readJournal(profile.id);
@@ -7990,6 +8031,8 @@ async function attachAfterShots(events,mappings){
  const max=Math.min(10,Math.max(1,Number(captureSnapshot?.afterShotMax)||3));
  for(const e of events){
   const journalId=mappings[e.account]||activeJournalId;
+  // Swing deník konektory nepoužívá (swing zadání §2): událost zůstane ve frontě.
+  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId))continue;
   const r=await window.desktopAPI.readJournal(journalId);
   if(!r?.ok)continue;
   const data=r.data||{};
@@ -8020,6 +8063,8 @@ async function importCapturedTrades(silent=false){
  let count=0;
  for(const e of pending){
   const journalId=mappings[e.account]||activeJournalId;
+  // Swing deník konektory nepoužívá (swing zadání §2): událost zůstane ve frontě.
+  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId))continue;
   const images=await capturedImages(e);
   const added=await appendOrMergeCapturedTrade(journalId,e,images);
   if(added)count++;
@@ -8131,6 +8176,8 @@ async function nt8BuildPreview(text){
  const byPosition=new Map();
  for(const e of events){
   const journalId=mappings[e.account]||activeJournalId;
+  // Swing deník konektory nepoužívá (swing zadání §2): událost zůstane ve frontě.
+  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId))continue;
   const j=await journalOf(journalId);
   const mapped=mapCapturedTrade(e,[],j.settings);
   const st=e.grossPnl==null?{status:'nopv',match:null}:nt8EventStatus(e,mapped,j.trades);
@@ -8671,7 +8718,8 @@ async function readTradesForOverview(profile){
  const result=await window.desktopAPI.readJournal(profile.id);
  if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
  const rows=Array.isArray(result.data?.trades)?result.data.trades:[];
- return rows.map(t=>({...t,journalId:profile.id,journalName:profile.name}));
+ // Swing obchody do futures přehledu ani kalendáře nepatří (swing zadání §0.1; krok 5).
+ return rows.filter(t=>t?.kind!=='SWING').map(t=>({...t,journalId:profile.id,journalName:profile.name}));
 }
 function refreshAccountInstrumentOptions(preferredValue=''){
  const selectedJournal=$('accountJournal').value;
@@ -8977,6 +9025,9 @@ async function startJournalApplication(){
     showToast('Kontext v3: '+parts.join('; ')+'. Zálohy deníku jsou v safety-backups.');
    }
   }catch(e){showToast('Převod na kontext v3 se nepodařil, deník zůstal beze změny: '+e.message)}
+  // Typ deníku (swing zadání §2): značka do souboru deníku, se zálohou. Selhání nic
+  // neshodí – deník se otevře jako futures a zápis typu se zkusí při dalším otevření.
+  try{await runJournalTypeMigration()}catch(e){showToast('Zápis typu deníku se nepodařil: '+e.message)}
   await load();
   void initNewsCalendar();
  }
@@ -8984,6 +9035,7 @@ async function startJournalApplication(){
 }
 window.addEventListener('journal:authenticated',()=>{void startJournalApplication()},{once:true});
 </script>
+<script src="swing-ui.js"></script>
 <script src="login.js"></script>
 </body>
 </html>

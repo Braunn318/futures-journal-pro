@@ -633,8 +633,15 @@ function readJournal(id) {
     // Značka převodu na kontext v3 (runContextV3Migration v rendereru): jeden
     // seznam hladin místo dvou a odebraná pole. Bez ní by se převod spouštěl
     // při každém otevření deníku.
-    contextVersion: Number(parsed.contextVersion) || 0
+    contextVersion: Number(parsed.contextVersion) || 0,
+    // Typ deníku (docs/ZADANI_SWING_CFD.md §2): FUTURES_INTRADAY / CFD_SWING.
+    // Značka journalTypeVersion = migrace typu proběhla (runJournalTypeMigration).
+    journalType: parsed.journalType === 'CFD_SWING' ? 'CFD_SWING' : (parsed.journalType === 'FUTURES_INTRADAY' ? 'FUTURES_INTRADAY' : undefined),
+    journalTypeVersion: Number(parsed.journalTypeVersion) || 0,
+    // Ručně zadané čekající příkazy (limitky) deníku – záložka Pozice/Příkazy.
+    pendingOrders: Array.isArray(parsed.pendingOrders) ? parsed.pendingOrders : []
   };
+  if (journal.journalType === undefined) delete journal.journalType;
   // Jednorázový přesun starých base64 obrázků do souborů. Proběhne při prvním
   // otevření deníku po aktualizaci a pak už nikdy (podruhé nenajde co
   // převádět). Pořadí je záměrné: obrázky jsou na disku DŘÍV, než se z deníku
@@ -1091,7 +1098,9 @@ function aiDerivedFields(rawTrades, main, mode) {
 function writeAiExportMirror(id, data) {
   try {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
-    const rawTrades = Array.isArray(data?.trades) ? data.trades : [];
+    // Swing obchody (kind SWING) do AI exportu zatím nejdou: Backtest Lab je čte jako futures
+    // a pojistka v Labu přijde se swing exportem (docs/ZADANI_SWING_CFD.md §9, krok 7).
+    const rawTrades = (Array.isArray(data?.trades) ? data.trades : []).filter(t => t?.kind !== 'SWING');
     const mainSettings = (Array.isArray(data?.settings) ? data.settings : []).find(s => s?.key === 'main')?.value || {};
     const derivedOf = aiDerivedFields(rawTrades, mainSettings, aiExportModeOf(id));
     // Kontext v3: export nese vždy nový tvar (nearLevels, bez odebraných
@@ -1111,7 +1120,7 @@ function writeAiExportMirror(id, data) {
     // / S/L vedle obchodů s „Hladinami v blízkosti".
     const taxonomy = FJContext.migrateConfigV3(mainSettings.taxonomy || {});
     const temp = `${aiExportPath(id)}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify({ journalId: id, updatedAt: new Date().toISOString(), taxonomy, trades, dayNotes }, null, 2), 'utf8');
+    fs.writeFileSync(temp, JSON.stringify({ journalId: id, ...(data?.journalType === 'CFD_SWING' ? { journalType: 'CFD_SWING' } : {}), updatedAt: new Date().toISOString(), taxonomy, trades, dayNotes }, null, 2), 'utf8');
     fs.renameSync(temp, aiExportPath(id));
   } catch (error) {
     logError('writeAiExportMirror', error);
@@ -1120,7 +1129,7 @@ function writeAiExportMirror(id, data) {
 // Položka manifestu: id, název a režim deníku (kontext v2) – Lab i export
 // deníku z něj poznají backtest.
 function aiManifestEntry(j) {
-  return { id: j?.id, name: j?.name, mode: j?.backtest === true ? 'BACKTEST' : 'LIVE' };
+  return { id: j?.id, name: j?.name, mode: j?.backtest === true ? 'BACKTEST' : 'LIVE', journalType: j?.journalType === 'CFD_SWING' ? 'CFD_SWING' : 'FUTURES_INTRADAY' };
 }
 ipcMain.handle('data:getAiExportInfo', async () => {
   try { return { ok: true, path: aiExportRoot() }; }
@@ -2925,6 +2934,12 @@ ipcMain.handle('capture:addAccount', async (_event, account) => {
   settings.deletedAccounts = (Array.isArray(settings.deletedAccounts) ? settings.deletedAccounts : []).filter(a => a !== name);
   writeCaptureSettings(settings);
   return { ok: true, account: name };
+});
+// Čekající příkazy z lokálního MCP serveru cTrader Desktop (jen čtení, app/ctrader-mcp.js).
+// Nedostupný cTrader = { available:false }, žádná chyba v protokolu.
+ipcMain.handle('ctraderMcp:pendingOrders', async (_event, url) => {
+  try { return await require('./app/ctrader-mcp.js').fetchPendingOrders(url); }
+  catch (error) { return { available: false, error: error.message }; }
 });
 ipcMain.handle('capture:status', async (_event, journalId) => {
   const settings = readCaptureSettings();

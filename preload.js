@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   deleteJournal: (journalId) => ipcRenderer.invoke('storage:deleteJournal', journalId),
   resetStorage: () => ipcRenderer.invoke('storage:reset'),
   captureStatus: (journalId) => ipcRenderer.invoke('capture:status', journalId),
+  ctraderPendingOrders: (url) => ipcRenderer.invoke('ctraderMcp:pendingOrders', url),
   captureSetActiveJournal: (journalId) => ipcRenderer.invoke('capture:setActiveJournal', journalId),
   captureEvents: (includeImported=false) => ipcRenderer.invoke('capture:events', includeImported),
   captureMarkImported: (ids) => ipcRenderer.invoke('capture:markImported', ids),
