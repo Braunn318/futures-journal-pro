@@ -36,8 +36,8 @@ function fakeServer(handlers) {
   return { fetchImpl, calls };
 }
 
-test('whitelist: jen pět čtecích nástrojů, žádný zápisový', () => {
-  assert.deepEqual([...mcp.ALLOWED_TOOLS].sort(), ['get_accounts_list', 'get_balance', 'get_pending_orders', 'get_positions', 'get_symbol_details']);
+test('whitelist: jen sedm čtecích nástrojů, žádný zápisový', () => {
+  assert.deepEqual([...mcp.ALLOWED_TOOLS].sort(), ['get_account_statistics', 'get_accounts_list', 'get_balance', 'get_order_history', 'get_pending_orders', 'get_positions', 'get_symbol_details']);
   for (const w of WRITE_TOOLS) assert.ok(!mcp.ALLOWED_TOOLS.includes(w), w);
 });
 

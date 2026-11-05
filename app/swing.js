@@ -390,7 +390,151 @@
     return { ...after, importedFields: list.filter(f => same(before[f], after[f])) };
   }
 
+  // ---- synchronizace přes lokální MCP server cTrader Desktop (bez cBota) ----
+  // get_positions = otevřené pozice, get_order_history = jeden řádek za každý zavírací deal
+  // (i částečný) se stejným positionId. Řádek historie nemá id dealu → noha se pozná podle
+  // času, objemu a ceny (shoduje se i s nohou, kterou už zapsal cBot).
+  function sameLeg(a, b) {
+    if (!a || !b) return false;
+    if (a.externalId && b.externalId && a.externalId === b.externalId) return true;
+    const ta = instantOf(a.closedAt), tb = instantOf(b.closedAt);
+    return ta != null && tb != null && Math.abs(ta - tb) <= 60000
+      && Math.abs((num(a.volume) || 0) - (num(b.volume) || 0)) < 1e-6
+      && Math.abs((num(a.price) || 0) - (num(b.price) || 0)) < 1e-9;
+  }
+  // Řádek get_order_history → noha. Rozdíl netProfit − (gross + swap + commission) (u FTMO
+  // poplatek za převod měny P/L) jde do komise (rozhodnutí 2026-11-04) → netto nohy = netProfit.
+  function legFromMcpHistory(row, lotSize) {
+    const volume = lotsOf(row && row.volume, lotSize);
+    if (volume == null) return null;
+    const gross = num(row.grossProfit), swap = num(row.swap) || 0, commission = num(row.commission) || 0, net = num(row.netProfit);
+    const rest = net != null && gross != null ? round(net - gross - swap - commission, 8) : 0;
+    return {
+      closedAt: fromUtcIso(row.closeTime), price: num(row.closePrice), volume, reason: null,
+      pnl: gross != null ? gross : net, swap, commission: round(commission + (rest || 0), 8),
+      externalId: `mcp:${row.positionId}:${row.closeTime}:${row.volume}`, source: 'CTRADER'
+    };
+  }
+  function swingFromMcpPosition(pos) {
+    const pid = 'ctrader-' + pos.id;
+    const t = {
+      id: 'sw_ctrader-' + String(pos.id).replace(/[^A-Za-z0-9_-]/g, '_'), kind: 'SWING', source: 'CTRADER', positionId: pid,
+      symbol: normalizeSymbol(pos.symbolName), direction: String(pos.tradeSide).toLowerCase() === 'sell' ? 'short' : 'long',
+      openedAt: fromUtcIso(pos.openTime), entryPrice: num(pos.entryPrice), volume: num(pos.volumeInLots),
+      volumeUnits: num(pos.volumeInUnits), slInitial: null, slMoves: [], targetsPlanned: [], riskAmount: null, exits: [],
+      swingSetup: '', grade: '', comment: '', images: [],
+      importedFields: ['symbol', 'direction', 'openedAt', 'entryPrice', 'volume']
+    };
+    t.date = swingListDate(t);
+    return t;
+  }
+  function swingFromMcpHistory(row) {
+    const pid = 'ctrader-' + row.positionId;
+    const t = {
+      id: 'sw_ctrader-' + String(row.positionId).replace(/[^A-Za-z0-9_-]/g, '_'), kind: 'SWING', source: 'CTRADER', positionId: pid,
+      symbol: normalizeSymbol(row.symbolName), direction: String(row.side).toLowerCase() === 'sell' ? 'short' : 'long',
+      openedAt: fromUtcIso(row.openTime), entryPrice: num(row.entryPrice), volume: 0, volumeFromLegs: true,
+      slInitial: null, slMoves: [], targetsPlanned: [], riskAmount: null, exits: [],
+      swingSetup: '', grade: '', comment: '', images: [],
+      importedFields: ['symbol', 'direction', 'openedAt', 'entryPrice', 'volume']
+    };
+    t.date = swingListDate(t);
+    return t;
+  }
+  // Přidá nohu, když v obchodu ještě není (stejná noha z cBota se nepřidá podruhé).
+  function addLeg(trade, leg) {
+    const exits = Array.isArray(trade.exits) ? trade.exits : [];
+    if (exits.some(x => sameLeg(x, leg))) return { trade, changed: false };
+    const next = { ...trade, exits: [...exits, leg] };
+    if (next.volumeFromLegs && (next.importedFields || []).includes('volume')) next.volume = round((num(next.volume) || 0) + leg.volume, 8);
+    return { trade: next, changed: true };
+  }
+  // Otevřená pozice zná zbývající objem: celkový objem = zbytek + součet nohou.
+  function reconcileOpenVolume(trade, pos) {
+    if (!(trade.importedFields || []).includes('volume')) return { trade, changed: false };
+    const remaining = num(pos && pos.volumeInLots);
+    if (remaining == null) return { trade, changed: false };
+    const total = round(remaining + exitsVolume(trade), 8);
+    if (num(trade.volume) === total && !trade.volumeFromLegs) return { trade, changed: false };
+    const next = { ...trade, volume: total };
+    delete next.volumeFromLegs;
+    return { trade: next, changed: true };
+  }
+  // Účet vybraný v deníku musí být v cTraderu právě aktivní. Odpovědi MCP číslo účtu nenesou,
+  // aktivní účet se pozná shodou broker + měna + zůstatek s řádkem seznamu účtů; víc shod = nejisté.
+  function mcpActiveAccountCheck(selected, balance, accounts) {
+    if (!selected || !selected.login) return { ok: false, reason: 'NO_ACCOUNT' };
+    if (!balance) return { ok: false, reason: 'NO_BALANCE' };
+    const same = (accounts || []).filter(a => a.brokerTitle === balance.brokerName && a.currency === balance.depositAsset && Number(a.balance) === Number(balance.balance));
+    if (!same.length) return { ok: false, reason: 'UNKNOWN_ACTIVE' };
+    if (same.length > 1) return { ok: false, reason: 'AMBIGUOUS' };
+    return String(same[0].login) === String(selected.login) ? { ok: true } : { ok: false, reason: 'OTHER_ACTIVE', active: same[0] };
+  }
+
+  // Plán synchronizace: z obchodů deníku a dat MCP (positions, history) spočítá nový seznam
+  // obchodů. Čistá funkce – nic nezapisuje. Pozice, ke které existuje ručně zadaný obchod
+  // (findPairCandidate) a ještě není rozhodnuto (opts.decisions: positionId → id obchodu / 'NEW'),
+  // se přeskočí a vrátí v `pairs` – rozhodne uživatel. Idempotentní: druhý běh nic nezmění.
+  function planMcpSync(trades, data, opts = {}) {
+    const decisions = opts.decisions || new Map();
+    const nowLocal = opts.nowLocal || berlinNowLocal();
+    const nowIso = opts.nowIso || new Date().toISOString();
+    const fromMs = opts.importFrom ? Date.parse(opts.importFrom + 'T00:00:00Z') : null;
+    const tooOld = iso => fromMs != null && Number.isFinite(Date.parse(iso || '')) && Date.parse(iso) < fromMs;
+    const rows = [...(trades || [])];
+    const byPid = new Map();
+    rows.forEach((t, i) => { if (isSwingRecord(t) && t.positionId) byPid.set(t.positionId, i); });
+    const open = new Map((data.positions || []).map(p => ['ctrader-' + p.id, p]));
+    const hist = new Map();
+    for (const h of data.history || []) {
+      const pid = 'ctrader-' + h.positionId;
+      if (!hist.has(pid)) hist.set(pid, []);
+      hist.get(pid).push(h);
+    }
+    const out = { trades: rows, created: 0, updated: 0, missingLot: new Set(), pairs: [], skippedOld: 0 };
+    for (const pid of new Set([...open.keys(), ...hist.keys()])) {
+      const pos = open.get(pid) || null;
+      const legsRows = (hist.get(pid) || []).slice().sort((a, b) => String(a.closeTime).localeCompare(String(b.closeTime)));
+      let idx = byPid.has(pid) ? byPid.get(pid) : -1;
+      if (idx < 0 && tooOld(pos ? pos.openTime : legsRows[0] && legsRows[0].openTime)) { out.skippedOld++; continue; }
+      let t = idx >= 0 ? rows[idx] : null;
+      const before = JSON.stringify(t);
+      if (!t) {
+        const draft = pos ? swingFromMcpPosition(pos) : swingFromMcpHistory(legsRows[0]);
+        const dec = decisions.get(pid);
+        const cand = dec && dec !== 'NEW' ? rows.find(x => x && x.id === dec && !x.positionId) : (dec === 'NEW' ? null : findPairCandidate(rows, draft));
+        if (cand && !dec) { out.pairs.push({ positionId: pid, candidateId: cand.id, draft }); continue; }
+        if (cand) { idx = rows.indexOf(cand); t = mergeImported({ ...cand, positionId: pid }, draft); }
+        else { t = { ...draft, createdAt: nowIso }; if (rows.some(x => x && x.id === t.id)) t.id += '_' + nowIso.replace(/\D/g, '').slice(-8); }
+      } else if (pos) {
+        t = mergeImported(t, swingFromMcpPosition(pos));
+      }
+      for (const h of legsRows) {
+        const lot = opts.lotSizeOf ? opts.lotSizeOf(normalizeSymbol(h.symbolName), pos) : null;
+        if (!lot) { out.missingLot.add(normalizeSymbol(h.symbolName)); continue; }
+        const leg = legFromMcpHistory(h, lot);
+        if (leg) t = addLeg(t, leg).trade;
+      }
+      if (pos) {
+        t = reconcileOpenVolume(t, pos).trade;
+        t = applyMcpPosition(t, pos, nowLocal).trade;
+      } else if ((t.exits || []).length && (t.importedFields || []).includes('volume')) {
+        // pozice už není otevřená → celý objem = součet nohou
+        const total = round(exitsVolume(t), 8);
+        if (num(t.volume) !== total || t.volumeFromLegs) { t = { ...t, volume: total }; delete t.volumeFromLegs; }
+      }
+      // nová pozice jen z historie, ze které nešla přidat žádná noha (neznámý lot) → nezakládat
+      if (idx < 0 && !pos && !(t.exits || []).length) continue;
+      if (JSON.stringify(t) === before) continue;
+      t = { ...t, updatedAt: nowIso };
+      if (idx >= 0) { rows[idx] = t; if (before === 'null') out.created++; else out.updated++; }
+      else { rows.push(t); byPid.set(pid, rows.length - 1); out.created++; }
+    }
+    return out;
+  }
+
   return {
+    planMcpSync, sameLeg, legFromMcpHistory, swingFromMcpPosition, swingFromMcpHistory, addLeg, reconcileOpenVolume, mcpActiveAccountCheck,
     IMPORT_FIELDS, swingFromCtraderEvent, mergeImported, applyCtraderClose, findPairCandidate, applyMcpPosition, dropEditedImportedFields,
     JOURNAL_TYPES, JOURNAL_TYPE_VERSION, JOURNAL_TYPE_LABELS, journalTypeOf, isSwingType, isSwingRecord,
     DEFAULT_CFD_INSTRUMENTS, ASSET_CLASSES, CURRENCIES, instrumentsOf, findInstrument, sanitizeInstrument, normalizeSymbol,

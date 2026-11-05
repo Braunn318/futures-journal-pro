@@ -2951,6 +2951,10 @@ ipcMain.handle('ctraderMcp:positions', async (_event, url) => {
   try { return await require('./app/ctrader-mcp.js').fetchPositions(url); }
   catch (error) { return { available: false, error: error.message }; }
 });
+ipcMain.handle('ctraderMcp:syncData', async (_event, url) => {
+  try { return await require('./app/ctrader-mcp.js').fetchSyncData(url); }
+  catch (error) { return { available: false, error: error.message }; }
+});
 ipcMain.handle('ctraderMcp:symbolDetails', async (_event, url, symbol) => {
   try { return await require('./app/ctrader-mcp.js').fetchSymbolDetails(url, symbol); }
   catch (error) { return { available: false, error: error.message }; }

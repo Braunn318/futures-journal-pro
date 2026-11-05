@@ -8,5 +8,7 @@ module.exports = Object.freeze([
   'get_balance',
   'get_accounts_list',
   'get_positions',
-  'get_symbol_details'
+  'get_symbol_details',
+  'get_order_history',
+  'get_account_statistics'
 ]);

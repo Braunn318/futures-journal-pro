@@ -115,6 +115,7 @@ function applyJournalTypeUi(){
  const riskCard=$('riskMaxDailyDrawdown')?.closest('.card');if(riskCard)riskCard.classList.add('futures-only');
  const note=$('swingOverviewNote');if(note)note.style.display=swing?'':'none';
  renderSwingSettings();
+ if(swing&&!swingMcpFirstSyncDone){swingMcpFirstSyncDone=true;setTimeout(()=>void syncSwingFromMcp(),1500)}
 }
 
 // ---------- formát ----------
@@ -250,7 +251,7 @@ async function refreshMcpOrders(){
   mcpState=r?.available?{available:true,orders:(r.orders||[]).map(FJSwing.pendingFromMcp).filter(Boolean),account:r.account||null,fetchedAt:r.fetchedAt}:{available:false,orders:[],account:null,fetchedAt:null,error:r?.error||null};
  }catch{mcpState={available:false,orders:[],account:null,fetchedAt:null}}
  renderPendingOrders();
- if(mcpState.available)try{await syncSwingPositionsFromMcp()}catch(e){console.warn('Synchronizace SL z cTraderu:',e)}
+ if(mcpState.available)try{await syncSwingFromMcp()}catch(e){console.warn('Synchronizace z cTraderu:',e)}
 }
 function positionsTabOpen(){return $('openPositions')?.classList.contains('active')}
 function startMcpPolling(){
@@ -617,7 +618,16 @@ function renderSwingSettings(){
  if(card){
   const list=swingInstruments();
   card.innerHTML=`<h2>Swing · CFD</h2>
-   <div class="field" style="max-width:240px"><label>Měna účtu</label><select id="swingCurrencySelect">${FJSwing.CURRENCIES.map(c=>`<option ${c===swingCurrency()?'selected':''}>${c}</option>`).join('')}</select><div class="sub">Peníze se do swing deníku opisují z výpisu brokera v této měně.</div></div>
+   <h3 style="margin-top:6px">Import z cTraderu (MCP)</h3>
+   <div class="sub">Otevřené pozice a provedené obchody se načítají přímo z běžícího cTrader Desktopu (MCP server, jen čtení) – cBot není potřeba. Vyber účet cTraderu, který patří tomuto deníku; synchronizuje se, jen když je v cTraderu aktivní právě on. Historie: v cTraderu nastav TradeWatch → History na „All“.</div>
+   <div class="swing-row" style="margin-top:8px">
+    <div class="field" style="min-width:280px"><label>Účet cTraderu</label><select id="swingMcpAccountSelect"><option value="">${esc(settings.ctraderMcpAccount?accountLabel(settings.ctraderMcpAccount):'— načti účty —')}</option></select></div>
+    <div class="field"><label>Importovat obchody od</label><input type="date" id="swingImportFrom" value="${esc(settings.ctraderImportFrom||'')}" title="Prázdné = vše, co cTrader v historii má načtené"></div>
+    <button class="btn" type="button" id="swingMcpLoadAccounts">Načíst účty</button>
+    <button class="btn primary" type="button" id="swingMcpSyncNow">Synchronizovat teď</button>
+   </div>
+   <div class="sub" id="swingMcpAccountInfo" style="margin-top:6px"></div>
+   <div class="field" style="max-width:240px;margin-top:12px"><label>Měna účtu</label><select id="swingCurrencySelect">${FJSwing.CURRENCIES.map(c=>`<option ${c===swingCurrency()?'selected':''}>${c}</option>`).join('')}</select><div class="sub">Peníze se do swing deníku opisují z výpisu brokera v této měně.</div></div>
    <h3 style="margin-top:14px">CFD instrumenty</h3>
    <div class="sub">Pip size stačí na pipy a R z cen; hodnota pipu ani ticku se nezadává. Velikost lotu (jednotek v 1 lotu) potřebuje jen import z cTraderu – objem posílá v jednotkách. Výchozí řádky jdou upravit; nic se nemaže.</div>
    <div class="table-scroll" style="margin-top:8px"><table><thead><tr><th>Symbol</th><th>Pip size</th><th>Desetinná místa</th><th>Lot (jednotek)</th><th>Třída</th><th>Base</th><th>Quote</th><th></th></tr></thead><tbody>
@@ -637,6 +647,16 @@ function renderSwingSettings(){
     <button class="btn" type="button" id="cfdAdd">＋ Přidat</button>
    </div>`;
   $('swingCurrencySelect').onchange=e=>void persistSettings({swingCurrency:e.target.value});
+  $('swingMcpAccountSelect').onchange=async e=>{
+   const a=(swingMcpLast?.accounts||[]).find(x=>String(x.login)===e.target.value);
+   await persistSettings({ctraderMcpAccount:a?{login:String(a.login),broker:a.brokerTitle||'',brokerTitle:a.brokerTitle||'',currency:a.currency||'',isLive:a.isLive!==false}:null});
+   renderSwingMcpStatus();
+   if(a)void syncSwingFromMcp({manual:true});
+  };
+  $('swingImportFrom').onchange=e=>void persistSettings({ctraderImportFrom:e.target.value||''});
+  $('swingMcpLoadAccounts').onclick=async()=>{await syncSwingFromMcp({manual:false});if(!swingMcpLast?.accounts?.length)showToast(swingMcpLast?.message||'cTrader neodpovídá.');renderSwingMcpStatus()};
+  $('swingMcpSyncNow').onclick=()=>void syncSwingFromMcp({manual:true});
+  renderSwingMcpStatus();
   const upsert=async row=>{
    const i=FJSwing.sanitizeInstrument(row);if(!i)return;
    const stored=(Array.isArray(settings.cfdInstruments)?settings.cfdInstruments:[]).filter(x=>FJSwing.normalizeSymbol(x?.symbol)!==i.symbol);
@@ -770,36 +790,110 @@ async function importSwingCtraderEventNow(journalId,e){
  }
  return 'done';
 }
-// SL / TP otevřených swing pozic z cTrader MCP (get_positions). Zápis jen při změně,
-// před prvním zápisem v sezení záloha deníku.
+// Synchronizace swing deníku přímo z cTrader Desktopu přes MCP (bez cBota): otevřené pozice
+// (get_positions, se SL / TP) a provedené obchody (get_order_history, každé uzavření = noha).
+// Jen pro aktivní swing deník a jen když je v cTraderu aktivní účet vybraný v deníku
+// (odpovědi číslo účtu nenesou). Výpočet je FJSwing.planMcpSync; zápis jen při změně, před
+// prvním zápisem v sezení záloha deníku. Ruční obchod odpovídající pozici se spáruje jen po potvrzení.
 let swingSyncBackedUp=false;
-async function syncSwingPositionsFromMcp(){
+let swingMcpSyncBusy=false;
+let swingMcpLast=null; // { at, ok, message, accounts, active }
+let swingMcpFirstSyncDone=false;
+const MCP_ACCOUNT_REASON={
+ NO_ACCOUNT:'Vyber v Nastavení → Swing · CFD, který účet cTraderu patří tomuto deníku.',
+ NO_BALANCE:'cTrader nevrátil údaje o účtu.',
+ UNKNOWN_ACTIVE:'Aktivní účet v cTraderu nejde poznat.',
+ AMBIGUOUS:'Aktivní účet v cTraderu nejde jednoznačně poznat (víc účtů se stejným brokerem, měnou a zůstatkem).',
+ OTHER_ACTIVE:'V cTraderu je aktivní jiný účet, než který patří tomuto deníku – přepni účet v cTraderu.'
+};
+function accountLabel(a){return a?`${a.brokerTitle||a.broker||'?'} · ${a.login} · ${a.currency||''}${a.isLive===false?' · demo':''}`:'—'}
+async function syncSwingFromMcp({manual=false}={}){
+ if(swingMcpSyncBusy||!isSwingJournalActive())return null;
  const s=mcpSettings();
- if(!s.enabled||!isSwingJournalActive()||!window.desktopAPI?.ctraderPositions)return 0;
- const open=swingOpenPositions().filter(t=>t.positionId&&String(t.positionId).startsWith('ctrader-'));
- if(!open.length)return 0;
- const r=await window.desktopAPI.ctraderPositions(s.url);
- if(!r?.available)return 0;
- const byId=new Map((r.positions||[]).map(p=>['ctrader-'+p.id,p]));
- const now=FJSwing.berlinNowLocal();
- const updates=new Map();
- for(const t of open){const p=byId.get(t.positionId);if(!p)continue;const res=FJSwing.applyMcpPosition(t,p,now);if(res.changed)updates.set(t.id,res.trade)}
- if(!updates.size)return 0;
- if(!swingSyncBackedUp){
-  const b=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-synchronizaci-ctrader');
-  if(!b||b.ok!==true)return 0;
-  swingSyncBackedUp=true;
+ if(!s.enabled||!window.desktopAPI?.ctraderSyncData){
+  swingMcpLast={at:new Date().toISOString(),ok:false,message:'Import z cTraderu přes MCP je vypnutý (Integrace → cTrader → „Limitky z cTraderu přes MCP“).'};
+  renderSwingMcpStatus();if(manual)showToast(swingMcpLast.message);return null;
  }
- await commitJournal(j=>{j.trades=(j.trades||[]).map(t=>{const u=updates.get(t?.id);return u?{...u,updatedAt:new Date().toISOString()}:t})});
- await load();
- return updates.size;
+ swingMcpSyncBusy=true;
+ try{
+  const r=await window.desktopAPI.ctraderSyncData(s.url);
+  if(!r?.available){swingMcpLast={at:new Date().toISOString(),ok:false,message:'cTrader nevypadá spuštěný (MCP server neodpovídá).'};return null}
+  const check=FJSwing.mcpActiveAccountCheck(settings.ctraderMcpAccount,r.balance,r.accounts);
+  const active=(r.accounts||[]).find(a=>a.brokerTitle===r.balance?.brokerName&&a.currency===r.balance?.depositAsset&&Number(a.balance)===Number(r.balance?.balance))||null;
+  if(!check.ok){
+   swingMcpLast={at:new Date().toISOString(),ok:false,message:MCP_ACCOUNT_REASON[check.reason]||'Účet nesouhlasí.',accounts:r.accounts,active};
+   if(manual)showToast(swingMcpLast.message);
+   return null;
+  }
+  // velikost lotu: tabulka CFD instrumentů → otevřená pozice → detail symbolu z cTraderu (uloží se do tabulky)
+  const lots=new Map();
+  for(const p of r.positions||[])if(Number(p.lotSize)>0)lots.set(FJSwing.normalizeSymbol(p.symbolName),Number(p.lotSize));
+  const need=new Set((r.history||[]).map(h=>FJSwing.normalizeSymbol(h.symbolName)).filter(sym=>!swingInstrumentOf(sym)?.lotSize&&!lots.has(sym)));
+  const added=[];
+  for(const sym of need){
+   const d=await window.desktopAPI.ctraderSymbolDetails?.(s.url,sym);
+   const lot=Number(d?.details?.lotSize);
+   if(d?.available&&lot>0){lots.set(sym,lot);const inst=swingInstrumentOf(sym);added.push({symbol:sym,lotSize:lot,pipSize:inst?.pipSize??(Number(d.details.pipSize)||null),priceDecimals:inst?.priceDecimals??(Number.isFinite(Number(d.details.digits))?Number(d.details.digits):null),assetClass:inst?.assetClass||'OTHER',baseCcy:inst?.baseCcy||'',quoteCcy:inst?.quoteCcy||''})}
+  }
+  if(added.length){
+   const stored=(Array.isArray(settings.cfdInstruments)?settings.cfdInstruments:[]).filter(x=>!added.some(a=>a.symbol===FJSwing.normalizeSymbol(x?.symbol)));
+   await persistSettings({cfdInstruments:[...stored,...added]});
+  }
+  const opts=()=>({lotSizeOf:(sym,pos)=>swingInstrumentOf(sym)?.lotSize||(pos&&Number(pos.lotSize)>0?Number(pos.lotSize):null)||lots.get(sym)||null,
+   importFrom:settings.ctraderImportFrom||'',decisions:swingPairDecisions,nowLocal:FJSwing.berlinNowLocal(),nowIso:new Date().toISOString()});
+  let plan=FJSwing.planMcpSync(db.data.trades||[],r,opts());
+  for(const p of plan.pairs){
+   const cand=(db.data.trades||[]).find(t=>t.id===p.candidateId);
+   const ok=await showConfirm(`Z cTraderu přišla pozice ${p.draft.symbol} ${p.draft.direction==='short'?'SHORT':'LONG'} otevřená ${String(p.draft.openedAt||'').replace('T',' ')}.\nV deníku je ručně zadaný obchod ${cand?.symbol||''} z ${String(cand?.openedAt||'').replace('T',' ')}, který jí nejspíš odpovídá.\n\nSpárovat = k ručnímu obchodu se doplní jen prázdná pole a výstupy z cTraderu. Založit nový = vznikne druhý obchod.`,{title:'Spárovat obchod z cTraderu',ok:'Spárovat',cancel:'Založit nový'});
+   swingPairDecisions.set(p.positionId,ok?p.candidateId:'NEW');
+  }
+  plan=FJSwing.planMcpSync(db.data.trades||[],r,opts());
+  const missing=[...plan.missingLot];
+  for(const sym of missing)swingImportWaiting.set(sym,(swingImportWaiting.get(sym)||0)+1);
+  const incomplete=r.stats&&Number(r.stats.totalTrades)>(r.history||[]).length;
+  let result={created:0,updated:0};
+  if(plan.created||plan.updated){
+   if(!swingSyncBackedUp){
+    const b=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-synchronizaci-ctrader');
+    if(!b||b.ok!==true){swingMcpLast={at:new Date().toISOString(),ok:false,message:'Zálohu deníku před synchronizací nejde vytvořit – nic se nezapsalo.'};return null}
+    swingSyncBackedUp=true;
+   }
+   result=await commitJournal(j=>{const p=FJSwing.planMcpSync(j.trades||[],r,opts());j.trades=p.trades;return {created:p.created,updated:p.updated}});
+  }
+  swingMcpLast={at:new Date().toISOString(),ok:true,accounts:r.accounts,active,
+   message:`cTrader: nové ${result.created} · aktualizované ${result.updated} · otevřené pozice ${(r.positions||[]).length} · uzavření v historii ${(r.history||[]).length}${missing.length?` · čeká (chybí velikost lotu): ${missing.join(', ')}`:''}${incomplete?' · historie v cTraderu je neúplná – v TradeWatch → History nastav období „All“':''}`};
+  if(result.created||result.updated)await load();
+  if(manual||result.created||result.updated)showToast(swingMcpLast.message);
+  return result;
+ }catch(e){
+  swingMcpLast={at:new Date().toISOString(),ok:false,message:'Synchronizace z cTraderu selhala: '+e.message};
+  return null;
+ }finally{
+  swingMcpSyncBusy=false;
+  renderSwingMcpStatus();
+ }
+}
+function renderSwingMcpStatus(){
+ const el=$('swingMcpStatus');
+ if(el)el.innerHTML=swingMcpLast?`<span class="${swingMcpLast.ok?'':'neg'}">${esc(swingMcpLast.message)}</span> <span class="sub">(${new Date(swingMcpLast.at).toLocaleTimeString('cs-CZ')})</span>`:'';
+ const acc=$('swingMcpAccountInfo');
+ if(acc){
+  const sel=settings.ctraderMcpAccount;
+  acc.innerHTML=`Vybraný účet: <b>${esc(sel?accountLabel(sel):'žádný')}</b>${swingMcpLast?.active?` · v cTraderu je teď aktivní ${esc(accountLabel(swingMcpLast.active))}`:''}`;
+ }
+ const pick=$('swingMcpAccountSelect');
+ if(pick&&swingMcpLast?.accounts?.length){
+  const sel=settings.ctraderMcpAccount;
+  pick.innerHTML='<option value="">— vyber účet —</option>'+swingMcpLast.accounts.map(a=>`<option value="${esc(String(a.login))}" ${sel&&String(sel.login)===String(a.login)?'selected':''}>${esc(accountLabel(a))}</option>`).join('');
+ }
+ renderSwingImportNotice();
 }
 function renderSwingImportNotice(){
  const box=$('swingImportNotice');
  if(!box)return;
  const waiting=[...swingImportWaiting.entries()];
  box.style.display=waiting.length?'':'none';
- box.textContent=waiting.length?`Obchody z cTraderu čekají na import – doplň velikost lotu (jednotek v 1 lotu) pro ${waiting.map(([s,n])=>`${s} (${n})`).join(', ')} v Nastavení → Swing · CFD, nebo zapni limitky z cTraderu přes MCP (velikost lotu se pak doplní sama).`:'';
+ box.textContent=waiting.length?`Obchody z cTraderu čekají na import – doplň velikost lotu (jednotek v 1 lotu) pro ${waiting.map(([s,n])=>`${s} (${n})`).join(', ')} v Nastavení → Swing · CFD (s cTraderem přes MCP se doplní sama).`:'';
 }
 
 // ---------- napojení na hlavní skript ----------
@@ -810,4 +904,6 @@ function renderSwingImportNotice(){
  $('addManualOrderBtn')?.addEventListener('click',()=>openOrderModal(null));
  $('addSwingPositionBtn')?.addEventListener('click',()=>openSwingModal(null));
  $('refreshOrdersBtn')?.addEventListener('click',()=>void refreshMcpOrders());
+ $('swingSyncNowBtn')?.addEventListener('click',()=>void syncSwingFromMcp({manual:true}));
+ setInterval(()=>{if(isSwingJournalActive()&&mcpSettings().enabled)void syncSwingFromMcp()},5*60*1000);
 })();

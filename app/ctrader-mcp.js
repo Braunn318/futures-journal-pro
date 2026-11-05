@@ -125,4 +125,28 @@ async function fetchSymbolDetails(url, symbol, opts) {
   return r.available ? { available: true, details: r.data || null } : r;
 }
 
-module.exports = { DEFAULT_URL, ALLOWED_TOOLS, createClient, fetchPendingOrders, fetchPositions, fetchSymbolDetails, parseResult, checkUrl, assertAllowed };
+// Všechno pro synchronizaci swing deníku v jedné relaci: aktivní účet (zůstatek, broker, měna),
+// seznam účtů, otevřené pozice, historie obchodů a statistika účtu (kontrola úplnosti historie).
+async function fetchSyncData(url, opts) {
+  let client;
+  try { client = createClient(url, opts); } catch (e) { return { available: false, error: e.message }; }
+  try {
+    const balance = await client.call('get_balance');
+    const accounts = await client.call('get_accounts_list');
+    const positions = await client.call('get_positions');
+    const history = await client.call('get_order_history');
+    const stats = await client.call('get_account_statistics').catch(() => null);
+    return {
+      available: true, fetchedAt: new Date().toISOString(), balance: balance || null,
+      accounts: Array.isArray(accounts && accounts.accounts) ? accounts.accounts : [],
+      positions: Array.isArray(positions && positions.positions) ? positions.positions : [],
+      history: Array.isArray(history && history.trades) ? history.trades : [],
+      stats: stats || null
+    };
+  } catch (e) {
+    const offline = /fetch failed|ECONNREFUSED|timeout|aborted/i.test(String(e && (e.cause && e.cause.code) || e.message));
+    return { available: false, error: offline ? null : e.message };
+  } finally { await client.close(); }
+}
+
+module.exports = { DEFAULT_URL, ALLOWED_TOOLS, createClient, fetchPendingOrders, fetchPositions, fetchSymbolDetails, fetchSyncData, parseResult, checkUrl, assertAllowed };

@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   captureStatus: (journalId) => ipcRenderer.invoke('capture:status', journalId),
   ctraderPendingOrders: (url) => ipcRenderer.invoke('ctraderMcp:pendingOrders', url),
   ctraderPositions: (url) => ipcRenderer.invoke('ctraderMcp:positions', url),
+  ctraderSyncData: (url) => ipcRenderer.invoke('ctraderMcp:syncData', url),
   ctraderSymbolDetails: (url, symbol) => ipcRenderer.invoke('ctraderMcp:symbolDetails', url, symbol),
   captureSetActiveJournal: (journalId) => ipcRenderer.invoke('capture:setActiveJournal', journalId),
   captureEvents: (includeImported=false) => ipcRenderer.invoke('capture:events', includeImported),

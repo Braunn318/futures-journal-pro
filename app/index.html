@@ -558,11 +558,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div>
             <h2>Pozice</h2>
             <p class="sub futures-only">Aktuálně otevřené pozice zachycené z konektorů (NinjaTrader, cTrader cBot).</p>
-            <p class="sub swing-only">Otevřené swing pozice – zadané ručně a importované z cTraderu (cBot); SL a TP doplní cTrader přes MCP. Přidat výstup, posunout SL.</p>
+            <p class="sub swing-only">Otevřené swing pozice – zadané ručně a načtené z cTraderu (MCP nebo cBot), se SL a TP z cTraderu. Přidat výstup, posunout SL.</p>
           </div>
           <button class="btn danger futures-only" id="clearInvalidPositions">Vymazat neplatné pozice</button>
-          <button class="btn primary swing-only" id="addSwingPositionBtn">＋ Otevřít pozici</button>
+          <span class="swing-only" style="display:flex;gap:8px;align-items:flex-start"><button class="btn" id="swingSyncNowBtn" title="Načte otevřené pozice a provedené obchody z běžícího cTraderu (MCP)">↻ Z cTraderu</button><button class="btn primary" id="addSwingPositionBtn">＋ Otevřít pozici</button></span>
         </div>
+        <div class="sub swing-only" id="swingMcpStatus" style="margin-top:8px"></div>
         <div class="alert swing-only" id="swingImportNotice" style="display:none;margin-top:12px"></div>
         <div class="table-scroll swing-only" style="margin-top:16px">
           <table>
@@ -1346,7 +1347,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     <div class="modalhead"><h2 id="journalNameModalTitle">Nový deník</h2><button class="icon" id="closeJournalNameModal">✕</button></div>
     <div class="field"><label id="journalNameLabel">Název deníku</label><input id="journalNameInput" maxlength="60" placeholder="Např. NQ, ES nebo GC"></div>
     <div class="field"><label for="journalMode">Režim deníku</label><select id="journalMode"><option value="LIVE">Živý</option><option value="BACKTEST">Backtest</option></select><div class="sub">Živý: bez „Naživo bych to vzal?“. Backtest: bez stavu „vědomě vynechán“. Jde změnit i v Nastavení → Obecné → Deníky.</div></div>
-    <div class="field"><label for="journalTypeSelect">Typ deníku</label><select id="journalTypeSelect"><option value="FUTURES_INTRADAY">Futures intraday</option><option value="CFD_SWING">Swing · CFD</option></select><div class="sub">Swing · CFD: obchod trvá dny a končí po částech, R se počítá z cen. Obchody z cTraderu se importují z cTrader cBota (účet přiřaď deníku v Integrace), SL a TP doplní cTrader přes MCP; NinjaTrader se pro swing nepoužívá. Bez intraday risk modulu. Změna typu nemění data obchodů.</div></div>
+    <div class="field"><label for="journalTypeSelect">Typ deníku</label><select id="journalTypeSelect"><option value="FUTURES_INTRADAY">Futures intraday</option><option value="CFD_SWING">Swing · CFD</option></select><div class="sub">Swing · CFD: obchod trvá dny a končí po částech, R se počítá z cen. Otevřené pozice a obchody z cTraderu se načítají přes cTrader MCP (účet vybereš v Nastavení → Swing · CFD) nebo z cTrader cBota; NinjaTrader se pro swing nepoužívá. Bez intraday risk modulu. Změna typu nemění data obchodů.</div></div>
     <div id="journalNameError" class="alert red"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="btn" id="cancelJournalName">Zrušit</button>
