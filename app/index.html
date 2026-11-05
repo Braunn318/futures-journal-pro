@@ -565,10 +565,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         </div>
         <div class="sub swing-only" id="swingMcpStatus" style="margin-top:8px"></div>
         <div class="alert swing-only" id="swingImportNotice" style="display:none;margin-top:12px"></div>
+        <div class="swing-only" id="swingOpenPnl" style="display:none;margin-top:10px"></div>
         <div class="table-scroll swing-only" style="margin-top:16px">
           <table>
-            <thead><tr><th>Symbol</th><th>Směr</th><th>Otevřeno · věk</th><th>Vstup</th><th>SL při otevření</th><th>Objem</th><th>Riziko</th><th></th></tr></thead>
-            <tbody id="swingOpenPositions"><tr><td colspan="8" class="sub">Žádná otevřená swing pozice.</td></tr></tbody>
+            <thead><tr><th>Symbol</th><th>Směr</th><th>Otevřeno · věk</th><th>Vstup</th><th>SL při otevření</th><th>Objem</th><th>Riziko</th><th>Aktuální cena</th><th>Zisk / ztráta</th><th></th></tr></thead>
+            <tbody id="swingOpenPositions"><tr><td colspan="10" class="sub">Žádná otevřená swing pozice.</td></tr></tbody>
           </table>
         </div>
         <div class="table-scroll futures-only" style="margin-top:16px">
@@ -597,7 +598,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     </section>
 
     <section id="accountOverview" class="section active">
-      <div class="alert" id="swingOverviewNote" style="display:none;margin-bottom:12px">Swing · CFD deník: obchody najdeš v Deníku, otevřené pozice a limitky v záložce Pozice/Příkazy. Statistiky, equity a kalendář swingu (P/L podle dne výstupu) přijdou v další verzi – přehled níže zatím swing obchody nepočítá.</div>
+      <div class="alert" id="swingOverviewNote" style="display:none;margin-bottom:12px">Swing · CFD deník: statistiky počítají uzavřené obchody (podle dne posledního výstupu), equity, P/L za období a Kalendář dávají realizované P/L do dne každé nohy výstupu. Otevřené pozice s okamžitým P/L jsou v záložce Pozice/Příkazy. Počáteční stav účtu nastav v Nastavení → Obecné.</div>
 
       <div class="subtab-bar">
         <button class="active" data-subtab="dashOverview">Přehled</button>
@@ -3216,11 +3217,13 @@ function renderDashboard(rows=trades,setups=setupRecords){
  renderTopInstruments(safeRows);
  renderTradeStatsTable(stats);
  if(typeof renderMovementStats==='function')renderMovementStats(safeRows);
- renderPeriodStats(safeRows);
+ // Swing obchod rozloží realizované P/L do dnů svých nohou (futures řádky beze změny).
+ const pnlRows=safeRows.flatMap(r=>r.swingLegRows||[r]);
+ renderPeriodStats(pnlRows);
  if($('gaugeWinrate'))renderGauges(stats);
  if($('histChart'))drawHistogram(safeRows);
- if($('equityChart'))drawEquityRows(safeRows);
- if($('weeklyChart'))drawWeeklyCurve(safeRows);
+ if($('equityChart'))drawEquityRows(pnlRows);
+ if($('weeklyChart'))drawWeeklyCurve(pnlRows);
  const today=new Date().toISOString().slice(0,10);
  const {violations,achievements}=evaluateDayRisk(today, computeDrawdownByDate());
  const alertBox=$('limitAlert');
@@ -4474,6 +4477,7 @@ function tradeTotalPoints(t){
  return Math.abs(Number(t.points||0))*(Number(t.contracts)||1);
 }
 function tradeHTML(t){
+ if(t?.sourceKind==='SWING'&&typeof swingOverviewRowHTML==='function')return swingOverviewRowHTML(t);
  const m=resultMeta(t.result);
  // Obsah skryté karty formuláře (Nastavení → Přizpůsobení) se neukazuje ani tady.
  const shown=key=>typeof tradeCardShown!=='function'||tradeCardShown(key);
@@ -4811,12 +4815,12 @@ let calendarAllTrades=null;
 async function loadCalendarAllTrades(){
  if(calendarAllTrades)return calendarAllTrades;
  calendarAllTrades=[];
- for(const p of visibleJournalProfiles())calendarAllTrades.push(...await readTradesForOverview(p));
+ for(const p of visibleJournalProfiles())calendarAllTrades.push(...await readTradesForOverview(p,{swing:'legs'}));
  return calendarAllTrades;
 }
 function getCalendarRows(){
  const scope=$('calendarJournal')?.value||'';
- if(!scope)return performanceRecords(trades); // Aktivní deník – přesně dosavadní chování
+ if(!scope)return performanceRecords((typeof isSwingJournalActive==='function'&&isSwingJournalActive()&&typeof swingActiveLegRows==='function')?swingActiveLegRows():trades); // Aktivní deník – futures přesně dosavadní chování; swing deník = nohy podle dne výstupu
  if(scope==='all')return performanceRecords(calendarAllTrades);
  return performanceRecords(calendarAllTrades).filter(t=>t.journalId===scope);
 }
@@ -4843,7 +4847,7 @@ function renderCalendar(){
  // Přepínače „včetně …" podle režimu deníků, které kalendář ukazuje.
  // Testy načítají renderCalendar bez těchto pomocníků – proto typeof.
  if(typeof refreshIncludeToggles==='function'){
-  const scopeRows=!scope?trades:(scope==='all'?(calendarAllTrades||[]):(calendarAllTrades||[]).filter(t=>t.journalId===scope));
+  const scopeRows=!scope?((typeof isSwingJournalActive==='function'&&isSwingJournalActive()&&typeof swingActiveLegRows==='function')?swingActiveLegRows():trades):(scope==='all'?(calendarAllTrades||[]):(calendarAllTrades||[]).filter(t=>t.journalId===scope));
   const scopeIds=!scope?[activeJournalId]:(scope==='all'?visibleJournalProfiles().map(j=>j.id):[scope]);
   refreshIncludeToggles('calendar',includeJournalsFor(scopeRows,scopeIds));
  }
@@ -4994,7 +4998,7 @@ window.showDay=date=>{
  if(typeof renderDayNewsBox==='function')renderDayNewsBox(date,$('dayNewsBox'));
  const scope=$('calendarJournal')?.value||'';
  const rows=getCalendarRows();
- const showRisk=!scope;
+ const showRisk=!scope&&!(typeof isSwingJournalActive==='function'&&isSwingJournalActive());
  const noteBox=$('dayRiskNote');
  if(noteBox){
   if(!showRisk){noteBox.className='alert';noteBox.textContent=''}
@@ -5005,7 +5009,7 @@ window.showDay=date=>{
    else{noteBox.className='alert';noteBox.textContent=''}
   }
  }
- const dayRows=rows.filter(t=>t.date===date).sort((a,b)=>a.entryTime.localeCompare(b.entryTime));
+ const dayRows=rows.filter(t=>t.date===date).sort((a,b)=>String(a.entryTime||'').localeCompare(String(b.entryTime||'')));
  $('dayTrades').innerHTML=dayRows.length?`<button class="btn primary" onclick="goToJournalForDate('${date}')" style="margin-bottom:12px">📒 Otevřít tento den v Deníku</button>`+dayRows.map(tradeHTML).join(''):'<div class="sub">Tento den zatím nemá obchody.</div>';
 };
 // Okno „☀ Kontext dne“ v Deníku: den nemusí mít obchody – ranní kontext se
@@ -8735,12 +8739,20 @@ setTimeout(refreshCaptureStatus,800);
 
 
 let overviewAllTrades=[];
-async function readTradesForOverview(profile){
+async function readTradesForOverview(profile,opts={}){
  const result=await window.desktopAPI.readJournal(profile.id);
  if(!result?.ok)throw new Error(result?.error||`Deník ${profile.name} nelze načíst.`);
  const rows=Array.isArray(result.data?.trades)?result.data.trades:[];
- // Swing obchody do futures přehledu ani kalendáře nepatří (swing zadání §0.1; krok 5).
- return rows.filter(t=>t?.kind!=='SWING').map(t=>({...t,journalId:profile.id,journalName:profile.name}));
+ const futures=rows.filter(t=>t?.kind!=='SWING').map(t=>({...t,journalId:profile.id,journalName:profile.name}));
+ // Swing obchody (swing zadání §5) jdou do Přehledu a Kalendáře jako záznamy adaptéru
+ // (FJSwing.swingTradeRecord / swingLegRows): Přehled po uzavřených obchodech, Kalendář po nohách.
+ const swing=rows.filter(t=>t?.kind==='SWING');
+ if(!swing.length||typeof FJSwing==='undefined')return futures;
+ const main=(Array.isArray(result.data?.settings)?result.data.settings:[]).find(s=>s?.key==='main')?.value||{};
+ const instruments=FJSwing.instrumentsOf(main);
+ const o={journalId:profile.id,journalName:profile.name,classify:v=>classifyResult(v,{...settings,...main})};
+ const extra=opts.swing==='legs'?swing.flatMap(t=>FJSwing.swingLegRows(t,o)):swing.map(t=>FJSwing.swingTradeRecord(t,FJSwing.findInstrument(t.symbol,instruments),o)).filter(Boolean);
+ return [...futures,...extra];
 }
 function refreshAccountInstrumentOptions(preferredValue=''){
  const selectedJournal=$('accountJournal').value;

@@ -213,10 +213,21 @@ async function deleteSwing(id){
 }
 
 // ---------- záložka Pozice/Příkazy ----------
+// Okamžitý P/L otevřených pozic z cTraderu (get_positions při synchronizaci). Jen v paměti,
+// do deníku se neukládá; ruční pozice bez vazby na cTrader ho nemají.
+let swingLivePositions=new Map();
+function swingLiveOf(t){return t?.positionId?swingLivePositions.get(t.positionId)||null:null}
 function renderSwingPositions(){
  const target=$('swingOpenPositions');
  if(!target)return;
  const rows=swingOpenPositions().sort((a,b)=>String(a.openedAt).localeCompare(String(b.openedAt)));
+ const total=$('swingOpenPnl');
+ if(total){
+  const live=rows.map(swingLiveOf).filter(Boolean);
+  const sum=live.reduce((a,l)=>a+(Number(l.netProfit)||0),0);
+  total.style.display=live.length?'':'none';
+  total.innerHTML=live.length?`Otevřený P/L (cTrader, netto): <b class="${signCls(sum)}">${fmtMoney(sum)}</b> <span class="sub">· ${live.length} z ${rows.length} pozic · načteno ${new Date(live[0].at).toLocaleTimeString('cs-CZ')}</span>`:'';
+ }
  target.innerHTML=rows.length?rows.map(t=>{
   const d=swingDerivedOf(t);
   const age=FJSwing.instantOf(t.openedAt);
@@ -229,9 +240,10 @@ function renderSwingPositions(){
    <td>${fmtPrice(t.slInitial,t.symbol)}<div class="sub">aktuální ${fmtPrice(d.currentSl,t.symbol)}</div></td>
    <td>${fmtNum(d.remainingVolume??t.volume,4)}${(t.exits||[]).length?`<div class="sub">z ${fmtNum(t.volume,4)}</div>`:''}</td>
    <td>${t.riskAmount!=null?fmtMoney(t.riskAmount):'—'}</td>
+   ${(()=>{const l=swingLiveOf(t);return l?`<td>${fmtPrice(l.currentPrice,t.symbol)}</td><td class="${signCls(l.netProfit)}"><b>${fmtMoney(l.netProfit)}</b>${l.pips!=null?`<div class="sub">${fmtNum(l.pips,1)} pipů</div>`:''}</td>`:'<td>—</td><td>—</td>'})()}
    <td class="swing-actions"><button class="btn" data-swing-exit="${esc(t.id)}">＋ Výstup</button><button class="btn" data-swing-sl="${esc(t.id)}">Posunout SL</button><button class="btn" data-swing-edit="${esc(t.id)}">Upravit</button></td>
   </tr>`;
- }).join(''):'<tr><td colspan="8" class="sub">Žádná otevřená swing pozice. Novou otevřeš tlačítkem „＋ Otevřít pozici“.</td></tr>';
+ }).join(''):'<tr><td colspan="10" class="sub">Žádná otevřená swing pozice. Novou otevřeš tlačítkem „＋ Otevřít pozici“.</td></tr>';
  wireSwingButtons(target);
 }
 
@@ -819,6 +831,8 @@ async function syncSwingFromMcp({manual=false}={}){
   const r=await window.desktopAPI.ctraderSyncData(s.url);
   if(!r?.available){swingMcpLast={at:new Date().toISOString(),ok:false,message:'cTrader nevypadá spuštěný (MCP server neodpovídá).'};return null}
   const check=FJSwing.mcpActiveAccountCheck(settings.ctraderMcpAccount,r.balance,r.accounts);
+  // okamžitý P/L jen pro účet, který patří deníku
+  swingLivePositions=new Map(check.ok?(r.positions||[]).map(p=>['ctrader-'+p.id,{currentPrice:p.currentPrice,netProfit:p.netProfit,grossProfit:p.grossProfit,pips:p.pips,at:r.fetchedAt||new Date().toISOString()}]):[]);
   const active=(r.accounts||[]).find(a=>a.brokerTitle===r.balance?.brokerName&&a.currency===r.balance?.depositAsset&&Number(a.balance)===Number(r.balance?.balance))||null;
   if(!check.ok){
    swingMcpLast={at:new Date().toISOString(),ok:false,message:MCP_ACCOUNT_REASON[check.reason]||'Účet nesouhlasí.',accounts:r.accounts,active};
@@ -871,6 +885,7 @@ async function syncSwingFromMcp({manual=false}={}){
  }finally{
   swingMcpSyncBusy=false;
   renderSwingMcpStatus();
+  renderSwingPositions();
  }
 }
 function renderSwingMcpStatus(){
@@ -896,6 +911,27 @@ function renderSwingImportNotice(){
  box.textContent=waiting.length?`Obchody z cTraderu čekají na import – doplň velikost lotu (jednotek v 1 lotu) pro ${waiting.map(([s,n])=>`${s} (${n})`).join(', ')} v Nastavení → Swing · CFD (s cTraderem přes MCP se doplní sama).`:'';
 }
 
+// ---------- Přehled účtu a Kalendář (swing zadání §5) ----------
+// Nohy aktivního swing deníku jako řádky kalendáře (P/L podle dne výstupu).
+function swingActiveLegRows(){
+ const p=activeJournalProfile();
+ const o={journalId:activeJournalId,journalName:p?.name||'',classify:v=>classifyResult(v,settings)};
+ return swingRows().flatMap(t=>FJSwing.swingLegRows(t,o));
+}
+// Řádek swing obchodu / nohy v Přehledu a v detailu dne (místo futures karty).
+function swingOverviewRowHTML(r){
+ const orig=r.journalId===activeJournalId?findSwing(r.swingId):null;
+ const cls=signCls(r.pnlRaw);
+ const head=`<b>${esc(r.instrument||'—')}</b> ${dirPill(r.side)} <span class="src-pill">swing</span>${r.journalName?` <span class="pill journal-pill">${esc(r.journalName)}</span>`:''}`;
+ const edit=orig?`<button class="btn" data-swing-open="${esc(r.swingId)}">Upravit</button>`:'';
+ if(r.swingLeg){
+  return `<div class="swing-card" data-swing-row="${esc(r.id)}"><div class="swing-card-head"><div>${head} <span class="sub">noha výstupu</span></div><div class="swing-actions">${edit}</div></div>
+   <div class="swing-kpis"><span><span class="sub">Uzavřeno</span>${fmtLocal(r.legClosedAt)}</span><span><span class="sub">Cena</span>${fmtPrice(r.legPrice,r.instrument)}</span><span><span class="sub">Objem</span>${fmtNum(r.legVolume,4)}</span>${r.legReason?`<span><span class="sub">Důvod</span>${esc(FJSwing.EXIT_REASON_LABELS[r.legReason]||r.legReason)}</span>`:''}<span><span class="sub">Otevřeno</span>${fmtLocal(r.tradeOpenedAt)}</span><span><span class="sub">Netto</span><b class="${cls}">${fmtMoney(r.pnlRaw)}</b></span></div></div>`;
+ }
+ return `<div class="swing-card" data-swing-row="${esc(r.id)}"><div class="swing-card-head"><div>${head}</div><div class="swing-actions">${edit}</div></div>
+  <div class="swing-kpis"><span><span class="sub">Otevřeno</span>${fmtLocal(r.openedAt)}</span><span><span class="sub">Uzavřeno</span>${fmtLocal(r.closedAt)}</span><span><span class="sub">Vstup → výstup</span>${fmtPrice(r.entryPrice,r.instrument)} → ${fmtPrice(r.exitPrice,r.instrument)}</span><span><span class="sub">Objem · nohy</span>${fmtNum(r.contracts,4)} · ${r.legs}</span><span><span class="sub">Držení</span>${fmtNum(r.holdingDays,1)} d</span><span><span class="sub">R z ceny</span>${r.rMultiple!=null?fmtNum(r.rMultiple,2)+' R':'—'}</span><span><span class="sub">Netto</span><b class="${cls}">${fmtMoney(r.pnlRaw)}</b></span>${r.setupCode?`<span><span class="sub">Setup</span>${esc(r.setupCode)}</span>`:''}</div></div>`;
+}
+
 // ---------- napojení na hlavní skript ----------
 (function wireSwingUi(){
  const navBtn=document.querySelector('.nav [data-section="openPositions"]');
@@ -906,4 +942,6 @@ function renderSwingImportNotice(){
  $('refreshOrdersBtn')?.addEventListener('click',()=>void refreshMcpOrders());
  $('swingSyncNowBtn')?.addEventListener('click',()=>void syncSwingFromMcp({manual:true}));
  setInterval(()=>{if(isSwingJournalActive()&&mcpSettings().enabled)void syncSwingFromMcp()},5*60*1000);
+ // „Upravit" u swing řádku v Přehledu / detailu dne (vykresluje se mimo seznam Deníku)
+ document.addEventListener('click',e=>{const b=e.target.closest?.('[data-swing-open]');if(!b)return;const t=findSwing(b.dataset.swingOpen);if(t){e.preventDefault();openSwingModal(t)}});
 })();

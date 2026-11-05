@@ -533,8 +533,53 @@
     return out;
   }
 
+  // ---- swing obchody v Přehledu účtu a Kalendáři (ZADANI_SWING_CFD.md §5) ----
+  // Realizované P/L patří ke dni nohy výstupu (kalendář, equity, P/L za období); statistiky
+  // po obchodech (win rate, PF, počty) jen uzavřené obchody, zařazené podle posledního výstupu.
+  // Výstupem jsou záznamy ve tvaru, který čtou futures agregace (date, pnlRaw, pnl, result,
+  // side, instrument …). Nemají `kind` (tradeRecords by je vyřadil), nesou `sourceKind:'SWING'`.
+  const defaultClassify = v => (v > 0 ? 'target' : v < 0 ? 'stoploss' : 'breakeven');
+  function swingLegRows(t, o = {}) {
+    if (!isSwingRecord(t) || t.recordType === 'SETUP_ONLY') return [];
+    const classify = o.classify || defaultClassify;
+    return validExits(t).map((e, i) => {
+      const net = legPnlNet(e), at = splitLocal(e.closedAt);
+      if (net == null || !at) return null;
+      return {
+        id: 'swing:' + t.id + ':' + i, sourceKind: 'SWING', swingLeg: true, swingId: t.id,
+        journalId: o.journalId, journalName: o.journalName,
+        date: at.date, entryTime: at.time, exitTime: '',
+        instrument: t.symbol || '', side: t.direction || '',
+        pnlRaw: net, pnl: Math.abs(net), result: classify(net),
+        legClosedAt: e.closedAt, legPrice: num(e.price), legVolume: num(e.volume), legReason: e.reason || null,
+        tradeOpenedAt: t.openedAt || null, currency: t.currency || null
+      };
+    }).filter(Boolean);
+  }
+  function swingTradeRecord(t, instrument, o = {}) {
+    if (!isSwingRecord(t) || t.recordType === 'SETUP_ONLY') return null;
+    const d = swingDerived(t, instrument);
+    if (d.status !== 'CLOSED' || d.pnlNetTotal == null || !d.closedAt) return null;
+    const classify = o.classify || defaultClassify;
+    const at = splitLocal(d.closedAt), open = splitLocal(t.openedAt);
+    let w = 0, wp = 0;
+    for (const e of validExits(t)) { const p = num(e.price), v = num(e.volume); if (p != null && v > 0) { w += v; wp += p * v; } }
+    return {
+      id: 'swing:' + t.id, sourceKind: 'SWING', swingId: t.id,
+      journalId: o.journalId, journalName: o.journalName,
+      date: at.date, entryTime: open ? open.time : '', exitTime: '',
+      instrument: t.symbol || '', side: t.direction || '',
+      pnlRaw: d.pnlNetTotal, pnl: Math.abs(d.pnlNetTotal), result: classify(d.pnlNetTotal),
+      rMultiple: d.rPrice, contracts: num(t.volume), entryPrice: num(t.entryPrice), exitPrice: w > 0 ? round(wp / w, 8) : null,
+      setupCode: t.swingSetup || '', comment: t.comment || '',
+      openedAt: t.openedAt || null, closedAt: d.closedAt, legs: validExits(t).length,
+      holdingDays: d.holdingDays, swap: d.swapTotal, commissionTotal: d.commissionTotal, currency: t.currency || null,
+      swingLegRows: swingLegRows(t, o)
+    };
+  }
+
   return {
-    planMcpSync, sameLeg, legFromMcpHistory, swingFromMcpPosition, swingFromMcpHistory, addLeg, reconcileOpenVolume, mcpActiveAccountCheck,
+    swingLegRows, swingTradeRecord, planMcpSync, sameLeg, legFromMcpHistory, swingFromMcpPosition, swingFromMcpHistory, addLeg, reconcileOpenVolume, mcpActiveAccountCheck,
     IMPORT_FIELDS, swingFromCtraderEvent, mergeImported, applyCtraderClose, findPairCandidate, applyMcpPosition, dropEditedImportedFields,
     JOURNAL_TYPES, JOURNAL_TYPE_VERSION, JOURNAL_TYPE_LABELS, journalTypeOf, isSwingType, isSwingRecord,
     DEFAULT_CFD_INSTRUMENTS, ASSET_CLASSES, CURRENCIES, instrumentsOf, findInstrument, sanitizeInstrument, normalizeSymbol,
