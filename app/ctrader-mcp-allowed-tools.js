@@ -6,5 +6,7 @@
 module.exports = Object.freeze([
   'get_pending_orders',
   'get_balance',
-  'get_accounts_list'
+  'get_accounts_list',
+  'get_positions',
+  'get_symbol_details'
 ]);

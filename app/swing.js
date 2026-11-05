@@ -40,7 +40,7 @@
 
   function fx(symbol, pip) {
     const base = symbol.slice(0, 3), quote = symbol.slice(3, 6);
-    return { symbol, pipSize: pip, priceDecimals: pip === 0.01 ? 3 : 5, assetClass: 'FX', baseCcy: base, quoteCcy: quote };
+    return { symbol, pipSize: pip, priceDecimals: pip === 0.01 ? 3 : 5, lotSize: 100000, assetClass: 'FX', baseCcy: base, quoteCcy: quote };
   }
   // Výchozí tabulka. Uživatelsky editovatelná (settings.cfdInstruments), uložené hodnoty mají přednost.
   const DEFAULT_CFD_INSTRUMENTS = Object.freeze([
@@ -50,7 +50,7 @@
     { symbol: 'US500', pipSize: 1, priceDecimals: 1, assetClass: 'INDEX', baseCcy: '', quoteCcy: '' },
     { symbol: 'US100', pipSize: 1, priceDecimals: 1, assetClass: 'INDEX', baseCcy: '', quoteCcy: '' },
     { symbol: 'GER40', pipSize: 1, priceDecimals: 1, assetClass: 'INDEX', baseCcy: '', quoteCcy: '' },
-    { symbol: 'XAUUSD', pipSize: 0.1, priceDecimals: 2, assetClass: 'COMMODITY', baseCcy: '', quoteCcy: '' },
+    { symbol: 'XAUUSD', pipSize: 0.1, priceDecimals: 2, lotSize: 100, assetClass: 'COMMODITY', baseCcy: '', quoteCcy: '' },
     { symbol: 'USOIL', pipSize: 0.01, priceDecimals: 2, assetClass: 'COMMODITY', baseCcy: '', quoteCcy: '' }
   ].map(Object.freeze));
 
@@ -75,10 +75,13 @@
     if (!symbol) return null;
     const pipSize = num(raw.pipSize);
     const priceDecimals = num(raw.priceDecimals);
+    const lotSize = num(raw.lotSize);
     return {
       symbol,
       pipSize: pipSize != null && pipSize > 0 ? pipSize : null,
       priceDecimals: priceDecimals != null && priceDecimals >= 0 ? Math.round(priceDecimals) : null,
+      // jednotek v 1 lotu (cTrader posílá objem v jednotkách); null = neznámé
+      lotSize: lotSize != null && lotSize > 0 ? lotSize : null,
       assetClass: ASSET_CLASSES.includes(raw.assetClass) ? raw.assetClass : 'OTHER',
       baseCcy: normalizeSymbol(raw.baseCcy).slice(0, 3),
       quoteCcy: normalizeSymbol(raw.quoteCcy).slice(0, 3)
@@ -89,7 +92,11 @@
     const out = new Map(DEFAULT_CFD_INSTRUMENTS.map(i => [i.symbol, { ...i, builtin: true }]));
     for (const raw of (settings && Array.isArray(settings.cfdInstruments) ? settings.cfdInstruments : [])) {
       const i = sanitizeInstrument(raw);
-      if (i) out.set(i.symbol, { ...i, builtin: DEFAULT_CFD_INSTRUMENTS.some(d => d.symbol === i.symbol) });
+      if (!i) continue;
+      // uložený řádek doplňuje výchozí: prázdná hodnota výchozí nepřepíše
+      const merged = { ...(out.get(i.symbol) || {}) };
+      for (const [k, v] of Object.entries(i)) if (v !== null && v !== '') merged[k] = v;
+      out.set(i.symbol, { ...merged, builtin: DEFAULT_CFD_INSTRUMENTS.some(d => d.symbol === i.symbol) });
     }
     return [...out.values()];
   }
@@ -280,7 +287,111 @@
     return p ? p.date : '';
   }
 
+  // ---- import z cTraderu (cBot konektor; docs/ZADANI_CTRADER_MCP.md §4) ----
+  // Obchod = pozice (positionId "ctrader-<id>", stejný klíč jako cBot), každé uzavření
+  // = noha. Peníze se znaménkem z cTraderu: pnl + swap + commission = NetProfit.
+  // Import vyplní pole jen prázdná nebo dřív importovaná (importedFields) – ruční hodnota vyhrává.
+  const IMPORT_FIELDS = ['symbol', 'direction', 'openedAt', 'entryPrice', 'volume', 'slInitial', 'targetsPlanned'];
+  const isEmpty = v => v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length);
+  const fromUtcIso = iso => { const ms = Date.parse(iso || ''); return Number.isFinite(ms) ? berlinNowLocal(ms) : null; };
+  const lotsOf = (units, lotSize) => { const u = num(units), l = num(lotSize); return u != null && l > 0 ? round(Math.abs(u) / l, 8) : null; };
+
+  // Nový swing obchod z události cBota (trade_opened i trade_closed). Bez lotSize u otevření null.
+  function swingFromCtraderEvent(e, lotSize) {
+    const open = e && e.type === 'trade_opened';
+    const volume = open ? lotsOf(e.quantity, lotSize) : 0;
+    if (open && volume == null) return null;
+    const pid = String(e.positionId || '');
+    const t = {
+      id: 'sw_' + pid.replace(/[^A-Za-z0-9_-]/g, '_'), kind: 'SWING', source: 'CTRADER',
+      positionId: pid, ctraderAccount: e.account != null ? String(e.account) : null,
+      symbol: normalizeSymbol(e.instrument), direction: e.side === 'short' ? 'short' : 'long',
+      openedAt: fromUtcIso(e.entryTime), entryPrice: num(e.entryPrice), volume,
+      slInitial: null, slMoves: [], targetsPlanned: [], riskAmount: null, exits: [],
+      swingSetup: '', grade: '', comment: '', images: [],
+      importedFields: ['symbol', 'direction', 'openedAt', 'entryPrice', 'volume']
+    };
+    if (!open) t.volumeFromLegs = true;
+    if (open && num(e.quantity) != null) t.volumeUnits = Math.abs(num(e.quantity));
+    t.date = swingListDate(t);
+    return t;
+  }
+  // Doplní importovaná pole do existujícího obchodu (spárovaný ruční obchod, pozdní otevírací událost).
+  function mergeImported(existing, imported) {
+    const out = { ...existing, importedFields: [...(existing.importedFields || [])] };
+    for (const f of IMPORT_FIELDS) {
+      if (isEmpty(imported[f])) continue;
+      if (isEmpty(out[f]) || out.importedFields.includes(f)) {
+        out[f] = imported[f];
+        if (!out.importedFields.includes(f)) out.importedFields.push(f);
+      }
+    }
+    // otevírací událost zná celkový objem → objem už neroste s nohami
+    if (!imported.volumeFromLegs && out.importedFields.includes('volume')) delete out.volumeFromLegs;
+    if (imported.volumeUnits != null && out.importedFields.includes('volume')) out.volumeUnits = imported.volumeUnits;
+    for (const k of ['positionId', 'ctraderAccount']) if (!out[k] && imported[k]) out[k] = imported[k];
+    out.date = swingListDate(out);
+    return out;
+  }
+  // Přidá nohu z uzavírací události. Stejný closingDealId podruhé nic nezmění.
+  function applyCtraderClose(trade, e, lotSize) {
+    const externalId = String(e.sourceExecutionId || e.closingDealId || e.id || '');
+    const exits = Array.isArray(trade.exits) ? trade.exits : [];
+    if (externalId && exits.some(x => x && x.externalId === externalId)) return { trade, changed: false };
+    const volume = lotsOf(e.quantity, lotSize);
+    if (volume == null) return { trade, changed: false, missingLot: true };
+    const net = num(e.ctraderNet != null ? e.ctraderNet : e.pnl);
+    const hasRaw = e.ctraderSwap !== undefined || e.ctraderCommission !== undefined;
+    const swap = hasRaw ? (num(e.ctraderSwap) || 0) : null;
+    const commission = hasRaw ? (num(e.ctraderCommission) || 0) : null;
+    const pnl = net == null ? null : round(net - (swap || 0) - (commission || 0), 8);
+    const leg = { closedAt: fromUtcIso(e.exitTime), price: num(e.exitPrice), volume, reason: null, pnl, swap, commission, externalId, source: 'CTRADER' };
+    const next = { ...trade, exits: [...exits, leg] };
+    if (next.volumeFromLegs) next.volume = round((num(next.volume) || 0) + volume, 8);
+    if (next.entryPrice == null && num(e.entryPrice) != null) next.entryPrice = num(e.entryPrice);
+    if (!next.openedAt && e.entryTime) { next.openedAt = fromUtcIso(e.entryTime); next.date = swingListDate(next); }
+    return { trade: next, changed: true };
+  }
+  // Ručně zadaný obchod, který nejspíš odpovídá importované pozici: stejný symbol a směr,
+  // otevření ± 5 min a stejný objem (u pozice z uzavírací události objem neznáme).
+  function findPairCandidate(rows, draft) {
+    const ms = instantOf(draft && draft.openedAt);
+    if (ms == null) return null;
+    return (rows || []).find(t => isSwingRecord(t) && !t.positionId && t.recordType !== 'SETUP_ONLY'
+      && normalizeSymbol(t.symbol) === draft.symbol && t.direction === draft.direction
+      && instantOf(t.openedAt) != null && Math.abs(instantOf(t.openedAt) - ms) <= 5 * 60000
+      && (draft.volumeFromLegs || (num(t.volume) != null && Math.abs(num(t.volume) - num(draft.volume)) < 1e-6))) || null;
+  }
+  // SL / TP otevřené pozice z cTrader MCP (get_positions) při synchronizaci.
+  function applyMcpPosition(trade, pos, nowLocal) {
+    const sl = num(pos && pos.stopLossPrice), tp = num(pos && pos.takeProfitPrice);
+    const t = { ...trade, slMoves: [...(trade.slMoves || [])], importedFields: [...(trade.importedFields || [])] };
+    let changed = false;
+    if (sl != null) {
+      if (num(t.slInitial) == null) { t.slInitial = sl; if (!t.importedFields.includes('slInitial')) t.importedFields.push('slInitial'); changed = true; }
+      else {
+        const moves = sortedMoves(t);
+        const current = moves.length ? num(moves[moves.length - 1].price) : num(t.slInitial);
+        if (Math.abs(current - sl) > 1e-9) { t.slMoves.push({ at: nowLocal || berlinNowLocal(), price: sl, reason: null, timeApprox: true }); changed = true; }
+      }
+    }
+    if (tp != null && isEmpty(t.targetsPlanned)) {
+      t.targetsPlanned = [{ price: tp, levelType: '' }];
+      if (!t.importedFields.includes('targetsPlanned')) t.importedFields.push('targetsPlanned');
+      changed = true;
+    }
+    return { trade: changed ? t : trade, changed };
+  }
+  // Ruční úprava importovaného pole ho vyřadí z importedFields (další import ho už nepřepíše).
+  function dropEditedImportedFields(before, after) {
+    const list = (before && before.importedFields) || [];
+    if (!list.length) return after;
+    const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    return { ...after, importedFields: list.filter(f => same(before[f], after[f])) };
+  }
+
   return {
+    IMPORT_FIELDS, swingFromCtraderEvent, mergeImported, applyCtraderClose, findPairCandidate, applyMcpPosition, dropEditedImportedFields,
     JOURNAL_TYPES, JOURNAL_TYPE_VERSION, JOURNAL_TYPE_LABELS, journalTypeOf, isSwingType, isSwingRecord,
     DEFAULT_CFD_INSTRUMENTS, ASSET_CLASSES, CURRENCIES, instrumentsOf, findInstrument, sanitizeInstrument, normalizeSymbol,
     EXIT_REASONS, EXIT_REASON_LABELS, SL_MOVE_REASONS, SL_MOVE_REASON_LABELS, SWING_SETUP_SUGGESTIONS,

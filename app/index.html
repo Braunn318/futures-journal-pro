@@ -558,11 +558,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div>
             <h2>Pozice</h2>
             <p class="sub futures-only">Aktuálně otevřené pozice zachycené z konektorů (NinjaTrader, cTrader cBot).</p>
-            <p class="sub swing-only">Otevřené swing pozice z deníku – přidat výstup, posunout SL.</p>
+            <p class="sub swing-only">Otevřené swing pozice – zadané ručně a importované z cTraderu (cBot); SL a TP doplní cTrader přes MCP. Přidat výstup, posunout SL.</p>
           </div>
           <button class="btn danger futures-only" id="clearInvalidPositions">Vymazat neplatné pozice</button>
           <button class="btn primary swing-only" id="addSwingPositionBtn">＋ Otevřít pozici</button>
         </div>
+        <div class="alert swing-only" id="swingImportNotice" style="display:none;margin-top:12px"></div>
         <div class="table-scroll swing-only" style="margin-top:16px">
           <table>
             <thead><tr><th>Symbol</th><th>Směr</th><th>Otevřeno · věk</th><th>Vstup</th><th>SL při otevření</th><th>Objem</th><th>Riziko</th><th></th></tr></thead>
@@ -1345,7 +1346,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     <div class="modalhead"><h2 id="journalNameModalTitle">Nový deník</h2><button class="icon" id="closeJournalNameModal">✕</button></div>
     <div class="field"><label id="journalNameLabel">Název deníku</label><input id="journalNameInput" maxlength="60" placeholder="Např. NQ, ES nebo GC"></div>
     <div class="field"><label for="journalMode">Režim deníku</label><select id="journalMode"><option value="LIVE">Živý</option><option value="BACKTEST">Backtest</option></select><div class="sub">Živý: bez „Naživo bych to vzal?“. Backtest: bez stavu „vědomě vynechán“. Jde změnit i v Nastavení → Obecné → Deníky.</div></div>
-    <div class="field"><label for="journalTypeSelect">Typ deníku</label><select id="journalTypeSelect"><option value="FUTURES_INTRADAY">Futures intraday</option><option value="CFD_SWING">Swing · CFD</option></select><div class="sub">Swing · CFD: obchod trvá dny a končí po částech, P/L se opisuje z výpisu brokera, R z cen. Bez importu z konektorů a bez intraday risk modulu. Změna typu nemění data obchodů.</div></div>
+    <div class="field"><label for="journalTypeSelect">Typ deníku</label><select id="journalTypeSelect"><option value="FUTURES_INTRADAY">Futures intraday</option><option value="CFD_SWING">Swing · CFD</option></select><div class="sub">Swing · CFD: obchod trvá dny a končí po částech, R se počítá z cen. Obchody z cTraderu se importují z cTrader cBota (účet přiřaď deníku v Integrace), SL a TP doplní cTrader přes MCP; NinjaTrader se pro swing nepoužívá. Bez intraday risk modulu. Změna typu nemění data obchodů.</div></div>
     <div id="journalNameError" class="alert red"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="btn" id="cancelJournalName">Zrušit</button>
@@ -8031,8 +8032,8 @@ async function attachAfterShots(events,mappings){
  const max=Math.min(10,Math.max(1,Number(captureSnapshot?.afterShotMax)||3));
  for(const e of events){
   const journalId=mappings[e.account]||activeJournalId;
-  // Swing deník konektory nepoužívá (swing zadání §2): událost zůstane ve frontě.
-  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId))continue;
+  // Swing deník: NinjaTrader a jiné zdroje se nepoužívají (událost zůstane ve frontě), cTrader ano.
+  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId)&&e.source!=='ctrader')continue;
   const r=await window.desktopAPI.readJournal(journalId);
   if(!r?.ok)continue;
   const data=r.data||{};
@@ -8057,14 +8058,27 @@ async function importCapturedTrades(silent=false){
  const r=await window.desktopAPI.captureEvents(false);
  const pending=(r?.events||[]).filter(e=>e.type==='trade_closed');
  const afterEvents=(r?.events||[]).filter(e=>e.type==='trade_after_screenshot');
- if(!pending.length&&!afterEvents.length){if(!silent)showToast('Nejsou připravené žádné uzavřené obchody.');return 0}
  const mappings=captureSnapshot?.accountMappings||{};
+ // Otevření pozice z cTrader cBota: jen pro swing deník (otevřená pozice s SL z MCP).
+ // Futures cesta otevírací události nepoužívá a nechává je, jak jsou.
+ const swingOpens=(r?.events||[]).filter(e=>e.type==='trade_opened'&&e.source==='ctrader'&&typeof isSwingJournalId==='function'&&isSwingJournalId(mappings[e.account]||activeJournalId));
+ if(!pending.length&&!afterEvents.length&&!swingOpens.length){if(!silent)showToast('Nejsou připravené žádné uzavřené obchody.');return 0}
  const importedIds=[];
  let count=0;
+ for(const e of swingOpens){
+  const res=await importSwingCtraderEvent(mappings[e.account]||activeJournalId,e);
+  if(res==='done')importedIds.push(e.id);
+ }
  for(const e of pending){
   const journalId=mappings[e.account]||activeJournalId;
-  // Swing deník konektory nepoužívá (swing zadání §2): událost zůstane ve frontě.
-  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId))continue;
+  // Swing deník: NinjaTrader a jiné zdroje se nepoužívají (událost zůstane ve frontě),
+  // obchody z cTraderu jdou do swing importu (pozice = obchod, uzavření = noha).
+  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId)&&e.source!=='ctrader')continue;
+  if(typeof isSwingJournalId==='function'&&isSwingJournalId(journalId)){
+   const res=await importSwingCtraderEvent(journalId,e);
+   if(res==='done'){importedIds.push(e.id);count++}
+   continue;
+  }
   const images=await capturedImages(e);
   const added=await appendOrMergeCapturedTrade(journalId,e,images);
   if(added)count++;
@@ -8700,11 +8714,17 @@ $('pollRelay').onclick=async()=>{
  try{const r=await window.desktopAPI.capturePollRelay();await refreshCaptureStatus();showToast(`Staženo alertů: ${r?.count||0}`)}
  catch(e){showToast('Relay nelze načíst: '+e.message)}
 };
-window.desktopAPI?.onCaptureEvent?.(async()=>{
+window.desktopAPI?.onCaptureEvent?.(async payload=>{
  await refreshCaptureStatus();
  const s=await window.desktopAPI.captureStatus();
- if(s?.autoImport&&(s.pending||s.pendingAfter))await importCapturedTrades(true);
+ const swingOpen=payload?.type==='trade_opened'&&payload?.source==='ctrader';
+ if(s?.autoImport&&(s.pending||s.pendingAfter||swingOpen))await importCapturedTrades(true);
 });
+// Otevření z cTraderu, která přišla, když deník neběžel (swing deník) – jednou po startu.
+setTimeout(async()=>{
+ const s=await window.desktopAPI?.captureStatus?.();
+ if(s?.autoImport)await importCapturedTrades(true);
+},3000);
 setInterval(async()=>{
  const s=await window.desktopAPI?.captureStatus?.();
  if(s?.autoImport&&(s.pending||s.pendingAfter))await importCapturedTrades(true);

@@ -36,15 +36,15 @@ function fakeServer(handlers) {
   return { fetchImpl, calls };
 }
 
-test('whitelist: jen tři čtecí nástroje, žádný zápisový', () => {
-  assert.deepEqual([...mcp.ALLOWED_TOOLS].sort(), ['get_accounts_list', 'get_balance', 'get_pending_orders']);
+test('whitelist: jen pět čtecích nástrojů, žádný zápisový', () => {
+  assert.deepEqual([...mcp.ALLOWED_TOOLS].sort(), ['get_accounts_list', 'get_balance', 'get_pending_orders', 'get_positions', 'get_symbol_details']);
   for (const w of WRITE_TOOLS) assert.ok(!mcp.ALLOWED_TOOLS.includes(w), w);
 });
 
 test('nástroj mimo whitelist se odmítne ještě před odesláním', async () => {
   const { fetchImpl, calls } = fakeServer({});
   const client = mcp.createClient(mcp.DEFAULT_URL, { fetchImpl });
-  for (const w of ['place_market_order', 'close_position', 'amend_position', 'get_positions']) {
+  for (const w of ['place_market_order', 'close_position', 'amend_position', 'get_deals']) {
     await assert.rejects(client.call(w), /nesmí volat/);
   }
   assert.equal(calls.length, 0, 'nic se neposlalo');

@@ -103,4 +103,26 @@ async function fetchPendingOrders(url, opts) {
   }
 }
 
-module.exports = { DEFAULT_URL, ALLOWED_TOOLS, createClient, fetchPendingOrders, parseResult, checkUrl, assertAllowed };
+// Jedno čtecí volání: { available, data } / { available:false }.
+async function readOnce(url, tool, args, opts) {
+  let client;
+  try { client = createClient(url, opts); } catch (e) { return { available: false, error: e.message }; }
+  try { return { available: true, fetchedAt: new Date().toISOString(), data: await client.call(tool, args) }; }
+  catch (e) {
+    const offline = /fetch failed|ECONNREFUSED|timeout|aborted/i.test(String(e && (e.cause && e.cause.code) || e.message));
+    return { available: false, error: offline ? null : e.message };
+  } finally { await client.close(); }
+}
+// Otevřené pozice aktivního účtu (SL / TP) – pro swing deník.
+async function fetchPositions(url, opts) {
+  const r = await readOnce(url, 'get_positions', {}, opts);
+  return r.available ? { available: true, fetchedAt: r.fetchedAt, positions: Array.isArray(r.data && r.data.positions) ? r.data.positions : [] } : r;
+}
+// Detail symbolu (velikost lotu, pip, digits) – doplní tabulku CFD instrumentů.
+async function fetchSymbolDetails(url, symbol, opts) {
+  if (!symbol || typeof symbol !== 'string') return { available: false, error: 'chybí symbol' };
+  const r = await readOnce(url, 'get_symbol_details', { symbolName: symbol }, opts);
+  return r.available ? { available: true, details: r.data || null } : r;
+}
+
+module.exports = { DEFAULT_URL, ALLOWED_TOOLS, createClient, fetchPendingOrders, fetchPositions, fetchSymbolDetails, parseResult, checkUrl, assertAllowed };

@@ -151,14 +151,15 @@ function swingCardHTML(t){
  const missing=FJSwing.swingMissing(t);
  const statusPill=setup?'<span class="pill hypo-pill">Setup bez vstupu · nenaplněno</span>':d.status==='OPEN'?'<span class="pill be">OTEVŘENÁ</span>':'<span class="pill">UZAVŘENÁ</span>';
  const legs=(t.exits||[]).slice().sort((a,b)=>String(a.closedAt).localeCompare(String(b.closedAt)));
- const legsHtml=legs.length?`<table class="swing-legs"><thead><tr><th>Výstup</th><th>Cena</th><th>Objem</th><th>Důvod</th><th>P/L</th><th>Swap</th><th>Komise</th><th>Netto</th></tr></thead><tbody>${legs.map(e=>{const n=FJSwing.legPnlNet(e);return `<tr><td>${fmtLocal(e.closedAt)}</td><td>${fmtPrice(e.price,t.symbol)}</td><td>${fmtNum(e.volume,4)}</td><td>${esc(FJSwing.EXIT_REASON_LABELS[e.reason]||'—')}</td><td class="${signCls(e.pnl)}">${fmtMoney(e.pnl)}</td><td class="${signCls(e.swap)}">${fmtMoney(e.swap)}</td><td class="${signCls(e.commission)}">${fmtMoney(e.commission)}</td><td class="${signCls(n)}"><b>${fmtMoney(n)}</b></td></tr>`}).join('')}</tbody></table>`:'';
- const imgs=(t.images||[]).length?`<div class="swing-imgs">${t.images.map(r=>thumbImgHTML(r)).join('')}</div>`:'';
+ const legsHtml=legs.length?`<table class="swing-legs"><thead><tr><th>Výstup</th><th>Cena</th><th>Objem</th><th>Důvod</th><th>P/L</th><th>Swap</th><th>Komise</th><th>Netto</th></tr></thead><tbody>${legs.map(e=>{const n=FJSwing.legPnlNet(e);return `<tr><td>${fmtLocal(e.closedAt)}${e.source==='CTRADER'?' <span class="src-pill">cTrader</span>':''}</td><td>${fmtPrice(e.price,t.symbol)}</td><td>${fmtNum(e.volume,4)}</td><td>${esc(FJSwing.EXIT_REASON_LABELS[e.reason]||'—')}</td><td class="${signCls(e.pnl)}">${fmtMoney(e.pnl)}</td><td class="${signCls(e.swap)}">${fmtMoney(e.swap)}</td><td class="${signCls(e.commission)}">${fmtMoney(e.commission)}</td><td class="${signCls(n)}"><b>${fmtMoney(n)}</b></td></tr>`}).join('')}</tbody></table>`:'';
+ const allImgs=[...(t.images||[]),...(t.imagesAfter||[])];
+ const imgs=allImgs.length?`<div class="swing-imgs">${allImgs.map(r=>thumbImgHTML(r)).join('')}</div>`:'';
  return `<div class="swing-card" data-swing-id="${esc(t.id)}">
   <div class="swing-card-head">
    <div><b>${esc(t.symbol||'—')}</b> ${dirPill(t.direction)} ${statusPill}
     ${missing.length?`<span class="pill incomplete-pill" title="Chybí: ${esc(missing.map(k=>FJSwing.MISSING_LABELS[k]).join(', '))}">⚠ Neúplné · ${missing.length}</span>`:''}
     ${d.volumeError?'<span class="pill loss" title="Součet objemů výstupů je větší než objem pozice">Objem výstupů &gt; objem</span>':''}
-    ${t.source==='CTRADER'?'<span class="src-pill">cTrader</span>':''}</div>
+    ${t.source==='CTRADER'||String(t.positionId||'').startsWith('ctrader-')?'<span class="src-pill" title="Importováno z cTraderu (cBot)">cTrader</span>':''}</div>
    <div class="swing-actions">
     ${!setup&&d.status==='OPEN'?`<button class="btn" data-swing-exit="${esc(t.id)}">＋ Výstup</button><button class="btn" data-swing-sl="${esc(t.id)}">Posunout SL</button>`:''}
     <button class="btn" data-swing-edit="${esc(t.id)}">Upravit</button>
@@ -249,6 +250,7 @@ async function refreshMcpOrders(){
   mcpState=r?.available?{available:true,orders:(r.orders||[]).map(FJSwing.pendingFromMcp).filter(Boolean),account:r.account||null,fetchedAt:r.fetchedAt}:{available:false,orders:[],account:null,fetchedAt:null,error:r?.error||null};
  }catch{mcpState={available:false,orders:[],account:null,fetchedAt:null}}
  renderPendingOrders();
+ if(mcpState.available)try{await syncSwingPositionsFromMcp()}catch(e){console.warn('Synchronizace SL z cTraderu:',e)}
 }
 function positionsTabOpen(){return $('openPositions')?.classList.contains('active')}
 function startMcpPolling(){
@@ -317,6 +319,7 @@ async function deletePendingOrder(o){
 
 function renderPositionsTab(){
  renderSwingPositions();
+ renderSwingImportNotice();
  renderPendingOrders();
 }
 
@@ -551,7 +554,10 @@ function readSwingForm(){
  };
  if(recordType){out.recordType='SETUP_ONLY';out.fillStatus=out.fillStatus||'NO_FILL'}else{delete out.recordType;if(out.fillStatus==='NO_FILL')delete out.fillStatus}
  out.date=FJSwing.swingListDate(out);
- return out;
+ // nohy z cTraderu si drží svůj původ a id dealu (formulář je nemá)
+ const prevExits=existing?.exits||[];
+ out.exits=out.exits.map(e=>{const p=prevExits.find(x=>x.externalId&&x.closedAt===e.closedAt&&Number(x.price)===Number(e.price));return p?{...e,externalId:p.externalId,source:p.source}:e});
+ return existing?FJSwing.dropEditedImportedFields(existing,out):out;
 }
 function renderSwingDerivedPreview(){
  if(!$('swDerived'))return;
@@ -613,11 +619,12 @@ function renderSwingSettings(){
   card.innerHTML=`<h2>Swing · CFD</h2>
    <div class="field" style="max-width:240px"><label>Měna účtu</label><select id="swingCurrencySelect">${FJSwing.CURRENCIES.map(c=>`<option ${c===swingCurrency()?'selected':''}>${c}</option>`).join('')}</select><div class="sub">Peníze se do swing deníku opisují z výpisu brokera v této měně.</div></div>
    <h3 style="margin-top:14px">CFD instrumenty</h3>
-   <div class="sub">Deník potřebuje jen velikost pipu (pipy a R z cen). Hodnota pipu ani ticku se nezadává. Výchozí řádky jdou upravit; nic se nemaže.</div>
-   <div class="table-scroll" style="margin-top:8px"><table><thead><tr><th>Symbol</th><th>Pip size</th><th>Desetinná místa</th><th>Třída</th><th>Base</th><th>Quote</th><th></th></tr></thead><tbody>
+   <div class="sub">Pip size stačí na pipy a R z cen; hodnota pipu ani ticku se nezadává. Velikost lotu (jednotek v 1 lotu) potřebuje jen import z cTraderu – objem posílá v jednotkách. Výchozí řádky jdou upravit; nic se nemaže.</div>
+   <div class="table-scroll" style="margin-top:8px"><table><thead><tr><th>Symbol</th><th>Pip size</th><th>Desetinná místa</th><th>Lot (jednotek)</th><th>Třída</th><th>Base</th><th>Quote</th><th></th></tr></thead><tbody>
    ${list.map(i=>`<tr data-cfd="${esc(i.symbol)}"><td><b>${esc(i.symbol)}</b>${i.builtin?'':' <span class="sub">vlastní</span>'}</td>
     <td><input type="number" step="any" min="0" data-cfdk="pipSize" value="${i.pipSize??''}" style="width:100px"></td>
     <td><input type="number" step="1" min="0" data-cfdk="priceDecimals" value="${i.priceDecimals??''}" style="width:70px"></td>
+    <td><input type="number" step="any" min="0" data-cfdk="lotSize" value="${i.lotSize??''}" style="width:100px" title="Kolik jednotek je 1 lot (cTrader posílá objem v jednotkách)"></td>
     <td><select data-cfdk="assetClass">${FJSwing.ASSET_CLASSES.map(a=>`<option ${a===i.assetClass?'selected':''}>${a}</option>`).join('')}</select></td>
     <td><input data-cfdk="baseCcy" value="${esc(i.baseCcy||'')}" style="width:60px"></td>
     <td><input data-cfdk="quoteCcy" value="${esc(i.quoteCcy||'')}" style="width:60px"></td>
@@ -665,6 +672,134 @@ function renderMcpSettings(){
   const r=await window.desktopAPI?.ctraderPendingOrders?.($('mcpUrl').value.trim());
   $('mcpTestResult').textContent=r?.available?`OK – ${r.orders.length} čekajících příkazů, aktivní účet ${r.account?.broker||'?'} (${r.account?.currency||''}).`:`cTrader neodpovídá${r?.error?' ('+r.error+')':''}.`;
  };
+}
+
+// ---------- import z cTraderu (cBot konektor) ----------
+// Událost cBota (trade_opened / trade_closed, source 'ctrader') mířící do swing deníku
+// (mapování účtů v Integrace) → swing obchod podle positionId „ctrader-<id>". Ruční hodnoty
+// vyhrávají (importedFields), ručně zadaný obchod se spáruje jen po potvrzení. Vrací
+// 'done' (událost jde označit jako importovaná), 'wait' (zůstane ve frontě) nebo 'error'.
+let swingPairPending=new Set();
+let swingPairDecisions=new Map();
+let swingImportWaiting=new Map();
+let swingImportChain=Promise.resolve();
+// Velikost lotu symbolu: tabulka CFD instrumentů deníku, jinak cTrader MCP (doplní se do tabulky).
+async function swingLotSizeFor(data,symbol){
+ const main=data.settings.find(s=>s?.key==='main');
+ const inst=FJSwing.findInstrument(symbol,FJSwing.instrumentsOf(main?.value||{}));
+ if(inst?.lotSize)return inst.lotSize;
+ const s=mcpSettings();
+ if(!s.enabled||!window.desktopAPI?.ctraderSymbolDetails)return null;
+ const r=await window.desktopAPI.ctraderSymbolDetails(s.url,symbol);
+ const lot=Number(r?.details?.lotSize);
+ if(!r?.available||!(lot>0))return null;
+ let entry=main;
+ if(!entry){entry={key:'main',value:{}};data.settings.push(entry)}
+ const list=Array.isArray(entry.value.cfdInstruments)?entry.value.cfdInstruments:[];
+ const pip=Number(r.details.pipSize),dig=Number(r.details.digits);
+ const row={symbol,lotSize:lot,pipSize:inst?.pipSize??(pip>0?pip:null),priceDecimals:inst?.priceDecimals??(Number.isFinite(dig)?dig:null),assetClass:inst?.assetClass||'OTHER',baseCcy:inst?.baseCcy||'',quoteCcy:inst?.quoteCcy||''};
+ entry.value={...entry.value,cfdInstruments:[...list.filter(x=>FJSwing.normalizeSymbol(x?.symbol)!==symbol),row]};
+ data.__settingsChanged=true;
+ return lot;
+}
+function importSwingCtraderEvent(journalId,e){
+ // jeden import za druhým – zápis čte a píše celý deník
+ const run=swingImportChain.then(()=>importSwingCtraderEventNow(journalId,e));
+ swingImportChain=run.catch(()=>{});
+ return run;
+}
+async function importSwingCtraderEventNow(journalId,e){
+ const r=await window.desktopAPI.readJournal(journalId);
+ if(!r?.ok)return 'error';
+ const data=r.data||{trades:[],settings:[]};
+ data.trades=Array.isArray(data.trades)?data.trades:[];
+ data.settings=Array.isArray(data.settings)?data.settings:[];
+ const symbol=FJSwing.normalizeSymbol(e.instrument);
+ const lot=await swingLotSizeFor(data,symbol);
+ if(!lot){swingImportWaiting.set(symbol,(swingImportWaiting.get(symbol)||0)+1);return 'wait'}
+ swingImportWaiting.delete(symbol);
+ const draft=FJSwing.swingFromCtraderEvent(e,lot);
+ if(!draft||!draft.positionId)return 'wait';
+ let idx=data.trades.findIndex(t=>FJSwing.isSwingRecord(t)&&t.positionId===draft.positionId);
+ let trade=idx>=0?data.trades[idx]:null;
+ const before=JSON.stringify(trade);
+ if(!trade){
+  const decision=swingPairDecisions.get(draft.positionId);
+  const cand=decision&&decision!=='NEW'?data.trades.find(t=>t?.id===decision&&!t.positionId):(decision==='NEW'?null:FJSwing.findPairCandidate(data.trades,draft));
+  if(cand&&!decision){
+   if(swingPairPending.has(draft.positionId))return 'wait';
+   swingPairPending.add(draft.positionId);
+   let ok=false;
+   try{
+    ok=await showConfirm(`Z cTraderu přišla pozice ${draft.symbol} ${draft.direction==='short'?'SHORT':'LONG'} otevřená ${String(draft.openedAt||'').replace('T',' ')}.\nV deníku je ručně zadaný obchod ${cand.symbol} z ${String(cand.openedAt||'').replace('T',' ')}, který jí nejspíš odpovídá.\n\nSpárovat = k ručnímu obchodu se doplní jen prázdná pole a výstupy z cTraderu. Založit nový = vznikne druhý obchod.`,{title:'Spárovat obchod z cTraderu',ok:'Spárovat',cancel:'Založit nový'});
+   }finally{swingPairPending.delete(draft.positionId)}
+   swingPairDecisions.set(draft.positionId,ok?cand.id:'NEW');
+   // deník se mezitím mohl změnit (jiný import, ruční uložení) → načíst znovu
+   return importSwingCtraderEventNow(journalId,e);
+  }
+  if(cand){
+   idx=data.trades.indexOf(cand);
+   trade=FJSwing.mergeImported({...cand,positionId:draft.positionId,ctraderAccount:draft.ctraderAccount},draft);
+  }else{
+   if(data.trades.some(t=>t?.id===draft.id))draft.id=draft.id+'_'+Date.now().toString(36);
+   draft.createdAt=new Date().toISOString();
+   trade=draft;
+  }
+ }else if(e.type==='trade_opened'){
+  trade=FJSwing.mergeImported(trade,draft);
+ }
+ if(e.type==='trade_closed'){
+  const res=FJSwing.applyCtraderClose(trade,e,lot);
+  trade=res.trade;
+ }
+ const changed=JSON.stringify(trade)!==before;
+ if(!changed&&!data.__settingsChanged)return 'done';
+ if(changed){
+  const imgs=await capturedImages(e);
+  if(imgs.length)trade={...trade,images:[...new Set([...(trade.images||[]),...imgs])].slice(0,4)};
+  trade.updatedAt=new Date().toISOString();
+  if(idx>=0)data.trades[idx]=trade;else data.trades.push(trade);
+ }
+ const settingsChanged=!!data.__settingsChanged;
+ delete data.__settingsChanged;
+ const w=await window.desktopAPI.writeJournal(journalId,data);
+ if(!w?.ok)return 'error';
+ if(settingsChanged&&journalId===activeJournalId&&typeof settings==='object'){
+  const main=data.settings.find(s=>s?.key==='main');
+  if(main?.value?.cfdInstruments)settings.cfdInstruments=main.value.cfdInstruments;
+ }
+ return 'done';
+}
+// SL / TP otevřených swing pozic z cTrader MCP (get_positions). Zápis jen při změně,
+// před prvním zápisem v sezení záloha deníku.
+let swingSyncBackedUp=false;
+async function syncSwingPositionsFromMcp(){
+ const s=mcpSettings();
+ if(!s.enabled||!isSwingJournalActive()||!window.desktopAPI?.ctraderPositions)return 0;
+ const open=swingOpenPositions().filter(t=>t.positionId&&String(t.positionId).startsWith('ctrader-'));
+ if(!open.length)return 0;
+ const r=await window.desktopAPI.ctraderPositions(s.url);
+ if(!r?.available)return 0;
+ const byId=new Map((r.positions||[]).map(p=>['ctrader-'+p.id,p]));
+ const now=FJSwing.berlinNowLocal();
+ const updates=new Map();
+ for(const t of open){const p=byId.get(t.positionId);if(!p)continue;const res=FJSwing.applyMcpPosition(t,p,now);if(res.changed)updates.set(t.id,res.trade)}
+ if(!updates.size)return 0;
+ if(!swingSyncBackedUp){
+  const b=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-synchronizaci-ctrader');
+  if(!b||b.ok!==true)return 0;
+  swingSyncBackedUp=true;
+ }
+ await commitJournal(j=>{j.trades=(j.trades||[]).map(t=>{const u=updates.get(t?.id);return u?{...u,updatedAt:new Date().toISOString()}:t})});
+ await load();
+ return updates.size;
+}
+function renderSwingImportNotice(){
+ const box=$('swingImportNotice');
+ if(!box)return;
+ const waiting=[...swingImportWaiting.entries()];
+ box.style.display=waiting.length?'':'none';
+ box.textContent=waiting.length?`Obchody z cTraderu čekají na import – doplň velikost lotu (jednotek v 1 lotu) pro ${waiting.map(([s,n])=>`${s} (${n})`).join(', ')} v Nastavení → Swing · CFD, nebo zapni limitky z cTraderu přes MCP (velikost lotu se pak doplní sama).`:'';
 }
 
 // ---------- napojení na hlavní skript ----------

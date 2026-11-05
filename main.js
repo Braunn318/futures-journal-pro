@@ -2701,7 +2701,12 @@ async function processCTraderClose(payload) {
     strategy: payload.strategy || '',
     screenshotPaths: images,
     sourceExecutionId: dealId || undefined,
-    positionId: payload.positionId || ''
+    positionId: payload.positionId || '',
+    // Surové hodnoty z cBota se znaménkem – pro swing deník (noha: pnl + swap + commission
+    // = NetProfit). Futures cesta je nepoužívá, její pnl / commission výše zůstávají beze změny.
+    ctraderNet: Number.isFinite(Number(payload.pnl)) ? Number(payload.pnl) : undefined,
+    ctraderSwap: Number.isFinite(Number(payload.swap)) ? Number(payload.swap) : undefined,
+    ctraderCommission: Number.isFinite(Number(payload.commission)) ? Number(payload.commission) : undefined
   }, 'ctrader');
   scheduleAfterShot({
     positionId: payload.positionId, account: payload.account, instrument: payload.instrument,
@@ -2939,6 +2944,15 @@ ipcMain.handle('capture:addAccount', async (_event, account) => {
 // Nedostupný cTrader = { available:false }, žádná chyba v protokolu.
 ipcMain.handle('ctraderMcp:pendingOrders', async (_event, url) => {
   try { return await require('./app/ctrader-mcp.js').fetchPendingOrders(url); }
+  catch (error) { return { available: false, error: error.message }; }
+});
+// Otevřené pozice (SL / TP pro swing deník) a detail symbolu (velikost lotu) – jen čtení.
+ipcMain.handle('ctraderMcp:positions', async (_event, url) => {
+  try { return await require('./app/ctrader-mcp.js').fetchPositions(url); }
+  catch (error) { return { available: false, error: error.message }; }
+});
+ipcMain.handle('ctraderMcp:symbolDetails', async (_event, url, symbol) => {
+  try { return await require('./app/ctrader-mcp.js').fetchSymbolDetails(url, symbol); }
   catch (error) { return { available: false, error: error.message }; }
 });
 ipcMain.handle('capture:status', async (_event, journalId) => {
