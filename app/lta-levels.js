@@ -34,7 +34,8 @@
     nearestCount: 3,       // N nad + N pod vstupem
     autoInForm: true,      // doplnit ve formuláři, když je seznam prázdný
     archive: true,         // ukládat verze levelů po dnech
-    retentionDays: 90,
+    retentionDays: 0,      // 0 = archiv se nemaže (od 4.8.102; mazání = ztráta dat)
+    retentionMigrated: false, // stará výchozí 90 už převedená na 0 (lta-store.getSettings)
     vwapRow: true,         // přidat VWAP v čase vstupu (z konektoru NT8)
     disabledFiles: [],     // relativní cesty souborů, které se nečtou (System/ATR_NT8.xml)
     excludedNames: [],     // názvy levelů z LTA, které se nedoplňují (OPEN, Combo L2…)
@@ -53,7 +54,8 @@
       nearestCount: int(s.nearestCount, 0, 50, DEFAULT_SETTINGS.nearestCount),
       autoInForm: s.autoInForm !== false,
       archive: s.archive !== false,
-      retentionDays: int(s.retentionDays, 1, 3650, DEFAULT_SETTINGS.retentionDays),
+      retentionDays: int(s.retentionDays, 0, 3650, DEFAULT_SETTINGS.retentionDays),
+      retentionMigrated: s.retentionMigrated === true,
       vwapRow: s.vwapRow !== false,
       disabledFiles: Array.isArray(s.disabledFiles)
         ? [...new Set(s.disabledFiles.filter(f => typeof f === 'string' && f).map(normalizeRelPath))]

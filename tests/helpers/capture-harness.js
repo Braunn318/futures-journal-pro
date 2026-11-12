@@ -37,6 +37,8 @@ function captureHarness({
     appendCaptureEvent: payload => { const e = { id: 'ev' + events.length, ...payload }; events.push(e); return e; },
     readCaptureEvents: () => events,
     writeCaptureEvents: () => {},
+    // Data trhu (svíčky dne) – testy záznamu obchodů se jich netýkají.
+    marketAfterTradeClosed: () => null,
     crypto: { randomUUID: () => 'pos-' + (++ids) },
     logInfo: (context, message) => info.push(message),
     Date: FakeDate

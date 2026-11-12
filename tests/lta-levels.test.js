@@ -237,7 +237,7 @@ test('archiv: vypnutý soubor se nečte, den bez archivu nic nevrátí, staré d
   try {
     h.write('System/SETT_NT8.xml', xml(level('ES 12-26', '7754.25', '30 SETT')));
     h.write('Local/LUDVIK_NT8.xml', xml(level('ES 12-26', '7583.96', '7 LUDVIK', { lower: 12, upper: 12 })));
-    h.store.setSettings({ disabledFiles: ['Local/LUDVIK_NT8.xml'] });
+    h.store.setSettings({ disabledFiles: ['Local/LUDVIK_NT8.xml'], retentionDays: 90 });
     h.store.stop();
     const today = await h.store.levelsFor({ root: 'ES', entryISO: new Date(h.clock.t).toISOString() });
     assert.deepEqual(today.levels.map(l => l.name), ['SETT']);

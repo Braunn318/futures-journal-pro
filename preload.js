@@ -78,6 +78,14 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   ltaSnapshot: () => ipcRenderer.invoke('lta:snapshot'),
   ltaChooseFolder: () => ipcRenderer.invoke('lta:chooseFolder'),
   ltaOpenFolder: () => ipcRenderer.invoke('lta:openFolder'),
+  // Data trhu (4.8.102): hlavní vypínač a přepínače
+  marketSettings: () => ipcRenderer.invoke('market:getSettings'),
+  marketSetSettings: patch => ipcRenderer.invoke('market:setSettings', patch),
+  marketStatus: () => ipcRenderer.invoke('market:status'),
+  marketBackfill: journalIds => ipcRenderer.invoke('market:backfill', journalIds),
+  marketCancel: () => ipcRenderer.invoke('market:cancel'),
+  marketOpenFolder: () => ipcRenderer.invoke('market:openFolder'),
+  onMarketProgress: cb => ipcRenderer.on('market:progress', (_event, data) => cb(data)),
   // Obrázky (4.8.7): čitelná jména podle obchodu, náhledy, vlastní složka.
   assignImageNames: (refs, record, owner) => ipcRenderer.invoke('image:assignNames', refs, record, owner),
   storeImageThumb: (ref, dataUrl) => ipcRenderer.invoke('image:storeThumb', ref, dataUrl),

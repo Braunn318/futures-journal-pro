@@ -26,7 +26,9 @@ function localDate(ms) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
-function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = () => {}, now = () => Date.now() }) {
+// `exportDir()` = složka ai-export/lta-levels, když je zapnutý export archivu
+// pro Backtest Lab (Nastavení → Data trhu), jinak null.
+function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = () => {}, now = () => Date.now(), exportDir = () => null }) {
   const root = path.join(userDataDir, 'lta-levels');
   const settingsPath = path.join(root, 'settings.json');
   const fileCache = new Map();      // abs → { mtimeMs, size, levels }
@@ -34,6 +36,7 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
   let timer = null;
   let lastSnapshot = null;          // { at, levelCount, written }
   let busy = null;
+  let retentionChecked = false;
 
   function ensureRoot() { fs.mkdirSync(root, { recursive: true }); }
 
@@ -44,9 +47,30 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
     fs.renameSync(tmp, file);
   }
 
+  // Do 4.8.101 se archiv po 90 dnech mazal (výchozí hodnota). Mazání je ztráta
+  // dat, proto se stará výchozí 90 jednou převede na „bez mazání" (0) – se
+  // zálohou settings.pred-retenci.json. Jinou ruční hodnotu převod nemění.
+  function migrateRetention() {
+    if (retentionChecked) return;
+    retentionChecked = true;
+    let raw;
+    try { raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch { return; }
+    if (!raw || typeof raw !== 'object' || raw.retentionMigrated === true) return;
+    const old = raw.retentionDays === undefined || Number(raw.retentionDays) === 90;
+    try {
+      if (old) fs.copyFileSync(settingsPath, path.join(root, 'settings.pred-retenci.json'));
+      writeAtomic(settingsPath, JSON.stringify(FJLta.cleanSettings({ ...raw, ...(old ? { retentionDays: 0 } : {}), retentionMigrated: true }), null, 2));
+      if (old) log('info', 'LTA levely: archiv se už nemaže (90 dní → bez mazání), záloha settings.pred-retenci.json.');
+    } catch (err) {
+      log('warn', 'LTA levely: převod retence selhal: ' + (err?.message || err));
+    }
+  }
+
   function getSettings() {
+    migrateRetention();
     try { return FJLta.cleanSettings(JSON.parse(fs.readFileSync(settingsPath, 'utf8'))); }
-    catch { return FJLta.cleanSettings({}); }
+    // Bez souboru = nová instalace: výchozí „bez mazání", převod už není potřeba.
+    catch { return FJLta.cleanSettings({ retentionMigrated: true }); }
   }
 
   function setSettings(patch) {
@@ -140,6 +164,7 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
       lastSignature.set(day, signature);
       lastSnapshot = { at, levelCount: levels.length, written: true };
       log('info', `LTA levely: uložena verze ${day} (${levels.length} levelů).`);
+      try { exportDays([day + '.json']); } catch (err) { log('warn', 'LTA levely: export do ai-export selhal: ' + (err?.message || err)); }
       return { written: true, day, count: levels.length };
     })();
     try { return await busy; } finally { busy = null; }
@@ -149,7 +174,54 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
     try { return fs.readdirSync(root).filter(n => DAY_FILE_RE.test(n)).sort(); } catch { return []; }
   }
 
+  // Kopie archivu pro Backtest Lab: ai-export/lta-levels/RRRR-MM-DD.json =
+  // { day, versions: [{ from, signature, levels }] } se všemi instrumenty.
+  // Soubor se přepíše jen tehdy, když se obsah liší. Vypnutý export nic nemaže.
+  function exportDays(names) {
+    let dir = null;
+    try { dir = exportDir(); } catch { dir = null; }
+    if (!dir) return { written: 0, same: 0, off: true };
+    let written = 0;
+    let same = 0;
+    for (const name of names) {
+      const day = DAY_FILE_RE.exec(name)?.[1];
+      if (!day) continue;
+      const text = JSON.stringify({ day, versions: readDay(day) });
+      const target = path.join(dir, name);
+      let current = null;
+      try { current = fs.readFileSync(target, 'utf8'); } catch { /* ještě není */ }
+      if (current === text) { same++; continue; }
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(target + '.tmp', text, 'utf8');
+      fs.renameSync(target + '.tmp', target);
+      written++;
+    }
+    return { written, same };
+  }
+
+  function exportArchive() { return exportDays(archiveDays()); }
+
+  // Pracovní dny mezi prvním dnem archivu a včerejškem, pro které archiv není
+  // (deník ten den neběžel). Nejnovější první.
+  function missingWeekdays(days) {
+    if (!days.length) return [];
+    const have = new Set(days.map(n => n.slice(0, 10)));
+    const [y, m, d] = days[0].slice(0, 10).split('-').map(Number);
+    const cur = new Date(y, m - 1, d);
+    const today = localDate(now());
+    const out = [];
+    while (localDate(cur.getTime()) < today) {
+      const wd = cur.getDay();
+      const key = localDate(cur.getTime());
+      if (wd !== 0 && wd !== 6 && !have.has(key)) out.push(key);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out.reverse();
+  }
+
+  // 0 = bez mazání (výchozí od 4.8.102).
   function prune(settings = getSettings()) {
+    if (!(settings.retentionDays > 0)) return 0;
     const cutoff = localDate(now() - settings.retentionDays * 864e5);
     let removed = 0;
     for (const name of archiveDays()) {
@@ -177,14 +249,21 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
       if (v) { levels = v.levels; source = 'archive'; versionFrom = v.from; }
     }
     if (!levels && day === localDate(now())) {
-      levels = (await readCurrent(settings)).levels;
+      const cur = await readCurrent(settings);
+      levels = cur.levels;
       source = 'live';
+      // Živé soubory: „verze" platí od posledního zápisu použitých souborů.
+      const changed = Math.max(0, ...cur.files.filter(f => f.enabled && !f.error).map(f => f.mtimeMs));
+      versionFrom = changed > 0 ? new Date(changed).toISOString() : null;
     }
+    // Verze, kterou deník uložil (nebo LTA zapsal) až po vstupu, může obsahovat
+    // levely, které při vstupu ještě nebyly – pohled do budoucnosti.
+    const versionAfterEntry = !!(levels && versionFrom && Number.isFinite(entryMs) && Date.parse(versionFrom) > entryMs);
     const disabled = new Set(settings.disabledFiles);
     // Vyloučené názvy (Nastavení → LTA levely) se nedoplňují; archiv je drží
     // dál, takže zrušení vyloučení platí i pro starší dny.
     const list = FJLta.levelsForInstrument((levels || []).filter(l => !disabled.has(l.source) && !FJLta.isExcluded(l.name, settings)), instrumentRoot, instrumentFull, new Date(t).toISOString());
-    return { ok: true, levels: list, source: levels ? source : 'none', day, versionFrom };
+    return { ok: true, levels: list, source: levels ? source : 'none', day, versionFrom, versionAfterEntry };
   }
 
   async function status() {
@@ -203,7 +282,10 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
         const cached = f.enabled ? fileCache.get(abs) : null;
         return cached ? { ...f, names: [...new Set(cached.levels.map(l => l.name))].sort((a, b) => a.localeCompare(b)) } : f;
       }), levelCount: levels.length,
-      archive: { days: days.length, first: days[0]?.slice(0, 10) || null, last: days[days.length - 1]?.slice(0, 10) || null, bytes },
+      archive: (() => {
+        const missing = missingWeekdays(days);
+        return { days: days.length, first: days[0]?.slice(0, 10) || null, last: days[days.length - 1]?.slice(0, 10) || null, bytes, missingWeekdays: missing.slice(0, 60), missingCount: missing.length };
+      })(),
       lastSnapshot
     };
   }
@@ -218,13 +300,17 @@ function createLtaStore({ userDataDir, documentsDir, fs = require('fs'), log = (
 
   function start() {
     try { prune(); } catch { /* ignore */ }
+    try { exportArchive(); } catch (err) { log('warn', 'LTA levely: export do ai-export selhal: ' + (err?.message || err)); }
     restartTimer();
     snapshot().catch(err => log('warn', 'LTA levely: první snímek selhal: ' + (err?.message || err)));
   }
 
   function stop() { if (timer) { clearInterval(timer); timer = null; } }
 
-  return { getSettings, setSettings, folder, defaultFolder, listFiles, readCurrent, snapshot, levelsFor, status, prune, start, stop, root };
+  // Dny archivu (RRRR-MM-DD) – pro zpětné doplnění svíček (Data trhu).
+  function archiveDayList() { return archiveDays().map(n => n.slice(0, 10)); }
+
+  return { getSettings, setSettings, folder, defaultFolder, listFiles, readCurrent, snapshot, levelsFor, status, prune, exportArchive, archiveDayList, start, stop, root };
 }
 
 module.exports = { createLtaStore, localDate, TIMER_MS };

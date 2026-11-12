@@ -64,6 +64,7 @@ function tradeForm() {
     renderSingleChipGrid() {},
     renderChipGrid() {},
     renderLevelRows() {},
+    renderLtaNote() {},
     syncWouldSkipField() {},
     isSkipLive: t => t?.wouldSkipLive === true,
     getTickSizeForInstrument: () => null,

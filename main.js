@@ -1131,6 +1131,13 @@ function writeAiExportMirror(id, data) {
 function aiManifestEntry(j) {
   return { id: j?.id, name: j?.name, mode: j?.backtest === true ? 'BACKTEST' : 'LIVE', journalType: j?.journalType === 'CFD_SWING' ? 'CFD_SWING' : 'FUTURES_INTRADAY' };
 }
+// Manifest ai-export/index.json. `ltaLevels` (archiv LTA levelů v podsložce
+// lta-levels) jen se zapnutým exportem v Nastavení → Data trhu.
+function aiManifest(list) {
+  const lta = ltaManifestInfo();
+  const market = marketManifestInfo();
+  return { updatedAt: new Date().toISOString(), journals: list.map(aiManifestEntry), ...(lta ? { ltaLevels: lta } : {}), ...(market ? { market } : {}) };
+}
 ipcMain.handle('data:getAiExportInfo', async () => {
   try { return { ok: true, path: aiExportRoot() }; }
   catch (error) { return { ok: false, error: error.message }; }
@@ -1142,7 +1149,7 @@ ipcMain.handle('data:regenerateAiExports', async (_event, journals) => {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
     const list = Array.isArray(journals) ? journals : [];
     // Manifest nejdřív – export deníku z něj bere režim (gradeRetro).
-    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(aiManifestEntry) };
+    const manifest = aiManifest(list);
     fs.writeFileSync(path.join(aiExportRoot(), 'index.json'), JSON.stringify(manifest, null, 2), 'utf8');
     for (const j of list) {
       if (!j?.id) continue;
@@ -1158,7 +1165,7 @@ ipcMain.handle('data:writeAiExportManifest', async (_event, journals) => {
   try {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
     const list = Array.isArray(journals) ? journals : [];
-    const manifest = { updatedAt: new Date().toISOString(), journals: list.map(aiManifestEntry) };
+    const manifest = aiManifest(list);
     fs.writeFileSync(path.join(aiExportRoot(), 'index.json'), JSON.stringify(manifest, null, 2), 'utf8');
     return { ok: true };
   } catch (error) {
@@ -2130,7 +2137,11 @@ function resumeAfterShotJobs() {
 const LIVE_CAPTURE = {
   shots: (label, account) => takeScreenshots(label, account),
   afterShot: info => { if (typeof scheduleAfterShot === 'function') scheduleAfterShot(info); },
-  emit: event => appendCaptureEvent(event, 'ninjatrader')
+  emit: event => {
+    const stored = appendCaptureEvent(event, 'ninjatrader');
+    try { marketAfterTradeClosed(event); } catch (error) { logError('Data trhu – požadavek na svíčky', error); }
+    return stored;
+  }
 };
 async function openPositionFromExecution(state, key, payload, { delta, price, commission, rate, pointValue, time, executionId, positionId }, ctx = LIVE_CAPTURE) {
   const images = await ctx.shots('entry', payload.account);
@@ -2779,6 +2790,20 @@ function startCaptureServer() {
     if (url.pathname === '/health' && req.method === 'GET') {
       return sendJson(res, 200, { ok: true, service: 'Futures Journal Trade Capture', version: '2.0', port: CAPTURE_PORT });
     }
+    // Data trhu (J2): konektor v5 si tu vyzvedává požadavky na svíčky dne.
+    // Prostý text, jeden požadavek na řádek (FJMarketBars.requestsText).
+    // Vypnuté ukládání svíček = prázdná odpověď, konektor nic nestahuje.
+    if (url.pathname === '/api/v1/market/requests' && req.method === 'GET') {
+      const key = req.headers['x-fj-api-key'] || url.searchParams.get('key');
+      const settings = dataDirAvailable() ? readCaptureSettings() : { apiKey: captureKeyCache.key, _readFailed: !captureKeyCache.key };
+      if (settings._readFailed) return sendJson(res, 503, { ok: false, error: 'Nastavení nejde přečíst, zkus to znovu.' });
+      if (key !== settings.apiKey) return sendJson(res, 401, { ok: false, error: 'Neplatný API klíč.' });
+      marketPoll.at = Date.now();
+      marketPoll.version = Number(req.headers['x-fj-connector-version']) || null;
+      const list = marketOn('marketBars') ? marketQueue().take(1) : [];
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(FJMarketBarsMain().requestsText(list));
+    }
     if (url.pathname === '/api/v1/events' && req.method === 'POST') {
       const key = req.headers['x-fj-api-key'] || url.searchParams.get('key');
       const source = String(req.headers['x-fj-source'] || '');
@@ -2803,6 +2828,12 @@ function startCaptureServer() {
         try {
           const payload = JSON.parse(raw || '{}');
           const source = payload.source || req.headers['x-fj-source'] || 'external';
+          // Svíčky dne (Data trhu, J2): mimo events.json i zálohu zpráv –
+          // ukládají se do <userData>/market, složku dat nepotřebují.
+          if (payload.type === 'market_bars') {
+            const result = handleMarketBars(payload);
+            return sendJson(res, result.ok ? 201 : 200, result);
+          }
           // Chybí složka dat, nebo se ze zálohy ještě přehrávají starší zprávy
           // (pořadí fillů je důležité) → do zálohy.
           if (!dataDirAvailable() || captureSpoolBusy()) {
@@ -3216,7 +3247,9 @@ function ninjaConnectorApiKey(source) {
 // keyMismatch: některá kopie konektoru posílá jiný klíč, než má aplikace –
 // každá její zpráva skončí 401 a obchody se neimportují. Klíč sám se z funkce
 // nevrací, jen příznak.
-async function ninjaConnectorStatus({ documentsDir, currentVersion, fsApi, apiKey }) {
+// `requiredVersion` = nejnižší verze, kterou zapnuté funkce potřebují (bez
+// Dat trhu stačí 4 – výzva k přeinstalaci se pak neukáže). Výchozí = šablona.
+async function ninjaConnectorStatus({ documentsDir, currentVersion, requiredVersion = currentVersion, fsApi, apiKey }) {
   const target = ninjaConnectorTargetPath(documentsDir);
   if (!fsApi.existsSync(target.customDir)) return { installed: false, currentVersion };
   const copies = await findNinjaConnectorCopies(target.customDir, fsApi);
@@ -3226,7 +3259,7 @@ async function ninjaConnectorStatus({ documentsDir, currentVersion, fsApi, apiKe
     const key = ninjaConnectorApiKey(copy.source);
     return key !== null && key !== apiKey;
   });
-  return { installed: true, installedVersion, currentVersion, outdated: installedVersion < currentVersion, keyMismatch };
+  return { installed: true, installedVersion, currentVersion, outdated: installedVersion < Math.min(requiredVersion, currentVersion), keyMismatch };
 }
 // Verze NinjaTraderu ze záznamu odinstalace ve Windows (výstup `reg query …
 // \Uninstall /s`): blok, jehož DisplayName je přesně „NinjaTrader" (ne doplňky
@@ -3292,7 +3325,8 @@ ipcMain.handle('capture:ninjaConnectorStatus', async () => {
   try {
     const currentVersion = ninjaConnectorVersion(ninjaConnectorTemplateSource());
     const settings = readCaptureSettings();
-    const status = await ninjaConnectorStatus({ documentsDir: app.getPath('documents'), currentVersion, fsApi: fs, apiKey: settings._readFailed ? undefined : settings.apiKey });
+    const requiredVersion = marketOn('marketBars') ? MARKET_CONNECTOR_VERSION : NT_CONNECTOR_BASE_VERSION;
+    const status = await ninjaConnectorStatus({ documentsDir: app.getPath('documents'), currentVersion, requiredVersion, fsApi: fs, apiKey: settings._readFailed ? undefined : settings.apiKey });
     // Pamatuje si, že konektor kdy nainstalovaný byl – upozornění po
     // aktualizaci NT8 pak platí i tehdy, když ho aktualizace odstranila.
     if (status.installed && !settings.ntConnectorSeen && !settings._readFailed) writeCaptureSettings({ ...settings, ntConnectorSeen: true });
@@ -3466,11 +3500,177 @@ function ltaStore() {
     ltaStoreInstance = createLtaStore({
       userDataDir: app.getPath('userData'),
       documentsDir: app.getPath('documents'),
-      log: (level, message) => (level === 'info' ? logInfo('LTA', message) : logError('LTA', message))
+      log: (level, message) => (level === 'info' ? logInfo('LTA', message) : logError('LTA', message)),
+      // Export archivu pro Backtest Lab jen se zapnutým přepínačem (Data trhu).
+      exportDir: () => (marketOn('ltaExport') ? ltaExportDir() : null)
     });
   }
   return ltaStoreInstance;
 }
+// ---- Data trhu (4.8.102): nastavení app/market-data.js, soubor <userData>/market-data/settings.json ----
+let marketStoreInstance = null;
+function marketStore() {
+  if (!marketStoreInstance) {
+    const { createMarketStore } = require('./app/market-data-store.js');
+    marketStoreInstance = createMarketStore({ userDataDir: app.getPath('userData') });
+  }
+  return marketStoreInstance;
+}
+function marketOn(key) {
+  try { return require('./app/market-data.js').isOn(marketStore().getSettings(), key); } catch { return false; }
+}
+function ltaExportDir() {
+  try { return path.join(aiExportRoot(), 'lta-levels'); } catch { return null; }
+}
+// Položka manifestu ai-export pro archiv LTA levelů (jen se zapnutým exportem).
+function ltaManifestInfo() {
+  if (!marketOn('ltaExport')) return null;
+  const dir = ltaExportDir();
+  let days = [];
+  try { days = fs.readdirSync(dir).filter(n => /^\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort(); } catch { /* zatím nic */ }
+  return { dir: 'lta-levels', days: days.length, first: days[0]?.slice(0, 10) || null, last: days[days.length - 1]?.slice(0, 10) || null };
+}
+ipcMain.handle('market:getSettings', async () => {
+  try { return { ok: true, settings: marketStore().getSettings() }; } catch (error) { logError('market:getSettings', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('market:setSettings', async (_event, patch) => {
+  try {
+    const before = marketOn('ltaExport');
+    const barsBefore = marketOn('marketBars');
+    const settings = marketStore().setSettings(patch);
+    // Zapnutí exportu: hned zkopírovat celý archiv (přepis jen změněných dnů).
+    let exported = null;
+    if (!before && marketOn('ltaExport')) exported = ltaStore().exportArchive();
+    // Zapnutí svíček: dorovnat kopii v ai-export. Vypnutí: rozdané požadavky
+    // se přestanou vydávat (fronta zůstane, nic se nemaže).
+    if (!barsBefore && marketOn('marketBars')) { try { marketBarsStore().exportAll(); } catch (error) { logError('Data trhu – export svíček', error); } }
+    return { ok: true, settings, exported };
+  } catch (error) { logError('market:setSettings', error); return { ok: false, error: error.message }; }
+});
+// ---- Data trhu – minutové svíčky dne (J2) ----
+// Konektor NT8 v5 si požadavky vyzvedává (GET /api/v1/market/requests) a
+// svíčky posílá zprávou market_bars. Logika: app/market-bars.js, soubory:
+// app/market-bars-store.js (<userData>/market/<ROOT>/<den>.json).
+const MARKET_CONNECTOR_VERSION = 5;   // konektor, který umí svíčky dne
+const NT_CONNECTOR_BASE_VERSION = 4;  // stačí bez Dat trhu (VWAP vstupu)
+const marketPoll = { at: null, version: null };
+let marketBatch = null;
+let marketBarsModule = null;
+function FJMarketBarsMain() { return marketBarsModule || (marketBarsModule = require('./app/market-bars.js')); }
+let marketQueueInstance = null;
+function marketQueue() {
+  if (!marketQueueInstance) marketQueueInstance = FJMarketBarsMain().createMarketQueue();
+  return marketQueueInstance;
+}
+function marketExportDir() {
+  try { return path.join(aiExportRoot(), 'market'); } catch { return null; }
+}
+let marketBarsStoreInstance = null;
+function marketBarsStore() {
+  if (!marketBarsStoreInstance) {
+    const { createMarketBarsStore } = require('./app/market-bars-store.js');
+    marketBarsStoreInstance = createMarketBarsStore({
+      userDataDir: app.getPath('userData'),
+      exportDir: () => (marketOn('marketBars') ? marketExportDir() : null)
+    });
+  }
+  return marketBarsStoreInstance;
+}
+function localDateOf(iso) {
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? require('./app/lta-store.js').localDate(ms) : '';
+}
+// Po uzavření obchodu z NT8: požadavek na svíčky celé seance dne vstupu.
+// Selhání nic nemění na importu obchodu – den jen zůstane bez svíček.
+function marketAfterTradeClosed(event) {
+  if (!event || event.type !== 'trade_closed' || !marketOn('marketBars')) return null;
+  const time = event.entryTime || event.exitTime || '';
+  return marketQueue().enqueue({ root: event.instrument || event.instrumentFull, instrumentFull: event.instrumentFull || '', day: localDateOf(time), time, reason: 'close' });
+}
+function marketProgressSnapshot() {
+  return { batch: marketBatch, progress: marketBatch ? marketQueue().progress(marketBatch) : null, poll: { ...marketPoll } };
+}
+function notifyMarketProgress() {
+  try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('market:progress', marketProgressSnapshot()); } catch { /* okno se zavírá */ }
+}
+function handleMarketBars(payload) {
+  const requestId = String(payload?.requestId || '');
+  let result;
+  if (!marketOn('marketBars')) result = { ok: false, error: 'off' };
+  else {
+    try { result = marketBarsStore().save(payload); }
+    catch (error) { logError('Data trhu – svíčky', error); result = { ok: false, error: error.message }; }
+  }
+  if (requestId) marketQueue().done(requestId, result.ok, result.error);
+  if (result.written) scheduleManifestExtras();
+  if (!result.ok && result.error !== 'off') logInfo('Data trhu', `svíčky ${payload?.root || ''} ${payload?.day || ''} nepřišly: ${result.error}`);
+  notifyMarketProgress();
+  return result;
+}
+// Po uložení svíček obnoví v ai-export/index.json jen klíče ltaLevels a
+// market (seznam deníků zná renderer, ten se nemění). Nejvýš jednou za 3 s.
+let manifestExtrasTimer = null;
+function scheduleManifestExtras() {
+  if (manifestExtrasTimer) return;
+  manifestExtrasTimer = setTimeout(() => {
+    manifestExtrasTimer = null;
+    try {
+      const file = path.join(aiExportRoot(), 'index.json');
+      let current;
+      try { current = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return; }
+      const { ltaLevels: _l, market: _m, ...rest } = current;
+      const lta = ltaManifestInfo();
+      const market = marketManifestInfo();
+      if (JSON.stringify(_l) === JSON.stringify(lta || undefined) && JSON.stringify(_m) === JSON.stringify(market || undefined)) return;
+      const next = { ...rest, updatedAt: new Date().toISOString(), ...(lta ? { ltaLevels: lta } : {}), ...(market ? { market } : {}) };
+      fs.writeFileSync(file + '.tmp', JSON.stringify(next, null, 2), 'utf8');
+      fs.renameSync(file + '.tmp', file);
+    } catch (error) { logError('Data trhu – manifest ai-export', error); }
+  }, 3000);
+  if (manifestExtrasTimer.unref) manifestExtrasTimer.unref();
+}
+// Položka manifestu ai-export pro svíčky (jen se zapnutým ukládáním svíček).
+function marketManifestInfo() {
+  if (!marketOn('marketBars')) return null;
+  try { const st = marketBarsStore().status(); return { dir: 'market', days: st.days, roots: st.roots }; } catch { return null; }
+}
+ipcMain.handle('market:status', async () => {
+  try {
+    return { ok: true, files: marketBarsStore().status(), ...marketProgressSnapshot(), queue: marketQueue().progress(), requiredConnector: MARKET_CONNECTOR_VERSION };
+  } catch (error) { logError('market:status', error); return { ok: false, error: error.message }; }
+});
+// Zpětné doplnění: dny s obchody (všechny futures deníky) a dny archivu LTA.
+ipcMain.handle('market:backfill', async (_event, journalIds) => {
+  try {
+    if (!marketOn('marketBars')) return { ok: false, error: 'Ukládání svíček je vypnuté.' };
+    const trades = [];
+    for (const id of Array.isArray(journalIds) ? journalIds : []) {
+      try { trades.push(...(readJournal(id)?.trades || [])); } catch (error) { logError('Data trhu – čtení deníku ' + id, error); }
+    }
+    const M = FJMarketBarsMain();
+    const plan = M.planBackfill({
+      trades, archiveDays: ltaStore().archiveDayList(), stored: marketBarsStore().storedIndex(), today: localDateOf(new Date().toISOString())
+    });
+    marketBatch = 'b' + Date.now().toString(36);
+    for (const p of plan) marketQueue().enqueue({ ...p, reason: 'backfill' }, marketBatch);
+    notifyMarketProgress();
+    return { ok: true, batch: marketBatch, count: plan.length };
+  } catch (error) { logError('market:backfill', error); return { ok: false, error: error.message }; }
+});
+ipcMain.handle('market:cancel', async () => {
+  const n = marketBatch ? marketQueue().cancelBatch(marketBatch) : 0;
+  notifyMarketProgress();
+  return { ok: true, cancelled: n };
+});
+ipcMain.handle('market:openFolder', async () => {
+  try {
+    const { shell } = require('electron');
+    const dir = marketBarsStore().root;
+    fs.mkdirSync(dir, { recursive: true });
+    const error = await shell.openPath(dir);
+    return error ? { ok: false, error } : { ok: true };
+  } catch (error) { return { ok: false, error: error.message }; }
+});
 ipcMain.handle('lta:status', async () => {
   try { return await ltaStore().status(); } catch (error) { logError('lta:status', error); return { ok: false, error: error.message }; }
 });

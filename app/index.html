@@ -1166,7 +1166,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaArchive"> Ukládat verze levelů po dnech <span class="sub">— pro obchody zapsané později; jednou za 5 min se jen zkontroluje čas zápisu souborů, verze se uloží jen při změně levelů</span></label>
           <div class="formgrid" style="margin-top:10px">
             <div class="field"><label>Počet levelů <span class="sub">— nad a pod vstupem (N + N)</span></label><input type="number" id="ltaNearestCount" min="0" max="50" step="1"></div>
-            <div class="field"><label>Uchovat archiv <span class="sub">— dní</span></label><input type="number" id="ltaRetentionDays" min="1" max="3650" step="1"></div>
+            <div class="field"><label>Mazat archiv starší než <span class="sub">— dní; 0 = nemazat (doporučeno, smazané dny nejde vrátit)</span></label><input type="number" id="ltaRetentionDays" min="0" max="3650" step="1"></div>
           </div>
           <div class="field full" style="margin-top:10px"><label>Složka LTA</label><div class="sub" id="ltaFolderInfo"></div>
             <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="ltaChooseFolder">Změnit složku…</button><button type="button" class="btn" id="ltaResetFolder">Výchozí složka</button><button type="button" class="btn" id="ltaOpenFolder">Otevřít složku</button><button type="button" class="btn" id="ltaRefresh">Obnovit</button></div></div>
@@ -1174,7 +1174,23 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field full" style="margin-top:10px"><label>Vyloučit názvy obsahující… <span class="sub">— jeden text na řádek, bez ohledu na velikost písmen; hodí se na názvy, které se mění každý den (např. „/“ vyloučí popisek s datem „11/02 - 00:“ z gamma souboru)</span></label><textarea id="ltaExcludePatterns" rows="3" placeholder="např. CLOSE"></textarea></div>
           <p class="sub" style="margin-top:6px">Vyloučený level se jen nedoplňuje (automaticky ani tlačítkem „Doplnit z LTA“). V archivu i v číselníku LTA Levels zůstává a ve formuláři ho jde vybrat ručně. Skrytá volba v Číselnících se navíc nenabízí vůbec.</p>
           <p class="sub" id="ltaArchiveInfo" style="margin-top:8px"></p>
+          <p class="sub" id="ltaMissingDays" style="margin-top:4px;display:none"></p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Do složky LTA se nikdy nic nezapisuje.</p>
+        </details>
+        <details class="card settings-card" data-card="marketData" id="marketDataCard">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Data trhu</h3></summary>
+          <p class="sub">Data trhu k obchodům pro Backtest Lab: archiv LTA levelů, původ hladin a další funkce postupně (svíčky dne, snímek trhu při vstupu). <b>Vypnuto = deník se chová jako dřív.</b> Vypnutí funkce nikdy nemaže data, která už jsou uložená – jen je přestane sbírat a ukazovat.</p>
+          <label class="settings-check" style="margin-top:12px"><input type="checkbox" id="marketEnabled"> <b>Data trhu zapnutá</b> <span class="sub">— první zapnutí zapne doporučenou sadu, pak jde každou funkci přepnout zvlášť</span></label>
+          <div id="marketFeatures" style="margin:6px 0 0 22px"></div>
+          <div id="marketBarsPanel" class="field full" style="margin:10px 0 0 22px;display:none"><label>Minutové svíčky dne</label>
+            <div class="sub" id="marketBarsInfo"></div>
+            <div class="sub" id="marketConnectorInfo" style="margin-top:4px"></div>
+            <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="marketBackfill">Doplnit svíčky pro dny s obchody a s archivem levelů</button><button type="button" class="btn" id="marketCancel" style="display:none">Přerušit</button><button type="button" class="btn" id="marketOpenFolder">Otevřít složku</button></div>
+            <div class="sub" id="marketProgress" style="margin-top:4px"></div>
+            <div class="sub" style="margin-top:4px">Svíčky se nikdy nemažou samy – smazat je jde jen ručně ve složce. Obchod se importuje vždy, i když svíčky nepřijdou (den pak zůstane bez svíček).</div>
+          </div>
+          <p class="sub" id="marketInfo" style="margin-top:8px"></p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Archiv LTA levelů se nemaže, ani když jsou Data trhu vypnutá.</p>
         </details>
         <details class="card settings-card" data-card="overviewFilters">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Přehled účtu</h3></summary>
@@ -1567,7 +1583,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Hladiny</span><span class="sub trade-section-summary" id="levelsSummary"></span><span class="trade-section-missing" id="levelsMissing"></span></summary>
         <div class="formgrid">
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
-          <div class="field full"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label><div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Přizpůsobení → LTA levely). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div>
+          <div class="field full"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label><div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Přizpůsobení → LTA levely). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsLtaNote" style="margin-top:6px;display:none"></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
           <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
@@ -1609,6 +1625,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
 <script src="taxonomy.js"></script>
 <script src="lta-levels.js"></script>
+<script src="market-data.js"></script>
 <script src="points.js"></script>
 <script src="context.js"></script>
 <script src="swing.js"></script>
@@ -3850,19 +3867,53 @@ async function ltaRowsFor({instrument,instrumentFull,entryISO,entryPrice,vwap,co
  if(s.vwapRow&&vw!=null&&vw>0&&!FJLta.isExcluded(FJLta.VWAP_NAME,s))levels.push({name:FJLta.VWAP_NAME,price:vw});
  out.source=res?.source||'none';
  out.count=levels.length;
+ // Původ hladin (Data trhu, J1): ze kterého dne a verze archivu a jestli
+ // verze vznikla až po vstupu. `offered` = kolik řádků LTA nabídlo.
+ out.meta={source:out.source,day:res?.day||null,versionFrom:res?.versionFrom||null,versionAfterEntry:res?.versionAfterEntry===true,offered:0};
  if(!levels.length)return out;
  const reg=FJTaxonomy.registerLtaNames([...new Set(levels.map(l=>l.name))],config);
  const removed=new Set(FJTaxonomy.removedKeys('LTA_LEVELS',reg.config));
  out.rows=FJLta.nearestRows(levels,entryPrice,s.nearestCount,name=>reg.keys[name],key=>removed.has(key)||FJTaxonomy.isHidden('NEAR_LEVEL',key,reg.config));
  out.config=reg.config;
  out.added=reg.added;
+ out.meta.offered=out.rows.length;
  return out;
+}
+// Hladiny se nedoplní samy, když verze levelů vznikla až po vstupu, nebo pro
+// den obchodu archiv není (Data trhu → upozornění). Rozhodne uživatel.
+function ltaHoldBack(meta){
+ return !!meta&&(meta.versionAfterEntry===true||meta.source==='none');
+}
+// Nastavení Data trhu (app/market-data.js) z main procesu. Bez desktopAPI
+// (náhled v prohlížeči) = výchozí, tedy vše vypnuto.
+let marketSettingsCache=null;
+async function marketSettings(force=false){
+ if(window.desktopAPI?.marketSettings&&(!marketSettingsCache||force)){
+  try{const r=await window.desktopAPI.marketSettings();if(r?.ok)marketSettingsCache=FJMarket.cleanMarketSettings(r.settings)}catch{}
+ }
+ return marketSettingsCache||FJMarket.cleanMarketSettings({});
+}
+function marketOn(key){return FJMarket.isOn(marketSettingsCache,key)}
+// Poznámka u Hladin v blízkosti, proč se levely z LTA nedoplnily samy.
+let formLtaMeta;
+function renderLtaNote(meta){
+ const el=$('nearLevelsLtaNote');if(!el)return;
+ if(!marketOn('ltaWarnings')||!ltaHoldBack(meta)||readLevelRows().length){el.innerHTML='';el.style.display='none';return}
+ const day=meta.day?meta.day.split('-').reverse().map(Number).join('. '):'den obchodu';
+ const time=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?'':d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})};
+ const msg=meta.source==='none'
+  ?`Pro ${esc(day)} není uložený archiv LTA levelů (deník ten den neběžel) – levely se nedoplnily.`
+  :`Levely z LTA pro tento obchod jsou z verze ${meta.source==='live'?'souborů změněných':'uložené'} až ${esc(time(meta.versionFrom))}, po vstupu. Můžou obsahovat levely, které při vstupu ještě nebyly, proto se nedoplnily samy.`;
+ const btn=meta.source!=='none'&&meta.offered>0?` <button type="button" class="btn" onclick="fillNearLevelsFromLta({force:true})">Doplnit přesto</button>`:'';
+ el.innerHTML=`⚠️ ${msg}${btn}`;
+ el.style.display='';
 }
 // Formulář obchodu: tlačítko „Doplnit z LTA" a automatické doplnění (auto),
 // které proběhne jen při prázdném seznamu a nezaškrtnutém „žádná hladina".
 let ltaFillToken=0;
-window.fillNearLevelsFromLta=async({auto=false}={})=>{
+window.fillNearLevelsFromLta=async({auto=false,force=false}={})=>{
  const s=await ltaSettings(!auto);
+ const market=await marketSettings();
  if(!s?.enabled){if(!auto)showToast('Import LTA levelů je vypnutý (Nastavení → Přizpůsobení → LTA levely).');return 0}
  if(auto&&(!s.autoInForm||readLevelRows().length||$(NEAR_LEVELS_ID+'None')?.checked))return 0;
  const instrument=$('instrument')?.value||'';
@@ -3872,12 +3923,15 @@ window.fillNearLevelsFromLta=async({auto=false}={})=>{
  const r=await ltaRowsFor({instrument,entryISO:ltaEntryISO($('date')?.value,$('entryTime')?.value),entryPrice,config:taxonomyConfig(),s});
  if(token!==ltaFillToken)return 0;
  if(auto&&(readLevelRows().length||$(NEAR_LEVELS_ID+'None')?.checked))return 0;
+ if(market.enabled&&r.meta)formLtaMeta=r.meta;
+ if(!force&&FJMarket.isOn(market,'ltaWarnings')&&ltaHoldBack(r.meta)){renderLtaNote(r.meta);return 0}
  if(r.added.length)await saveTaxonomyConfig(r.config);
  const current=readLevelRows();
  const merged=FJLta.mergeRows(current,r.rows);
  const fresh=merged.slice(current.length);
  for(const row of fresh)appendLevelRow(row);
  updateLevelsSummary();
+ renderLtaNote(null);
  if(!auto||fresh.length){
   const why=r.source==='none'?' Pro tento den nejsou uložené LTA levely.':r.count?'':' LTA pro tento instrument nemá žádné levely.';
   showToast(fresh.length?`Doplněno z LTA: ${fresh.length} ${fresh.length===1?'hladina':fresh.length<5?'hladiny':'hladin'}.`:`Z LTA nebylo co doplnit.${why}`);
@@ -3891,7 +3945,12 @@ async function ltaApplyToCapturedTrade(trade,event,jTaxonomy){
   const s=await ltaSettings();
   if(!s?.enabled)return null;
   if(FJTaxonomy.nearLevelsOf(trade).length||trade.nearLevelsNone)return null;
+  const market=await marketSettings();
   const r=await ltaRowsFor({instrument:trade.instrument,instrumentFull:event.instrumentFull,entryISO:event.entryTime||null,entryPrice:trade.entryPrice,vwap:event.entryVwap,config:jTaxonomy||{},s});
+  // Původ hladin se ukládá jen se zapnutými Daty trhu (vypnuto = jako dřív).
+  if(market.enabled&&r.meta)trade.ltaMeta=r.meta;
+  // Verze po vstupu / den bez archivu: nic potichu, rozhodne uživatel v kartě Hladiny.
+  if(FJMarket.isOn(market,'ltaWarnings')&&ltaHoldBack(r.meta))return null;
   if(r.rows.length)FJTaxonomy.setNearLevels(trade,r.rows,false);
   return r.added.length?r.config:null;
  }catch(err){
@@ -5203,6 +5262,9 @@ function openModal(t=null,{title}={}){
  renderLevelRows(FJTaxonomy.nearLevelsOf(t));
  // Zaškrtnutí až po řádcích: syncNearNoneControls ho u obchodu s řádky zruší.
  if($(NEAR_LEVELS_ID+'None'))$(NEAR_LEVELS_ID+'None').checked=FJTaxonomy.nearLevelsNoneOf(t);
+ // Původ hladin z LTA: formulář ho mění jen při doplnění z LTA (undefined = beze změny).
+ formLtaMeta=undefined;
+ renderLtaNote(t?.ltaMeta||null);
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
  updateConfluenceHint();
  // Karty formuláře se otevřou tak, jak je uživatel naposledy nechal.
@@ -6273,6 +6335,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   // ukládá jen true a jen bez řádků. Starý tvar (dva seznamy SR) se tím
   // z obchodu odstraní.
   FJTaxonomy.setNearLevels(obj,readLevelRows(),readNearNone());
+  if(formLtaMeta)obj.ltaMeta=formLtaMeta;
   obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
   obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
   // Kontext v2 (A4): prázdné = nevyplněno, neukládá se nic.
@@ -6571,6 +6634,8 @@ function combineTradeObjects(list,src=settings){
   sourceEventId:list.find(t=>t.sourceEventId)?.sourceEventId,
   sourceEventIds:[...new Set(legs.flatMap(l=>Array.isArray(l.sourceEventIds)&&l.sourceEventIds.length?l.sourceEventIds:(l.sourceEventId?[l.sourceEventId]:[])))],
   externalAccount:list.find(t=>t.externalAccount)?.externalAccount||'',
+  // Původ hladin z LTA (Data trhu): z první nohy, která ho má.
+  ...(list.find(t=>t.ltaMeta)?{ltaMeta:list.find(t=>t.ltaMeta).ltaMeta}:{}),
   journalId:first.journalId
  };
  // Dopočty k chování ceny po výstupu se po sloučení počítají ZNOVU: vstupní
@@ -6737,7 +6802,104 @@ async function renderLtaSettings(){
  $('ltaArchiveInfo').textContent=s.archive
   ?`Archiv: ${a.days} ${a.days===1?'den':a.days>=2&&a.days<=4?'dny':'dní'}${a.first?` (${a.first} – ${a.last})`:''}, ${(a.bytes/1048576).toFixed(1)} MB.${snap}`
   :'Archiv je vypnutý – levely jde doplnit jen k dnešním obchodům (z aktuálních souborů).';
+ // Zdraví archivu (Data trhu → upozornění): pracovní dny, kdy deník neběžel.
+ const miss=$('ltaMissingDays');
+ if(miss){
+  const list=a.missingWeekdays||[];
+  const show=s.archive&&marketOn('ltaWarnings')&&list.length>0;
+  miss.style.display=show?'':'none';
+  miss.textContent=show?`Dny bez archivu (deník ten den neběžel, levely k obchodům z těch dnů nejsou): ${list.map(d=>d.split('-').reverse().map(Number).join('. ')).join(', ')}${a.missingCount>list.length?` a dalších ${a.missingCount-list.length}`:''}.`:'';
+ }
 }
+// Nastavení → Data trhu: hlavní vypínač a přepínač pro každou hotovou funkci
+// (FJMarket.FEATURES, ready). Přepínač bez předpokladu je zešedlý s důvodem.
+async function renderMarketSettings(){
+ const card=$('marketDataCard');if(!card)return;
+ if(!window.desktopAPI?.marketSettings){card.style.display='none';return}
+ const s=await marketSettings(true);
+ $('marketEnabled').checked=s.enabled;
+ $('marketFeatures').innerHTML=FJMarket.FEATURES.filter(f=>f.ready).map(f=>{
+  const why=FJMarket.blockedReason(s,f.key);
+  return `<label class="settings-check" style="margin-top:8px${why?';opacity:.55':''}"${why?` title="${esc(why)}"`:''}><input type="checkbox" class="market-feature" data-key="${esc(f.key)}"${s.features[f.key]?' checked':''}${why?' disabled':''}> ${esc(f.label)} <span class="sub">— ${esc(f.desc)}${why&&s.enabled?` <b>${esc(why)}</b>`:''}</span></label>`;
+ }).join('');
+ document.querySelectorAll('#marketFeatures .market-feature').forEach(box=>box.onchange=()=>saveMarketSettings({features:{[box.dataset.key]:box.checked}}));
+ let info='';
+ if(FJMarket.isOn(s,'ltaExport')){
+  const p=await window.desktopAPI.getAiExportInfo?.().catch(()=>null);
+  info=`Archiv LTA levelů se kopíruje do ${p?.ok?esc(p.path)+'\\':''}lta-levels (jeden soubor na den, přepis jen při změně).`;
+ }
+ $('marketInfo').innerHTML=info;
+ await renderMarketBarsPanel(s);
+}
+// Svíčky dne (J2): stav uložených dnů, konektoru a zpětného doplnění.
+const MARKET_ERROR_TEXT={out_of_range:'NinjaTrader vrátil jiný den (Playback?)',empty:'bez dat',timeout:'konektor neodpověděl',instrument_not_found:'kontrakt nenalezen',no_session:'seance nenalezena',session_not_started:'seance ještě nezačala',off:'svíčky vypnuté'};
+function marketProgressText(p){
+ if(!p||!p.total)return '';
+ const finished=p.done+p.failed+p.cancelled;
+ const errs=Object.entries(p.errors||{}).map(([k,n])=>`${MARKET_ERROR_TEXT[k]||k} ${n}×`).join(', ');
+ return `Doplňování: ${finished} / ${p.total}${p.done?` · uloženo ${p.done}`:''}${p.failed?` · bez svíček ${p.failed}${errs?` (${errs})`:''}`:''}${p.cancelled?` · přerušeno ${p.cancelled}`:''}${p.pending+p.inflight?' …':' · hotovo'}`;
+}
+function renderMarketProgress(snap){
+ const p=snap?.progress;
+ if($('marketProgress'))$('marketProgress').textContent=marketProgressText(p);
+ if($('marketCancel'))$('marketCancel').style.display=p&&(p.pending+p.inflight)>0?'':'none';
+}
+async function renderMarketBarsPanel(s){
+ const panel=$('marketBarsPanel');if(!panel)return;
+ const on=FJMarket.isOn(s,'marketBars');
+ panel.style.display=on?'':'none';
+ if(!on||!window.desktopAPI?.marketStatus)return;
+ const st=await window.desktopAPI.marketStatus().catch(()=>null);
+ if(!st?.ok){$('marketBarsInfo').textContent='Stav svíček nejde načíst.';return}
+ const f=st.files;
+ $('marketBarsInfo').textContent=f.days?`Uloženo ${f.days} ${f.days===1?'den':f.days<5?'dny':'dní'} (${f.roots.join(', ')}), ${(f.bytes/1048576).toFixed(1)} MB.`:'Zatím žádné svíčky.';
+ // Konektor: ptá se (verze 5), nebo proč ne.
+ const age=st.poll?.at?Math.round((Date.now()-st.poll.at)/1000):null;
+ let conn;
+ if(age!==null&&age<180)conn=`Konektor NT8${st.poll.version?` v${st.poll.version}`:''} se ptá (naposledy před ${age} s).`;
+ else{
+  const ns=await window.desktopAPI.captureNinjaConnectorStatus?.().catch(()=>null);
+  if(ns?.installed&&ns.installedVersion<st.requiredConnector)conn=`⚠️ Svíčky vyžadují konektor NT8 verze ${st.requiredConnector} (nainstalovaná ${ns.installedVersion}). Přeinstaluj ho v Integrace → NinjaTrader a v NinjaScript Editoru stiskni F5.`;
+  else if(ns&&!ns.installed)conn='⚠️ Konektor NT8 není nainstalovaný (Integrace → NinjaTrader).';
+  else conn='Konektor se zatím neozval – běží NinjaTrader s připojením k datům? Ptá se jednou za minutu.';
+ }
+ $('marketConnectorInfo').textContent=conn;
+ renderMarketProgress(st);
+}
+(()=>{
+ $('marketBackfill')?.addEventListener('click',async()=>{
+  const ids=(journalProfiles||[]).filter(j=>j?.journalType!=='CFD_SWING').map(j=>j.id);
+  const r=await window.desktopAPI.marketBackfill(ids);
+  if(!r?.ok){showToast('Doplnění svíček nejde spustit: '+(r?.error||''));return}
+  showToast(r.count?`Svíčky se doplní pro ${r.count} ${r.count===1?'den':r.count<5?'dny':'dní'} – konektor NT8 je stáhne postupně.`:'Všechny dny s obchody a s archivem levelů už svíčky mají.');
+  await renderMarketSettings();
+ });
+ $('marketCancel')?.addEventListener('click',async()=>{await window.desktopAPI.marketCancel();await renderMarketSettings()});
+ $('marketOpenFolder')?.addEventListener('click',async()=>{const r=await window.desktopAPI.marketOpenFolder();if(!r?.ok)showToast('Složku nejde otevřít: '+(r?.error||''))});
+ let pending=null;
+ window.desktopAPI?.onMarketProgress?.(snap=>{
+  renderMarketProgress(snap);
+  // Počet uložených dní se obnoví nejvýš jednou za 2 s.
+  if(!pending&&$('marketDataCard')?.open)pending=setTimeout(()=>{pending=null;renderMarketBarsPanel(marketSettingsCache).catch(()=>{})},2000);
+ });
+})();
+async function saveMarketSettings(patch){
+ const r=await window.desktopAPI.marketSetSettings(patch);
+ if(!r?.ok){showToast('Nastavení Dat trhu se nepodařilo uložit: '+(r?.error||''));return}
+ marketSettingsCache=FJMarket.cleanMarketSettings(r.settings);
+ if(r.exported?.written)showToast(`Archiv LTA levelů zkopírován pro Backtest Lab: ${r.exported.written} ${r.exported.written===1?'den':r.exported.written<5?'dny':'dní'}.`);
+ // Manifest ai-export nese archiv jen se zapnutým exportem.
+ window.desktopAPI?.writeAiExportManifest?.(journalProfiles);
+ await renderMarketSettings();
+ if($('ltaSettingsCard')?.open)await renderLtaSettings();
+}
+(()=>{
+ marketSettings(true).catch(()=>{});
+ const card=$('marketDataCard');if(!card)return;
+ card.addEventListener('toggle',()=>{if(card.open)renderMarketSettings()});
+ $('marketEnabled')?.addEventListener('change',()=>saveMarketSettings({enabled:$('marketEnabled').checked}));
+ if(!window.desktopAPI?.marketSettings)card.style.display='none';
+})();
 async function saveLtaSettings(patch){
  const r=await window.desktopAPI.ltaSetSettings(patch);
  if(!r?.ok){showToast('Nastavení LTA levelů se nepodařilo uložit: '+(r?.error||''));return}
