@@ -11,7 +11,7 @@ using NinjaTrader.NinjaScript;
 #endregion
 
 // Futures Journal PRO – NinjaTrader 8 Execution + Position Sync Connector
-// FJ_CONNECTOR_VERSION: 7
+// FJ_CONNECTOR_VERSION: 8
 // (Zvyš při každé změně toho, co konektor posílá – aplikace podle toho pozná
 // zastaralou instalaci v NT a jednou nabídne přeinstalaci.)
 // Exekuce se posílají okamžitě. Úplný stav pozic se posílá při každé změně
@@ -52,7 +52,10 @@ namespace NinjaTrader.NinjaScript.AddOns
         // Verze 7: živé ticky v paměti (jako graf) – snímek má ticky až do
         // vstupu, i když historie ticků od spojení končí dřív; svíčky snímku
         // z minutové historie, pokrytí ticky (ticksComplete / ticksUntil / ticksGap).
-        private const string CONNECTOR_VERSION = "7";
+        // Verze 8: seznam sledovaných instrumentů si pamatuje (watch.txt), takže
+        // živé ticky běží od spuštění NT8, i když deník ještě neběží; instrument
+        // každé exekuce se sleduje hned.
+        private const string CONNECTOR_VERSION = "8";
         private static int marketPolling = 0;
         private Timer syncTimer;
         // NinjaTrader umí znovu vyvolat ExecutionUpdate pro fill, který už jednou
@@ -75,6 +78,7 @@ namespace NinjaTrader.NinjaScript.AddOns
 
                 try { Connection.ConnectionStatusUpdate += OnConnectionStatusUpdate; } catch { }
                 SendAllPositionSnapshots();
+                LoadWatchFile();
                 PollWatchList();
                 PollMarketRequests();
             }
@@ -203,6 +207,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 string account = x.Account != null ? x.Account.Name : "";
                 string instrument = x.Instrument.MasterInstrument != null ? x.Instrument.MasterInstrument.Name : x.Instrument.FullName;
                 string instrumentFull = x.Instrument.FullName ?? instrument;
+                // Živé ticky (snímek trhu): instrument obchodu se sleduje hned,
+                // i bez deníku – jen když je snímek v deníku zapnutý (watchEnabled).
+                try { if (watchEnabled) EnsureLive(x.Instrument); } catch { }
                 string action = x.Order != null ? x.Order.OrderAction.ToString() : "";
                 string orderName = x.Order != null ? x.Order.Name : x.Name;
                 string orderId = x.Order != null ? x.Order.OrderId : x.OrderId;
@@ -585,18 +592,10 @@ namespace NinjaTrader.NinjaScript.AddOns
                     if (!response.IsSuccessStatusCode) return;
                     text = await response.Content.ReadAsStringAsync();
                 }
-                var wanted = new HashSet<string>();
-                foreach (string line in (text ?? "").Split('\n'))
-                {
-                    string[] f = line.TrimEnd('\r').Split('\t');
-                    string root = f[0].Trim();
-                    if (root.Length == 0) continue;
-                    Instrument instrument = ResolveInstrument(f.Length > 1 ? f[1].Trim() : "", root, DateTime.Now);
-                    if (instrument == null || string.IsNullOrEmpty(instrument.FullName)) continue;
-                    wanted.Add(instrument.FullName);
-                    EnsureLive(instrument);
-                }
+                HashSet<string> wanted = ApplyWatchText(text);
                 DropLiveExcept(wanted);
+                watchEnabled = wanted.Count > 0;
+                SaveWatchFile(text);
             }
             catch (Exception ex)
             {
@@ -605,6 +604,63 @@ namespace NinjaTrader.NinjaScript.AddOns
             finally
             {
                 System.Threading.Interlocked.Exchange(ref watchPolling, 0);
+            }
+        }
+
+        // Seznam z deníku (kořen \t kontrakt na řádek) → sledované instrumenty.
+        private static HashSet<string> ApplyWatchText(string text)
+        {
+            var wanted = new HashSet<string>();
+            foreach (string line in (text ?? "").Split('\n'))
+            {
+                string[] f = line.TrimEnd('\r').Split('\t');
+                string root = f[0].Trim();
+                if (root.Length == 0) continue;
+                Instrument instrument = ResolveInstrument(f.Length > 1 ? f[1].Trim() : "", root, DateTime.Now);
+                if (instrument == null || string.IsNullOrEmpty(instrument.FullName)) continue;
+                wanted.Add(instrument.FullName);
+                EnsureLive(instrument);
+            }
+            return wanted;
+        }
+
+        // Poslední seznam z deníku na disku (Documents\NinjaTrader 8\FuturesJournalCapture\watch.txt):
+        // po spuštění NT8 se živé ticky sbírají hned, i když deník ještě neběží.
+        // Prázdný seznam (snímek v deníku vypnutý) soubor smaže.
+        private static bool watchEnabled = false;
+        private static string WatchFile()
+        {
+            return System.IO.Path.Combine(NinjaTrader.Core.Globals.UserDataDir, "FuturesJournalCapture", "watch.txt");
+        }
+
+        private static void LoadWatchFile()
+        {
+            try
+            {
+                string file = WatchFile();
+                if (!System.IO.File.Exists(file)) return;
+                watchEnabled = ApplyWatchText(System.IO.File.ReadAllText(file)).Count > 0;
+            }
+            catch (Exception ex)
+            {
+                NinjaTrader.Code.Output.Process("FuturesJournalCapture živé ticky (soubor): " + ex.Message, PrintTo.OutputTab1);
+            }
+        }
+
+        private static void SaveWatchFile(string text)
+        {
+            try
+            {
+                string file = WatchFile();
+                string clean = (text ?? "").Replace("\r", "").Trim();
+                if (clean.Length == 0) { if (System.IO.File.Exists(file)) System.IO.File.Delete(file); return; }
+                if (System.IO.File.Exists(file) && System.IO.File.ReadAllText(file) == clean) return;
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file));
+                System.IO.File.WriteAllText(file, clean);
+            }
+            catch (Exception ex)
+            {
+                NinjaTrader.Code.Output.Process("FuturesJournalCapture živé ticky (soubor): " + ex.Message, PrintTo.OutputTab1);
             }
         }
 

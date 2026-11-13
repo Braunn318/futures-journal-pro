@@ -3596,7 +3596,8 @@ const MARKET_CONNECTOR_VERSION = 5;   // konektor, který umí svíčky dne
 const NT_CONNECTOR_BASE_VERSION = 4;  // stačí bez Dat trhu (VWAP vstupu)
 // Snímek trhu při vstupu: v7 drží živé ticky (v6 brala jen historii ticků,
 // která u některých spojení – Tradovate – končila desítky minut před vstupem).
-const SNAPSHOT_CONNECTOR_VERSION = 7;
+// v8: seznam sledovaných instrumentů si konektor pamatuje (živé ticky od spuštění NT8).
+const SNAPSHOT_CONNECTOR_VERSION = 8;
 const marketPoll = { at: null, version: null };
 let marketBatch = null;
 let marketBarsModule = null;

@@ -376,20 +376,26 @@ test('main: požadavek na snímek jen se zapnutým snímkem; v5 a v6 dostanou je
   const v5 = h.m.marketTakeForConnector(5);
   assert.deepEqual(v5.map(r => r.type || 'bars'), ['bars']);
   assert.deepEqual(plain(h.m.marketTakeForConnector(6)), [], 'v6 (jen historie ticků) snímky nedostane');
-  const v7 = h.m.marketTakeForConnector(7);
+  assert.deepEqual(plain(h.m.marketTakeForConnector(7)), [], 'v7 (sledování až s deníkem) snímky nedostane');
+  const v7 = h.m.marketTakeForConnector(8);
   assert.equal(v7[0].type, 'snapshot');
   assert.equal(v7[0].executionId, 'E1');
   assert.equal(FJMarketBars.requestsText(v7).split('\t').length, 7);
   h.settings.s = FJMarket.setFeature(h.settings.s, 'marketBars', false);
-  assert.deepEqual(plain(h.m.marketTakeForConnector(7)), [], 'vypnuté svíčky = nic');
+  assert.deepEqual(plain(h.m.marketTakeForConnector(8)), [], 'vypnuté svíčky = nic');
 });
 
 // --------------------------------------------------- zdroj konektoru
 
 test('konektor v7: živé ticky jako graf, svíčky z minutové historie, pokrytí ticky, tick rule, jen do vstupu, jen čte', () => {
   const src = readRepoFile('CONNECTORS/NinjaTrader8/FuturesJournalCapture.cs');
-  assert.match(src, /FJ_CONNECTOR_VERSION:\s*7\b/);
-  assert.match(src, /CONNECTOR_VERSION = "7"/);
+  assert.match(src, /FJ_CONNECTOR_VERSION:\s*8\b/);
+  assert.match(src, /CONNECTOR_VERSION = "8"/);
+  // v8: živé ticky od spuštění NT8 bez deníku
+  assert.match(src, /LoadWatchFile\(\);\s*PollWatchList\(\);/, 'seznam ze souboru před prvním dotazem');
+  assert.match(src, /watch\.txt/);
+  assert.match(src, /if \(watchEnabled\) EnsureLive\(x\.Instrument\)/, 'instrument obchodu se sleduje hned');
+  assert.match(src, /if \(clean\.Length == 0\) \{ if \(System\.IO\.File\.Exists\(file\)\) System\.IO\.File\.Delete\(file\)/, 'vypnutý snímek soubor smaže');
   assert.match(src, /new MarketData\(instrument\)/, 'živé ticky v paměti');
   assert.match(src, /MarketDataType\.Last/);
   assert.match(src, /\/api\/v1\/market\/watch/);

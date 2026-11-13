@@ -1194,7 +1194,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="sub" id="marketSnapshotConn"></div>
             <div class="formgrid" style="margin-top:6px">
               <div class="field"><label>Value area <span class="sub">— % objemu dne pro VAH / VAL</span></label><input type="number" id="marketVaPct" min="50" max="95" step="1"></div>
-              <div class="field"><label>Živé ticky <span class="sub">— instrumenty, jejichž ticky drží konektor v paměti jako graf (kořeny oddělené čárkou, např. MES, ES); prázdné = automaticky podle obchodů</span></label><input type="text" id="marketLiveRoots" placeholder="automaticky"></div>
+              <div class="field"><label>Živé ticky <span class="sub">— konektor je sbírá sám od spuštění NT8 (nic se nezapíná, deník nemusí běžet). Instrumenty: kořeny oddělené čárkou, např. MES, ES; prázdné = automaticky podle obchodů</span></label><input type="text" id="marketLiveRoots" placeholder="automaticky"></div>
               <div class="field" id="marketLevelsNField"><label>Řádky ze snímku <span class="sub">— N nejbližších nad a N pod vstupem</span></label><input type="number" id="marketLevelsN" min="0" max="20" step="1"></div>
             </div>
             <div id="marketLevelTypes" style="margin-top:6px"></div>
@@ -6969,7 +6969,7 @@ async function renderMarketSnapshotPanel(s){
  document.querySelectorAll('#marketLevelTypes .market-level-type').forEach(box=>box.onchange=()=>saveMarketSettings({levelTypes:{[box.dataset.key]:box.checked}}));
  const notes=[];
  const ns=await window.desktopAPI?.captureNinjaConnectorStatus?.().catch(()=>null);
- const need=7;
+ const need=8;
  if(ns?.installed&&ns.installedVersion<need)notes.push(`⚠️ Snímek vyžaduje konektor NT8 verze ${need} (nainstalovaná ${ns.installedVersion}) – přeinstaluj ho v Integrace → NinjaTrader a v NinjaScript Editoru stiskni F5.`);
  else if(ns&&!ns.installed)notes.push('⚠️ Konektor NT8 není nainstalovaný (Integrace → NinjaTrader).');
  if(!FJMarket.isOn(s,'marketBars'))notes.push('Včerejší VPOC / VAH / VAL a test / netest se počítají ze svíček dne – zapni i „Ukládání minutových svíček dne“.');
