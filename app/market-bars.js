@@ -51,10 +51,18 @@
     if (!byTime.size) return { ok: false, error: list.length ? 'out_of_range' : 'empty' };
     const bars = [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]);
     dropped += list.length - dropped - bars.length;
+    // Objem na cenách za seanci (konektor v6, z ticků) – pro VPOC / VAH / VAL
+    // předchozího dne ve snímku trhu (J3). Starší konektor ho neposílá.
+    const profile = Array.isArray(p.profile)
+      ? p.profile.map(r => [num(Array.isArray(r) ? r[0] : NaN), num(Array.isArray(r) ? r[1] : NaN)])
+        .filter(([pr, v]) => Number.isFinite(pr) && pr > 0 && Number.isFinite(v) && v >= 0)
+        .sort((a, b) => a[0] - b[0])
+      : null;
     return {
       ok: true,
       dropped,
       data: {
+        ...(profile && profile.length ? { profile } : {}),
         v: FILE_VERSION,
         root,
         instrumentFull: String(p.instrumentFull || ''),
@@ -70,11 +78,13 @@
     };
   }
 
-  // Přepis jen tehdy, když přibyly svíčky (delší soubor se nikdy nenahradí kratším).
+  // Přepis jen tehdy, když přibyly svíčky (delší soubor se nikdy nenahradí
+  // kratším), nebo když stejně dlouhý soubor nově nese objem na cenách.
   function shouldReplace(current, next) {
     if (!next || !Array.isArray(next.bars)) return false;
     const have = Array.isArray(current?.bars) ? current.bars.length : 0;
-    return next.bars.length > have;
+    if (next.bars.length !== have) return next.bars.length > have;
+    return !Array.isArray(current?.profile) && Array.isArray(next.profile) && next.profile.length > 0;
   }
 
   function isComplete(data) {
@@ -96,13 +106,18 @@
       const root = rootOf(req?.root || req?.instrumentFull);
       const day = String(req?.day || '');
       if (!root || !DAY_RE.test(day)) return null;
-      const same = items.find(it => active(it) && it.root === root && it.day === day);
+      // Typ: 'bars' = svíčky dne (kořen + den), 'snapshot' = snímek při vstupu (exekuce).
+      const type = req.type === 'snapshot' ? 'snapshot' : 'bars';
+      const executionId = String(req.executionId || '');
+      if (type === 'snapshot' && !executionId) return null;
+      const same = items.find(it => active(it) && it.type === type && (type === 'snapshot' ? it.executionId === executionId : it.root === root && it.day === day));
       if (same) {
         if (!same.instrumentFull && req.instrumentFull) same.instrumentFull = String(req.instrumentFull);
         return same;
       }
       const it = {
         id: 'm' + now().toString(36) + '-' + (++seq).toString(36),
+        type, executionId,
         root, day,
         instrumentFull: String(req.instrumentFull || ''),
         time: String(req.time || ''),
@@ -126,12 +141,13 @@
       }
     }
 
-    function take(max = 1) {
+    // `accept(item)` = které požadavky konektor umí (v5 jen svíčky).
+    function take(max = 1, accept = () => true) {
       expire();
       const out = [];
       for (const it of items) {
         if (out.length >= max) break;
-        if (it.state !== 'pending') continue;
+        if (it.state !== 'pending' || !accept(it)) continue;
         it.state = 'inflight';
         it.tries += 1;
         it.takenAt = now();
@@ -199,10 +215,11 @@
   }
 
   // Odpověď pro konektor: jeden požadavek na řádek, pole oddělená tabulátorem
-  // (id, kořen, kontrakt, den, čas uvnitř seance) – C# nemusí parsovat JSON.
+  // (id, kořen, kontrakt, den, čas, typ, exekuce) – C# nemusí parsovat JSON.
+  // Konektor v5 čte jen prvních pět sloupců (a dostává jen svíčky).
   function requestsText(list) {
     const clean = v => String(v || '').replace(/[\t\r\n]/g, ' ');
-    return (list || []).map(r => [r.id, r.root, r.instrumentFull, r.day, r.time].map(clean).join('\t') + '\n').join('');
+    return (list || []).map(r => [r.id, r.root, r.instrumentFull, r.day, r.time, r.type || 'bars', r.executionId].map(clean).join('\t') + '\n').join('');
   }
 
   return { FILE_VERSION, rootOf, normalizeBarsPayload, shouldReplace, isComplete, createMarketQueue, timeForDay, planBackfill, requestsText };

@@ -7,6 +7,7 @@ const crypto = require('crypto');
 // v rendereru, pro AI export. Modul je dual (script src i require).
 const FJContext = require('./app/context.js');
 const FJPoints = require('./app/points.js');
+const FJSnapshot = require('./app/market-snapshot.js');
 
 // Screenshoty obchodů se nedrží v JSONu deníku, ale jako obyčejné soubory, na
 // které deník odkazuje adresou "fjimg://store/<otisk>.<přípona>" (viz sekce
@@ -1095,6 +1096,15 @@ function aiDerivedFields(rawTrades, main, mode) {
   // Lhůta „doplněno zpětně“ je nastavení deníku – export počítá stejně jako aplikace.
   return t => FJContext.derivedFields(t, { tickSize: FJPoints.tickSizeFor(t?.instrument, templates), config: main?.taxonomy || {}, dayOrder: order, mode, gradeRetroGraceMin: main?.gradeRetroGraceMinutes });
 }
+// Data trhu (J4): dopočty signální svíčky pro Backtest Lab – počítají se při
+// exportu z uloženého snímku a výběru svíčky (neukládají se na obchod).
+// Nesou se i se zobrazením vypnutým: uložená data Lab potřebuje.
+function aiMarketDerived(t) {
+  if (!t?.marketSnapshot) return {};
+  const sig = FJSnapshot.signalBar(t.marketSnapshot, t.signalBarOffset ?? -1);
+  if (!sig) return {};
+  return { signalBar: { offset: sig.offset, time: sig.bar.t, closeVsVpoc: sig.closeVsVpoc, volumeVsMedian20: sig.volumeVsMedian20, delta: sig.bar.delta, vpoc: sig.bar.vpoc || [], vpocTagMismatch: FJSnapshot.vpocTagMismatch(t, sig) } };
+}
 function writeAiExportMirror(id, data) {
   try {
     fs.mkdirSync(aiExportRoot(), { recursive: true });
@@ -1110,7 +1120,7 @@ function writeAiExportMirror(id, data) {
     // Dokup: vstupy pozice dopočítané z nohou (FJPoints.entriesOf). Jen
     // u obchodu, který víc vstupů opravdu má.
     const entriesOf = t => { const entries = FJPoints.entriesOf(t); return entries.length > 1 ? { entries } : {}; };
-    const trades = rawTrades.map(t => ({ ...exportTrade(t), derived: { ...derivedOf(t), ...entriesOf(t) } }));
+    const trades = rawTrades.map(t => ({ ...exportTrade(t), derived: { ...derivedOf(t), ...entriesOf(t), ...aiMarketDerived(t) } }));
     const dayNotes = {};
     for (const date in (data?.dayNotes || {})) dayNotes[date] = stripDayNote(data.dayNotes[date]);
     // Úprava číselníků deníku (vlastní volby, přejmenování) – bez ní by
@@ -2140,6 +2150,11 @@ const LIVE_CAPTURE = {
   emit: event => {
     const stored = appendCaptureEvent(event, 'ninjatrader');
     try { marketAfterTradeClosed(event); } catch (error) { logError('Data trhu – požadavek na svíčky', error); }
+    // Data trhu (J3): po otevření pozice požadavek na snímek trhu při vstupu.
+    if (event?.type === 'trade_opened') {
+      try { marketAfterEntry({ executionId: event.sourceExecutionId, instrument: event.instrument, instrumentFull: event.instrumentFull, time: event.entryTime }); }
+      catch (error) { logError('Data trhu – požadavek na snímek', error); }
+    }
     return stored;
   }
 };
@@ -2170,7 +2185,8 @@ async function openPositionFromExecution(state, key, payload, { delta, price, co
     lots: [{ key: lotKeyOf(payload, executionId), time, price, qty: Math.abs(delta), commission }],
     // VWAP v čase vstupu posílá konektor zvlášť (entry_vwap) podle ID téhle exekuce.
     ...(executionId ? { entryExecutionId: executionId } : {}),
-    ...takeEarlyEntryVwap(executionId)
+    ...takeEarlyEntryVwap(executionId),
+    ...takeEarlyMarketSnapshot(executionId)
   };
   return ctx.emit({
     type: 'trade_opened',
@@ -2489,6 +2505,7 @@ async function applyExecution(state, payload, ctx = LIVE_CAPTURE) {
       sourceExecutionId: executionId,
       positionId: current.positionId || '',
       ...(Number.isFinite(Number(current.entryVwap)) && current.entryVwap !== null ? { entryVwap: Number(current.entryVwap) } : {}),
+      ...(current.marketSnapshot ? { marketSnapshot: current.marketSnapshot } : {}),
       ...excursionTicks(payload, current.side, current.entryRefPrice, price)
     }));
   }
@@ -2725,6 +2742,14 @@ async function processCTraderClose(payload) {
   });
 }
 async function processIncomingPayload(payload, source='external') {
+  // Snímek trhu při vstupu (Data trhu, J3): jen se připojí k pozici / obchodu,
+  // do historie událostí se nezapisuje.
+  if (payload?.type === 'market_snapshot' && source === 'ninjatrader') {
+    const attached = await withCaptureLock(() => processMarketSnapshot(payload));
+    if (payload.requestId) marketQueue().done(String(payload.requestId), !payload.error, payload.error || null);
+    notifyMarketProgress();
+    return { id: 'market_snapshot', attached };
+  }
   // Snímky pozic a VWAP vstupu se do logu událostí neukládají – nejsou to
   // obchody a vytlačovaly by z kruhové paměti skutečnou historii.
   const raw = appendCaptureEvent(payload, source, payload.type !== 'position_snapshot' && payload.type !== 'entry_vwap');
@@ -2800,7 +2825,7 @@ function startCaptureServer() {
       if (key !== settings.apiKey) return sendJson(res, 401, { ok: false, error: 'Neplatný API klíč.' });
       marketPoll.at = Date.now();
       marketPoll.version = Number(req.headers['x-fj-connector-version']) || null;
-      const list = marketOn('marketBars') ? marketQueue().take(1) : [];
+      const list = marketTakeForConnector(marketPoll.version);
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end(FJMarketBarsMain().requestsText(list));
     }
@@ -3325,7 +3350,7 @@ ipcMain.handle('capture:ninjaConnectorStatus', async () => {
   try {
     const currentVersion = ninjaConnectorVersion(ninjaConnectorTemplateSource());
     const settings = readCaptureSettings();
-    const requiredVersion = marketOn('marketBars') ? MARKET_CONNECTOR_VERSION : NT_CONNECTOR_BASE_VERSION;
+    const requiredVersion = marketOn('snapshot') ? SNAPSHOT_CONNECTOR_VERSION : marketOn('marketBars') ? MARKET_CONNECTOR_VERSION : NT_CONNECTOR_BASE_VERSION;
     const status = await ninjaConnectorStatus({ documentsDir: app.getPath('documents'), currentVersion, requiredVersion, fsApi: fs, apiKey: settings._readFailed ? undefined : settings.apiKey });
     // Pamatuje si, že konektor kdy nainstalovaný byl – upozornění po
     // aktualizaci NT8 pak platí i tehdy, když ho aktualizace odstranila.
@@ -3553,6 +3578,7 @@ ipcMain.handle('market:setSettings', async (_event, patch) => {
 // app/market-bars-store.js (<userData>/market/<ROOT>/<den>.json).
 const MARKET_CONNECTOR_VERSION = 5;   // konektor, který umí svíčky dne
 const NT_CONNECTOR_BASE_VERSION = 4;  // stačí bez Dat trhu (VWAP vstupu)
+const SNAPSHOT_CONNECTOR_VERSION = 6; // snímek trhu při vstupu
 const marketPoll = { at: null, version: null };
 let marketBatch = null;
 let marketBarsModule = null;
@@ -3587,6 +3613,93 @@ function marketAfterTradeClosed(event) {
   const time = event.entryTime || event.exitTime || '';
   return marketQueue().enqueue({ root: event.instrument || event.instrumentFull, instrumentFull: event.instrumentFull || '', day: localDateOf(time), time, reason: 'close' });
 }
+// ---- Data trhu – snímek trhu při vstupu (J3) ----
+// Konektor v6 pošle po vstupu market_snapshot (ticky seance do vstupu). Připojí
+// se k pozici stejně jako VWAP vstupu (processEntryVwap): otevřená pozice →
+// neimportovaný trade_closed → uloží se, než dorazí exekuce.
+const earlyMarketSnapshots = new Map();
+function takeEarlyMarketSnapshot(executionId) {
+  if (!executionId || !earlyMarketSnapshots.has(executionId)) return {};
+  const marketSnapshot = earlyMarketSnapshots.get(executionId);
+  earlyMarketSnapshots.delete(executionId);
+  return { marketSnapshot };
+}
+function marketSettingsNow() {
+  try { return marketStore().getSettings(); } catch { return { valueAreaPct: 70 }; }
+}
+function processMarketSnapshot(payload) {
+  if (!marketOn('snapshot')) return false;
+  const executionId = String(payload?.executionId || '');
+  const r = FJSnapshot.normalizeSnapshotPayload(payload, marketSettingsNow().valueAreaPct);
+  if (!r.ok || !executionId) {
+    if (payload?.error) logInfo('Data trhu', 'snímek ' + executionId + ' nepřišel: ' + payload.error);
+    return false;
+  }
+  const snap = r.snapshot;
+  try { marketRequestPrevDay(payload.root || payload.instrumentFull, String(payload.tradeDay || '')); } catch (error) { logError('Data trhu – předchozí den', error); }
+  const state = readCaptureState();
+  const open = Object.values(state.positions || {}).find(p => p && p.entryExecutionId === executionId);
+  if (open) {
+    if (!open.marketSnapshot) { open.marketSnapshot = snap; writeCaptureState(state); }
+    return true;
+  }
+  const positionId = recentClosedEntries.get(executionId);
+  if (positionId) {
+    const events = readCaptureEvents();
+    let changed = 0;
+    for (const e of events) {
+      if (e.type === 'trade_closed' && !e.imported && e.positionId === positionId && e.marketSnapshot === undefined) { e.marketSnapshot = snap; changed++; }
+    }
+    if (changed) writeCaptureEvents(events);
+    else logInfo('Data trhu', 'snímek ' + executionId + ' dorazil až po importu obchodu – nedoplněn.');
+    return changed > 0;
+  }
+  earlyMarketSnapshots.set(executionId, snap);
+  while (earlyMarketSnapshots.size > 50) earlyMarketSnapshots.delete(earlyMarketSnapshots.keys().next().value);
+  return false;
+}
+// Po vstupu z NT8: požadavek na snímek (jen se zapnutým snímkem).
+function marketAfterEntry(entry) {
+  if (!entry?.executionId || !marketOn('snapshot')) return null;
+  return marketQueue().enqueue({ type: 'snapshot', executionId: String(entry.executionId), root: entry.instrument || entry.instrumentFull, instrumentFull: entry.instrumentFull || '', day: localDateOf(entry.time), time: entry.time || '', reason: 'entry' });
+}
+// Které požadavky dostane konektor: svíčky dne od verze 5, snímky až od verze 6.
+function marketTakeForConnector(version) {
+  const bars = marketOn('marketBars');
+  const snapshots = marketOn('snapshot') && Number(version) >= 6;
+  if (!bars && !snapshots) return [];
+  return marketQueue().take(1, it => (it.type === 'snapshot' ? snapshots : bars));
+}
+// Předchozí obchodní den (bez víkendu) pro včerejší VPOC / VAH / VAL: když
+// chybí úplný soubor svíček, zařadí se požadavek na něj (jen se svíčkami).
+function previousWeekday(day) {
+  const [y, m, d] = String(day).split('-').map(Number);
+  const t = new Date(y, m - 1, d);
+  do { t.setDate(t.getDate() - 1); } while (t.getDay() === 0 || t.getDay() === 6);
+  return localDateOf(t.toISOString());
+}
+function marketRequestPrevDay(root, day) {
+  if (!marketOn('marketBars') || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const M = FJMarketBarsMain();
+  const prev = previousWeekday(day);
+  if (M.isComplete(marketBarsStore().read(root, prev))) return null;
+  return marketQueue().enqueue({ root, day: prev, time: M.timeForDay(prev), reason: 'prevDay' });
+}
+// Soubor dne a předchozího obchodního dne (pracovní den před ním) pro průchod
+// daty trhu v rendereru. Starší uložený den se za „včerejšek" nebere – když
+// předchozí den chybí, včerejší hodnoty zůstanou prázdné (požadavek na něj
+// zařadí processMarketSnapshot).
+function marketDataFor(root, day) {
+  const store = marketBarsStore();
+  const M = FJMarketBarsMain();
+  const dayFile = store.read(root, day);
+  const prevFile = store.read(root, previousWeekday(day));
+  return { dayFile, prevFile, prevComplete: M.isComplete(prevFile) };
+}
+ipcMain.handle('market:dataFor', async (_event, query) => {
+  try { return { ok: true, ...marketDataFor(String(query?.root || ''), String(query?.day || '')) }; }
+  catch (error) { logError('market:dataFor', error); return { ok: false, error: error.message }; }
+});
 function marketProgressSnapshot() {
   return { batch: marketBatch, progress: marketBatch ? marketQueue().progress(marketBatch) : null, poll: { ...marketPoll } };
 }
@@ -3602,7 +3715,10 @@ function handleMarketBars(payload) {
     catch (error) { logError('Data trhu – svíčky', error); result = { ok: false, error: error.message }; }
   }
   if (requestId) marketQueue().done(requestId, result.ok, result.error);
-  if (result.written) scheduleManifestExtras();
+  if (result.written) {
+    scheduleManifestExtras();
+    try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('market:saved', { root: result.root, day: result.day }); } catch { /* okno se zavírá */ }
+  }
   if (!result.ok && result.error !== 'off') logInfo('Data trhu', `svíčky ${payload?.root || ''} ${payload?.day || ''} nepřišly: ${result.error}`);
   notifyMarketProgress();
   return result;
@@ -3636,7 +3752,7 @@ function marketManifestInfo() {
 }
 ipcMain.handle('market:status', async () => {
   try {
-    return { ok: true, files: marketBarsStore().status(), ...marketProgressSnapshot(), queue: marketQueue().progress(), requiredConnector: MARKET_CONNECTOR_VERSION };
+    return { ok: true, files: marketBarsStore().status(), ...marketProgressSnapshot(), queue: marketQueue().progress(), requiredConnector: MARKET_CONNECTOR_VERSION, snapshotConnector: SNAPSHOT_CONNECTOR_VERSION };
   } catch (error) { logError('market:status', error); return { ok: false, error: error.message }; }
 });
 // Zpětné doplnění: dny s obchody (všechny futures deníky) a dny archivu LTA.

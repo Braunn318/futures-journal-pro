@@ -86,6 +86,9 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   marketCancel: () => ipcRenderer.invoke('market:cancel'),
   marketOpenFolder: () => ipcRenderer.invoke('market:openFolder'),
   onMarketProgress: cb => ipcRenderer.on('market:progress', (_event, data) => cb(data)),
+  // Snímek trhu (J3): svíčky dne a předchozího dne pro průchod daty trhu
+  marketDataFor: query => ipcRenderer.invoke('market:dataFor', query),
+  onMarketSaved: cb => ipcRenderer.on('market:saved', (_event, data) => cb(data)),
   // Obrázky (4.8.7): čitelná jména podle obchodu, náhledy, vlastní složka.
   assignImageNames: (refs, record, owner) => ipcRenderer.invoke('image:assignNames', refs, record, owner),
   storeImageThumb: (ref, dataUrl) => ipcRenderer.invoke('image:storeThumb', ref, dataUrl),

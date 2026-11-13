@@ -155,7 +155,7 @@ test('AI export: swing obchody zatím nejdou ven, hlavička nese journalType', (
   try {
     const FJContext = require('../app/context.js');
     const FJPoints = require('../app/points.js');
-    const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'writeAiExportMirror', 'aiManifestEntry'],
+    const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'aiMarketDerived', 'writeAiExportMirror', 'aiManifestEntry'],
       { fs, path, aiExportRoot: () => ai, logError: (w, e) => { throw e; }, FJContext, FJPoints });
     api.writeAiExportMirror('j1', { journalType: 'CFD_SWING', trades: [...SWING, FUT[0]], settings: [], dayNotes: {} });
     const out = JSON.parse(fs.readFileSync(path.join(ai, 'j1.json'), 'utf8'));

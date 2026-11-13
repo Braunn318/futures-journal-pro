@@ -606,6 +606,7 @@
   // číselníku NEOVĚŘUJE (převod běží dřív, než se načtou vlastní volby, a export
   // bere obchody z víc deníků).
   const LEGACY_SIDES = ['TG', 'SL'];
+  const NEAR_SOURCES = ['lta', 'snapshot'];
 
   function sanitizeNearLevels(group, value, config) {
     const list = Array.isArray(value) ? value : [];
@@ -631,6 +632,10 @@
         continue;
       }
       if (testState) row.testState = testState;
+      // Data trhu (4.8.102): odkud řádek přišel (LTA / snímek trhu) a jestli
+      // test / netest doplnil stroj. Ruční řádek nemá ani jedno.
+      if (price != null && NEAR_SOURCES.includes(raw.source)) row.source = raw.source;
+      if (testState && raw.testStateAuto === true) row.testStateAuto = true;
       bySignature.set(signature, row);
       rows.push(row);
     }

@@ -404,7 +404,7 @@ test('A7/7: AI export – obchod bez smazaných polí, v novém tvaru i u deník
   const ai = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-ai-export-v3-'));
   try {
     const errors = [];
-    const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'writeAiExportMirror'], {
+    const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'aiMarketDerived', 'writeAiExportMirror'], {
       fs, path, aiExportRoot: () => ai, logError: (where, error) => errors.push(where + ': ' + error.message)
     });
     const old = { ...LONG, date: '2026-10-09', entryTime: '15:31', liquiditySwept: 'YES', pathProfile: 'LVN', entryLevelTests: { VAH: 'TESTED' },

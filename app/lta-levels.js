@@ -273,7 +273,7 @@
       const sig = r.level + '|' + Number(r.price);
       if (seen.has(sig)) continue;
       seen.add(sig);
-      list.push({ level: r.level, price: r.price });
+      list.push({ level: r.level, price: r.price, ...(r.source ? { source: r.source } : {}) });
     }
     return list;
   }

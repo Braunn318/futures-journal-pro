@@ -155,7 +155,7 @@ test('fronta: dávka zpětného doplnění, průběh a přerušení', () => {
   assert.deepEqual(q.take(5), []);
   assert.equal(q.progress('b1').cancelled, 2);
   assert.equal(FJMarketBars.requestsText([{ id: 'x1', root: 'MES', instrumentFull: '', day: '2026-11-11', time: '2026-11-11T11:00:00.000Z' }]),
-    'x1\tMES\t\t2026-11-11\t2026-11-11T11:00:00.000Z\n');
+    'x1\tMES\t\t2026-11-11\t2026-11-11T11:00:00.000Z\tbars\t\n', 'konektor v5 čte prvních 5 sloupců, v6 i typ a exekuci');
   assert.equal(FJMarketBars.requestsText([]), '');
 });
 
@@ -219,7 +219,7 @@ test('po uzavření obchodu: požadavek na svíčky jen se zapnutými svíčkami
 
 test('konektor v5: vyzvedává požadavky a posílá market_bars, jen čte', () => {
   const src = readRepoFile('CONNECTORS/NinjaTrader8/FuturesJournalCapture.cs');
-  assert.match(src, /FJ_CONNECTOR_VERSION:\s*5\b/);
+  assert.ok(Number(/FJ_CONNECTOR_VERSION:\s*(\d+)/.exec(src)[1]) >= 5, 'svíčky dne umí konektor od verze 5');
   assert.match(src, /\/api\/v1\/market\/requests/);
   assert.match(src, /\\"market_bars\\"/);
   assert.match(src, /out_of_range/, 'svíčky mimo seanci (Playback) se nepošlou jako data');

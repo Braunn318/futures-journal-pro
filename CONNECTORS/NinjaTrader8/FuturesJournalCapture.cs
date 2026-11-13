@@ -11,7 +11,7 @@ using NinjaTrader.NinjaScript;
 #endregion
 
 // Futures Journal PRO – NinjaTrader 8 Execution + Position Sync Connector
-// FJ_CONNECTOR_VERSION: 5
+// FJ_CONNECTOR_VERSION: 6
 // (Zvyš při každé změně toho, co konektor posílá – aplikace podle toho pozná
 // zastaralou instalaci v NT a jednou nabídne přeinstalaci.)
 // Exekuce se posílají okamžitě. Úplný stav pozic se posílá při každé změně
@@ -47,7 +47,9 @@ namespace NinjaTrader.NinjaScript.AddOns
         // MARKET_TRADING_HOURS = Trading Hours instrumentu (jako u VWAP).
         private const bool SEND_MARKET_BARS = true;
         private const string MARKET_TRADING_HOURS = "";
-        private const string CONNECTOR_VERSION = "5";
+        // Verze 6: snímek trhu při vstupu (zpráva "market_snapshot", ticky
+        // seance do vstupu) a objem na cenách u svíček dne.
+        private const string CONNECTOR_VERSION = "6";
         private static int marketPolling = 0;
         private Timer syncTimer;
         // NinjaTrader umí znovu vyvolat ExecutionUpdate pro fill, který už jednou
@@ -229,8 +231,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                 await PostJson(json);
                 if (x.Account != null) SendPositionSnapshot(x.Account);
                 if (x.IsEntry) SendEntryVwap(x);
-                // Po výstupu má aplikace případně požadavek na svíčky dne.
-                if (x.IsExit) PollMarketRequests();
+                // Po vstupu má aplikace případně požadavek na snímek trhu,
+                // po výstupu na svíčky dne.
+                PollMarketRequests();
             }
             catch (Exception ex)
             {
@@ -419,7 +422,9 @@ namespace NinjaTrader.NinjaScript.AddOns
                     {
                         string[] f = line.TrimEnd('\r').Split('\t');
                         if (f.Length < 5 || f[0].Length == 0) continue;
-                        await SendMarketBars(f[0], f[1], f[2], f[3], f[4]);
+                        // Sloupce: id, kořen, kontrakt, den, čas, typ, exekuce.
+                        if (f.Length >= 7 && f[5] == "snapshot") await SendMarketSnapshot(f[0], f[1], f[2], f[3], f[4], f[6]);
+                        else await SendMarketBars(f[0], f[1], f[2], f[3], f[4]);
                     }
                 }
             }
@@ -443,6 +448,7 @@ namespace NinjaTrader.NinjaScript.AddOns
             string hoursName = "";
             DateTime sessionBegin = DateTime.MinValue, sessionEnd = DateTime.MinValue;
             StringBuilder bars = new StringBuilder();
+            StringBuilder profile = new StringBuilder();
             try
             {
                 DateTime atUtc;
@@ -471,8 +477,34 @@ namespace NinjaTrader.NinjaScript.AddOns
                                 sessionBegin = sessions.ActualSessionBegin;
                                 sessionEnd = sessions.ActualSessionEnd;
                                 DateTime to = sessionEnd < DateTime.Now ? sessionEnd : DateTime.Now;
-                                if (to <= sessionBegin) error = "session_not_started";
-                                else error = await FetchMinuteBars(instrument, hours, sessionBegin, sessionEnd, to, bars);
+                                // Den bez seance (víkend, svátek): GetNextSession vrátí až další seanci.
+                                if (sessionBegin > at || sessionEnd < at) error = "no_session_that_day";
+                                else if (to <= sessionBegin) error = "session_not_started";
+                                else
+                                {
+                                    error = await FetchMinuteBars(instrument, hours, sessionBegin, sessionEnd, to, bars);
+                                    // Objem na cenách za seanci (pro VPOC / VAH / VAL předchozího
+                                    // dne ve snímku). Selhání ticků = svíčky bez profilu.
+                                    if (error == null)
+                                    {
+                                        DateTime sb = sessionBegin, se = sessionEnd;
+                                        string tickError = await WithTicks(instrument, hours, sessionBegin, to, b =>
+                                        {
+                                            Dictionary<long, double> prof = new Dictionary<long, double>();
+                                            double ts = instrument.MasterInstrument.TickSize;
+                                            for (int i = 0; i < b.Count; i++)
+                                            {
+                                                DateTime t = b.GetTime(i);
+                                                if (t <= sb || t > se) continue;
+                                                AddVolume(prof, PriceKey(b.GetClose(i), ts), b.GetVolume(i));
+                                            }
+                                            if (prof.Count == 0) return "out_of_range";
+                                            AppendProfile(profile, prof, ts);
+                                            return null;
+                                        });
+                                        if (tickError != null) profile.Clear();
+                                    }
+                                }
                             }
                         }
                     }
@@ -496,9 +528,250 @@ namespace NinjaTrader.NinjaScript.AddOns
                 (sessionEnd > DateTime.MinValue ? "\"sessionEnd\":\"" + sessionEnd.ToUniversalTime().ToString("o") + "\"," : "") +
                 (error != null
                     ? "\"error\":\"" + Escape(error.Replace("\r", " ").Replace("\n", " ")) + "\""
-                    : "\"bars\":[" + bars.ToString() + "]") +
+                    : "\"bars\":[" + bars.ToString() + "]" + (profile.Length > 0 ? ",\"profile\":[" + profile.ToString() + "]" : "")) +
             "}";
             await PostJson(json);
+        }
+
+        // ---------------- Snímek trhu při vstupu (verze 6) ----------------
+        // Ticky seance do času vstupu (t > entry se nepočítá). Jedním průchodem:
+        //  - delta = tick rule: obchod výš než předchozí = nákup, níž = prodej,
+        //    stejná cena = směr předchozího; směr se přenáší přes celou seanci
+        //    (stejně jako LTA footprint, ověřeno 9/9 svíček – docs/SNAPSHOT_DISCOVERY.md),
+        //  - 1min a 30min svíčky z ticků (konec svíčky = minuta nahoru, 30min
+        //    zarovnané od začátku seance), VPOC = cena s největším objemem
+        //    (při shodě všechny),
+        //  - profil dne do vstupu, high / low, VWAP z 1min typické ceny.
+        // VAH / VAL z profilu počítá aplikace (jedno pravidlo pro dnešek i včerejšek).
+        private const int SNAPSHOT_BARS_1M = 25;
+
+        private class BarAgg
+        {
+            public DateTime End;
+            public double O = double.NaN, H = double.MinValue, L = double.MaxValue, C, V, Delta;
+            public Dictionary<long, double> Profile = new Dictionary<long, double>();
+            public void Add(double p, double v, int dir, long key)
+            {
+                if (double.IsNaN(O)) O = p;
+                if (p > H) H = p;
+                if (p < L) L = p;
+                C = p; V += v; Delta += dir * v;
+                AddVolume(Profile, key, v);
+            }
+        }
+
+        private async System.Threading.Tasks.Task SendMarketSnapshot(string id, string root, string full, string day, string timeIso, string executionId)
+        {
+            string error = null;
+            string instrumentFull = full ?? "";
+            string hoursName = "";
+            StringBuilder body = new StringBuilder();
+            try
+            {
+                DateTime entryUtc;
+                if (!DateTime.TryParse(timeIso, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out entryUtc))
+                    error = "bad_time";
+                else
+                {
+                    DateTime entry = DateTime.SpecifyKind(entryUtc, DateTimeKind.Utc).ToLocalTime();
+                    Instrument instrument = ResolveInstrument(full, root, entry);
+                    TradingHours hours = instrument == null ? null : (!string.IsNullOrEmpty(MARKET_TRADING_HOURS)
+                        ? TradingHours.Get(MARKET_TRADING_HOURS)
+                        : (instrument.MasterInstrument != null ? instrument.MasterInstrument.TradingHours : null));
+                    SessionIterator sessions = hours == null ? null : new SessionIterator(hours);
+                    if (instrument == null) error = "instrument_not_found";
+                    else if (hours == null) error = "no_trading_hours";
+                    else if (!sessions.GetNextSession(entry, true) || sessions.ActualSessionBegin > entry) error = "no_session";
+                    else
+                    {
+                        instrumentFull = instrument.FullName ?? "";
+                        hoursName = hours.Name ?? "";
+                        DateTime sessionBegin = sessions.ActualSessionBegin;
+                        double ts = instrument.MasterInstrument.TickSize;
+                        error = await WithTicks(instrument, hours, sessionBegin, entry.AddSeconds(1), b => BuildSnapshot(b, sessionBegin, entry, ts, body));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                error = "error: " + ex.Message;
+            }
+
+            string json = "{" +
+                "\"source\":\"ninjatrader\"," +
+                "\"type\":\"market_snapshot\"," +
+                "\"requestId\":\"" + Escape(id) + "\"," +
+                "\"executionId\":\"" + Escape(executionId) + "\"," +
+                "\"root\":\"" + Escape(root) + "\"," +
+                "\"instrumentFull\":\"" + Escape(instrumentFull) + "\"," +
+                // Datum obchodu; klíč "day" nese hodnoty dne (profil, high / low, VWAP).
+                "\"tradeDay\":\"" + Escape(day) + "\"," +
+                "\"time\":\"" + Escape(timeIso) + "\"," +
+                "\"tradingHours\":\"" + Escape(hoursName) + "\"," +
+                "\"timeZone\":\"" + Escape(NtTimeZoneId()) + "\"," +
+                (error != null
+                    ? "\"error\":\"" + Escape(error.Replace("\r", " ").Replace("\n", " ")) + "\""
+                    : body.ToString()) +
+            "}";
+            await PostJson(json);
+        }
+
+        // Z ticků (sessionBegin, entry] postaví části snímku do `body` (bez složených
+        // závorek). Vrací null, nebo kód chyby.
+        private static string BuildSnapshot(Bars b, DateTime sessionBegin, DateTime entry, double ts, StringBuilder body)
+        {
+            var minutes = new List<BarAgg>();
+            var halves = new List<BarAgg>();
+            var dayProfile = new Dictionary<long, double>();
+            var tickTimes = new List<DateTime>();
+            var tickPrices = new List<double>();
+            double high = double.MinValue, low = double.MaxValue, lastPrice = double.NaN;
+            int lastDirection = 0, outside = 0;
+            for (int i = 0; i < b.Count; i++)
+            {
+                DateTime t = b.GetTime(i);
+                if (t <= sessionBegin) { outside++; continue; }
+                if (t > entry) { outside++; continue; }
+                double p = b.GetClose(i), v = b.GetVolume(i);
+                if (!IsUsablePrice(p)) continue;
+                if (!double.IsNaN(lastPrice)) { if (p > lastPrice) lastDirection = 1; else if (p < lastPrice) lastDirection = -1; }
+                lastPrice = p;
+                long key = PriceKey(p, ts);
+                DateTime mEnd = CeilTo(t, sessionBegin, 1);
+                if (minutes.Count == 0 || minutes[minutes.Count - 1].End != mEnd) minutes.Add(new BarAgg { End = mEnd });
+                minutes[minutes.Count - 1].Add(p, v, lastDirection, key);
+                DateTime hEnd = CeilTo(t, sessionBegin, 30);
+                if (halves.Count == 0 || halves[halves.Count - 1].End != hEnd) halves.Add(new BarAgg { End = hEnd });
+                halves[halves.Count - 1].Add(p, v, lastDirection, key);
+                AddVolume(dayProfile, key, v);
+                if (p > high) high = p;
+                if (p < low) low = p;
+                tickTimes.Add(t);
+                tickPrices.Add(p);
+            }
+            if (tickPrices.Count == 0) return outside > 0 ? "out_of_range" : "empty";
+
+            // Rozsah cen po každém ticku (pro „dotkla se cena VPOC 30m po uzavření svíčky").
+            int n = tickPrices.Count;
+            double[] sufMin = new double[n + 1], sufMax = new double[n + 1];
+            sufMin[n] = double.MaxValue; sufMax[n] = double.MinValue;
+            for (int i = n - 1; i >= 0; i--) { sufMin[i] = Math.Min(sufMin[i + 1], tickPrices[i]); sufMax[i] = Math.Max(sufMax[i + 1], tickPrices[i]); }
+
+            var closed = minutes.FindAll(m => m.End <= entry);
+            double pv = 0, vol = 0;
+            foreach (BarAgg m in closed) { pv += (m.H + m.L + m.C) / 3.0 * m.V; vol += m.V; }
+
+            body.Append("\"bars1m\":[");
+            int start = Math.Max(0, closed.Count - SNAPSHOT_BARS_1M);
+            for (int i = start; i < closed.Count; i++)
+            {
+                BarAgg m = closed[i];
+                if (i > start) body.Append(",");
+                body.Append("[\"").Append(m.End.ToUniversalTime().ToString("o")).Append("\",")
+                    .Append(Num(m.O)).Append(",").Append(Num(m.H)).Append(",").Append(Num(m.L)).Append(",").Append(Num(m.C)).Append(",")
+                    .Append(Num(m.V)).Append(",").Append(Num(m.Delta)).Append(",[").Append(VpocList(m.Profile, ts, null, null, null)).Append("]]");
+            }
+            body.Append("],\"bars30m\":[");
+            bool firstHalf = true;
+            foreach (BarAgg h in halves)
+            {
+                if (h.End > entry) continue;
+                int after = tickTimes.FindIndex(x => x > h.End);
+                if (after < 0) after = n;
+                var tested = new StringBuilder();
+                string vpocs = VpocList(h.Profile, ts, tested, sufMin[after], sufMax[after]);
+                if (!firstHalf) body.Append(",");
+                firstHalf = false;
+                body.Append("[\"").Append(h.End.ToUniversalTime().ToString("o")).Append("\",")
+                    .Append(Num(h.O)).Append(",").Append(Num(h.H)).Append(",").Append(Num(h.L)).Append(",").Append(Num(h.C)).Append(",")
+                    .Append(Num(h.V)).Append(",[").Append(vpocs).Append("],[").Append(tested.ToString()).Append("]]");
+            }
+            var profile = new StringBuilder();
+            AppendProfile(profile, dayProfile, ts);
+            body.Append("],\"day\":{\"profile\":[").Append(profile.ToString()).Append("],")
+                .Append("\"high\":").Append(Num(high)).Append(",\"low\":").Append(Num(low))
+                .Append(vol > 0 ? ",\"vwap\":" + Num(pv / vol) : "").Append("}");
+            return null;
+        }
+
+        // VPOC (všechny ceny s největším objemem). S `tested` zapíše ke každé,
+        // jestli leží v rozsahu cen po uzavření svíčky [min, max].
+        private static string VpocList(Dictionary<long, double> profile, double ts, StringBuilder tested, double? min, double? max)
+        {
+            double best = -1;
+            foreach (var kv in profile) if (kv.Value > best) best = kv.Value;
+            var keys = new List<long>();
+            foreach (var kv in profile) if (kv.Value == best) keys.Add(kv.Key);
+            keys.Sort();
+            var sb = new StringBuilder();
+            for (int i = 0; i < keys.Count; i++)
+            {
+                double p = keys[i] * ts;
+                if (i > 0) { sb.Append(","); if (tested != null) tested.Append(","); }
+                sb.Append(Num(p));
+                if (tested != null) tested.Append(min.HasValue && max.HasValue && min.Value <= p && p <= max.Value ? "true" : "false");
+            }
+            return sb.ToString();
+        }
+
+        // Konec svíčky, do které čas patří: (konec − délka, konec], zarovnáno od začátku seance.
+        private static DateTime CeilTo(DateTime t, DateTime sessionBegin, int minutes)
+        {
+            long span = TimeSpan.FromMinutes(minutes).Ticks;
+            long since = (t - sessionBegin).Ticks;
+            long periods = since / span + (since % span > 0 ? 1 : 0);
+            return sessionBegin.AddTicks(periods * span);
+        }
+
+        private static long PriceKey(double price, double tickSize) { return (long)Math.Round(price / tickSize); }
+
+        private static void AddVolume(Dictionary<long, double> profile, long key, double v)
+        {
+            double cur;
+            profile[key] = profile.TryGetValue(key, out cur) ? cur + v : v;
+        }
+
+        private static void AppendProfile(StringBuilder sb, Dictionary<long, double> profile, double ts)
+        {
+            var keys = new List<long>(profile.Keys);
+            keys.Sort();
+            for (int i = 0; i < keys.Count; i++)
+            {
+                if (i > 0) sb.Append(",");
+                sb.Append("[").Append(Num(keys[i] * ts)).Append(",").Append(Num(profile[keys[i]])).Append("]");
+            }
+        }
+
+        private static string Num(double v)
+        {
+            return IsUsablePrice(v) ? Math.Round(v, 8).ToString(CultureInfo.InvariantCulture) : "null";
+        }
+
+        // Ticky (from, to] instrumentu; `work` je zpracuje a vrátí null, nebo kód chyby.
+        private static async System.Threading.Tasks.Task<string> WithTicks(Instrument instrument, TradingHours hours, DateTime from, DateTime to, Func<Bars, string> work)
+        {
+            var tcs = new System.Threading.Tasks.TaskCompletionSource<string>();
+            BarsRequest request = new BarsRequest(instrument, from, to);
+            request.BarsPeriod = new BarsPeriod { BarsPeriodType = BarsPeriodType.Tick, Value = 1 };
+            request.TradingHours = hours;
+            try
+            {
+                request.Request((req, code, message) =>
+                {
+                    try
+                    {
+                        if (code != ErrorCode.NoError || req.Bars == null) { tcs.TrySetResult("data: " + code + " " + message); return; }
+                        tcs.TrySetResult(work(req.Bars));
+                    }
+                    catch (Exception ex) { tcs.TrySetResult("error: " + ex.Message); }
+                });
+                var finished = await System.Threading.Tasks.Task.WhenAny(tcs.Task, System.Threading.Tasks.Task.Delay(180000));
+                return finished == tcs.Task ? tcs.Task.Result : "timeout";
+            }
+            finally
+            {
+                request.Dispose();
+            }
         }
 
         // Stáhne 1min svíčky (from, to] a zapíše jen ty, které končí uvnitř

@@ -97,6 +97,7 @@ function replayer() {
   ], {
     takeScreenshots: async () => { throw new Error('ruční import nesmí dělat screenshoty'); },
     appendCaptureEvent: () => { throw new Error('ruční import nesmí psát do historie událostí'); },
+    takeEarlyMarketSnapshot: () => ({}),
     crypto: { randomUUID: () => 'rnd-' + (++ids) },
     logInfo: () => {}
   });

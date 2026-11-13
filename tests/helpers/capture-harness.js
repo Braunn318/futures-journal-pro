@@ -39,6 +39,8 @@ function captureHarness({
     writeCaptureEvents: () => {},
     // Data trhu (svíčky dne) – testy záznamu obchodů se jich netýkají.
     marketAfterTradeClosed: () => null,
+    marketAfterEntry: () => null,
+    takeEarlyMarketSnapshot: () => ({}),
     crypto: { randomUUID: () => 'pos-' + (++ids) },
     logInfo: (context, message) => info.push(message),
     Date: FakeDate

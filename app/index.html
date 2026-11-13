@@ -301,6 +301,7 @@ input.input-error{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
 /* ✕ zůstává v posledním sloupci, i když je test / netest skrytý (Pole kontextu). */
 .sr-row .sr-remove{grid-column:4;grid-row:1}
 .sr-row .sr-test{grid-column:3;grid-row:1}
+.sr-row .sr-test.sr-test-auto{border-style:dashed}
 .level-test-name{min-width:140px;font-size:13px;font-weight:700}
 .qc-label{font-size:12px;font-weight:800;letter-spacing:.03em;color:var(--muted)}
 .day-context-card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}
@@ -1189,6 +1190,15 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="sub" id="marketProgress" style="margin-top:4px"></div>
             <div class="sub" style="margin-top:4px">Svíčky se nikdy nemažou samy – smazat je jde jen ručně ve složce. Obchod se importuje vždy, i když svíčky nepřijdou (den pak zůstane bez svíček).</div>
           </div>
+          <div id="marketSnapshotPanel" class="field full" style="margin:10px 0 0 22px;display:none"><label>Snímek trhu při vstupu</label>
+            <div class="sub" id="marketSnapshotConn"></div>
+            <div class="formgrid" style="margin-top:6px">
+              <div class="field"><label>Value area <span class="sub">— % objemu dne pro VAH / VAL</span></label><input type="number" id="marketVaPct" min="50" max="95" step="1"></div>
+              <div class="field" id="marketLevelsNField"><label>Řádky ze snímku <span class="sub">— N nejbližších nad a N pod vstupem</span></label><input type="number" id="marketLevelsN" min="0" max="20" step="1"></div>
+            </div>
+            <div id="marketLevelTypes" style="margin-top:6px"></div>
+            <div class="sub" style="margin-top:4px">Typ řádku je volba číselníku Hladina vstupu (Nastavení → Číselníky) – jde přejmenovat i skrýt; skrytá volba se nedoplňuje. High / Low dne je ve výchozím stavu skrytá.</div>
+          </div>
           <p class="sub" id="marketInfo" style="margin-top:8px"></p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Archiv LTA levelů se nemaže, ani když jsou Data trhu vypnutá.</p>
         </details>
@@ -1572,6 +1582,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" id="skippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— jen u „vědomě vynechán“</span></label><select id="skippedReason"></select><input id="skippedReasonNote" placeholder="upřesnění textem (nepovinné)" style="margin-top:6px"></div>
           <div class="field full"><label>Trend 1m <span class="sub">— trend na 1min grafu</span></label><div id="trend" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="trendHtf"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
+          <div class="field full" id="signalBarField" style="display:none"><label>Signální svíčka <span class="sub">— ze snímku trhu při vstupu; klikem vyber jinou (−1 = poslední uzavřená svíčka před vstupem)</span></label><div id="signalBarPreview"></div><div class="sub" id="signalBarInfo" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky"></div></div>
           <div class="field full" data-ctx-field="grade"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
           <div class="field full" data-ctx-field="entryTestNo"><label>Kolikátý test vstupní hladiny <span class="sub">— v seanci (1. test = netest)</span></label><div id="entryTestNo" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
@@ -1625,6 +1636,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
 <script src="taxonomy.js"></script>
 <script src="lta-levels.js"></script>
+<script src="market-snapshot.js"></script>
 <script src="market-data.js"></script>
 <script src="points.js"></script>
 <script src="context.js"></script>
@@ -3802,6 +3814,9 @@ function rowFromElement(el){
   testState:el.querySelector('.sr-test')?.value||''
  };
  if(el.dataset?.legacySide){row.legacySide=el.dataset.legacySide;row.ticksFromEntry=el.dataset.legacyTicks}
+ // Data trhu: zdroj řádku (LTA / snímek) a test / netest doplněný strojem.
+ if(el.dataset?.source)row.source=el.dataset.source;
+ if(el.dataset?.testAuto==='1'&&row.testState)row.testStateAuto=true;
  return row;
 }
 window.appendLevelRow=(row={})=>{
@@ -3824,10 +3839,15 @@ window.appendLevelRow=(row={})=>{
   el.dataset.legacySide=row.legacySide;
   el.dataset.legacyTicks=row.ticksFromEntry!=null?row.ticksFromEntry:'';
  }
- el.querySelector('.sr-level').addEventListener('change',()=>updateLevelsSummary());
+ if(row.source)el.dataset.source=row.source;
+ const test=el.querySelector('.sr-test');
+ if(row.testStateAuto&&row.testState){el.dataset.testAuto='1';test.classList.add('sr-test-auto');test.title='Doplněno ze svíček dne (cena se hladiny v seanci před vstupem dotkla = test). Jde přepsat ručně.'}
+ // Ručně upravený typ nebo cena = ruční řádek; ručně zvolený test = ruční hodnota.
+ const manual=()=>{delete el.dataset.source};
+ el.querySelector('.sr-level').addEventListener('change',()=>{manual();updateLevelsSummary()});
  // Vzdálenosti překreslí scheduleTradeSections (poslouchá celý #tradeForm).
- el.querySelector('.sr-price').addEventListener('input',()=>updateLevelsSummary());
- el.querySelector('.sr-test').addEventListener('change',()=>updateLevelsSummary());
+ el.querySelector('.sr-price').addEventListener('input',()=>{manual();updateLevelsSummary()});
+ test.addEventListener('change',()=>{delete el.dataset.testAuto;test.classList.remove('sr-test-auto');test.title='Netest = cena se hladiny v seanci ještě nedotkla';updateLevelsSummary()});
  el.querySelector('.sr-remove').addEventListener('click',()=>{el.remove();updateLevelsSummary()});
  host.appendChild(el);
  if(typeof applyContextFieldVisibility==='function')applyContextFieldVisibility();
@@ -3894,6 +3914,86 @@ async function marketSettings(force=false){
  return marketSettingsCache||FJMarket.cleanMarketSettings({});
 }
 function marketOn(key){return FJMarket.isOn(marketSettingsCache,key)}
+// Data trhu (J3) u jednoho obchodu: řádky Hladin ze snímku, včerejší VPOC /
+// VAH / VAL ze souboru svíček předchozího dne a test / netest ze svíček dne
+// (FJSnapshot.applyMarketData). Ruční hodnoty se nikdy nemění. Vrací nový
+// objekt jen při změně; nic neukládá.
+async function applyMarketDataToTrade(trade,config){
+ const none={trade,changed:[]};
+ const m=await marketSettings();
+ if(!m.enabled||!trade||trade.kind==='SWING'||!trade.date||!trade.instrument)return none;
+ const levels=FJMarket.isOn(m,'snapshotLevels');
+ const autoTest=FJMarket.isOn(m,'autoTest');
+ if(!trade.marketSnapshot&&!autoTest)return none;
+ let files=null;
+ try{files=await window.desktopAPI?.marketDataFor?.({root:normalizeInstrumentCode(trade.instrument),day:trade.date})}catch{files=null}
+ const cfg=config||taxonomyConfig();
+ const known=new Set(FJTaxonomy.allKeys('NEAR_LEVEL',cfg));
+ const rows=FJTaxonomy.nearLevelsOf(trade);
+ const input=rows.length||Array.isArray(trade.nearLevels)?{...trade,nearLevels:rows}:{...trade};
+ const r=FJSnapshot.applyMarketData(input,{
+  levels,autoTest,types:m.levelTypes,n:m.levelsN,pct:m.valueAreaPct,
+  isHidden:key=>!known.has(key)||FJTaxonomy.isHidden('NEAR_LEVEL',key,cfg),
+  dayFile:files?.ok?files.dayFile:null,prevFile:files?.ok?files.prevFile:null,prevComplete:!!files?.prevComplete
+ });
+ if(!r.changed.length)return none;
+ if(r.changed.includes('levels')||r.changed.includes('testState'))FJTaxonomy.setNearLevels(r.trade,r.trade.nearLevels,false);
+ return r;
+}
+// Svíčky dne uložené (konektor, zpětné doplnění) → průchod u obchodů aktivního
+// deníku z toho dne (a u obchodů dalších dnů, kterým chybí včerejšek).
+(()=>{
+ window.desktopAPI?.onMarketSaved?.(async({root,day}={})=>{
+  try{
+   const m=await marketSettings();
+   if(!m.enabled||!root||!day)return;
+   const list=(trades||[]).filter(t=>t&&t.kind!=='SWING'&&normalizeInstrumentCode(t.instrument)===root&&(t.date===day||(t.marketSnapshot&&!t.marketSnapshot.prevDay&&t.date>day)));
+   let saved=0;
+   for(const t of list){
+    const r=await applyMarketDataToTrade(t);
+    if(r.changed.length){await put('trades',{...r.trade,updatedAt:Date.now()});saved++}
+   }
+   if(saved)await load();
+  }catch(err){console.warn('Data trhu po svíčkách',err)}
+ });
+})();
+// Signální svíčka v kartě Setup: posledních 5 uzavřených 1min svíček před
+// vstupem (OHLC + čárka VPOC), klik vybere jinou. Dopočty (zavření vůči VPOC,
+// objem vůči mediánu) se počítají při čtení a neukládají se.
+let formSnapshot=null;
+let formSignalBarOffset;
+const CLOSE_VS_VPOC_TEXT={ABOVE:'NAD',AT:'NA',BELOW:'POD'};
+function renderSignalBar(){
+ const field=$('signalBarField');if(!field)return;
+ const bars=(formSnapshot?.bars1m||[]).slice(-5);
+ if(!formSnapshot||!marketOn('signalBar')||!bars.length){field.style.display='none';return}
+ field.style.display='';
+ const off=formSignalBarOffset??-1;
+ const prices=bars.flatMap(b=>[b.h,b.l,...(b.vpoc||[])]).filter(Number.isFinite);
+ const hi=Math.max(...prices),lo=Math.min(...prices),span=Math.max(hi-lo,1e-9);
+ const W=36,H=84,pad=6,y=p=>pad+(hi-p)/span*(H-2*pad);
+
+ const cols=bars.map((b,i)=>{
+  const o=i-bars.length; // −5 … −1
+  const x=i*W+W/2,up=b.c>=b.o,col=up?'var(--green)':'var(--red)';
+  const top=y(Math.max(b.o,b.c)),bh=Math.max(1,Math.abs(y(b.o)-y(b.c)));
+  const vp=(b.vpoc||[]).map(v=>`<line x1="${x-11}" x2="${x+11}" y1="${y(v)}" y2="${y(v)}" stroke="var(--text)" stroke-width="2"/>`).join('');
+  const sel=o===off?`<rect x="${x-W/2+1}" y="1" width="${W-2}" height="${H-2}" rx="4" fill="none" stroke="var(--text)" stroke-dasharray="3 2"/>`:'';
+  return `<g data-off="${o}" style="cursor:pointer"><title>Svíčka ${o}: O ${b.o} H ${b.h} L ${b.l} C ${b.c} · objem ${b.v} · VPOC ${(b.vpoc||[]).join(' / ')}</title><rect x="${x-W/2}" y="0" width="${W}" height="${H}" fill="transparent"/>${sel}<line x1="${x}" x2="${x}" y1="${y(b.h)}" y2="${y(b.l)}" stroke="${col}"/><rect x="${x-6}" y="${top}" width="12" height="${bh}" fill="${col}"/>${vp}<text x="${x}" y="${H+12}" text-anchor="middle" font-size="10" fill="var(--muted)">${o}</text></g>`;
+ }).join('');
+ $('signalBarPreview').innerHTML=`<svg width="${W*bars.length}" height="${H+16}" role="img" aria-label="Posledních ${bars.length} svíček před vstupem">${cols}</svg>`;
+ $('signalBarPreview').querySelectorAll('g[data-off]').forEach(g=>g.addEventListener('click',()=>{formSignalBarOffset=Number(g.dataset.off);renderSignalBar()}));
+ const sig=FJSnapshot.signalBar(formSnapshot,off);
+ if(!sig){$('signalBarInfo').textContent='';return}
+ const t=new Date(sig.bar.t);
+ const vpocs=(sig.bar.vpoc||[]).join(' / ')||'—';
+ const rel=sig.closeVsVpoc?`zavření ${CLOSE_VS_VPOC_TEXT[sig.closeVsVpoc]} VPOC ${vpocs}`:(sig.bar.vpoc||[]).length>1?`zavření mezi VPOC ${vpocs}`:'VPOC neznámý';
+ const vol=sig.volumeVsMedian20!=null?`objem ${sig.volumeVsMedian20.toFixed(2).replace('.',',')}× medián 20 předchozích`:'objem: na medián chybí 20 předchozích svíček';
+ const delta=sig.bar.delta!=null?` · delta ${sig.bar.delta>0?'+':''}${sig.bar.delta}`:'';
+ const formTrade={side:$('side')?.value,ofConfirm:typeof readChipGrid==='function'?readChipGrid('ofConfirm','OF_CONFIRM'):[]};
+ const warn=FJSnapshot.vpocTagMismatch(formTrade,sig)?' · ⚠️ nesoulad se štítkem „Uzavření vůči VPOC v pořádku“ (štítek má přednost)':'';
+ $('signalBarInfo').textContent=`Svíčka ${off} (${Number.isNaN(t.getTime())?'':t.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})}): ${rel} · ${vol}${delta}${warn}`;
+}
 // Poznámka u Hladin v blízkosti, proč se levely z LTA nedoplnily samy.
 let formLtaMeta;
 function renderLtaNote(meta){
@@ -3927,7 +4027,7 @@ window.fillNearLevelsFromLta=async({auto=false,force=false}={})=>{
  if(!force&&FJMarket.isOn(market,'ltaWarnings')&&ltaHoldBack(r.meta)){renderLtaNote(r.meta);return 0}
  if(r.added.length)await saveTaxonomyConfig(r.config);
  const current=readLevelRows();
- const merged=FJLta.mergeRows(current,r.rows);
+ const merged=FJLta.mergeRows(current,market.enabled?r.rows.map(row=>({...row,source:'lta'})):r.rows);
  const fresh=merged.slice(current.length);
  for(const row of fresh)appendLevelRow(row);
  updateLevelsSummary();
@@ -3951,7 +4051,7 @@ async function ltaApplyToCapturedTrade(trade,event,jTaxonomy){
   if(market.enabled&&r.meta)trade.ltaMeta=r.meta;
   // Verze po vstupu / den bez archivu: nic potichu, rozhodne uživatel v kartě Hladiny.
   if(FJMarket.isOn(market,'ltaWarnings')&&ltaHoldBack(r.meta))return null;
-  if(r.rows.length)FJTaxonomy.setNearLevels(trade,r.rows,false);
+  if(r.rows.length)FJTaxonomy.setNearLevels(trade,market.enabled?r.rows.map(row=>({...row,source:'lta'})):r.rows,false);
   return r.added.length?r.config:null;
  }catch(err){
   console.warn('LTA levely k importu',err);
@@ -5265,6 +5365,10 @@ function openModal(t=null,{title}={}){
  // Původ hladin z LTA: formulář ho mění jen při doplnění z LTA (undefined = beze změny).
  formLtaMeta=undefined;
  renderLtaNote(t?.ltaMeta||null);
+ // Signální svíčka (Data trhu, J3): výběr se uloží, jen když ho uživatel změní.
+ formSnapshot=t?.marketSnapshot||null;
+ formSignalBarOffset=t?.signalBarOffset;
+ renderSignalBar();
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
  updateConfluenceHint();
  // Karty formuláře se otevřou tak, jak je uživatel naposledy nechal.
@@ -6336,6 +6440,7 @@ $('tradeForm').addEventListener('submit',async e=>{
   // z obchodu odstraní.
   FJTaxonomy.setNearLevels(obj,readLevelRows(),readNearNone());
   if(formLtaMeta)obj.ltaMeta=formLtaMeta;
+  if(formSignalBarOffset!==undefined){if(formSignalBarOffset===-1)delete obj.signalBarOffset;else obj.signalBarOffset=formSignalBarOffset}
   obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
   obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
   // Kontext v2 (A4): prázdné = nevyplněno, neukládá se nic.
@@ -6636,6 +6741,10 @@ function combineTradeObjects(list,src=settings){
   externalAccount:list.find(t=>t.externalAccount)?.externalAccount||'',
   // Původ hladin z LTA (Data trhu): z první nohy, která ho má.
   ...(list.find(t=>t.ltaMeta)?{ltaMeta:list.find(t=>t.ltaMeta).ltaMeta}:{}),
+  // Snímek trhu a výběr signální svíčky: z první nohy, která je má.
+  ...(list.find(t=>t.marketSnapshot)?{marketSnapshot:list.find(t=>t.marketSnapshot).marketSnapshot}:{}),
+  ...(list.find(t=>t.signalBarOffset!=null)?{signalBarOffset:list.find(t=>t.signalBarOffset!=null).signalBarOffset}:{}),
+  ...(list.find(t=>Array.isArray(t.marketLevelsApplied))?{marketLevelsApplied:list.find(t=>Array.isArray(t.marketLevelsApplied)).marketLevelsApplied}:{}),
   journalId:first.journalId
  };
  // Dopočty k chování ceny po výstupu se po sloučení počítají ZNOVU: vstupní
@@ -6830,7 +6939,33 @@ async function renderMarketSettings(){
  }
  $('marketInfo').innerHTML=info;
  await renderMarketBarsPanel(s);
+ await renderMarketSnapshotPanel(s);
 }
+// Snímek trhu (J3): value area, N a typy řádků ze snímku, verze konektoru.
+async function renderMarketSnapshotPanel(s){
+ const panel=$('marketSnapshotPanel');if(!panel)return;
+ const on=FJMarket.isOn(s,'snapshot');
+ panel.style.display=on?'':'none';
+ if(!on)return;
+ if(document.activeElement!==$('marketVaPct'))$('marketVaPct').value=s.valueAreaPct;
+ if(document.activeElement!==$('marketLevelsN'))$('marketLevelsN').value=s.levelsN;
+ const levels=FJMarket.isOn(s,'snapshotLevels');
+ $('marketLevelsNField').style.display=levels?'':'none';
+ $('marketLevelTypes').innerHTML=levels?FJSnapshot.LEVEL_TYPES.map(t=>`<label class="settings-check sub" style="margin-top:2px"><input type="checkbox" class="market-level-type" data-key="${esc(t.key)}"${s.levelTypes?.[t.key]===false?'':' checked'}> ${esc(t.label)} <span class="sub">→ ${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',t.level)||t.level)}</span></label>`).join(''):'';
+ document.querySelectorAll('#marketLevelTypes .market-level-type').forEach(box=>box.onchange=()=>saveMarketSettings({levelTypes:{[box.dataset.key]:box.checked}}));
+ const notes=[];
+ const ns=await window.desktopAPI?.captureNinjaConnectorStatus?.().catch(()=>null);
+ const need=6;
+ if(ns?.installed&&ns.installedVersion<need)notes.push(`⚠️ Snímek vyžaduje konektor NT8 verze ${need} (nainstalovaná ${ns.installedVersion}) – přeinstaluj ho v Integrace → NinjaTrader a v NinjaScript Editoru stiskni F5.`);
+ else if(ns&&!ns.installed)notes.push('⚠️ Konektor NT8 není nainstalovaný (Integrace → NinjaTrader).');
+ if(!FJMarket.isOn(s,'marketBars'))notes.push('Včerejší VPOC / VAH / VAL a test / netest se počítají ze svíček dne – zapni i „Ukládání minutových svíček dne“.');
+ $('marketSnapshotConn').textContent=notes.join(' ');
+}
+(()=>{
+ $('marketVaPct')?.addEventListener('change',()=>saveMarketSettings({valueAreaPct:Number($('marketVaPct').value)}));
+ $('marketLevelsN')?.addEventListener('change',()=>saveMarketSettings({levelsN:Number($('marketLevelsN').value)}));
+ $('side')?.addEventListener('change',()=>{if(typeof renderSignalBar==='function')renderSignalBar()});
+})();
 // Svíčky dne (J2): stav uložených dnů, konektoru a zpětného doplnění.
 const MARKET_ERROR_TEXT={out_of_range:'NinjaTrader vrátil jiný den (Playback?)',empty:'bez dat',timeout:'konektor neodpověděl',instrument_not_found:'kontrakt nenalezen',no_session:'seance nenalezena',session_not_started:'seance ještě nezačala',off:'svíčky vypnuté'};
 function marketProgressText(p){
@@ -7185,6 +7320,21 @@ function extraTargetCsvCells(t,extra){
  for(let n=3;n<3+extra;n++)out.push(FJTaxonomy.storedTargetTypes(t['targetLevel'+n]).join('|'),t['targetLevel'+n]?.price??'');
  return out;
 }
+// Data trhu (J4, přepínač 8 „Nové sloupce v CSV"): signální svíčka vůči VPOC,
+// objem signální svíčky vůči mediánu 20 předchozích a zdroj každého řádku
+// Hladin. Jdou na úplný konec řádku – ostatní sloupce se neposouvají.
+function marketCsvHeader(count=1){
+ const out=['Signální svíčka vůči VPOC','Objem signální svíčky ×'];
+ for(let i=1;i<=count;i++)out.push(`Hladina ${i}: zdroj`);
+ return out;
+}
+function marketCsvCells(t,count=1){
+ const sig=t.marketSnapshot?FJSnapshot.signalBar(t.marketSnapshot,t.signalBarOffset??-1):null;
+ const rows=FJTaxonomy.nearLevelsOf(t);
+ const out=[sig?.closeVsVpoc||'',sig?.volumeVsMedian20!=null?Math.round(sig.volumeVsMedian20*100)/100:''];
+ for(let i=0;i<count;i++)out.push(rows[i]?.source||'');
+ return out;
+}
 function tradeCsvHeader(count=1){
  return ['Instrument','Datum','Čas vstupu','Cena vstupu','Čas výstupu','Cena výstupu','Směr','Výsledek','Body celkem','Body na kontrakt','Cena SL','R','Plánované R','Pokračování po výstupu (ticky)','Protipohyb po výstupu (ticky)','Protipohyb dřív','MFE (ticky)','MAE (ticky)','Sledováno po výstupu (min)','SL (ticky)','Výstup (ticky)','Max ve směru po výstupu (ticky)','Max ve směru celkem (ticky)','Max proti (ticky)','Zpět na vstup','Až na SL','Setup','Trend','Hladina vstupu',...levelCsvHeader(count),'Order flow','Cíl 1 typ','Cíl 1 cena','Cíl 2 typ','Cíl 2 cena','Neúplný kontext','Konfluence','Stav naplnění','Naživo bych nevzal','Důvod (naživo)','P/L (čisté)','Komise','Kontrakty','Strategie','Dodržen plán','Komentář (viditelný)','Plán: Instrument','Plán: Max. obchodů','Plán: Limit ztráty','Plán: Denní cíl','Plán: Od','Plán: Do','Plán: Setup/scénář','Plán: Psychologický checklist','Plán: Poznámka','Den: Komentář','Den: Náhled','Den: Poznámky'];
 }
@@ -7257,13 +7407,13 @@ function journalCsvTable(rows,dayNoteOf,opts={}){
  const firstIdByDate=firstTradeIdPerDate(rows);
  const order=FJContext.dayOrder(rows);
  const extra=extraTargetCsvCount(rows);
- const out=[[...tradeCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra)]];
+ const out=[[...tradeCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra),...(opts.marketCsv?marketCsvHeader(count):[])]];
  for(const t of rows){
   const note=t.date?dayNoteOf(t.date):null;
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?(note||emptyDayNoteCells()):null;
   const tickSize=opts.tickSizeOf?.(t.instrument);
-  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra)]);
+  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra),...(opts.marketCsv?marketCsvCells(t,count):[])]);
  }
  return out;
 }
@@ -7272,26 +7422,26 @@ function emptyDayNoteCells(){return {comment:'',preview:'',notes:''}}
 // (allRows), ne nad vyfiltrovanými řádky – jinak by filtr data nebo
 // instrumentu změnil „kolikátý obchod dne". journals: { id: { mode, config,
 // templates, gradeRetroGraceMin } }; dayNoteOf('journalId|datum').
-function reportCsvTable(rows,allRows,dayNoteOf,journals={}){
+function reportCsvTable(rows,allRows,dayNoteOf,journals={},opts={}){
  const count=levelCsvCount(rows);
  const first={};
  rows.forEach(t=>{if(t.date){const k=t.journalId+'|'+t.date;const cur=first[k];if(!cur||String(t.entryTime||'').localeCompare(String(cur.entryTime||''))<0)first[k]=t}});
  const orders={};
  for(const id of new Set(rows.map(t=>t.journalId)))orders[id]=FJContext.dayOrder((allRows||rows).filter(t=>t.journalId===id));
  const extra=extraTargetCsvCount(rows);
- const out=[[...reportCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra)]];
+ const out=[[...reportCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra),...(opts.marketCsv?marketCsvHeader(count):[])]];
  for(const t of rows){
   const key=t.journalId+'|'+t.date;
   const note=t.date?dayNoteOf(key):null;
   const dn=t.date&&first[key]===t?(note||{}):null;
   const j=journals[t.journalId]||{};
   const tickSize=FJPoints.tickSizeFor(t.instrument,j.templates);
-  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra)]);
+  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra),...(opts.marketCsv?marketCsvCells(t,count):[])]);
  }
  return out;
 }
 $('exportCsv').onclick=async()=>{
- const table=journalCsvTable(trades,date=>(db?.data?.dayNotes||{})[date]||null,{tickSizeOf:i=>getTickSizeForInstrument(i),config:FJTaxonomy.getConfig(),mode:activeJournalMode(),gradeRetroGraceMin:settings.gradeRetroGraceMinutes});
+ const table=journalCsvTable(trades,date=>(db?.data?.dayNotes||{})[date]||null,{tickSizeOf:i=>getTickSizeForInstrument(i),config:FJTaxonomy.getConfig(),mode:activeJournalMode(),gradeRetroGraceMin:settings.gradeRetroGraceMinutes,marketCsv:marketOn('csvColumns')});
  const csv=table.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
  if(window.desktopAPI?.exportBackupOnce){
@@ -7905,7 +8055,7 @@ $('reportCsv').onclick=async()=>{
   const main=(Array.isArray(r?.data?.settings)?r.data.settings:[]).find(s=>s?.key==='main')?.value||{};
   journals[p.id]={mode:FJContext.journalMode(p),config:main.taxonomy||{},templates:main.templates||[],gradeRetroGraceMin:main.gradeRetroGraceMinutes};
  }
- const table=reportCsvTable(reportRows,await collectReportRows(),k=>allDayNotes[k]||null,journals);
+ const table=reportCsvTable(reportRows,await collectReportRows(),k=>allDayNotes[k]||null,journals,{marketCsv:marketOn('csvColumns')});
  const csv=table.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n');
  const content='\ufeff'+csv;
  if(window.desktopAPI?.exportBackupOnce){
@@ -8104,6 +8254,8 @@ function mapCapturedTrade(e,images=[],jSettings=settings){
   side:e.side||'',
   positionId:e.positionId||'',
   ...(e.sourceExecutionId?{exitExecutionId:String(e.sourceExecutionId)}:{}),
+  // Snímek trhu při vstupu (Data trhu, J3) – posílá ho main jen se zapnutým snímkem.
+  ...(e.marketSnapshot&&typeof e.marketSnapshot==='object'?{marketSnapshot:e.marketSnapshot}:{}),
   // MFE/MAE naměřené konektorem (u NinjaTraderu Execution.MaxPrice/MinPrice
   // vstupů, viz excursionTicks v main.js). Příznak Source odliší měření od
   // ručního zadání i od dopočtu z výstupní ceny; bez hodnoty se pole vůbec
@@ -8162,6 +8314,9 @@ async function appendOrMergeCapturedTrade(journalId,event,images=[]){
   }
  }
  const targetTaxonomy=ltaConfig||jTaxonomy;
+ // Data trhu (J3): řádky Hladin ze snímku, včerejšek a test / netest ze svíček
+ // dne. Svíčky dne často dorazí až po importu – pak to dodělá onMarketSaved.
+ try{const md=await applyMarketDataToTrade(trade,targetTaxonomy);if(md.changed.length)Object.assign(trade,md.trade)}catch(err){console.warn('Data trhu k importu',err)}
  // Dopočty (exitTicks, maxFavorableTicks, maxAdverseTicks…) hned při importu –
  // jinak by je obchod s jediným výstupem dostal až po ručním uložení formuláře
  // a MFE/MAE z NinjaTraderu by se do nich nepropsaly. Velikost ticku se bere

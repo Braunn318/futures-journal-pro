@@ -16,7 +16,7 @@ const { loadMain } = require('./helpers/extract');
 function mirror() {
   const ai = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-ai-export-'));
   const errors = [];
-  const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'writeAiExportMirror'], {
+  const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'aiMarketDerived', 'writeAiExportMirror'], {
     fs, path,
     aiExportRoot: () => ai,
     logError: (where, error) => errors.push(where + ': ' + error.message)
@@ -61,7 +61,7 @@ function mirrorWithManifest(manifest) {
   const ai = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-ai-export-'));
   if (manifest) fs.writeFileSync(path.join(ai, 'index.json'), JSON.stringify(manifest));
   const errors = [];
-  const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'writeAiExportMirror'], {
+  const api = loadMain(['safeJournalId', 'aiExportPath', 'stripImages', 'stripDayNote', 'aiExportModeOf', 'aiDerivedFields', 'aiMarketDerived', 'writeAiExportMirror'], {
     fs, path, aiExportRoot: () => ai, logError: (where, error) => errors.push(where + ': ' + error.message)
   });
   return { errors, write: (id, data) => { api.writeAiExportMirror(id, data); return JSON.parse(fs.readFileSync(path.join(ai, id + '.json'), 'utf8')); } };

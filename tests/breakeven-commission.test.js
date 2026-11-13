@@ -42,6 +42,8 @@ test('main.js: uzavření pozice na vstupní ceně dá záporný čistý výsled
       takeScreenshots: async () => [],
       appendCaptureEvent: (payload) => { const e = { id: 'ev' + events.length, ...payload }; events.push(e); return e; },
       marketAfterTradeClosed: () => null,
+      marketAfterEntry: () => null,
+      takeEarlyMarketSnapshot: () => ({}),
       crypto: { randomUUID: () => 'pos-1' },
       Date
     }
