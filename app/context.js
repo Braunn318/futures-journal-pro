@@ -381,6 +381,42 @@
     return Object.keys(out).length ? out : null;
   }
 
+  // Zprávy z ekonomického kalendáře (štítek 📰 dne) → klíč DAY_NEWS. Jediné
+  // pravidlo předvyplnění pole „Zprávy“: počítá se při čtení, nikdy se
+  // neukládá, ruční volba má vždy přednost. Svátky se nepočítají; prázdný
+  // kalendář = null (pole zůstane prázdné a hlídá se jako dřív).
+  const NEWS_CALENDAR_RULES = [
+    ['FOMC', /\bFOMC\b|Fed(eral)?\s+(Interest\s+Rate|Funds)|Federal\s+Funds/i],
+    ['CPI', /\bCPI\b/i],
+    ['NFP', /Non-?Farm|\bNFP\b/i]
+  ];
+  function newsKeyFromCalendar(events, config) {
+    const list = Array.isArray(events) ? events.filter(e => e && !e.holiday) : [];
+    if (!list.length) return null;
+    const titles = list.map(e => String(e.title || ''));
+    let key = 'OTHER';
+    for (const [k, re] of NEWS_CALENDAR_RULES) if (titles.some(t => re.test(t))) { key = k; break; }
+    const tx = FJTaxonomy();
+    if (tx.isValidKey('DAY_NEWS', key, config)) return key;
+    return key !== 'OTHER' && tx.isValidKey('DAY_NEWS', 'OTHER', config) ? 'OTHER' : null;
+  }
+  // Kontext dne, jak se čte: uložené hodnoty + předvyplnění z kalendáře tam,
+  // kde nic uloženo není. `prefilled` = pole, která jsou jen předvyplněná.
+  function effectiveDayContext(dc, calendarEvents, config) {
+    const values = { ...(dc && typeof dc === 'object' ? dc : {}) };
+    const prefilled = [];
+    if (!values.newsEvent) {
+      const k = newsKeyFromCalendar(calendarEvents, config);
+      if (k) { values.newsEvent = k; prefilled.push('newsEvent'); }
+    }
+    return { values, prefilled };
+  }
+  // Ranní pole, která dni chybí (po předvyplnění z kalendáře).
+  function missingMorningFields(dc, calendarEvents, config) {
+    const { values } = effectiveDayContext(dc, calendarEvents, config);
+    return DAY_CONTEXT_MORNING.filter(k => !values[k]);
+  }
+
   const SESSION_LABELS = {
     EU_MORNING: 'EU dopoledne', US_OPEN: 'US open', US_MID: 'US poledne', US_CLOSE: 'US závěr', EVENING_OTHER: 'mimo hlavní seance'
   };
@@ -581,6 +617,7 @@
     SESSION_LABELS, derivedSummaryParts, applyGrade, gradeRetro, gradeRetroGrace, GRADE_RETRO_GRACE_MIN,
     DAY_CONTEXT, DAY_CONTEXT_GROUPS, DAY_CONTEXT_FIELDS, DAY_CONTEXT_LABELS, DAY_CONTEXT_MORNING, DAY_CONTEXT_EVENING,
     dayContextOptions, dayContextLabel, sanitizeDayContext,
+    newsKeyFromCalendar, effectiveDayContext, missingMorningFields,
     journalMode, skipLiveAllowed, allowedFillStatus,
     dataCheckIssues, dataCheckLabel, DATA_CHECK_LABELS, clearSkipLiveInLive,
     includeToggleState, includeInvalidNote

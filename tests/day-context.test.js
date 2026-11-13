@@ -166,15 +166,21 @@ test('4.8.2: renderer kontextu dne do okna v Deníku – bez omezení Kalendář
   assert.match(cal.innerHTML, /jen u aktivního deníku/, 'Kalendář přes všechny deníky dál neupravuje');
   r.renderDayContextBox('', box, { onSaved() {} });
   assert.match(box.innerHTML, /Vyber datum/);
+  // Zprávy z ekonomického kalendáře: předvyplněný chip (čárkovaně), ne uložená volba.
+  r.__context.newsForDate = d => d === '2026-10-20' ? [{ time: '14:30', title: 'CPI m/m' }] : [];
+  r.renderDayContextBox('2026-10-20', box, { onSaved() {} });
+  assert.match(box.innerHTML, /chip prefill" data-value="CPI"[^<]*(z kalendáře)/);
+  assert.doesNotMatch(box.innerHTML, /chip on" data-value="CPI"/);
+  assert.match(box.innerHTML, /předvyplněno z ekonomického kalendáře/);
 });
 
 test('4.8.2: tlačítko ☀ Kontext dne ukáže ✓, když má dnešek ranní kontext kompletní', () => {
   const nodes = new Map();
   const $ = id => { if (!nodes.has(id)) nodes.set(id, { id, textContent: '' }); return nodes.get(id); };
   const today = new Date(2026, 9, 10, 8, 30);
-  const run = dayNotes => {
-    const r = loadRenderer(['emptyDayNote', 'getDayNote', 'localDateStr', 'morningContextDone', 'renderDayContextBtn'], {
-      $, FJContext, db: { data: { dayNotes } }, Date: class extends Date { constructor(...a) { if (a.length) super(...a); else super(today); } }
+  const run = (dayNotes, news = {}) => {
+    const r = loadRenderer(['emptyDayNote', 'getDayNote', 'localDateStr', 'dayContextMissingFieldsFor', 'morningContextDone', 'renderDayContextBtn'], {
+      $, FJContext, db: { data: { dayNotes } }, newsForDate: d => news[d] || [], Date: class extends Date { constructor(...a) { if (a.length) super(...a); else super(today); } }
     });
     assert.equal(r.localDateStr(), '2026-10-10', 'místní datum, ne UTC');
     r.renderDayContextBtn();
@@ -183,6 +189,41 @@ test('4.8.2: tlačítko ☀ Kontext dne ukáže ✓, když má dnešek ranní ko
   assert.equal(run({}), '☀ Kontext dne');
   assert.equal(run({ '2026-10-10': { dayContext: { openVsValue: 'IN_VA', dayTypeExpected: 'P' } } }), '☀ Kontext dne', 'chybí zprávy');
   assert.equal(run({ '2026-10-10': { dayContext: { openVsValue: 'IN_VA', dayTypeExpected: 'P', newsEvent: 'NONE' } } }), '☀ Kontext dne ✓');
+  assert.equal(run({ '2026-10-10': { dayContext: { openVsValue: 'IN_VA', dayTypeExpected: 'P' } } }, { '2026-10-10': [{ time: '14:30', title: 'Core PPI m/m' }] }),
+    '☀ Kontext dne ✓', 'Zprávy předvyplněné z ekonomického kalendáře');
+});
+
+test('4.8.102: Zprávy předvyplněné z ekonomického kalendáře – jen při čtení, ruční volba má přednost', () => {
+  const ev = title => ({ time: '14:30', title });
+  assert.equal(FJContext.newsKeyFromCalendar([]), null);
+  assert.equal(FJContext.newsKeyFromCalendar(null), null);
+  assert.equal(FJContext.newsKeyFromCalendar([{ holiday: true, title: 'Bank Holiday' }]), null, 'svátek se nepočítá');
+  assert.equal(FJContext.newsKeyFromCalendar([ev('Core PPI m/m'), ev('PPI m/m')]), 'OTHER');
+  assert.equal(FJContext.newsKeyFromCalendar([ev('Core CPI m/m')]), 'CPI');
+  assert.equal(FJContext.newsKeyFromCalendar([ev('Non-Farm Employment Change')]), 'NFP');
+  assert.equal(FJContext.newsKeyFromCalendar([ev('CPI y/y'), ev('Federal Funds Rate')]), 'FOMC', 'FOMC má přednost');
+  assert.equal(FJContext.newsKeyFromCalendar([ev('FOMC Statement')]), 'FOMC');
+
+  const morning = { openVsValue: 'IN_VA', dayTypeExpected: 'BALANCE_D' };
+  const cal = [ev('Core PPI m/m')];
+  assert.deepEqual(FJContext.missingMorningFields(morning, []), ['newsEvent']);
+  assert.deepEqual(FJContext.missingMorningFields(morning, cal), []);
+  assert.deepEqual(FJContext.missingMorningFields(null, cal), ['openVsValue', 'dayTypeExpected']);
+  const eff = FJContext.effectiveDayContext(morning, cal);
+  assert.deepEqual(eff, { values: { ...morning, newsEvent: 'OTHER' }, prefilled: ['newsEvent'] });
+  assert.equal(morning.newsEvent, undefined, 'předvyplnění nemění uložená data');
+  assert.deepEqual(FJContext.effectiveDayContext({ ...morning, newsEvent: 'NONE' }, cal),
+    { values: { ...morning, newsEvent: 'NONE' }, prefilled: [] }, 'ruční „Bez zpráv“ vyhrává nad kalendářem');
+});
+
+test('4.8.102: varování u obchodu říká, které pole kontextu dne chybí', () => {
+  const FJTaxonomy = require('../app/taxonomy.js');
+  const on = FJTaxonomy.normalizeFieldConfig({ dayContext: { warn: true } });
+  const labels = FJTaxonomy.missingForCards({ date: '2026-11-13' }, {}, undefined, on,
+    { dayContextMissing: true, dayContextMissingLabels: ['Zprávy'] });
+  assert.ok(labels.includes('Kontext dne (Zprávy)'), labels.join(', '));
+  const plainLabel = FJTaxonomy.missingForCards({ date: '2026-11-13' }, {}, undefined, on, { dayContextMissing: true });
+  assert.ok(plainLabel.includes('Kontext dne'));
 });
 
 test('4.8.2: Deník má tlačítko a okno kontextu dne s nativním datem', () => {

@@ -964,7 +964,13 @@
   function missingWarnItems(trade, cardConfig, config, fieldConfig, opts) {
     const items = missingContextItems(trade, config, fieldConfig).filter(item => cardWarns(cardConfig, item.card));
     const isTrade = !!trade && typeof trade === 'object' && trade.recordType !== 'SETUP_ONLY';
-    if (isTrade && opts?.dayContextMissing === true && fieldWarns(fieldConfig, 'dayContext')) items.push({ key: 'dayContext', card: null, label: CONTEXT_FIELD_BY_KEY.dayContext.label });
+    // `opts.dayContextMissingLabels` (volitelné) = popisky chybějících polí,
+    // aby varování řeklo, co doplnit: „Kontext dne (Zprávy)“.
+    if (isTrade && opts?.dayContextMissing === true && fieldWarns(fieldConfig, 'dayContext')) {
+      const which = Array.isArray(opts.dayContextMissingLabels) ? opts.dayContextMissingLabels.filter(Boolean) : [];
+      const base = CONTEXT_FIELD_BY_KEY.dayContext.label;
+      items.push({ key: 'dayContext', card: null, label: which.length ? `${base} (${which.join(', ')})` : base });
+    }
     // Psychika dne: `opts.dayPsychMissing` = dni chybí některá hlídaná část
     // (missingDayPsych – volající zná denní poznámky). U obchodu se hlásí, jen
     // když je zapnuté „upozornění u obchodů dne".

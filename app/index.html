@@ -191,6 +191,7 @@ canvas{width:100%;height:100%}
 .chip{border:1px solid var(--line);background:var(--input-bg);color:var(--text);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer;user-select:none}
 .chip:hover{border-color:var(--hover-border)}
 .chip.on{background:rgba(var(--blue-rgb),.18);border-color:var(--blue)}
+.chip.prefill{border-style:dashed;border-color:var(--blue);background:rgba(var(--blue-rgb),.08)}
 .pill.context-pill{background:rgba(var(--tint-rgb),.10);font-size:10px;padding:1px 6px;opacity:.9}
 .tax-row{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}
 .tax-row.hidden-option input{opacity:.5;font-style:italic}
@@ -2178,10 +2179,20 @@ function applyContextFieldVisibility(){
 }
 // Chybí dni obchodu ranní kontext dne? Jen u obchodu aktivního deníku – denní
 // poznámky jiného deníku (Přehled, Reporty) tu nejsou.
+// Pole Zprávy předvyplní ekonomický kalendář (FJContext.effectiveDayContext),
+// když ho uživatel nevyplnil ručně. Vrací seznam chybějících ranních polí.
+function dayContextMissingFieldsFor(date){
+ if(!date||typeof getDayNote!=='function')return [];
+ const cal=typeof newsForDate==='function'?newsForDate(date):[];
+ return FJContext.missingMorningFields(getDayNote(date).dayContext,cal);
+}
 function dayContextMissingFor(t){
  if(!t?.date||(t.journalId&&t.journalId!==activeJournalId)||typeof getDayNote!=='function')return false;
- const dc=getDayNote(t.date).dayContext||{};
- return FJContext.DAY_CONTEXT_MORNING.some(k=>!dc[k]);
+ return dayContextMissingFieldsFor(t.date).length>0;
+}
+function dayContextMissingLabelsFor(t){
+ if(!t?.date||(t.journalId&&t.journalId!==activeJournalId))return [];
+ return dayContextMissingFieldsFor(t.date).map(k=>FJContext.DAY_CONTEXT_LABELS[k]);
 }
 // Co ukáže Přehled účtu po startu (Nastavení → Deníky): jen poslední aktivní
 // deník (výchozí), nebo všechny viditelné. Platí pro celou aplikaci.
@@ -4415,6 +4426,7 @@ function incompleteBadgeHTML(t){
  const labels=FJTaxonomy.missingForCards(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig,undefined,
   typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig,
   {dayContextMissing:typeof dayContextMissingFor==='function'&&dayContextMissingFor(t),
+   dayContextMissingLabels:typeof dayContextMissingLabelsFor==='function'?dayContextMissingLabelsFor(t):[],
    dayPsychMissing:typeof dayPsychMissingFor==='function'&&dayPsychMissingFor(t)});
  if(!labels.length)return '';
  return `<span class="pill incomplete-pill" title="Chybí: ${esc(labels.join(', '))}">⚠ Neúplné · ${labels.length}</span>`;
@@ -4802,7 +4814,7 @@ function dayGroupHTML(date,dayTrades,daySetups=[]){
  return `<div class="day-wrap${open?' open':''}" data-day="${date}">
  <div class="day-header" onclick="toggleDayNote('${date}')">
  <svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
- <span class="date">${date}</span>${note.dayContext&&contextFieldShown('dayContext')?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext))}</span>`:''}${dayTrades.length&&dayPsychWarnOnDay(date)?`<span class="pill context-pill psych-warn" title="Psychika dne – nevyplněno: ${esc(dayPsychMissingParts(date).map(p=>FJTaxonomy.DAY_PSYCH_LABELS[p].toLowerCase()).join(', '))}">⚠ Psychika dne</span>`:''}${typeof newsPillHTML==='function'?newsPillHTML(date):''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
+ <span class="date">${date}</span>${note.dayContext&&contextFieldShown('dayContext')?`<span class="pill context-pill day-context-pill" title="Kontext dne (Kalendář → den)">${esc(dayContextSummary(note.dayContext,date))}</span>`:''}${dayTrades.length&&dayPsychWarnOnDay(date)?`<span class="pill context-pill psych-warn" title="Psychika dne – nevyplněno: ${esc(dayPsychMissingParts(date).map(p=>FJTaxonomy.DAY_PSYCH_LABELS[p].toLowerCase()).join(', '))}">⚠ Psychika dne</span>`:''}${typeof newsPillHTML==='function'?newsPillHTML(date):''}<span class="count">${weekday} · ${dayTrades.length} ${czPluralObchod(dayTrades.length)}${skipCount?` · ${skipCount}× naživo bych nevzal`:''}${noFillCount?` · ${noFillCount}× no fill`:''}${skippedCount?` · ${skippedCount}× vědomě vynechán`:''}${daySetups.length?` · ${daySetups.length}× setup bez vstupu`:''}</span>
  <div class="spacer"></div>
  ${levelsBtn}
  ${excludedHTML}
@@ -5101,11 +5113,12 @@ function goToJournalForDate(date){
 // Kontext dne (A5) v detailu dne v Kalendáři: všech pět polí, večerní
 // (skutečný typ dne, migrace value) zvýrazněná – vyplňují se po obchodování.
 // Ukládá se hned po kliknutí, jen u aktivního deníku (kontext dne patří deníku).
-function dayContextSummary(dc){
- if(!dc)return '';
+function dayContextSummary(dc,date){
+ // Předvyplnění z ekonomického kalendáře (jen čtení) – označené „(kalendář)“.
+ const eff=FJContext.effectiveDayContext(dc,date&&typeof newsForDate==='function'?newsForDate(date):[]);
  const parts=[];
  // Popisek z číselníku deníku (Nastavení → Číselníky → Kontext dne).
- for(const k of FJContext.DAY_CONTEXT_FIELDS)if(dc[k])parts.push(FJContext.dayContextLabel(k,dc[k]));
+ for(const k of FJContext.DAY_CONTEXT_FIELDS)if(eff.values[k])parts.push(FJContext.dayContextLabel(k,eff.values[k])+(eff.prefilled.includes(k)?' (kalendář)':''));
  return parts.join(' · ');
 }
 // Týž renderer slouží i oknu „☀ Kontext dne“ v Deníku (box + onSaved) – tam
@@ -5117,7 +5130,11 @@ function renderDayContextBox(date,box=$('dayContextBox'),opts={}){
  if(scope){box.innerHTML='<div class="sub" style="margin-bottom:10px">Kontext dne jde upravit jen u aktivního deníku (výběr „Aktivní deník“).</div>';return}
  if(!date){box.innerHTML='<div class="sub">Vyber datum.</div>';return}
  const dc=getDayNote(date).dayContext||{};
- const group=k=>`<div class="day-context-group${FJContext.DAY_CONTEXT_EVENING.includes(k)?' evening':''}" data-key="${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}${FJContext.DAY_CONTEXT_EVENING.includes(k)?' <span class="sub">— večer</span>':' <span class="sub">— ráno</span>'}</div><div class="chip-grid">${FJContext.dayContextOptions(k,dc[k]).map(o=>`<span class="chip${dc[k]===o.key?' on':''}" data-value="${esc(o.key)}" role="button" tabindex="0">${esc(o.label)}${o.hidden?' (skrytá)':''}</span>`).join('')}</div></div>`;
+ // Zprávy předvyplněné z ekonomického kalendáře: chip čárkovaně, klik uloží
+ // ruční volbu (ta má pak přednost). Předvyplnění se neukládá.
+ const pre=FJContext.effectiveDayContext(dc,typeof newsForDate==='function'?newsForDate(date):[]);
+ const preOf=k=>pre.prefilled.includes(k)?pre.values[k]:'';
+ const group=k=>`<div class="day-context-group${FJContext.DAY_CONTEXT_EVENING.includes(k)?' evening':''}" data-key="${k}"><div class="qc-label">${esc(FJContext.DAY_CONTEXT_LABELS[k])}${FJContext.DAY_CONTEXT_EVENING.includes(k)?' <span class="sub">— večer</span>':' <span class="sub">— ráno</span>'}${preOf(k)?' <span class="sub">— předvyplněno z ekonomického kalendáře, kliknutím potvrdíš / změníš</span>':''}</div><div class="chip-grid">${FJContext.dayContextOptions(k,dc[k]||preOf(k)).map(o=>`<span class="chip${dc[k]===o.key?' on':''}${!dc[k]&&preOf(k)===o.key?' prefill':''}" data-value="${esc(o.key)}" role="button" tabindex="0">${esc(o.label)}${o.hidden?' (skrytá)':''}${!dc[k]&&preOf(k)===o.key?' (z kalendáře)':''}</span>`).join('')}</div></div>`;
  box.innerHTML=`<div class="day-context-card"><div class="day-context-title">Kontext dne ${esc(date)} <span class="sub">— platí pro všechny obchody dne, kliknutím se uloží</span></div>${FJContext.DAY_CONTEXT_FIELDS.map(group).join('')}</div>`;
  box.querySelectorAll('.day-context-group').forEach(g=>{
   const key=g.dataset.key;
@@ -5188,8 +5205,7 @@ window.showDay=date=>{
 // vyplňuje před prvním obchodem. Výchozí je dnešek (místní datum).
 function localDateStr(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function morningContextDone(date){
- const dc=getDayNote(date).dayContext||{};
- return FJContext.DAY_CONTEXT_MORNING.every(k=>dc[k]);
+ return dayContextMissingFieldsFor(date).length===0;
 }
 function renderDayContextBtn(){
  const btn=$('dayContextBtn'); if(!btn)return;
@@ -5202,7 +5218,7 @@ function renderDayContextModal(focusFirst){
  renderDayNewsBox(date,$('dayNewsModalBox'));
  if(!focusFirst||!date)return;
  // Fokus na první nevyplněnou skupinu – nejdřív ranní, pak večerní.
- const dc=getDayNote(date).dayContext||{};
+ const dc=FJContext.effectiveDayContext(getDayNote(date).dayContext,newsForDate(date)).values;
  const key=FJContext.DAY_CONTEXT_MORNING.find(k=>!dc[k])||FJContext.DAY_CONTEXT_FIELDS.find(k=>!dc[k])||FJContext.DAY_CONTEXT_MORNING[0];
  const g=box.querySelector(`.day-context-group[data-key="${key}"]`);
  (g?.querySelector('.chip.on')||g?.querySelector('.chip'))?.focus();
