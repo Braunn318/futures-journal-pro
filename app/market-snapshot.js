@@ -10,6 +10,13 @@
 //
 // Deník MĚŘÍ, nehodnotí: žádná tolerance ani pásmo. „AT" = přesná shoda ceny.
 // Dopočty signální svíčky se neukládají – počítají se při čtení.
+//
+// Konektor v7: OHLCV svíček z minutové historie (je aktuální), ticky (živé
+// ticky konektoru + historie) dodají deltu a VPOC jen svíčkám, které celé
+// pokrývají; ostatním null. `ticksUntil` / `ticksComplete` říkají, kam ticky
+// sahají. Snímek z v6 (jen z ticků) se pozná podle chybějícího `ticksComplete`.
+// Svíčka −k se určuje podle ČASU vstupu (konec = minuta vstupu − (k−1) min),
+// ne podle pořadí – snímek s dírou tak nikdy nevydá starou svíčku za −1.
 
 (function (root, factory) {
   const api = factory();
@@ -24,6 +31,9 @@
   const num = v => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN));
   const price = v => { const n = num(v); return Number.isFinite(n) && n > 0 ? n : null; };
   const iso = v => { const t = Date.parse(v); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
+  const MINUTE = 60000;
+  // Konec svíčky −1: začátek minuty vstupu (svíčka, která skončila nejpozději při vstupu).
+  const entryFloor = time => { const t = Date.parse(time); return Number.isFinite(t) ? Math.floor(t / MINUTE) * MINUTE : NaN; };
   const priceList = v => (Array.isArray(v) ? v : (v == null ? [] : [v])).map(price).filter(x => x != null);
 
   // Value area z profilu [[cena, objem]]: VPOC = cena s největším objemem (při
@@ -65,7 +75,8 @@
     const bars1m = [];
     for (const b of Array.isArray(p.bars1m) ? p.bars1m : []) {
       const [t, o, h, l, c, v, d, vp] = Array.isArray(b) ? b : [b?.t, b?.o, b?.h, b?.l, b?.c, b?.v, b?.delta, b?.vpoc];
-      const bar = { t: iso(t), o: price(o), h: price(h), l: price(l), c: price(c), v: num(v), delta: Number.isFinite(num(d)) ? num(d) : null, vpoc: priceList(vp) };
+      // delta / VPOC null = svíčku ticky celou nepokryly (nezměřeno), ne nula.
+      const bar = { t: iso(t), o: price(o), h: price(h), l: price(l), c: price(c), v: num(v), delta: d != null && Number.isFinite(num(d)) ? num(d) : null, vpoc: vp == null ? null : priceList(vp) };
       // Jen uzavřené svíčky před vstupem (konec svíčky <= vstup).
       if (!bar.t || Date.parse(bar.t) > entry || [bar.o, bar.h, bar.l, bar.c].includes(null) || !Number.isFinite(bar.v)) continue;
       bars1m.push(bar);
@@ -96,7 +107,48 @@
       day: { vpoc: va?.vpoc ?? null, vah: va?.vah ?? null, val: va?.val ?? null, high: price(p.day?.high), low: price(p.day?.low), vwap: price(p.day?.vwap) },
       prevDay: null
     };
+    // Pokrytí ticky (konektor v7). Chybí = snímek z v6, pokrytí se odvodí ze svíček.
+    if (typeof p.ticksComplete === 'boolean') {
+      snapshot.ticksComplete = p.ticksComplete;
+      snapshot.ticksUntil = iso(p.ticksUntil);
+      if (Array.isArray(p.ticksGap) && iso(p.ticksGap[0]) && iso(p.ticksGap[1])) snapshot.ticksGap = [iso(p.ticksGap[0]), iso(p.ticksGap[1])];
+    }
     return { ok: true, snapshot };
+  }
+
+  // Kam ve snímku sahají ticky: { ticksUntil, gapMinutes, complete }.
+  // v7: podle konektoru. v6 (svíčky jen z ticků): poslední svíčka musí končit
+  // v minutě vstupu, jinak ticky skončily dřív.
+  function snapshotCoverage(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    const floor = entryFloor(snapshot.time);
+    const bars = Array.isArray(snapshot.bars1m) ? snapshot.bars1m : [];
+    let until, complete;
+    if (typeof snapshot.ticksComplete === 'boolean') {
+      until = snapshot.ticksUntil || null;
+      complete = snapshot.ticksComplete && !snapshot.ticksGap;
+    } else {
+      until = bars.length ? bars[bars.length - 1].t : null;
+      complete = !!until && Date.parse(until) >= floor;
+    }
+    const u = Date.parse(until);
+    const gapMinutes = complete || !Number.isFinite(u) || !Number.isFinite(floor) ? 0 : Math.max(0, Math.floor((floor - u) / MINUTE));
+    return { ticksUntil: until, gapMinutes, complete, gap: snapshot.ticksGap || null };
+  }
+
+  // Nahradit uložený snímek nově příchozím (stejný vstup, opakovaný požadavek)?
+  // Jen když je úplnější: úplný místo neúplného, ticky dál, nebo víc svíček s deltou.
+  function shouldReplaceSnapshot(old, neu) {
+    if (!neu || typeof neu !== 'object') return false;
+    if (!old) return true;
+    if (old.executionId && neu.executionId && String(old.executionId) !== String(neu.executionId)) return false;
+    const a = snapshotCoverage(old), b = snapshotCoverage(neu);
+    if (a.complete) return false;
+    if (b.complete) return true;
+    const ua = Date.parse(a.ticksUntil), ub = Date.parse(b.ticksUntil);
+    if (Number.isFinite(ub) && (!Number.isFinite(ua) || ub > ua)) return true;
+    const measured = s => (s.bars1m || []).filter(x => x.delta != null).length;
+    return measured(neu) > measured(old);
   }
 
   function median(values) {
@@ -106,14 +158,25 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
 
-  // Signální svíčka: offset −1 = poslední uzavřená svíčka před vstupem, až −5.
-  // Zavření vůči vlastnímu VPOC: ABOVE / AT (přesná shoda) / BELOW; víc VPOC
-  // se stejným objemem a zavření mezi nimi = null. Objem vůči mediánu 20
-  // předchozích svíček (null, když jich snímek tolik nemá).
+  // Konec svíčky s offsetem −1 … −5 (ISO), podle času vstupu.
+  function signalBarEnd(snapshot, offset = -1) {
+    const floor = entryFloor(snapshot?.time);
+    if (!Number.isFinite(floor)) return null;
+    const off = Math.max(-5, Math.min(-1, Math.round(Number(offset)) || -1));
+    return new Date(floor + (off + 1) * MINUTE).toISOString();
+  }
+
+  // Signální svíčka: offset −1 = svíčka, která skončila v minutě vstupu, až −5
+  // (podle času; když ve snímku není – díra v datech, minuta bez obchodu –
+  // výsledek je null). Zavření vůči vlastnímu VPOC: ABOVE / AT (přesná shoda) /
+  // BELOW; víc VPOC se stejným objemem a zavření mezi nimi, nebo VPOC
+  // nezměřený = null. Objem vůči mediánu 20 předchozích svíček (null, když
+  // jich snímek tolik nemá).
   function signalBar(snapshot, offset = -1) {
     const bars = Array.isArray(snapshot?.bars1m) ? snapshot.bars1m : [];
     const off = Math.max(-5, Math.min(-1, Math.round(Number(offset)) || -1));
-    const idx = bars.length + off;
+    const end = signalBarEnd(snapshot, off);
+    const idx = end ? bars.findIndex(b => b.t === end) : -1;
     if (idx < 0) return null;
     const bar = bars[idx];
     const vpocs = Array.isArray(bar.vpoc) ? bar.vpoc : [];
@@ -230,11 +293,18 @@
   //  - řádky Hladin ze snímku (každá skupina jen jednou – smazaný řádek se nevrací),
   //  - test / netest ze svíček dne.
   // `opts`: { levels, autoTest, types, n, isHidden, dayFile, prevFile, prevComplete, pct }
+  // `opts.snapshot` = snímek téhož vstupu, který přišel později (opakovaný
+  // požadavek) – nahradí uložený jen přes shouldReplaceSnapshot; výběr
+  // signální svíčky a včerejšek zůstanou.
   function applyMarketData(trade, opts = {}) {
     if (!trade || typeof trade !== 'object') return { trade, changed: [] };
     const next = { ...trade };
     const changed = [];
-    const snap = trade.marketSnapshot;
+    if (trade.marketSnapshot && opts.snapshot && shouldReplaceSnapshot(trade.marketSnapshot, opts.snapshot)) {
+      next.marketSnapshot = { ...opts.snapshot, prevDay: opts.snapshot.prevDay || trade.marketSnapshot.prevDay || null };
+      changed.push('snapshot');
+    }
+    const snap = next.marketSnapshot;
     if (snap && !snap.prevDay && opts.prevFile && opts.prevComplete) {
       const prev = prevDayFromFile(opts.prevFile, snap.valueAreaPct || opts.pct);
       if (prev) { next.marketSnapshot = { ...snap, prevDay: prev }; changed.push('prevDay'); }
@@ -243,7 +313,10 @@
     let rows = hasRows ? next.nearLevels.slice() : [];
     if (opts.levels && next.marketSnapshot && next.nearLevelsNone !== true) {
       const applied = new Set(Array.isArray(next.marketLevelsApplied) ? next.marketLevelsApplied : []);
-      const groups = ['DAY', ...(next.marketSnapshot.prevDay ? ['PREV'] : [])].filter(g => !applied.has(g));
+      // Hodnoty dne z neúplného snímku (ticky skončily před vstupem) se do
+      // Hladin nedávají – doplní se, až přijde úplný snímek.
+      const dayReady = snapshotCoverage(next.marketSnapshot).complete;
+      const groups = [...(dayReady ? ['DAY'] : []), ...(next.marketSnapshot.prevDay ? ['PREV'] : [])].filter(g => !applied.has(g));
       if (groups.length) {
         // N nejbližších se vybírá ze VŠECH typů (i z dřív doplněné skupiny),
         // doplní se jen ty z nových skupin – včerejšek, který dorazí později,
@@ -269,7 +342,7 @@
 
   return {
     VERSION, BARS_1M, DEFAULT_VA_PCT, LEVEL_TYPES,
-    valueArea, normalizeSnapshotPayload, signalBar, vpocTagMismatch,
+    valueArea, normalizeSnapshotPayload, snapshotCoverage, shouldReplaceSnapshot, signalBarEnd, signalBar, vpocTagMismatch,
     snapshotLevelCandidates, snapshotRows, autoTestStates, prevDayFromFile, entryIsoOf, applyMarketData
   };
 }));

@@ -22,7 +22,7 @@
     { key: 'ltaExport', label: 'Export archivu LTA levelů pro Backtest Lab', desc: 'Archiv verzí levelů po dnech se kopíruje do ai-export/lta-levels (přepis jen při změně).', recommended: true, ready: true },
     { key: 'ltaWarnings', label: 'Upozornění na verzi levelů po vstupu / chybějící archiv', desc: 'Levely, které deník uložil až po vstupu, nebo den bez archivu se nedoplní samy – v kartě Hladiny se ukáže proč a rozhodneš ty.', recommended: true, ready: true },
     { key: 'marketBars', label: 'Ukládání minutových svíček dne', desc: 'Po uzavření obchodu konektor NT8 (verze 5) pošle minutové svíčky OHLCV celé seance dne obchodu (<userData>/market, kopie v ai-export/market).', recommended: true, ready: true },
-    { key: 'snapshot', label: 'Snímek trhu při vstupu', desc: 'Konektor NT8 (verze 6) při vstupu pošle 25 minutových svíček před vstupem s VPOC a deltou, 30min svíčky s VPOC, VPOC / VAH / VAL a high / low dne do vstupu a VWAP. Včerejší hodnoty ze svíček předchozího dne.', recommended: true, ready: true },
+    { key: 'snapshot', label: 'Snímek trhu při vstupu', desc: 'Konektor NT8 (verze 7) drží živé ticky obchodovaných instrumentů (jako graf) a při vstupu pošle 25 minutových svíček před vstupem s VPOC a deltou, 30min svíčky s VPOC, VPOC / VAH / VAL a high / low dne do vstupu a VWAP. Včerejší hodnoty ze svíček předchozího dne.', recommended: true, ready: true },
     { key: 'signalBar', label: 'Náhled a výběr signální svíčky v kartě Setup', desc: 'Posledních 5 svíček před vstupem; klikem se vybere jiná. Zavření vůči vlastnímu VPOC a objem vůči mediánu 20 předchozích (dopočet, neukládá se).', recommended: true, ready: true, requires: ['snapshot'] },
     { key: 'snapshotLevels', label: 'Doplňování řádků hladin ze snímku', desc: 'Netestované VPOC 30m, VPOC / VAH / VAL dne a včerejška, high / low seance a včerejška do Hladin v blízkosti – N nejbližších nad a pod vstupem. Ruční řádky se nikdy nepřepíšou.', recommended: true, ready: true, requires: ['snapshot'] },
     { key: 'autoTest', label: 'Test / netest doplněný ze svíček', desc: 'U řádků bez ručního test / netest doplní ze svíček dne, jestli se cena hladiny v seanci před vstupem dotkla (test) nebo ne (netest). Jde ručně přepsat.', recommended: true, ready: true, requires: ['snapshot'] },
@@ -36,8 +36,11 @@
     features: Object.freeze(Object.fromEntries(FEATURES.map(f => [f.key, false]))),
     levelsN: 3,          // řádky Hladin ze snímku: N nejbližších nad a N pod vstupem
     valueAreaPct: 70,    // value area (VAH / VAL) v % objemu
-    levelTypes: Object.freeze({}) // vypnuté typy řádků ze snímku { DAY_VAH: false }
+    levelTypes: Object.freeze({}), // vypnuté typy řádků ze snímku { DAY_VAH: false }
+    liveTickRoots: Object.freeze([]) // instrumenty pro živé ticky konektoru; prázdné = automaticky (co se obchoduje)
   });
+  const cleanRoots = v => [...new Set((Array.isArray(v) ? v : String(v || '').split(/[\s,;]+/))
+    .map(x => String(x || '').trim().toUpperCase()).filter(x => /^[A-Z0-9_.-]{1,20}$/.test(x)))].slice(0, 20);
 
   // Typy řádků ze snímku (app/market-snapshot.js) – v Node přes require,
   // v rendereru je skript načtený dřív.
@@ -60,7 +63,8 @@
       levelsN: clampInt(s.levelsN, 0, 20, DEFAULT_SETTINGS.levelsN),
       valueAreaPct: clampInt(s.valueAreaPct, 50, 95, DEFAULT_SETTINGS.valueAreaPct),
       // Ukládají se jen vypnuté typy – nový typ je tak zapnutý.
-      levelTypes: Object.fromEntries(Object.entries(types).filter(([k, v]) => known.has(k) && v === false))
+      levelTypes: Object.fromEntries(Object.entries(types).filter(([k, v]) => known.has(k) && v === false)),
+      liveTickRoots: cleanRoots(s.liveTickRoots)
     };
   }
 
@@ -91,6 +95,7 @@
     }
     if (p.levelsN !== undefined) s = cleanMarketSettings({ ...s, levelsN: p.levelsN });
     if (p.valueAreaPct !== undefined) s = cleanMarketSettings({ ...s, valueAreaPct: p.valueAreaPct });
+    if (p.liveTickRoots !== undefined) s = cleanMarketSettings({ ...s, liveTickRoots: p.liveTickRoots });
     if (p.levelTypes && typeof p.levelTypes === 'object') {
       const merged = { ...s.levelTypes };
       for (const [k, v] of Object.entries(p.levelTypes)) { if (v === false) merged[k] = false; else delete merged[k]; }

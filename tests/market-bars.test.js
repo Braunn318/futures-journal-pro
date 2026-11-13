@@ -202,7 +202,7 @@ test('po uzavření obchodu: požadavek na svíčky jen se zapnutými svíčkami
   const settings = { s: FJMarket.cleanMarketSettings({}) };
   const { marketAfterTradeClosed } = loadMain(['marketAfterTradeClosed'], {
     FJMarketBars, marketQueue: () => queue, marketOn: key => FJMarket.isOn(settings.s, key),
-    localDateOf: iso => iso.slice(0, 10)
+    localDateOf: iso => iso.slice(0, 10), marketRefreshSnapshot: () => null
   });
   const closed = { type: 'trade_closed', instrument: 'MES', instrumentFull: 'MES 12-26', entryTime: '2026-11-11T09:00:00.000Z' };
   marketAfterTradeClosed(closed);

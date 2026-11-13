@@ -66,7 +66,8 @@ test('snímek: 25 posledních uzavřených svíček, 30m s testem VPOC, VA dne z
 
 function snapWith(lastBars) {
   const s = FJSnapshot.normalizeSnapshotPayload(payload(), 70).snapshot;
-  s.bars1m = s.bars1m.slice(0, 25 - lastBars.length).concat(lastBars.map((b, i) => ({ t: at(100 + i), o: 7600, h: 7605, l: 7595, v: 100, delta: 0, ...b })));
+  // Poslední svíčka končí v minutě vstupu (11:40) – svíčka −1.
+  s.bars1m = s.bars1m.slice(0, 25 - lastBars.length).concat(lastBars.map((b, i) => ({ t: at(40 - (lastBars.length - 1 - i)), o: 7600, h: 7605, l: 7595, v: 100, delta: 0, ...b })));
   return s;
 }
 
@@ -94,8 +95,82 @@ test('signální svíčka: víc VPOC – mezi nimi null, objem vůči mediánu 2
   const prev = s.bars1m.slice(4, 24).map(b => b.v).sort((a, b) => a - b);
   const med = (prev[9] + prev[10]) / 2;
   assert.equal(FJSnapshot.signalBar(s, -1).volumeVsMedian20, 300 / med);
-  assert.equal(FJSnapshot.signalBar({ bars1m: s.bars1m.slice(-10) }, -1).volumeVsMedian20, null, 'bez 20 předchozích null');
-  assert.equal(FJSnapshot.signalBar({ bars1m: [] }, -1), null);
+  assert.equal(FJSnapshot.signalBar({ ...s, bars1m: s.bars1m.slice(-10) }, -1).volumeVsMedian20, null, 'bez 20 předchozích null');
+  assert.equal(FJSnapshot.signalBar({ ...s, bars1m: [] }, -1), null);
+});
+
+// ------------------------------- díra v ticích (ticky jen do 16:34, vstup 16:53)
+
+test('signální svíčka podle času: snímek končící 19 min před vstupem nemá −1 (žádná stará svíčka za −1)', () => {
+  const p = payload({ time: '2026-11-12T11:59:05.000Z' });
+  p.bars1m.pop(); // ticky skončily v 11:40
+  const s = FJSnapshot.normalizeSnapshotPayload(p, 70).snapshot;
+  assert.equal(s.bars1m[s.bars1m.length - 1].t, at(40), 'poslední svíčka 11:40');
+  assert.equal(FJSnapshot.signalBarEnd(s, -1), at(59));
+  assert.equal(FJSnapshot.signalBarEnd(s, -5), at(55));
+  assert.equal(FJSnapshot.signalBar(s, -1), null);
+  assert.equal(FJSnapshot.signalBar(s, -5), null);
+  assert.deepEqual(plain(FJSnapshot.snapshotCoverage(s)), { ticksUntil: at(40), gapMinutes: 19, complete: false, gap: null }, 'v6: pokrytí ze svíček');
+  const ok = FJSnapshot.normalizeSnapshotPayload(payload(), 70).snapshot;
+  assert.equal(FJSnapshot.snapshotCoverage(ok).complete, true);
+  assert.equal(FJSnapshot.signalBar(ok, -1).bar.t, at(40));
+});
+
+test('konektor v7: svíčky bez tickového pokrytí mají deltu a VPOC null; pokrytí z konektoru', () => {
+  const p = payload({ time: '2026-11-12T11:41:05.000Z', ticksComplete: false, ticksUntil: at(34) + '', ticksGap: [at(34), at(38)] });
+  p.bars1m.pop(); // minuta 11:41 ještě neskončila
+  p.bars1m = p.bars1m.map(b => (Date.parse(b[0]) > Date.parse(at(34)) ? [b[0], b[1], b[2], b[3], b[4], b[5], null, null] : b));
+  const s = FJSnapshot.normalizeSnapshotPayload(p, 70).snapshot;
+  const last = s.bars1m[s.bars1m.length - 1];
+  assert.equal(last.delta, null, 'nezměřeno, ne nula');
+  assert.equal(last.vpoc, null);
+  assert.equal(s.ticksComplete, false);
+  assert.deepEqual(plain(s.ticksGap), [at(34), at(38)]);
+  const cov = FJSnapshot.snapshotCoverage(s);
+  assert.equal(cov.complete, false);
+  assert.equal(cov.ticksUntil, at(34));
+  // −1 = 11:41 (vstup 11:41:05) z minutové historie, bez VPOC → zavření neznámé; −2 = 11:40
+  p.bars1m.push([at(41), 7600, 7601, 7599, 7600, 50, null, null]);
+  const s2 = FJSnapshot.normalizeSnapshotPayload(p, 70).snapshot;
+  assert.equal(FJSnapshot.signalBar(s2, -1).bar.t, at(41));
+  assert.equal(FJSnapshot.signalBar(s2, -1).closeVsVpoc, null);
+  assert.equal(FJSnapshot.signalBar(s, -1), null, 'svíčka 11:41 ve snímku chybí');
+  assert.equal(FJSnapshot.signalBar(s, -2).closeVsVpoc, null);
+  // Díra uprostřed = neúplné, i když ticky sahají až ke vstupu.
+  const g = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: true, ticksUntil: ENTRY, ticksGap: [at(20), at(22)] }), 70).snapshot;
+  assert.equal(FJSnapshot.snapshotCoverage(g).complete, false);
+});
+
+test('opakovaný snímek nahradí uložený jen když je úplnější; jiný vstup nikdy', () => {
+  const partial = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: false, ticksUntil: at(34) }), 70).snapshot;
+  const later = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: false, ticksUntil: at(38) }), 70).snapshot;
+  const full = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: true, ticksUntil: ENTRY }), 70).snapshot;
+  assert.equal(FJSnapshot.shouldReplaceSnapshot(null, partial), true);
+  assert.equal(FJSnapshot.shouldReplaceSnapshot(partial, later), true, 'ticky dál');
+  assert.equal(FJSnapshot.shouldReplaceSnapshot(later, partial), false);
+  assert.equal(FJSnapshot.shouldReplaceSnapshot(partial, full), true);
+  assert.equal(FJSnapshot.shouldReplaceSnapshot(full, later), false, 'úplný se nepřepisuje');
+  assert.equal(FJSnapshot.shouldReplaceSnapshot(partial, { ...full, executionId: 'JINY' }), false);
+});
+
+test('průchod: z neúplného snímku se hodnoty dne do Hladin nedají, z úplného ano; výběr svíčky a ruční řádek zůstanou', () => {
+  const partial = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: false, ticksUntil: at(34) }), 70).snapshot;
+  const full = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: true, ticksUntil: ENTRY }), 70).snapshot;
+  const manual = { level: 'VAL', price: 7590, testState: 'UNTESTED' };
+  const trade = { id: 't', entryPrice: 7601, marketSnapshot: partial, signalBarOffset: -2, nearLevels: [manual] };
+  const opts = { levels: true, types: {}, n: 3 };
+  const r1 = FJSnapshot.applyMarketData(trade, opts);
+  assert.deepEqual(r1.changed, [], 'neúplný: nic');
+  const r2 = FJSnapshot.applyMarketData(trade, { ...opts, snapshot: full });
+  assert.ok(r2.changed.includes('snapshot'));
+  assert.ok(r2.changed.includes('levels'));
+  assert.equal(r2.trade.marketSnapshot.ticksComplete, true);
+  assert.equal(r2.trade.signalBarOffset, -2);
+  assert.deepEqual(plain(r2.trade.nearLevels[0]), manual);
+  assert.ok(r2.trade.nearLevels.some(r => r.source === 'snapshot' && r.level === 'VPOC_DAY'));
+  assert.deepEqual(plain(r2.trade.marketLevelsApplied), ['DAY']);
+  // Horší snímek (zase neúplný) už úplný nepřepíše.
+  assert.deepEqual(FJSnapshot.applyMarketData(r2.trade, { ...opts, snapshot: partial }).changed, []);
 });
 
 // --------------------------------------- řádky ze snímku (test 7)
@@ -223,15 +298,20 @@ function mainHarness(market) {
   const queue = FJMarketBars.createMarketQueue({ now: () => 0 });
   const settings = { s: market };
   const prevCalls = [];
-  const m = loadMain(['processMarketSnapshot', 'marketAfterEntry', 'marketTakeForConnector', 'earlyMarketSnapshots', 'takeEarlyMarketSnapshot', 'recentClosedEntries'], {
-    FJSnapshot, FJMarketBars,
+  const stored = [];
+  const sent = [];
+  const m = loadMain(['processMarketSnapshot', 'marketAfterEntry', 'marketTakeForConnector', 'earlyMarketSnapshots', 'takeEarlyMarketSnapshot', 'recentClosedEntries', 'SNAPSHOT_CONNECTOR_VERSION', 'marketRefreshSnapshot'], {
+    FJSnapshot, FJMarketBars, FJMarketBarsMain: () => FJMarketBars,
+    storeSnapshot: (root, day, snap) => { stored.push([root, day, snap.executionId]); return true; },
+    mainWindow: { isDestroyed: () => false, webContents: { send: (ch, data) => sent.push([ch, data]) } },
+    logError: () => {},
     readCaptureState: () => state, writeCaptureState: () => {},
     readCaptureEvents: () => events, writeCaptureEvents: () => {},
     logInfo: () => {}, marketQueue: () => queue,
     marketOn: key => FJMarket.isOn(settings.s, key), marketSettingsNow: () => settings.s,
     marketRequestPrevDay: (root, day) => prevCalls.push([root, day]), localDateOf: iso => String(iso).slice(0, 10)
   });
-  return { m, state, events, queue, settings, prevCalls };
+  return { m, state, events, queue, settings, prevCalls, stored, sent };
 }
 
 test('main: snímek se připojí k otevřené pozici, k neimportovanému obchodu, nebo počká na vstup', () => {
@@ -253,7 +333,40 @@ test('main: snímek se připojí k otevřené pozici, k neimportovanému obchodu
   assert.equal('marketSnapshot' in off.state.positions.k, false);
 });
 
-test('main: požadavek na snímek jen se zapnutým snímkem; v5 dostane jen svíčky, v6 i snímky', () => {
+test('main: opakovaný snímek – uloží se podle dne pro renderer, u pozice a obchodu nahradí jen neúplný', () => {
+  const on = FJMarket.setEnabled(FJMarket.cleanMarketSettings({}), true);
+  const h = mainHarness(on);
+  h.m.processMarketSnapshot(payload({ ticksComplete: false, ticksUntil: at(34) }));
+  assert.equal(h.state.positions.k.marketSnapshot.ticksComplete, false);
+  h.m.processMarketSnapshot(payload({ ticksComplete: true, ticksUntil: ENTRY }));
+  assert.equal(h.state.positions.k.marketSnapshot.ticksComplete, true, 'úplnější nahradí');
+  h.m.processMarketSnapshot(payload({ ticksComplete: false, ticksUntil: at(38) }));
+  assert.equal(h.state.positions.k.marketSnapshot.ticksComplete, true, 'horší nepřepíše');
+  assert.deepEqual(h.stored[0], ['ES', '2026-11-12', 'E1'], 'uloženo podle kořene a dne obchodu');
+  assert.deepEqual(plain(h.sent[0]), ['market:saved', { root: 'ES', day: '2026-11-12', snapshot: 'E1' }]);
+  // Obchod už importovaný (trade_closed imported) – zůstane jen uložený snímek pro renderer.
+  h.m.recentClosedEntries.set('E5', 'p5');
+  h.events.push({ type: 'trade_closed', positionId: 'p5', imported: true, marketSnapshot: { executionId: 'E5' } });
+  assert.equal(h.m.processMarketSnapshot(payload({ executionId: 'E5' })), true);
+  assert.equal(h.events[0].marketSnapshot.time, undefined, 'importovaná událost se nemění');
+});
+
+test('main: neúplný snímek se po zavření / doplnění vyžádá znovu, úplný ne', () => {
+  const on = FJMarket.setEnabled(FJMarket.cleanMarketSettings({}), true);
+  const h = mainHarness(on);
+  const partial = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: false, ticksUntil: at(34) }), 70).snapshot;
+  const full = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: true, ticksUntil: ENTRY }), 70).snapshot;
+  assert.equal(h.m.marketRefreshSnapshot(full, 'ES', 'close'), null);
+  const it = h.m.marketRefreshSnapshot(partial, 'ES', 'close');
+  assert.equal(it.type, 'snapshot');
+  assert.equal(it.executionId, 'E1');
+  assert.equal(it.time, ENTRY);
+  assert.equal(it.root, 'ES');
+  const offH = mainHarness(FJMarket.cleanMarketSettings({}));
+  assert.equal(offH.m.marketRefreshSnapshot(partial, 'ES', 'close'), null, 'vypnuto = nic');
+});
+
+test('main: požadavek na snímek jen se zapnutým snímkem; v5 a v6 dostanou jen svíčky, v7 i snímky', () => {
   const h = mainHarness(FJMarket.cleanMarketSettings({}));
   h.m.marketAfterEntry({ executionId: 'E1', instrument: 'ES', instrumentFull: 'ES 12-26', time: ENTRY });
   assert.equal(h.queue.progress().total, 0, 'vypnuto = žádný požadavek');
@@ -262,19 +375,31 @@ test('main: požadavek na snímek jen se zapnutým snímkem; v5 dostane jen sví
   h.queue.enqueue({ root: 'ES', day: '2026-11-11' });
   const v5 = h.m.marketTakeForConnector(5);
   assert.deepEqual(v5.map(r => r.type || 'bars'), ['bars']);
-  const v6 = h.m.marketTakeForConnector(6);
-  assert.equal(v6[0].type, 'snapshot');
-  assert.equal(v6[0].executionId, 'E1');
-  assert.equal(FJMarketBars.requestsText(v6).split('\t').length, 7);
+  assert.deepEqual(plain(h.m.marketTakeForConnector(6)), [], 'v6 (jen historie ticků) snímky nedostane');
+  const v7 = h.m.marketTakeForConnector(7);
+  assert.equal(v7[0].type, 'snapshot');
+  assert.equal(v7[0].executionId, 'E1');
+  assert.equal(FJMarketBars.requestsText(v7).split('\t').length, 7);
   h.settings.s = FJMarket.setFeature(h.settings.s, 'marketBars', false);
-  assert.deepEqual(h.m.marketTakeForConnector(6), [], 'vypnuté svíčky = nic');
+  assert.deepEqual(plain(h.m.marketTakeForConnector(7)), [], 'vypnuté svíčky = nic');
 });
 
 // --------------------------------------------------- zdroj konektoru
 
-test('konektor v6: snímek z ticků, tick rule, jen do vstupu, jen čte', () => {
+test('konektor v7: živé ticky jako graf, svíčky z minutové historie, pokrytí ticky, tick rule, jen do vstupu, jen čte', () => {
   const src = readRepoFile('CONNECTORS/NinjaTrader8/FuturesJournalCapture.cs');
-  assert.match(src, /FJ_CONNECTOR_VERSION:\s*6\b/);
+  assert.match(src, /FJ_CONNECTOR_VERSION:\s*7\b/);
+  assert.match(src, /CONNECTOR_VERSION = "7"/);
+  assert.match(src, /new MarketData\(instrument\)/, 'živé ticky v paměti');
+  assert.match(src, /MarketDataType\.Last/);
+  assert.match(src, /\/api\/v1\/market\/watch/);
+  assert.match(src, /ConnectionStatus\.ConnectionLost/, 'výpadek spojení vynuluje živé ticky');
+  assert.match(src, /FetchMinuteList\(instrument, hours, sessionBegin, sessionEnd, entry, minutes\)/, 'svíčky snímku z minutové historie');
+  assert.match(src, /\\"ticksComplete\\":/);
+  assert.match(src, /\\"ticksUntil\\":/);
+  assert.match(src, /\\"ticksGap\\":/);
+  assert.match(src, /null,null\]/, 'nezměřená svíčka má deltu a VPOC null');
+  assert.match(src, /b\.End <= entry/, 'svíčky po vstupu ne');
   assert.match(src, /\\"market_snapshot\\"/);
   assert.match(src, /BarsPeriodType\.Tick/);
   assert.match(src, /lastDirection/, 'tick rule se směrem přes celou seanci');
@@ -315,4 +440,42 @@ test('průchod: včerejšek, který přijde později, nepřidá řádky nad limi
   const second = FJSnapshot.applyMarketData(first, { levels: true, n: 2, prevFile, prevComplete: true }).trade;
   assert.deepEqual(second.marketLevelsApplied, ['DAY', 'PREV']);
   assert.equal(below(second.nearLevels), 2, 'pořád N pod vstupem');
+});
+
+test('renderer: později uložený úplnější snímek téhož vstupu nahradí neúplný (opakovaný požadavek)', async () => {
+  const { loadRenderer } = require('./helpers/extract');
+  const partial = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: false, ticksUntil: at(34) }), 70).snapshot;
+  const full = FJSnapshot.normalizeSnapshotPayload(payload({ ticksComplete: true, ticksUntil: ENTRY }), 70).snapshot;
+  const trade = { id: 't', instrument: 'ES', date: '2026-11-12', side: 'long', entryPrice: 7601, marketSnapshot: partial, signalBarOffset: -3 };
+  const asked = [];
+  const r = loadRenderer(['applyMarketDataToTrade'], {
+    FJSnapshot, FJMarket, marketSettings: async () => FJMarket.setEnabled(FJMarket.cleanMarketSettings({}), true), normalizeInstrumentCode: i => String(i).toUpperCase(),
+    taxonomyConfig: () => ({}),
+    window: { desktopAPI: { marketDataFor: async q => { asked.push(q); return { ok: true, dayFile: null, prevFile: null, prevComplete: false, snapshots: { E1: full } }; } } }
+  });
+  const out = await r.applyMarketDataToTrade(trade);
+  assert.deepEqual(plain(asked[0]), { root: 'ES', day: '2026-11-12' });
+  assert.ok(out.changed.includes('snapshot'));
+  assert.equal(out.trade.marketSnapshot.ticksComplete, true);
+  assert.equal(out.trade.signalBarOffset, -3, 'výběr svíčky zůstal');
+  assert.ok(out.trade.nearLevels.some(x => x.level === 'VPOC_DAY'), 'hodnoty dne až z úplného snímku');
+});
+
+test('main: seznam pro živé ticky – ruční seznam, jinak pozice a co se obchoduje; vypnutý snímek = nic', () => {
+  const settings = { s: FJMarket.setEnabled(FJMarket.cleanMarketSettings({}), true) };
+  const today = new Date().toISOString().slice(0, 10);
+  const m = loadMain(['marketWatchList'], {
+    FJMarketBarsMain: () => FJMarketBars,
+    marketOn: key => FJMarket.isOn(settings.s, key), marketSettingsNow: () => settings.s,
+    readCaptureState: () => ({ positions: { a: { instrument: 'MNQ', instrumentFull: 'MNQ 12-26' } } }),
+    marketBarsStore: () => ({ storedIndex: () => ({ ['MES|' + today]: true, 'CL|2020-01-02': true }) }),
+    localDateOf: iso => String(iso).slice(0, 10),
+    app: { getPath: () => 'C:/nikde' }, fs: { readdirSync: () => { throw new Error('ne'); } }, path: require('path')
+  });
+  assert.deepEqual(plain(m.marketWatchList()), [{ root: 'MNQ', instrumentFull: 'MNQ 12-26' }, { root: 'MES', instrumentFull: '' }], 'CL bez obchodu za 30 dní ne');
+  settings.s = FJMarket.applyPatch(settings.s, { liveTickRoots: 'es, mes;ES' });
+  assert.deepEqual(plain(settings.s.liveTickRoots), ['ES', 'MES']);
+  assert.deepEqual(plain(m.marketWatchList()).map(w => w.root), ['ES', 'MES'], 'ruční seznam má přednost');
+  settings.s = FJMarket.setFeature(settings.s, 'snapshot', false);
+  assert.deepEqual(plain(m.marketWatchList()), []);
 });

@@ -1194,6 +1194,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="sub" id="marketSnapshotConn"></div>
             <div class="formgrid" style="margin-top:6px">
               <div class="field"><label>Value area <span class="sub">— % objemu dne pro VAH / VAL</span></label><input type="number" id="marketVaPct" min="50" max="95" step="1"></div>
+              <div class="field"><label>Živé ticky <span class="sub">— instrumenty, jejichž ticky drží konektor v paměti jako graf (kořeny oddělené čárkou, např. MES, ES); prázdné = automaticky podle obchodů</span></label><input type="text" id="marketLiveRoots" placeholder="automaticky"></div>
               <div class="field" id="marketLevelsNField"><label>Řádky ze snímku <span class="sub">— N nejbližších nad a N pod vstupem</span></label><input type="number" id="marketLevelsN" min="0" max="20" step="1"></div>
             </div>
             <div id="marketLevelTypes" style="margin-top:6px"></div>
@@ -1582,7 +1583,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div class="field" id="skippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— jen u „vědomě vynechán“</span></label><select id="skippedReason"></select><input id="skippedReasonNote" placeholder="upřesnění textem (nepovinné)" style="margin-top:6px"></div>
           <div class="field full"><label>Trend 1m <span class="sub">— trend na 1min grafu</span></label><div id="trend" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="trendHtf"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
-          <div class="field full" id="signalBarField" style="display:none"><label>Signální svíčka <span class="sub">— ze snímku trhu při vstupu; klikem vyber jinou (−1 = poslední uzavřená svíčka před vstupem)</span></label><div id="signalBarPreview"></div><div class="sub" id="signalBarInfo" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky"></div></div>
+          <div class="field full" id="signalBarField" style="display:none"><label>Signální svíčka <span class="sub">— ze snímku trhu při vstupu; klikem vyber jinou (−1 = svíčka, která skončila v minutě vstupu)</span></label><div id="signalBarPreview"></div><div class="sub" id="signalBarInfo" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky"></div></div>
           <div class="field full" data-ctx-field="grade"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
           <div class="field full" data-ctx-field="entryTestNo"><label>Kolikátý test vstupní hladiny <span class="sub">— v seanci (1. test = netest)</span></label><div id="entryTestNo" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
@@ -3931,7 +3932,11 @@ async function applyMarketDataToTrade(trade,config){
  const known=new Set(FJTaxonomy.allKeys('NEAR_LEVEL',cfg));
  const rows=FJTaxonomy.nearLevelsOf(trade);
  const input=rows.length||Array.isArray(trade.nearLevels)?{...trade,nearLevels:rows}:{...trade};
+ // Snímek téhož vstupu, který přišel později (opakovaný požadavek) – nahradí
+ // uložený jen když je úplnější.
+ const later=files?.ok&&trade.marketSnapshot?.executionId?files.snapshots?.[trade.marketSnapshot.executionId]:null;
  const r=FJSnapshot.applyMarketData(input,{
+  snapshot:later||null,
   levels,autoTest,types:m.levelTypes,n:m.levelsN,pct:m.valueAreaPct,
   isHidden:key=>!known.has(key)||FJTaxonomy.isHidden('NEAR_LEVEL',key,cfg),
   dayFile:files?.ok?files.dayFile:null,prevFile:files?.ok?files.prevFile:null,prevComplete:!!files?.prevComplete
@@ -3957,42 +3962,50 @@ async function applyMarketDataToTrade(trade,config){
   }catch(err){console.warn('Data trhu po svíčkách',err)}
  });
 })();
-// Signální svíčka v kartě Setup: posledních 5 uzavřených 1min svíček před
-// vstupem (OHLC + čárka VPOC), klik vybere jinou. Dopočty (zavření vůči VPOC,
-// objem vůči mediánu) se počítají při čtení a neukládají se.
+// Signální svíčka v kartě Setup: 5 minutových svíček, které skončily v minutě
+// vstupu a 4 minuty před ní (podle ČASU – svíčka, která ve snímku chybí, je
+// prázdné místo, nikdy ji nezastoupí starší). OHLC + čárka VPOC, klik vybere
+// jinou. Dopočty (zavření vůči VPOC, objem vůči mediánu) se počítají při
+// čtení a neukládají se.
 let formSnapshot=null;
 let formSignalBarOffset;
 const CLOSE_VS_VPOC_TEXT={ABOVE:'NAD',AT:'NA',BELOW:'POD'};
 function renderSignalBar(){
  const field=$('signalBarField');if(!field)return;
- const bars=(formSnapshot?.bars1m||[]).slice(-5);
- if(!formSnapshot||!marketOn('signalBar')||!bars.length){field.style.display='none';return}
+ if(!formSnapshot||!marketOn('signalBar')){field.style.display='none';return}
  field.style.display='';
+ const hm=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?'':d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})};
+ const byTime=new Map((formSnapshot.bars1m||[]).map(b=>[b.t,b]));
+ const slots=[-5,-4,-3,-2,-1].map(o=>{const end=FJSnapshot.signalBarEnd(formSnapshot,o);return {o,end,b:end?byTime.get(end)||null:null}});
  const off=formSignalBarOffset??-1;
- const prices=bars.flatMap(b=>[b.h,b.l,...(b.vpoc||[])]).filter(Number.isFinite);
- const hi=Math.max(...prices),lo=Math.min(...prices),span=Math.max(hi-lo,1e-9);
- const W=36,H=84,pad=6,y=p=>pad+(hi-p)/span*(H-2*pad);
+ const prices=slots.filter(s=>s.b).flatMap(({b})=>[b.h,b.l,...(b.vpoc||[])]).filter(Number.isFinite);
+ const hi=prices.length?Math.max(...prices):1,lo=prices.length?Math.min(...prices):0,span=Math.max(hi-lo,1e-9);
+ const W=40,H=84,pad=6,y=p=>pad+(hi-p)/span*(H-2*pad);
 
- const cols=bars.map((b,i)=>{
-  const o=i-bars.length; // −5 … −1
-  const x=i*W+W/2,up=b.c>=b.o,col=up?'var(--green)':'var(--red)';
+ const cols=slots.map(({o,end,b},i)=>{
+  const x=i*W+W/2;
+  const sel=o===off?`<rect x="${x-W/2+1}" y="1" width="${W-2}" height="${H-2}" rx="4" fill="none" stroke="var(--text)" stroke-dasharray="3 2"/>`:'';
+  const label=`<text x="${x}" y="${H+12}" text-anchor="middle" font-size="10" fill="var(--muted)">${o}</text><text x="${x}" y="${H+24}" text-anchor="middle" font-size="9" fill="var(--muted)">${hm(end)}</text>`;
+  if(!b)return `<g data-off="${o}" style="cursor:pointer"><title>Svíčka ${o} (${hm(end)}) ve snímku chybí</title><rect x="${x-W/2}" y="0" width="${W}" height="${H}" fill="transparent"/>${sel}<text x="${x}" y="${H/2+4}" text-anchor="middle" font-size="12" fill="var(--muted)">–</text>${label}</g>`;
+  const up=b.c>=b.o,col=up?'var(--green)':'var(--red)';
   const top=y(Math.max(b.o,b.c)),bh=Math.max(1,Math.abs(y(b.o)-y(b.c)));
   const vp=(b.vpoc||[]).map(v=>`<line x1="${x-11}" x2="${x+11}" y1="${y(v)}" y2="${y(v)}" stroke="var(--text)" stroke-width="2"/>`).join('');
-  const sel=o===off?`<rect x="${x-W/2+1}" y="1" width="${W-2}" height="${H-2}" rx="4" fill="none" stroke="var(--text)" stroke-dasharray="3 2"/>`:'';
-  return `<g data-off="${o}" style="cursor:pointer"><title>Svíčka ${o}: O ${b.o} H ${b.h} L ${b.l} C ${b.c} · objem ${b.v} · VPOC ${(b.vpoc||[]).join(' / ')}</title><rect x="${x-W/2}" y="0" width="${W}" height="${H}" fill="transparent"/>${sel}<line x1="${x}" x2="${x}" y1="${y(b.h)}" y2="${y(b.l)}" stroke="${col}"/><rect x="${x-6}" y="${top}" width="12" height="${bh}" fill="${col}"/>${vp}<text x="${x}" y="${H+12}" text-anchor="middle" font-size="10" fill="var(--muted)">${o}</text></g>`;
+  return `<g data-off="${o}" style="cursor:pointer"><title>Svíčka ${o} (${hm(end)}): O ${b.o} H ${b.h} L ${b.l} C ${b.c} · objem ${b.v} · VPOC ${(b.vpoc||[]).join(' / ')||'nezměřen'}${b.delta!=null?' · delta '+b.delta:''}</title><rect x="${x-W/2}" y="0" width="${W}" height="${H}" fill="transparent"/>${sel}<line x1="${x}" x2="${x}" y1="${y(b.h)}" y2="${y(b.l)}" stroke="${col}"/><rect x="${x-6}" y="${top}" width="12" height="${bh}" fill="${col}"/>${vp}${label}</g>`;
  }).join('');
- $('signalBarPreview').innerHTML=`<svg width="${W*bars.length}" height="${H+16}" role="img" aria-label="Posledních ${bars.length} svíček před vstupem">${cols}</svg>`;
+ $('signalBarPreview').innerHTML=`<svg width="${W*slots.length}" height="${H+28}" role="img" aria-label="Pět minutových svíček před vstupem">${cols}</svg>`;
  $('signalBarPreview').querySelectorAll('g[data-off]').forEach(g=>g.addEventListener('click',()=>{formSignalBarOffset=Number(g.dataset.off);renderSignalBar()}));
+ // Díra v ticích: odkud chybí delta a VPOC (snímek se doplní opakovaným požadavkem).
+ const cov=FJSnapshot.snapshotCoverage(formSnapshot);
+ const gap=cov&&!cov.complete?`⚠️ Ticky z NT8 ${cov.gap?`chybí ${hm(cov.gap[0])}–${hm(cov.gap[1])}`:`jen do ${hm(cov.ticksUntil)||'?'}`} (vstup ${hm(formSnapshot.time)}) – delta a VPOC u novějších svíček chybí; snímek se doplní po zavření obchodu nebo přes „Doplnit svíčky…“, až je NT8 vydá. `:'';
  const sig=FJSnapshot.signalBar(formSnapshot,off);
- if(!sig){$('signalBarInfo').textContent='';return}
- const t=new Date(sig.bar.t);
+ if(!sig){$('signalBarInfo').textContent=`${gap}Svíčka ${off} (${hm(FJSnapshot.signalBarEnd(formSnapshot,off))}) ve snímku chybí.`;return}
  const vpocs=(sig.bar.vpoc||[]).join(' / ')||'—';
- const rel=sig.closeVsVpoc?`zavření ${CLOSE_VS_VPOC_TEXT[sig.closeVsVpoc]} VPOC ${vpocs}`:(sig.bar.vpoc||[]).length>1?`zavření mezi VPOC ${vpocs}`:'VPOC neznámý';
+ const rel=sig.closeVsVpoc?`zavření ${CLOSE_VS_VPOC_TEXT[sig.closeVsVpoc]} VPOC ${vpocs}`:(sig.bar.vpoc||[]).length>1?`zavření mezi VPOC ${vpocs}`:'VPOC nezměřen';
  const vol=sig.volumeVsMedian20!=null?`objem ${sig.volumeVsMedian20.toFixed(2).replace('.',',')}× medián 20 předchozích`:'objem: na medián chybí 20 předchozích svíček';
  const delta=sig.bar.delta!=null?` · delta ${sig.bar.delta>0?'+':''}${sig.bar.delta}`:'';
  const formTrade={side:$('side')?.value,ofConfirm:typeof readChipGrid==='function'?readChipGrid('ofConfirm','OF_CONFIRM'):[]};
  const warn=FJSnapshot.vpocTagMismatch(formTrade,sig)?' · ⚠️ nesoulad se štítkem „Uzavření vůči VPOC v pořádku“ (štítek má přednost)':'';
- $('signalBarInfo').textContent=`Svíčka ${off} (${Number.isNaN(t.getTime())?'':t.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})}): ${rel} · ${vol}${delta}${warn}`;
+ $('signalBarInfo').textContent=`${gap}Svíčka ${off} (${hm(sig.bar.t)}): ${rel} · ${vol}${delta}${warn}`;
 }
 // Poznámka u Hladin v blízkosti, proč se levely z LTA nedoplnily samy.
 let formLtaMeta;
@@ -6949,13 +6962,14 @@ async function renderMarketSnapshotPanel(s){
  if(!on)return;
  if(document.activeElement!==$('marketVaPct'))$('marketVaPct').value=s.valueAreaPct;
  if(document.activeElement!==$('marketLevelsN'))$('marketLevelsN').value=s.levelsN;
+ if(document.activeElement!==$('marketLiveRoots'))$('marketLiveRoots').value=(s.liveTickRoots||[]).join(', ');
  const levels=FJMarket.isOn(s,'snapshotLevels');
  $('marketLevelsNField').style.display=levels?'':'none';
  $('marketLevelTypes').innerHTML=levels?FJSnapshot.LEVEL_TYPES.map(t=>`<label class="settings-check sub" style="margin-top:2px"><input type="checkbox" class="market-level-type" data-key="${esc(t.key)}"${s.levelTypes?.[t.key]===false?'':' checked'}> ${esc(t.label)} <span class="sub">→ ${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',t.level)||t.level)}</span></label>`).join(''):'';
  document.querySelectorAll('#marketLevelTypes .market-level-type').forEach(box=>box.onchange=()=>saveMarketSettings({levelTypes:{[box.dataset.key]:box.checked}}));
  const notes=[];
  const ns=await window.desktopAPI?.captureNinjaConnectorStatus?.().catch(()=>null);
- const need=6;
+ const need=7;
  if(ns?.installed&&ns.installedVersion<need)notes.push(`⚠️ Snímek vyžaduje konektor NT8 verze ${need} (nainstalovaná ${ns.installedVersion}) – přeinstaluj ho v Integrace → NinjaTrader a v NinjaScript Editoru stiskni F5.`);
  else if(ns&&!ns.installed)notes.push('⚠️ Konektor NT8 není nainstalovaný (Integrace → NinjaTrader).');
  if(!FJMarket.isOn(s,'marketBars'))notes.push('Včerejší VPOC / VAH / VAL a test / netest se počítají ze svíček dne – zapni i „Ukládání minutových svíček dne“.');
@@ -6964,6 +6978,7 @@ async function renderMarketSnapshotPanel(s){
 (()=>{
  $('marketVaPct')?.addEventListener('change',()=>saveMarketSettings({valueAreaPct:Number($('marketVaPct').value)}));
  $('marketLevelsN')?.addEventListener('change',()=>saveMarketSettings({levelsN:Number($('marketLevelsN').value)}));
+ $('marketLiveRoots')?.addEventListener('change',()=>saveMarketSettings({liveTickRoots:$('marketLiveRoots').value}));
  $('side')?.addEventListener('change',()=>{if(typeof renderSignalBar==='function')renderSignalBar()});
 })();
 // Svíčky dne (J2): stav uložených dnů, konektoru a zpětného doplnění.

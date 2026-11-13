@@ -29,8 +29,13 @@ test('AI export: derived nese dopočty signální svíčky podle uloženého vý
   const { aiMarketDerived } = loadMain(['aiMarketDerived'], { FJSnapshot });
   const t = { side: 'long', ofConfirm: ['CLOSE_VS_VPOC_OK'], marketSnapshot: snapshot() };
   assert.deepEqual(plain(aiMarketDerived(t)), {
+    snapshotCoverage: { ticksUntil: at(40), gapMinutes: 0, complete: true, gap: null },
     signalBar: { offset: -1, time: at(40), closeVsVpoc: 'BELOW', volumeVsMedian20: 1, delta: 3, vpoc: [7600], vpocTagMismatch: true }
   });
+  // Svíčka v čase vstupu ve snímku chybí (ticky skončily dřív) → null, ne starší svíčka.
+  const late = { ...t, marketSnapshot: { ...t.marketSnapshot, time: '2026-11-12T11:59:05.000Z' } };
+  assert.equal(aiMarketDerived(late).signalBar, null);
+  assert.equal(aiMarketDerived(late).snapshotCoverage.gapMinutes, 19);
   assert.equal(aiMarketDerived({ ...t, signalBarOffset: -2 }).signalBar.closeVsVpoc, 'ABOVE');
   assert.equal(aiMarketDerived({ ...t, signalBarOffset: -2 }).signalBar.vpocTagMismatch, false);
   assert.deepEqual(plain(aiMarketDerived({ side: 'long' })), {});
