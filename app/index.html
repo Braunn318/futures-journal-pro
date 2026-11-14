@@ -335,6 +335,38 @@ textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-c
 .table-scroll{overflow:auto}table{width:100%;border-collapse:collapse;min-width:900px}th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 #settings .settings-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+/* Karta Stav služby (dřív Integrace) má uvnitř vlastní dvousloupcovou mřížku polí. */
+#settings .settings-card .settings-grid{grid-template-columns:1fr 1fr}
+#settings .settings-nav input[type=search]{background:var(--input-bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font:inherit}
+/* Nastavení (4.8.103): vlevo sekce + hledání, vpravo obsah sekce. Skupina =
+   karta s nadpisem, jednou větou a štítkem platnosti. */
+.settings-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:start}
+.settings-nav{position:sticky;top:12px;display:flex;flex-direction:column;gap:8px}
+.settings-nav input[type=search]{width:100%}
+.settings-nav-list{display:flex;flex-direction:column;gap:2px}
+.settings-nav-list button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;color:var(--muted);padding:10px 12px;border-radius:10px;font-weight:700;cursor:pointer}
+.settings-nav-list button:hover{background:var(--panel2);color:var(--text)}
+.settings-nav-list button.active{background:var(--blue);color:#06101f}
+.settings-nav-ico{width:20px;text-align:center}
+.settings-nav-select{display:none}
+.settings-search-results{display:flex;flex-direction:column;gap:2px;max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:4px;background:var(--panel)}
+.settings-search-results[hidden]{display:none}
+.settings-search-results button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:7px 9px;border-radius:8px;cursor:pointer;font-size:13px}
+.settings-search-results button:hover,.settings-search-results button:focus{background:var(--panel2)}
+.settings-search-results .sub{display:block;font-size:11px}
+.settings-body{min-width:0}.settings-body .settings-card{min-width:0;overflow-wrap:anywhere}
+.settings-sec{display:none}.settings-sec.active{display:block}
+.settings-sec-head{margin-bottom:12px}.settings-sec-head h2{margin:0 0 2px}
+.settings-back{margin-bottom:10px}.settings-back[hidden]{display:none}
+.settings-card>summary .settings-group-text{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.settings-card>summary .settings-group-desc{font-size:12px;font-weight:400}
+.settings-scope{flex:none;font-size:11px;font-weight:700;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted);white-space:nowrap}
+.settings-scope-journal{border-color:rgba(var(--blue-rgb),.6);color:var(--blue)}
+.settings-flash{animation:settingsFlash 1.6s ease}
+@keyframes settingsFlash{0%,40%{box-shadow:0 0 0 3px rgba(var(--blue-rgb),.75);border-radius:8px}100%{box-shadow:0 0 0 0 rgba(var(--blue-rgb),0)}}
+.settings-gear{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px}
+.settings-gear:hover{color:var(--blue);background:var(--panel2)}
+@media(max-width:1100px){#settings .settings-card .settings-grid{grid-template-columns:1fr}.settings-layout{grid-template-columns:1fr}.settings-nav{position:static}.settings-nav-list{display:none}.settings-nav-select{display:block;width:100%}}
 .settings-card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;user-select:none}
 .settings-card>summary::-webkit-details-marker{display:none}
 .settings-card>summary h3{margin:0}
@@ -569,7 +601,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <button data-section="journal">📒 Deník</button>
       <button data-section="calendar">📅 Kalendář</button>
       <button data-section="reports">📑 Reporty</button>
-      <button data-section="integrations">🔌 Integrace</button>
+      <button data-section="settings" data-settings-open="connections">🔌 Integrace</button>
       <button data-section="settings">⚙️ Nastavení</button>
     </div>
   </aside>
@@ -581,7 +613,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <button class="btn primary" id="addTradeBtn" style="display:none">＋ Přidat obchod</button>
         <button class="btn" id="addSetupBtn" style="display:none" title="Setup, který byl, ale nedošlo k exekuci – do P/L nevstupuje; do fill rate jen stav „nenaplněno“">＋ Setup bez vstupu</button>
         <button class="btn" id="distanceUnitBtn" type="button" data-distance-unit-btn>📏 Ticky</button>
-        <button class="btn" id="newsCalendarBtn" type="button" title="Otevře kalendář makro zpráv v prohlížeči (adresa jde změnit v Nastavení → Obecné → Kalendář zpráv)">📰 Kalendář zpráv</button>
+        <button class="btn" id="newsCalendarBtn" type="button" title="Otevře kalendář makro zpráv v prohlížeči (adresa jde změnit v Nastavení → Připojení a zdroje dat → Kalendář zpráv)">📰 Kalendář zpráv</button>
       </div>
     </div>
 
@@ -632,7 +664,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     </section>
 
     <section id="accountOverview" class="section active">
-      <div class="alert" id="swingOverviewNote" style="display:none;margin-bottom:12px">Swing · CFD deník: statistiky počítají uzavřené obchody (podle dne posledního výstupu), equity, P/L za období a Kalendář dávají realizované P/L do dne každé nohy výstupu. Otevřené pozice s okamžitým P/L jsou v záložce Pozice/Příkazy. Počáteční stav účtu nastav v Nastavení → Obecné.</div>
+      <div class="alert" id="swingOverviewNote" style="display:none;margin-bottom:12px">Swing · CFD deník: statistiky počítají uzavřené obchody (podle dne posledního výstupu), equity, P/L za období a Kalendář dávají realizované P/L do dne každé nohy výstupu. Otevřené pozice s okamžitým P/L jsou v záložce Pozice/Příkazy. Počáteční stav účtu nastav v Nastavení → Instrumenty a účty → Účet tohoto deníku.</div>
 
       <div class="subtab-bar">
         <button class="active" data-subtab="dashOverview">Přehled</button>
@@ -672,12 +704,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="field" data-ov-filter="mae"><label>MAE od <span class="sub">— <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></label><input type="number" id="accountMaeMin" min="0" step="any"></div>
             <div class="field" data-ov-filter="mae"><label>MAE do <span class="sub">— <span data-unit-t="ticky" data-unit-b="body">ticky</span></span></label><input type="number" id="accountMaeMax" min="0" step="any"></div>
           </div>
-          <p class="sub" style="margin-top:6px">Prázdné pole = bez omezení. Při filtru MFE / MAE vypadnou obchody, které hodnotu nemají vyplněnou (0 je platná hodnota a filtrem projde). Číselné filtry se použijí tlačítkem „Zobrazit“. Které filtry se tu ukazují, nastavíš v Nastavení → Přizpůsobení → Přehled účtu.</p>
+          <p class="sub" style="margin-top:6px">Prázdné pole = bez omezení. Při filtru MFE / MAE vypadnou obchody, které hodnotu nemají vyplněnou (0 je platná hodnota a filtrem projde). Číselné filtry se použijí tlačítkem „Zobrazit“. Které filtry se tu ukazují, nastavíš v Nastavení → Vzhled a zobrazení → Přehled účtu.</p>
         </details>
         <details class="account-more-filters" id="accountSectionsBox">
-          <summary>Zobrazené sekce <span id="accountSectionsCount" class="sub"></span></summary>
+          <summary>Zobrazené sekce <span id="accountSectionsCount" class="sub"></span> <button type="button" class="settings-gear" data-settings-link="overviewFilters" title="Nastavení Přehledu účtu">⚙</button></summary>
           <div class="overview-section-settings" data-ov-section-settings></div>
-          <p class="sub" style="margin-top:6px">Skrytá sekce nic nemaže a nemění výpočty ani exporty. Stejné volby jsou v Nastavení → Přizpůsobení → Přehled účtu.</p>
+          <p class="sub" style="margin-top:6px">Skrytá sekce nic nemaže a nemění výpočty ani exporty. Stejné volby jsou v Nastavení → Vzhled a zobrazení → Přehled účtu.</p>
         </details>
       </div>
 
@@ -900,18 +932,318 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 
     
     
-    <section id="integrations" class="section">
-      <div class="subtab-bar">
-        <button class="active" data-subtab="capStatus">Stav a obecné</button>
-        <button data-subtab="capNinja">NinjaTrader</button>
-        <button data-subtab="capCtrader">cTrader</button>
-        <button data-subtab="capTradingview">TradingView</button>
-        <button data-subtab="capMapping">Přiřazení účtů</button>
-      </div>
+    
 
-      <div class="subsection active" id="capStatus">
-      <div class="card">
-        <h2>Stav služby a obecné akce</h2>
+    <section id="settings" class="section">
+    <div class="settings-layout">
+      <aside class="settings-nav">
+        <input type="search" id="settingsSearch" placeholder="Hledat v nastavení…" aria-label="Hledat v nastavení" autocomplete="off">
+        <div id="settingsSearchResults" class="settings-search-results" hidden></div>
+        <nav class="settings-nav-list" aria-label="Sekce Nastavení">
+          <button type="button" data-settings-sec="general"><span class="settings-nav-ico">⚙️</span><span>Obecné</span></button>
+          <button type="button" data-settings-sec="display"><span class="settings-nav-ico">🎨</span><span>Vzhled a zobrazení</span></button>
+          <button type="button" data-settings-sec="dictionaries"><span class="settings-nav-ico">📚</span><span>Číselníky</span></button>
+          <button type="button" data-settings-sec="levels"><span class="settings-nav-ico">📐</span><span>Hladiny a data trhu</span></button>
+          <button type="button" data-settings-sec="accounts"><span class="settings-nav-ico">💼</span><span>Instrumenty a účty</span></button>
+          <button type="button" data-settings-sec="connections"><span class="settings-nav-ico">🔌</span><span>Připojení a zdroje dat</span></button>
+          <button type="button" data-settings-sec="data"><span class="settings-nav-ico">💾</span><span>Data a zálohy</span></button>
+          <button type="button" data-settings-sec="app"><span class="settings-nav-ico">ℹ️</span><span>Aplikace</span></button>
+        </nav>
+        <select id="settingsSectionSelect" class="settings-nav-select" aria-label="Sekce Nastavení"><option value="general">⚙️ Obecné</option><option value="display">🎨 Vzhled a zobrazení</option><option value="dictionaries">📚 Číselníky</option><option value="levels">📐 Hladiny a data trhu</option><option value="accounts">💼 Instrumenty a účty</option><option value="connections">🔌 Připojení a zdroje dat</option><option value="data">💾 Data a zálohy</option><option value="app">ℹ️ Aplikace</option></select>
+      </aside>
+      <div class="settings-body">
+        <div class="settings-back" id="settingsBack" hidden><button type="button" class="btn" id="settingsBackBtn">← Zpět</button></div>
+      <div class="settings-sec" data-sec="general" id="setsec-general">
+        <div class="settings-sec-head"><h2>⚙️ Obecné</h2><p class="sub">Základ aplikace</p></div>
+        <div class="settings-grid">
+<details class="card settings-card" data-card="journals">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Deníky</h3></summary>
+          <div class="panel-subtitle" style="margin-top:0">Přehled účtu po spuštění ukáže</div>
+          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="active"> Poslední aktivní deník</label>
+          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="all"> Všechny deníky</label>
+          <p class="sub" style="margin-top:6px">Filtr „Deník / karta“ v Přehledu účtu jde pak kdykoli přepnout ručně. Uloží se hned.</p>
+          <div class="panel-subtitle">Režim, skrytí a smazání</div>
+          <p class="sub"><b>Režim</b> říká, jaký deník to je. <b>Živý</b>: formulář nenabízí „Naživo bych to vzal?“ (otázka patří jen k backtestu). <b>Backtest</b>: stav naplnění nenabízí „vědomě vynechán“ – v replayi se setup dá vzít vždy. Změna režimu uložené obchody nemění; co novému režimu neodpovídá, najdeš v Deníku přes filtr „Kontrola dat“.</p>
+          <p class="sub">Skrytý deník se nikde nezobrazuje ani nezapočítává (výběr deníku, Přehled účtu, Kalendář, Reporty, přesun obchodu). Jeho data zůstávají, jdou do záloh i do AI exportu a deník jde kdykoli znovu zobrazit. Když skryješ aktivní deník, aplikace přepne na naposledy použitý viditelný. Poslední viditelný deník skrýt nejde.</p>
+          <div id="journalVisibilityList" style="margin-top:10px"></div>
+        </details>
+<details class="card settings-card" data-card="security">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Zabezpečení aplikace</h3></summary>
+          <p class="sub">Při prvním spuštění si nastavíš vlastní heslo.</p>
+          <button class="btn" id="changePassword">Změnit heslo</button>
+          <button class="btn" id="lockApp" style="margin-left:8px">🔒 Zamknout aplikaci</button>
+        </details>
+        </div>
+      </div>
+      <div class="settings-sec" data-sec="display" id="setsec-display">
+        <div class="settings-sec-head"><h2>🎨 Vzhled a zobrazení</h2><p class="sub">Jak to vypadá a co vidím</p></div>
+        <div class="settings-grid">
+<details class="card settings-card" data-card="distanceUnit">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Jednotka vzdáleností</h3></summary>
+          <p class="sub">MFE, MAE, pohyb po výstupu, vzdálenosti hladin a dopočty v ticích, nebo v bodech (např. 17 t = 4,25 b u ES/MES/NQ/MNQ). V bodech se i zadává. Uložená data zůstávají v ticích, exporty taky. Instrument bez známé velikosti ticku (Nastavení → Instrumenty a účty → Šablony podle instrumentu) se ukazuje dál v ticích. Stejný přepínač je v horní liště.</p>
+          <div class="field" style="margin-top:10px">
+            <label>Jednotka</label>
+            <select id="distanceUnitSelect">
+              <option value="ticks">Ticky (výchozí)</option>
+              <option value="points">Body</option>
+            </select>
+          </div>
+        </details>
+<details class="card settings-card" data-card="theme">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Vzhled (téma)</h3></summary>
+          <p class="sub">Platí pro celou aplikaci na tomto počítači, nezávisle na deníku. Uloží se jen v tomto zařízení.</p>
+          <div class="field" style="margin-top:10px">
+            <label>Motiv</label>
+            <select id="themeMode">
+              <option value="dark">Tmavý (výchozí)</option>
+              <option value="light">Světlý</option>
+              <option value="custom">Vlastní</option>
+            </select>
+          </div>
+          <div id="customThemeFields" style="display:none;margin-top:14px">
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px">
+              <div>Pozadí – nahoře</div><div>Pozadí – dole</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_bgStart"><input type="color" id="tp_bgEnd">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Postranní panel</div><div>Karty / panely</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_sidebarBg"><input type="color" id="tp_panel">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Text</div><div>Ohraničení</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_text"><input type="color" id="tp_line">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Zvýraznění (accent)</div><div>Zisk (Target)</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_blue"><input type="color" id="tp_green">
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
+              <div>Ztráta (Stop Loss)</div><div>Break Even / upozornění</div>
+            </div>
+            <div class="template-row" style="grid-template-columns:1fr 1fr">
+              <input type="color" id="tp_red"><input type="color" id="tp_yellow">
+            </div>
+            <button class="btn" id="resetThemeDefaults" style="margin-top:14px">Obnovit výchozí tmavé barvy</button>
+          </div>
+          <button class="btn primary" id="saveTheme" style="margin-top:14px">Uložit vzhled</button>
+        </details>
+<details class="card settings-card" data-card="tradeCards">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Karty obchodu</h3></summary>
+          <p class="sub">Které karty se ukazují ve formuláři obchodu a u obchodu v Deníku, a u kterých upozorňovat na nevyplněná pole (štítek „⚠ Neúplné“ na kartě obchodu a „chybí N“ v hlavičce karty). Skrytá karta jen zmizí – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí karty se zase ukážou.</p>
+          <div id="tradeCardSettings" style="margin-top:10px"></div>
+          <p class="sub" style="margin-top:10px"><b>Psychika</b> – před vstupem, v průběhu a po výstupu, ale jen pole, která mají v „Pole kontextu“ zapnuté upozornění (ve výchozím stavu žádné).</p>
+          <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend 1m, trend 30m, známka; <b>Hladiny</b> – hladina vstupu, hladiny v blízkosti (hladina, nebo „žádná hladina v blízkosti“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U nenaplněného / vynechaného setupu bez výstupní ceny se cena SL, MFE, MAE ani ticky po výstupu nekontrolují; s vyplněným hypotetickým výstupem ano.</p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
+        <details class="card settings-card" data-card="contextFields">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Pole kontextu</h3></summary>
+          <p class="sub">Jednotlivá pole kontextu obchodu jdou skrýt a u každého zvlášť zapnout upozornění na nevyplněné. Skryté pole zmizí z formuláře obchodu, z rychlého kontextu, z karty obchodu i dne a nepočítá se do štítku „⚠ Neúplné“ – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí pole se zase ukážou.</p>
+          <div id="contextFieldSettings" style="margin-top:10px"></div>
+          
+          
+          <p class="sub" style="margin-top:10px"><b>Psychika</b> (škála 1–8, 1 nejhorší, 8 nejlepší): tři pole obchodu jsou v kartě Psychika, tři pole dne v okně ☀ Kontext dne, v detailu dne v Kalendáři a v řádku „Psychika“ u dne v Deníku. U polí dne „Upozorňovat na nevyplněné“ říká, že se pole hlídá; <b>kde</b> se to ukáže, určují dva řádky „upozornění na dni“ (záhlaví dne v Deníku a kalendář, jen dny s obchody) a „upozornění u obchodů dne“ (štítek „⚠ Neúplné“). Popisky hodnot jdou přejmenovat v Nastavení → Číselníky.</p>
+          <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše kromě <b>Setup – sekundární</b> zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
+        <details class="card settings-card" data-card="tradeForm">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Formulář obchodu</h3></summary>
+          <div class="field" style="margin-top:14px;max-width:560px"><label>Známka – „doplněno zpětně“ až po <span class="sub">— minut od uložení obchodu do deníku</span></label><input type="number" id="gradeRetroGraceMinutes" min="0" step="1" placeholder="30"></div>
+          <p class="sub">Známka zadaná do téhle lhůty od uložení obchodu (u pozice s víc cíli od posledního výstupu) se nepovažuje za doplněnou zpětně – importovanému obchodu ji dřív zadat nejde. Výchozí je 30 minut, 0 = hned po uložení. Platí pro aktivní deník, uloží se hned a stejně počítá i export (CSV, AI export). V backtest deníku se „doplněno zpětně“ neurčuje.</p>
+        </details>
+        <details class="card settings-card" data-card="tradeList">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Seznam obchodů</h3></summary>
+          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="levelsViewSummary"> Souhrnný řádek mimo detail obchodu <span class="sub">— „Hladiny: 2 mezi SL a vstupem · 2 před cílem“</span></label>
+        </details>
+        <details class="card settings-card" data-card="overviewFilters">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Přehled účtu</h3></summary>
+          <div class="panel-subtitle" style="margin-top:0">Filtry</div>
+          <p class="sub">Které „Další filtry“ se ukazují v Přehledu účtu. Skrytý filtr se nepoužije, i když v něm zůstala hodnota – data se nikdy nemažou.</p>
+          <div id="overviewFilterSettings" style="margin-top:10px"></div>
+          <div class="panel-subtitle">Sekce</div>
+          <p class="sub">Které karty Přehled účtu ukazuje. Stejné volby jsou přímo v přehledu pod „Zobrazené sekce“. Skrytá karta nic nemaže a nemění výpočty ani exporty; když skryješ všechny karty jedné řady, zmizí i její nadpis.</p>
+          <div class="overview-section-settings" id="overviewSectionSettings" data-ov-section-settings></div>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
+        </details>
+        </div>
+      </div>
+      <div class="settings-sec" data-sec="dictionaries" id="setsec-dictionaries">
+        <div class="settings-sec-head"><h2>📚 Číselníky</h2><p class="sub">Z čeho vybírám</p></div>
+        <div class="settings-grid">
+<details class="card settings-card" data-card="taxonomy">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Číselníky kontextu obchodu</h3></summary>
+          <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volbu jde skrýt – skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových – nebo smazat; smazanou jde obnovit.</p>
+          <div id="taxonomyGroups"></div>
+</details>
+        <details class="card settings-card" data-card="taxonomyTransfer">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Přenos číselníků</h3></summary>
+            <p class="sub">Číselníky patří ke kartě deníku, takže backtest a živý deník mají každý svoje. Tady se dají zkopírovat do jiné karty nebo uložit do souboru a načíst na jiném počítači.</p>
+            <div class="mapping-row" style="margin-top:10px">
+              <select id="taxonomyCopyTarget"></select>
+              <button type="button" class="btn" id="taxonomyCopyBtn">Zkopírovat do karty</button>
+            </div>
+            <div class="mapping-row" style="margin-top:10px">
+              <button type="button" class="btn" id="taxonomyExportBtn">Exportovat do souboru</button>
+              <label class="btn" for="taxonomyImportInput" style="text-align:center;cursor:pointer">Importovat ze souboru</label>
+              <input type="file" id="taxonomyImportInput" accept="application/json,.json" style="display:none">
+            </div>
+            <div class="sub" id="taxonomyTransferNote" style="margin-top:8px"></div>
+        </details>
+        </div>
+      </div>
+      <div class="settings-sec" data-sec="levels" id="setsec-levels">
+        <div class="settings-sec-head"><h2>📐 Hladiny a data trhu</h2><p class="sub">Co se k obchodu doplní samo</p></div>
+        <div class="settings-grid">
+        <details class="card settings-card" data-card="marketData" id="marketDataCard">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Data z NinjaTraderu</h3></summary>
+          <p class="sub">Data trhu k obchodům pro Backtest Lab: archiv LTA levelů, původ hladin a další funkce postupně (svíčky dne, snímek trhu při vstupu). <b>Vypnuto = deník se chová jako dřív.</b> Vypnutí funkce nikdy nemaže data, která už jsou uložená – jen je přestane sbírat a ukazovat.</p>
+          <label class="settings-check" style="margin-top:12px"><input type="checkbox" id="marketEnabled"> <b>Data trhu zapnutá</b> <span class="sub">— první zapnutí zapne doporučenou sadu, pak jde každou funkci přepnout zvlášť</span></label>
+          <div id="marketFeatures" style="margin:6px 0 0 22px"></div>
+          <div id="marketBarsPanel" class="field full" style="margin:10px 0 0 22px;display:none"><label>Minutové svíčky dne</label>
+            <div class="sub" id="marketBarsInfo"></div>
+            <div class="sub" id="marketConnectorInfo" style="margin-top:4px"></div>
+            <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="marketBackfill" title="Svíčky dne pro dny s obchody a s archivem LTA levelů; snímek trhu pro obchody, které ho nemají (čas vstupu z obchodu), a VPOC 30M aktuální ke starším snímkům (konektor NT8 verze 9). Ruční řádky Hladin se nemění.">Doplnit svíčky a snímky pro dny s obchody</button><button type="button" class="btn" id="marketCancel" style="display:none">Přerušit</button><button type="button" class="btn" id="marketOpenFolder">Otevřít složku</button></div>
+            <div class="sub" id="marketProgress" style="margin-top:4px"></div>
+            <div class="sub" style="margin-top:4px">Svíčky se nikdy nemažou samy – smazat je jde jen ručně ve složce. Obchod se importuje vždy, i když svíčky nepřijdou (den pak zůstane bez svíček).</div>
+          </div>
+          <div id="marketSnapshotPanel" class="field full" style="margin:10px 0 0 22px;display:none"><label>Snímek trhu při vstupu</label>
+            <div class="sub" id="marketSnapshotConn"></div>
+            <div class="formgrid" style="margin-top:6px">
+              <div class="field"><label>Value area <span class="sub">— % objemu dne pro VAH / VAL</span></label><input type="number" id="marketVaPct" min="50" max="95" step="1"></div>
+              <div class="field"><label>Živé ticky <span class="sub">— konektor je sbírá sám od spuštění NT8 (nic se nezapíná, deník nemusí běžet). Instrumenty: kořeny oddělené čárkou, např. MES, ES; prázdné = automaticky podle obchodů</span></label><input type="text" id="marketLiveRoots" placeholder="automaticky"></div>
+            </div>
+            <div class="sub" style="margin-top:4px">Řádky hladin ze snímku (N, typy): Nastavení → Hladiny a data trhu → Hladiny ze snímku trhu.</div>
+          </div>
+          <p class="sub" id="marketInfo" style="margin-top:8px"></p>
+          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Archiv LTA levelů se nemaže, ani když jsou Data trhu vypnutá.</p>
+        </details>
+        <details class="card settings-card" data-card="levels" id="ltaSettingsCard">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Hladiny z LTA souborů</h3></summary>
+          <div id="ltaFeatures"></div>
+
+          <p class="sub">Doplňuje do „Hladiny v blízkosti“ levely z LiveTradingAsistent (složka <code>CustomLevels</code> v NinjaTraderu): <b>N nejbližších nad a N pod cenou vstupu</b>, s cenou, bez test / netest. Typ řádku je doslovný název levelu z LTA – číselník <b>LTA Levels</b> (Nastavení → Číselníky) se zakládá sám; volbu tam jde přejmenovat, skrýt (pak se nedoplňuje) i smazat. Zadané řádky se nikdy nemažou ani nepřepisují a doplněné jde ručně upravit nebo odebrat.</p>
+          <label class="settings-check" style="margin-top:12px"><input type="checkbox" id="ltaEnabled"> Import LTA levelů zapnutý</label>
+          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaAutoInForm"> Doplnit automaticky ve formuláři <span class="sub">— po vyplnění instrumentu a ceny vstupu, jen když je seznam prázdný</span></label>
+          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaVwapRow"> Přidat VWAP v čase vstupu <span class="sub">— počítá ho konektor NT8 (verze 4) z 1min barů seance; jen u obchodů z konektoru</span></label>
+          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaArchive"> Ukládat verze levelů po dnech <span class="sub">— pro obchody zapsané později; jednou za 5 min se jen zkontroluje čas zápisu souborů, verze se uloží jen při změně levelů</span></label>
+          <div class="formgrid" style="margin-top:10px">
+            <div class="field"><label>Počet levelů <span class="sub">— nad a pod vstupem (N + N)</span></label><input type="number" id="ltaNearestCount" min="0" max="50" step="1"></div>
+            <div class="field"><label>Mazat archiv starší než <span class="sub">— dní; 0 = nemazat (doporučeno, smazané dny nejde vrátit)</span></label><input type="number" id="ltaRetentionDays" min="0" max="3650" step="1"></div>
+          </div>
+          <div class="field full" style="margin-top:10px"><label>Složka LTA</label><div class="sub" id="ltaFolderInfo"></div>
+            <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="ltaChooseFolder">Změnit složku…</button><button type="button" class="btn" id="ltaResetFolder">Výchozí složka</button><button type="button" class="btn" id="ltaOpenFolder">Otevřít složku</button><button type="button" class="btn" id="ltaRefresh">Obnovit</button></div></div>
+          <div class="field full" style="margin-top:10px"><label>Soubory a levely <span class="sub">— vypnutý soubor se nečte (např. stará kopie v Local); u souboru rozbal „levely“ a odškrtni ty, které se nemají doplňovat (OPEN, SETT, gamma Combo L2…)</span></label><div id="ltaFiles"></div></div>
+          <div class="field full" style="margin-top:10px"><label>Vyloučit názvy obsahující… <span class="sub">— jeden text na řádek, bez ohledu na velikost písmen; hodí se na názvy, které se mění každý den (např. „/“ vyloučí popisek s datem „11/02 - 00:“ z gamma souboru)</span></label><textarea id="ltaExcludePatterns" rows="3" placeholder="např. CLOSE"></textarea></div>
+          <p class="sub" style="margin-top:6px">Vyloučený level se jen nedoplňuje (automaticky ani tlačítkem „Doplnit z LTA“). V archivu i v číselníku LTA Levels zůstává a ve formuláři ho jde vybrat ručně. Skrytá volba v Číselnících se navíc nenabízí vůbec.</p>
+          <p class="sub" id="ltaArchiveInfo" style="margin-top:8px"></p>
+          <p class="sub" id="ltaMissingDays" style="margin-top:4px;display:none"></p>
+          <p class="sub" style="margin-top:8px">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Do složky LTA se nikdy nic nezapisuje.</p>
+        </details>
+        <details class="card settings-card" data-card="levelsSnapshot" id="levelsSnapshotCard">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Hladiny ze snímku trhu</h3></summary>
+
+          <div id="levelsSnapshotSection">
+            <label class="settings-check" style="margin-top:8px" id="levelsSnapshotOnLabel"><input type="checkbox" id="levelsSnapshotOn"> Doplňovat řádky hladin ze snímku trhu <span class="sub" id="levelsSnapshotWhy"></span></label>
+            <div class="formgrid" style="margin-top:6px"><div class="field" id="marketLevelsNField"><label>Řádky ze snímku <span class="sub">— N nejbližších nad a N pod vstupem</span></label><input type="number" id="marketLevelsN" min="0" max="20" step="1"></div></div>
+            <div id="marketLevelTypes" style="margin-top:6px"></div>
+            <div class="sub" style="margin-top:4px">Typ řádku je volba číselníku Hladina vstupu (Nastavení → Číselníky) – jde přejmenovat i skrýt; skrytá volba se nedoplňuje. High / Low dne je ve výchozím stavu skrytá. Snímek trhu (konektor NT8, value area, živé ticky) se zapíná v kartě Data trhu.</div>
+          </div>
+          <div id="snapshotFeatures" style="margin-top:6px"></div>
+        </details>
+        <details class="card settings-card" data-card="levelsMap" id="levelsMapCard">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Signální svíčky a Mapa obchodu</h3></summary>
+
+          <p class="sub">Mapa obchodu = graf v kartě Hladiny: svíčky snímku, Vstup / SL / cíle a všechny hladiny (zdroj = styl čáry), pod ním jeden řádek slovy a sbalený seznam. Plný výpis hladin je jen v detailu obchodu; v seznamu obchodů, kartě dne, kalendáři a reportech nanejvýš souhrnný řádek.</p>
+          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="levelsViewMap"> Mapa obchodu v kartě Hladiny <span class="sub">— vypnuto = karta jako dřív</span></label>
+          <div class="formgrid" style="margin-top:8px"><div class="field"><label>Počet svíček v mapě <span class="sub">— ze snímku trhu; signální jde vybrat z posledních 5</span></label><select id="levelsViewBars"><option value="5">5</option><option value="10">10</option></select></div></div>
+          <div id="mapFeatures" style="margin-top:6px"></div>
+        </details>
+        </div>
+      </div>
+      <div class="settings-sec" data-sec="accounts" id="setsec-accounts">
+        <div class="settings-sec-head"><h2>💼 Instrumenty a účty</h2><p class="sub">Co a kde obchoduju</p></div>
+        <div class="settings-grid">
+        <details class="card settings-card" data-card="account">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Účet tohoto deníku</h3></summary>
+          <div class="field"><label>Počáteční stav účtu</label><input type="number" id="startingBalance" step="0.01"></div>
+          <div class="field" style="margin-top:12px"><label>Hlavní měna</label><input id="currency" value="USD" disabled></div>
+          <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
+          <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
+        </details>
+        <details class="card settings-card" data-card="templates">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Šablony podle instrumentu</h3></summary>
+          <p class="sub">Pro daný instrument lze předvyplnit dodržení plánu, komentář, hodnotu bodu, velikost ticku, výchozí komisi a nejvyšší „rozumný“ SL v tickech (dál se hlásí „nepravděpodobně daleko“) — při ručním přidání i při automatickém importu.</p>
+          <div class="template-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.1fr auto;margin-top:12px;font-weight:700;color:var(--muted);font-size:12px">
+            <div>Instrument</div><div>Plán</div><div>Bod ($)</div><div>Tick</div><div>Komise ($/ks)</div><div title="Nejvyšší SL v tickech, který ještě nehlásí „nepravděpodobně daleko“. Prázdné = 40, 0 = nehlásit.">Max SL (t)</div><div>Komentář</div><div></div>
+          </div>
+          <div class="template-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
+            <input id="tplNewInstrument" placeholder="např. MES">
+            <select id="tplNewPlan"><option value="">—</option><option value="ano">Ano</option><option value="ne">Ne</option></select>
+            <input id="tplNewPointValue" type="number" step="any" min="0" placeholder="5,00">
+            <input id="tplNewTickSize" type="number" step="any" min="0" placeholder="0,25" title="Velikost ticku – nejmenší pohyb ceny. Potřebná pro všechny tikové dopočty (SL v ticích, MFE/MAE z výstupu, po výstupu, vzdálenosti hladin).">
+            <input id="tplNewCommission" type="number" step="any" min="0" placeholder="1,90">
+            <input id="tplNewMaxSl" type="number" step="1" min="0" placeholder="40" title="Nejvyšší SL v tickech, který ještě nehlásí „nepravděpodobně daleko“. Prázdné = 40, 0 = nehlásit.">
+            <input id="tplNewComment" placeholder="Komentář">
+            <button class="btn primary" id="addTemplate" style="padding:8px 10px">＋</button>
+          </div>
+          <div class="sub" style="margin-top:8px">Pár běžných kontraktů má hodnotu bodu předvyplněnou automaticky, i bez šablony: ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5. Přidáním šablony pro daný instrument (i jen s vyplněným polem "Bod") si můžeš tuhle vestavěnou hodnotu přepsat vlastní. Komise ve výchozím stavu vestavěnou hodnotu nemá – dokud ji nevyplníš, nic se nemění. Sloupec <b>Tick</b> je velikost ticku (nejmenší pohyb ceny) – potřebují ji všechny tikové dopočty (SL v ticích, MFE/MAE z výstupu, po výstupu, vzdálenosti hladin). Vestavěně ji mají též kontrakty: ES/MES/NQ/MNQ 0,25, YM/MYM 1, RTY/M2K 0,1. U jiného instrumentu se NEHÁDÁ – bez vyplněné hodnoty zůstanou tikové dopočty prázdné.</div>
+          <div id="templateList" style="margin-top:12px"></div>
+          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+            <label>Komise u nových importovaných obchodů (NinjaTrader / cTrader)</label>
+            <select id="useConnectorCommission">
+              <option value="ne">Použít komisi ze šablony instrumentu (výchozí)</option>
+              <option value="ano">Použít komisi nahlášenou konektorem</option>
+            </select>
+            <div class="sub" style="margin-top:6px">NinjaTrader posílá jen "Commission" a nezahrnuje další poplatky (Clearing, Exchange, IP, NFA fee), takže reálná komise může být vyšší, než co pošle konektor. Proto je výchozí chování bezpečnější: použije se komise ze šablony instrumentu (za kontrakt). Pokud šablona pro daný instrument komisi vyplněnou nemá, použije se hodnota od konektoru – s nulou se nepočítá, jinak by se obchod se ztrátou až po komisích tvářil v přehledu jako zisk. Přepnutím na "Použít komisi nahlášenou konektorem" se konektorová hodnota použije vždy, i když šablona existuje.</div>
+            <button class="btn" id="saveConnectorCommissionSetting" style="margin-top:10px">Uložit</button>
+          </div>
+        </details>
+        <details class="card settings-card" data-card="risk">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Limity a pravidla účtu</h3></summary>
+          <p class="sub">Volitelné denní/celkové limity pro tento konkrétní deník. Prázdné pole = pravidlo je vypnuté. Porušení nebo splnění cíle se poznačí u příslušného dne v Kalendáři.</p>
+          <div class="field" style="margin-top:10px"><label>Max. denní drawdown (v měně účtu)</label><input type="number" id="riskMaxDailyDrawdown" min="0" step="0.01" placeholder="např. 1000"></div>
+          <div class="field" style="margin-top:12px"><label>Max. celkový drawdown účtu (v měně účtu)</label><input type="number" id="riskMaxTotalDrawdown" min="0" step="0.01" placeholder="např. 5000"><div class="sub">Propad od nejvyššího dosaženého stavu účtu (peak) k aktuálnímu stavu.</div></div>
+          <div class="field" style="margin-top:12px"><label>Limit S/L za den (počet obchodů)</label><input type="number" id="riskMaxSlPerDay" min="0" step="1" placeholder="např. 3"></div>
+          <div class="field" style="margin-top:12px"><label>Celk. limit obchodů za den</label><input type="number" id="riskMaxTradesPerDay" min="0" step="1" placeholder="např. 6"></div>
+          <div class="field" style="margin-top:12px"><label>Limit profit obchodů / den</label><input type="number" id="riskMaxProfitTradesPerDay" min="0" step="1" placeholder="např. 4"></div>
+          <div class="field" style="margin-top:12px"><label>Profit target / den (v měně účtu)</label><input type="number" id="riskProfitTargetPerDay" min="0" step="0.01" placeholder="např. 800"><div class="sub">Nejde o porušení pravidla – den se v kalendáři zvýrazní zeleně jako splněný cíl.</div></div>
+          <button class="btn primary" id="saveRiskSettings" style="margin-top:14px">Uložit řízení rizika</button>
+        </details>
+        <details class="card settings-card" data-card="breakEven">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Výsledek a slučování obchodů</h3></summary>
+          <p class="sub">Obchod s výsledkem blízko nuly se označí jako Break Even místo ztráty. Obchody stejné pozice (např. TP1/TP2/BE z NinjaTraderu) lze slučovat automaticky.</p>
+          <div class="field" style="margin-top:10px"><label>Rozpoznávat Break Even</label><select id="breakEvenEnabled"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+          <div class="field" style="margin-top:12px"><label>Práh Break Even (v měně účtu, ±)</label><input type="number" id="breakEvenThreshold" min="0" step="0.01" value="0"><div class="sub">Obchod s čistým ziskem/ztrátou v tomto rozmezí kolem nuly se zobrazí jako Break Even.</div></div>
+          <div class="field" style="margin-top:12px"><label>Automaticky slučovat cíle stejné pozice (TP1/TP2/BE) při importu</label><select id="autoMergeLegs"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
+          <button class="btn primary" id="saveBreakEvenSettings" style="margin-top:14px">Uložit nastavení</button>
+        </details>
+        <details class="card settings-card" data-card="accountMapping">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Přiřazení účtů k deníkům</h3></summary>
+        <p class="sub">Například SIM101 → Simulace, APEX-123 → Apex účet. Backtest v NinjaTraderu běží na odděleném Playback účtu – přiřaď ho vlastní kartě, ať se jeho obchody nikdy nepotkají s živou equity.</p>
+        <div class="mapping-row" style="margin-bottom:12px">
+          <input id="captureNewAccount" type="text" placeholder="Název účtu, např. Playback101">
+          <button class="btn" id="captureAddAccount" type="button">Přidat účet</button>
+        </div>
+        <p class="sub" style="margin-top:-4px">Účet se v seznamu objeví sám, jakmile z něj přijde první obchod. Přidej ho ručně, pokud ho chceš přiřadit dřív – jinak by první backtest obchod spadl do právě otevřené karty.</p>
+        <div id="captureMappingRows"></div>
+        <p class="sub" style="margin-top:10px"><b>Skrýt</b> jen schová účet z tohoto seznamu. Posílání obchodů tím <b>nevypneš</b>: obchody z účtu dál chodí do přiřazeného deníku, a bez přiřazení do právě aktivního. Totéž platí pro účet přiřazený ke skrytému deníku – obchody chodí dál do něj.</p>
+        <button class="btn" id="captureSaveMappings" style="margin-top:12px">Uložit přiřazení</button>
+        <div id="captureHiddenAccountsBox" style="margin-top:16px"></div>
+        </details>
+        </div>
+      </div>
+      <div class="settings-sec" data-sec="connections" id="setsec-connections">
+        <div class="settings-sec-head"><h2>🔌 Připojení a zdroje dat</h2><p class="sub">Odkud tečou obchody a data</p></div>
+        <div class="settings-grid">
+        <details class="card settings-card" data-card="captureStatus">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Stav služby a screenshoty</h3></summary>
         <p class="sub">Exekuce se automaticky párují do otevřených a uzavřených obchodů, včetně částečných fillů a otočení pozice. Stejný lokální endpoint a API klíč používá NinjaTrader konektor, cTrader cBot i TradingView relay.</p>
         <div class="settings-grid" style="margin-top:16px">
           <div class="field"><label>Stav služby</label><input id="captureStatusText" readonly></div>
@@ -968,12 +1300,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn" id="captureNewKey">Nový API klíč</button>
           <button class="btn danger" id="captureClear">Vymazat frontu</button>
         </div>
-      </div>
-      </div>
-
-      <div class="subsection" id="capNinja">
-      <div class="card">
-        <h2>NinjaTrader</h2>
+        </details>
+        <details class="card settings-card" data-card="ninjatrader">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>NinjaTrader</h3></summary>
         <p class="sub">Konektor používá stejný lokální endpoint a API klíč jako sekce "Stav a obecné".</p>
         <div class="sub" id="ntConnectorState" style="margin-top:10px">Stav konektoru se zjišťuje…</div>
         <div class="settings-grid" style="margin-top:12px">
@@ -985,12 +1314,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn primary" id="captureInstallNinja">Nainstalovat NinjaTrader konektor automaticky</button>
           <button class="btn" id="captureExportConnector">Pouze stáhnout NinjaTrader konektor</button>
         </div>
-      </div>
-      </div>
-
-      <div class="subsection" id="capCtrader">
-      <div class="card">
-        <h2>cTrader</h2>
+        </details>
+        <details class="card settings-card" data-card="ctrader">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>cTrader</h3></summary>
+          <div id="capCtrader">
         <div class="integration-actions">
           <button class="btn" id="captureTestCTrader" title="Nasimuluje cTrader pozici uzavřenou přes dva cíle (TP1/TP2) se stejným Position.Id">Otestovat cTrader (TP1/TP2)</button>
           <button class="btn primary" id="captureExportCTrader">Pouze stáhnout cTrader cBot (.cs)</button>
@@ -1000,21 +1327,18 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <b>cTrader – jak zapojit (ověřeno podle aktuální dokumentace cTrader):</b> v cTrader Desktopu vlevo dole klikni na <b>Algo</b>, v kartě <b>cBots</b> klikni <b>New</b>, zvol jazyk C# a „From scratch" / Blank, pojmenuj přesně <b>„FuturesJournalCTraderConnector"</b> a potvrď Create. Otevře se editor s ukázkovým kódem – ten celý smaž (Ctrl+A, Delete) a vlož místo něj obsah staženého souboru (tlačítko „Pouze stáhnout cTrader cBot (.cs)" výše, pak ho otevři v Poznámkovém bloku a zkopíruj). Klikni <b>Build</b> (Ctrl+B) – dole by se měla objevit zelená hláška o úspěchu. Pak se vrať do grafu účtu, který chceš sledovat, klikni na ikonu cBotů, najdi FuturesJournalCTraderConnector a přidej instanci – klikni <b>Start</b>. Konektor používá vestavěné síťové rozhraní cAlgo, takže nepotřebuje neomezený přístup (Full Access) – cTrader se na nic ptát nebude. API klíč je v souboru už doplněný automaticky, stejný jako u NinjaTraderu.
           <br><br>Tlačítko „Aktualizovat cBot" výše funguje až <b>po tomto prvním ručním vytvoření</b> – najde už existující projekt v Dokumenty\cAlgo\Sources\Robots a přepíše jen jeho kód, takže při příští aktualizaci Futures Journal PRO už nebudeš muset nic ručně kopírovat. Samotný projekt (soubory .csproj/.sln) si spravuje cTrader sám, ty se automaticky nevytváří.
         </div>
-      </div>
-      </div>
+          </div>
+        </details>
+        <details class="card settings-card" data-card="tradingview">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>TradingView</h3></summary>
 
-      <div class="subsection" id="capTradingview">
-      <div class="card">
-        <h2>TradingView</h2>
         <div class="integration-actions">
           <button class="btn primary" id="capturePrepareTradingView">Připravit Pine Script a otevřít TradingView</button>
           <button class="btn primary" id="capturePrepareWorker">Připravit webhook a otevřít Cloudflare</button>
           <button class="btn" id="captureExportTradingView">Pouze stáhnout TradingView Pine Script</button>
           <button class="btn" id="captureExportTradingViewWorker">Pouze stáhnout TradingView webhook relay</button>
         </div>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <h2>TradingView – webhook relay</h2>
+          <h4 class="settings-sub">Webhook relay</h4>
         <p class="sub">TradingView nemůže posílat na localhost. Připravený Cloudflare Worker přijme veřejný webhook a aplikace si alerty bezpečně stáhne.</p>
         <div class="settings-grid" style="margin-top:14px">
           <div class="field full"><label>Veřejná adresa Workeru</label><input id="relayUrl" placeholder="https://futures-journal-relay...workers.dev"></div>
@@ -1026,39 +1350,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn" id="pollRelay">Stáhnout alerty nyní</button>
         </div>
         <p class="sub" style="margin-top:10px">Zdroj Workeru a Pine Script jsou ve složce <b>CONNECTORS</b>.</p>
-      </div>
-      </div>
-
-      <div class="subsection" id="capMapping">
-      <div class="card">
-        <h3>Přiřazení účtů ke kartám</h3>
-        <p class="sub">Například SIM101 → Simulace, APEX-123 → Apex účet. Backtest v NinjaTraderu běží na odděleném Playback účtu – přiřaď ho vlastní kartě, ať se jeho obchody nikdy nepotkají s živou equity.</p>
-        <div class="mapping-row" style="margin-bottom:12px">
-          <input id="captureNewAccount" type="text" placeholder="Název účtu, např. Playback101">
-          <button class="btn" id="captureAddAccount" type="button">Přidat účet</button>
-        </div>
-        <p class="sub" style="margin-top:-4px">Účet se v seznamu objeví sám, jakmile z něj přijde první obchod. Přidej ho ručně, pokud ho chceš přiřadit dřív – jinak by první backtest obchod spadl do právě otevřené karty.</p>
-        <div id="captureMappingRows"></div>
-        <p class="sub" style="margin-top:10px"><b>Skrýt</b> jen schová účet z tohoto seznamu. Posílání obchodů tím <b>nevypneš</b>: obchody z účtu dál chodí do přiřazeného deníku, a bez přiřazení do právě aktivního. Totéž platí pro účet přiřazený ke skrytému deníku – obchody chodí dál do něj.</p>
-        <button class="btn" id="captureSaveMappings" style="margin-top:12px">Uložit přiřazení</button>
-        <div id="captureHiddenAccountsBox" style="margin-top:16px"></div>
-      </div>
-      </div>
-
-    </section>
-
-    <section id="settings" class="section">
-      <div class="subtab-bar">
-        <button class="active" data-subtab="settingsGeneral">Obecné</button>
-        <button data-subtab="settingsCustomize">Přizpůsobení</button>
-        <button data-subtab="settingsRisk">Riziko</button>
-        <button data-subtab="settingsTemplates">Šablony</button>
-        <button data-subtab="settingsTaxonomy">Číselníky</button>
-        <button data-subtab="settingsBackup">Data a zálohy</button>
-      </div>
-
-      <div class="subsection active" id="settingsGeneral">
-      <div class="settings-grid">
+        </details>
         <details class="card settings-card" data-card="newsCalendar">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Kalendář zpráv</h3></summary>
           <label class="settings-check"><input type="checkbox" id="newsShowButton"> Tlačítko „📰 Kalendář zpráv“ v horní liště</label>
@@ -1073,296 +1365,12 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <p class="sub" style="margin-top:8px">Zdroj dává jen aktuální týden. Deník si stažené týdny pamatuje (soubor news-calendar.json v datové složce), takže historie štítků začíná prvním stažením; následující týden se objeví, až ho zdroj zveřejní (obvykle v neděli). Stahuje se při startu a každých 6 hodin, nejvýš jednou za hodinu. Časy jsou v místním čase počítače. Ruční pole „Zprávy“ v Kontextu dne se samo nevyplňuje – štítek je jen informace vedle něj.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
-        <details class="card settings-card" data-card="journals">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Deníky</h3></summary>
-          <div class="panel-subtitle" style="margin-top:0">Přehled účtu po spuštění ukáže</div>
-          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="active"> Poslední aktivní deník</label>
-          <label class="settings-check"><input type="radio" name="overviewStartJournal" value="all"> Všechny deníky</label>
-          <p class="sub" style="margin-top:6px">Filtr „Deník / karta“ v Přehledu účtu jde pak kdykoli přepnout ručně. Uloží se hned.</p>
-          <div class="panel-subtitle">Režim, skrytí a smazání</div>
-          <p class="sub"><b>Režim</b> říká, jaký deník to je. <b>Živý</b>: formulář nenabízí „Naživo bych to vzal?“ (otázka patří jen k backtestu). <b>Backtest</b>: stav naplnění nenabízí „vědomě vynechán“ – v replayi se setup dá vzít vždy. Změna režimu uložené obchody nemění; co novému režimu neodpovídá, najdeš v Deníku přes filtr „Kontrola dat“.</p>
-          <p class="sub">Skrytý deník se nikde nezobrazuje ani nezapočítává (výběr deníku, Přehled účtu, Kalendář, Reporty, přesun obchodu). Jeho data zůstávají, jdou do záloh i do AI exportu a deník jde kdykoli znovu zobrazit. Když skryješ aktivní deník, aplikace přepne na naposledy použitý viditelný. Poslední viditelný deník skrýt nejde.</p>
-          <div id="journalVisibilityList" style="margin-top:10px"></div>
-        </details>
-        <details class="card settings-card" data-card="security">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Zabezpečení aplikace</h3></summary>
-          <p class="sub">Při prvním spuštění si nastavíš vlastní heslo.</p>
-          <button class="btn" id="changePassword">Změnit heslo</button>
-          <button class="btn" id="lockApp" style="margin-left:8px">🔒 Zamknout aplikaci</button>
-        </details>
-        <details class="card settings-card" data-card="account">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Účet</h3></summary>
-          <div class="field"><label>Počáteční stav účtu</label><input type="number" id="startingBalance" step="0.01"></div>
-          <div class="field" style="margin-top:12px"><label>Hlavní měna</label><input id="currency" value="USD" disabled></div>
-          <div class="field" style="margin-top:12px"><label>Kurz USD/CZK</label><input id="usdCzkRate" type="number" min="0.01" step="0.01" value="23.00"><div class="sub">Částky zadávej v USD. Pod nimi se automaticky zobrazí orientační přepočet v CZK.</div></div>
-          <button class="btn primary" id="saveSettings" style="margin-top:14px">Uložit nastavení</button>
-        </details>
-        <details class="card settings-card" data-card="update">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Aktualizace aplikace</h3></summary>
-          <p class="sub" style="margin-top:0">Aplikace si sama zjišťuje, jestli na GitHubu vyšla nová verze, a nabídne ji. Bez tvého potvrzení se nic nestahuje ani neinstaluje. Deníky, obchody ani nastavení se aktualizací nemění.</p>
-          <div id="updateInfo" class="sub" style="margin-top:10px">Zjišťuji verzi…</div>
-          <button class="btn" id="checkUpdates" style="margin-top:10px">🔄 Zkontrolovat aktualizace</button>
-          <button class="btn primary" id="installUpdate" style="margin-top:10px;margin-left:8px;display:none">Aktualizovat</button>
-          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
-            <label class="settings-check"><input type="checkbox" id="updateTestChannel"> Povolit testovací (pre-release) verze</label>
-            <div id="updateTestBox" style="display:none">
-              <button class="btn" id="checkTestUpdates" style="margin-top:10px;border:1px solid rgba(var(--yellow-rgb),.6)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--yellow)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Zkontrolovat aktualizace Test verze</button>
-              <p class="sub" id="updateTestWarning" style="color:var(--yellow);margin-top:8px"></p>
-            </div>
-          </div>
-        </details>
+        </div>
       </div>
-      </div>
-
-      <div class="subsection" id="settingsCustomize">
-      <div class="settings-grid">
-        <details class="card settings-card" data-card="distanceUnit">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Jednotka vzdáleností</h3></summary>
-          <p class="sub">MFE, MAE, pohyb po výstupu, vzdálenosti hladin a dopočty v ticích, nebo v bodech (např. 17 t = 4,25 b u ES/MES/NQ/MNQ). V bodech se i zadává. Uložená data zůstávají v ticích, exporty taky. Instrument bez známé velikosti ticku (Nastavení → Šablony) se ukazuje dál v ticích. Stejný přepínač je v horní liště.</p>
-          <div class="field" style="margin-top:10px">
-            <label>Jednotka</label>
-            <select id="distanceUnitSelect">
-              <option value="ticks">Ticky (výchozí)</option>
-              <option value="points">Body</option>
-            </select>
-          </div>
-        </details>
-        <details class="card settings-card" data-card="theme">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Vzhled (téma)</h3></summary>
-          <p class="sub">Platí pro celou aplikaci na tomto počítači, nezávisle na deníku. Uloží se jen v tomto zařízení.</p>
-          <div class="field" style="margin-top:10px">
-            <label>Motiv</label>
-            <select id="themeMode">
-              <option value="dark">Tmavý (výchozí)</option>
-              <option value="light">Světlý</option>
-              <option value="custom">Vlastní</option>
-            </select>
-          </div>
-          <div id="customThemeFields" style="display:none;margin-top:14px">
-            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px">
-              <div>Pozadí – nahoře</div><div>Pozadí – dole</div>
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr">
-              <input type="color" id="tp_bgStart"><input type="color" id="tp_bgEnd">
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
-              <div>Postranní panel</div><div>Karty / panely</div>
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr">
-              <input type="color" id="tp_sidebarBg"><input type="color" id="tp_panel">
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
-              <div>Text</div><div>Ohraničení</div>
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr">
-              <input type="color" id="tp_text"><input type="color" id="tp_line">
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
-              <div>Zvýraznění (accent)</div><div>Zisk (Target)</div>
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr">
-              <input type="color" id="tp_blue"><input type="color" id="tp_green">
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr;font-weight:700;color:var(--muted);font-size:12px;margin-top:10px">
-              <div>Ztráta (Stop Loss)</div><div>Break Even / upozornění</div>
-            </div>
-            <div class="template-row" style="grid-template-columns:1fr 1fr">
-              <input type="color" id="tp_red"><input type="color" id="tp_yellow">
-            </div>
-            <button class="btn" id="resetThemeDefaults" style="margin-top:14px">Obnovit výchozí tmavé barvy</button>
-          </div>
-          <button class="btn primary" id="saveTheme" style="margin-top:14px">Uložit vzhled</button>
-        </details>
-        <details class="card settings-card" data-card="tradeCards">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Karty obchodu</h3></summary>
-          <p class="sub">Které karty se ukazují ve formuláři obchodu a u obchodu v Deníku, a u kterých upozorňovat na nevyplněná pole (štítek „⚠ Neúplné“ na kartě obchodu a „chybí N“ v hlavičce karty). Skrytá karta jen zmizí – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí karty se zase ukážou.</p>
-          <div id="tradeCardSettings" style="margin-top:10px"></div>
-          <p class="sub" style="margin-top:10px"><b>Psychika</b> – před vstupem, v průběhu a po výstupu, ale jen pole, která mají v „Pole kontextu“ zapnuté upozornění (ve výchozím stavu žádné).</p>
-          <p class="sub" style="margin-top:10px">Kontroluje se: <b>SL / TP</b> – cena Stop Lossu a cena targetu; <b>Pohyb ceny</b> – MFE, MAE a ticky po výstupu (oběma směry); <b>Setup</b> – setup, stav naplnění, trend 1m, trend 30m, známka; <b>Hladiny</b> – hladina vstupu, hladiny v blízkosti (hladina, nebo „žádná hladina v blízkosti“), order flow potvrzení, typ cílové hladiny 1. Dopočítané hodnoty se počítají jako vyplněné, nula také. U nenaplněného / vynechaného setupu bez výstupní ceny se cena SL, MFE, MAE ani ticky po výstupu nekontrolují; s vyplněným hypotetickým výstupem ano.</p>
-          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
-        </details>
-        <details class="card settings-card" data-card="contextFields">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Pole kontextu</h3></summary>
-          <p class="sub">Jednotlivá pole kontextu obchodu jdou skrýt a u každého zvlášť zapnout upozornění na nevyplněné. Skryté pole zmizí z formuláře obchodu, z rychlého kontextu, z karty obchodu i dne a nepočítá se do štítku „⚠ Neúplné“ – data u obchodů zůstávají, jdou do CSV i AI exportu a po zapnutí pole se zase ukážou.</p>
-          <div id="contextFieldSettings" style="margin-top:10px"></div>
-          <div class="field" style="margin-top:14px;max-width:560px"><label>Známka – „doplněno zpětně“ až po <span class="sub">— minut od uložení obchodu do deníku</span></label><input type="number" id="gradeRetroGraceMinutes" min="0" step="1" placeholder="30"></div>
-          <p class="sub">Známka zadaná do téhle lhůty od uložení obchodu (u pozice s víc cíli od posledního výstupu) se nepovažuje za doplněnou zpětně – importovanému obchodu ji dřív zadat nejde. Výchozí je 30 minut, 0 = hned po uložení. Platí pro aktivní deník, uloží se hned a stejně počítá i export (CSV, AI export). V backtest deníku se „doplněno zpětně“ neurčuje.</p>
-          <p class="sub" style="margin-top:10px"><b>Psychika</b> (škála 1–8, 1 nejhorší, 8 nejlepší): tři pole obchodu jsou v kartě Psychika, tři pole dne v okně ☀ Kontext dne, v detailu dne v Kalendáři a v řádku „Psychika“ u dne v Deníku. U polí dne „Upozorňovat na nevyplněné“ říká, že se pole hlídá; <b>kde</b> se to ukáže, určují dva řádky „upozornění na dni“ (záhlaví dne v Deníku a kalendář, jen dny s obchody) a „upozornění u obchodů dne“ (štítek „⚠ Neúplné“). Popisky hodnot jdou přejmenovat v Nastavení → Číselníky.</p>
-          <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše kromě <b>Setup – sekundární</b> zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
-          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
-        </details>
-        <details class="card settings-card" data-card="levels" id="ltaSettingsCard">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Hladiny</h3></summary>
-          <p class="sub">Hladiny v blízkosti obchodu na jednom místě: jak se v kartě Hladiny zobrazují (Mapa obchodu) a odkud se doplňují – z LTA souborů a ze snímku trhu. Všechny řádky jsou jeden seznam „Hladiny v blízkosti“; ruční řádek se nikdy nepřepíše a vypnutí nic nemaže.</p>
-          <h4 class="settings-sub">Zobrazení</h4>
-          <p class="sub">Mapa obchodu = graf v kartě Hladiny: svíčky snímku, Vstup / SL / cíle a všechny hladiny (zdroj = styl čáry), pod ním jeden řádek slovy a sbalený seznam. Plný výpis hladin je jen v detailu obchodu; v seznamu obchodů, kartě dne, kalendáři a reportech nanejvýš souhrnný řádek.</p>
-          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="levelsViewMap"> Mapa obchodu v kartě Hladiny <span class="sub">— vypnuto = karta jako dřív</span></label>
-          <div class="formgrid" style="margin-top:8px"><div class="field"><label>Počet svíček v mapě <span class="sub">— ze snímku trhu; signální jde vybrat z posledních 5</span></label><select id="levelsViewBars"><option value="5">5</option><option value="10">10</option></select></div></div>
-          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="levelsViewSummary"> Souhrnný řádek mimo detail obchodu <span class="sub">— „Hladiny: 2 mezi SL a vstupem · 2 před cílem“</span></label>
-          <h4 class="settings-sub">Z LTA souborů</h4>
-          <p class="sub">Doplňuje do „Hladiny v blízkosti“ levely z LiveTradingAsistent (složka <code>CustomLevels</code> v NinjaTraderu): <b>N nejbližších nad a N pod cenou vstupu</b>, s cenou, bez test / netest. Typ řádku je doslovný název levelu z LTA – číselník <b>LTA Levels</b> (Nastavení → Číselníky) se zakládá sám; volbu tam jde přejmenovat, skrýt (pak se nedoplňuje) i smazat. Zadané řádky se nikdy nemažou ani nepřepisují a doplněné jde ručně upravit nebo odebrat.</p>
-          <label class="settings-check" style="margin-top:12px"><input type="checkbox" id="ltaEnabled"> Import LTA levelů zapnutý</label>
-          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaAutoInForm"> Doplnit automaticky ve formuláři <span class="sub">— po vyplnění instrumentu a ceny vstupu, jen když je seznam prázdný</span></label>
-          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaVwapRow"> Přidat VWAP v čase vstupu <span class="sub">— počítá ho konektor NT8 (verze 4) z 1min barů seance; jen u obchodů z konektoru</span></label>
-          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaArchive"> Ukládat verze levelů po dnech <span class="sub">— pro obchody zapsané později; jednou za 5 min se jen zkontroluje čas zápisu souborů, verze se uloží jen při změně levelů</span></label>
-          <div class="formgrid" style="margin-top:10px">
-            <div class="field"><label>Počet levelů <span class="sub">— nad a pod vstupem (N + N)</span></label><input type="number" id="ltaNearestCount" min="0" max="50" step="1"></div>
-            <div class="field"><label>Mazat archiv starší než <span class="sub">— dní; 0 = nemazat (doporučeno, smazané dny nejde vrátit)</span></label><input type="number" id="ltaRetentionDays" min="0" max="3650" step="1"></div>
-          </div>
-          <div class="field full" style="margin-top:10px"><label>Složka LTA</label><div class="sub" id="ltaFolderInfo"></div>
-            <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="ltaChooseFolder">Změnit složku…</button><button type="button" class="btn" id="ltaResetFolder">Výchozí složka</button><button type="button" class="btn" id="ltaOpenFolder">Otevřít složku</button><button type="button" class="btn" id="ltaRefresh">Obnovit</button></div></div>
-          <div class="field full" style="margin-top:10px"><label>Soubory a levely <span class="sub">— vypnutý soubor se nečte (např. stará kopie v Local); u souboru rozbal „levely“ a odškrtni ty, které se nemají doplňovat (OPEN, SETT, gamma Combo L2…)</span></label><div id="ltaFiles"></div></div>
-          <div class="field full" style="margin-top:10px"><label>Vyloučit názvy obsahující… <span class="sub">— jeden text na řádek, bez ohledu na velikost písmen; hodí se na názvy, které se mění každý den (např. „/“ vyloučí popisek s datem „11/02 - 00:“ z gamma souboru)</span></label><textarea id="ltaExcludePatterns" rows="3" placeholder="např. CLOSE"></textarea></div>
-          <p class="sub" style="margin-top:6px">Vyloučený level se jen nedoplňuje (automaticky ani tlačítkem „Doplnit z LTA“). V archivu i v číselníku LTA Levels zůstává a ve formuláři ho jde vybrat ručně. Skrytá volba v Číselnících se navíc nenabízí vůbec.</p>
-          <p class="sub" id="ltaArchiveInfo" style="margin-top:8px"></p>
-          <p class="sub" id="ltaMissingDays" style="margin-top:4px;display:none"></p>
-          <h4 class="settings-sub">Ze snímku trhu</h4>
-          <div id="levelsSnapshotSection">
-            <label class="settings-check" style="margin-top:8px" id="levelsSnapshotOnLabel"><input type="checkbox" id="levelsSnapshotOn"> Doplňovat řádky hladin ze snímku trhu <span class="sub" id="levelsSnapshotWhy"></span></label>
-            <div class="formgrid" style="margin-top:6px"><div class="field" id="marketLevelsNField"><label>Řádky ze snímku <span class="sub">— N nejbližších nad a N pod vstupem</span></label><input type="number" id="marketLevelsN" min="0" max="20" step="1"></div></div>
-            <div id="marketLevelTypes" style="margin-top:6px"></div>
-            <div class="sub" style="margin-top:4px">Typ řádku je volba číselníku Hladina vstupu (Nastavení → Číselníky) – jde přejmenovat i skrýt; skrytá volba se nedoplňuje. High / Low dne je ve výchozím stavu skrytá. Snímek trhu (konektor NT8, value area, živé ticky) se zapíná v kartě Data trhu.</div>
-          </div>
-          <p class="sub" style="margin-top:8px">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Do složky LTA se nikdy nic nezapisuje.</p>
-        </details>
-        <details class="card settings-card" data-card="marketData" id="marketDataCard">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Data trhu</h3></summary>
-          <p class="sub">Data trhu k obchodům pro Backtest Lab: archiv LTA levelů, původ hladin a další funkce postupně (svíčky dne, snímek trhu při vstupu). <b>Vypnuto = deník se chová jako dřív.</b> Vypnutí funkce nikdy nemaže data, která už jsou uložená – jen je přestane sbírat a ukazovat.</p>
-          <label class="settings-check" style="margin-top:12px"><input type="checkbox" id="marketEnabled"> <b>Data trhu zapnutá</b> <span class="sub">— první zapnutí zapne doporučenou sadu, pak jde každou funkci přepnout zvlášť</span></label>
-          <div id="marketFeatures" style="margin:6px 0 0 22px"></div>
-          <div id="marketBarsPanel" class="field full" style="margin:10px 0 0 22px;display:none"><label>Minutové svíčky dne</label>
-            <div class="sub" id="marketBarsInfo"></div>
-            <div class="sub" id="marketConnectorInfo" style="margin-top:4px"></div>
-            <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="marketBackfill" title="Svíčky dne pro dny s obchody a s archivem LTA levelů; snímek trhu pro obchody, které ho nemají (čas vstupu z obchodu), a VPOC 30M aktuální ke starším snímkům (konektor NT8 verze 9). Ruční řádky Hladin se nemění.">Doplnit svíčky a snímky pro dny s obchody</button><button type="button" class="btn" id="marketCancel" style="display:none">Přerušit</button><button type="button" class="btn" id="marketOpenFolder">Otevřít složku</button></div>
-            <div class="sub" id="marketProgress" style="margin-top:4px"></div>
-            <div class="sub" style="margin-top:4px">Svíčky se nikdy nemažou samy – smazat je jde jen ručně ve složce. Obchod se importuje vždy, i když svíčky nepřijdou (den pak zůstane bez svíček).</div>
-          </div>
-          <div id="marketSnapshotPanel" class="field full" style="margin:10px 0 0 22px;display:none"><label>Snímek trhu při vstupu</label>
-            <div class="sub" id="marketSnapshotConn"></div>
-            <div class="formgrid" style="margin-top:6px">
-              <div class="field"><label>Value area <span class="sub">— % objemu dne pro VAH / VAL</span></label><input type="number" id="marketVaPct" min="50" max="95" step="1"></div>
-              <div class="field"><label>Živé ticky <span class="sub">— konektor je sbírá sám od spuštění NT8 (nic se nezapíná, deník nemusí běžet). Instrumenty: kořeny oddělené čárkou, např. MES, ES; prázdné = automaticky podle obchodů</span></label><input type="text" id="marketLiveRoots" placeholder="automaticky"></div>
-            </div>
-            <div class="sub" style="margin-top:4px">Řádky hladin ze snímku (N, typy): Nastavení → Přizpůsobení → Hladiny → Ze snímku trhu.</div>
-          </div>
-          <p class="sub" id="marketInfo" style="margin-top:8px"></p>
-          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Archiv LTA levelů se nemaže, ani když jsou Data trhu vypnutá.</p>
-        </details>
-        <details class="card settings-card" data-card="overviewFilters">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Přehled účtu</h3></summary>
-          <div class="panel-subtitle" style="margin-top:0">Filtry</div>
-          <p class="sub">Které „Další filtry“ se ukazují v Přehledu účtu. Skrytý filtr se nepoužije, i když v něm zůstala hodnota – data se nikdy nemažou.</p>
-          <div id="overviewFilterSettings" style="margin-top:10px"></div>
-          <div class="panel-subtitle">Sekce</div>
-          <p class="sub">Které karty Přehled účtu ukazuje. Stejné volby jsou přímo v přehledu pod „Zobrazené sekce“. Skrytá karta nic nemaže a nemění výpočty ani exporty; když skryješ všechny karty jedné řady, zmizí i její nadpis.</p>
-          <div class="overview-section-settings" data-ov-section-settings></div>
-          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
-        </details>
-      </div>
-      </div>
-
-      <div class="subsection" id="settingsRisk">
-      <div class="settings-grid">
-        <details class="card settings-card" data-card="risk">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Řízení rizika (per deník)</h3></summary>
-          <p class="sub">Volitelné denní/celkové limity pro tento konkrétní deník. Prázdné pole = pravidlo je vypnuté. Porušení nebo splnění cíle se poznačí u příslušného dne v Kalendáři.</p>
-          <div class="field" style="margin-top:10px"><label>Max. denní drawdown (v měně účtu)</label><input type="number" id="riskMaxDailyDrawdown" min="0" step="0.01" placeholder="např. 1000"></div>
-          <div class="field" style="margin-top:12px"><label>Max. celkový drawdown účtu (v měně účtu)</label><input type="number" id="riskMaxTotalDrawdown" min="0" step="0.01" placeholder="např. 5000"><div class="sub">Propad od nejvyššího dosaženého stavu účtu (peak) k aktuálnímu stavu.</div></div>
-          <div class="field" style="margin-top:12px"><label>Limit S/L za den (počet obchodů)</label><input type="number" id="riskMaxSlPerDay" min="0" step="1" placeholder="např. 3"></div>
-          <div class="field" style="margin-top:12px"><label>Celk. limit obchodů za den</label><input type="number" id="riskMaxTradesPerDay" min="0" step="1" placeholder="např. 6"></div>
-          <div class="field" style="margin-top:12px"><label>Limit profit obchodů / den</label><input type="number" id="riskMaxProfitTradesPerDay" min="0" step="1" placeholder="např. 4"></div>
-          <div class="field" style="margin-top:12px"><label>Profit target / den (v měně účtu)</label><input type="number" id="riskProfitTargetPerDay" min="0" step="0.01" placeholder="např. 800"><div class="sub">Nejde o porušení pravidla – den se v kalendáři zvýrazní zeleně jako splněný cíl.</div></div>
-          <button class="btn primary" id="saveRiskSettings" style="margin-top:14px">Uložit řízení rizika</button>
-        </details>
-        <details class="card settings-card" data-card="breakEven">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Break Even a slučování obchodů</h3></summary>
-          <p class="sub">Obchod s výsledkem blízko nuly se označí jako Break Even místo ztráty. Obchody stejné pozice (např. TP1/TP2/BE z NinjaTraderu) lze slučovat automaticky.</p>
-          <div class="field" style="margin-top:10px"><label>Rozpoznávat Break Even</label><select id="breakEvenEnabled"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
-          <div class="field" style="margin-top:12px"><label>Práh Break Even (v měně účtu, ±)</label><input type="number" id="breakEvenThreshold" min="0" step="0.01" value="0"><div class="sub">Obchod s čistým ziskem/ztrátou v tomto rozmezí kolem nuly se zobrazí jako Break Even.</div></div>
-          <div class="field" style="margin-top:12px"><label>Automaticky slučovat cíle stejné pozice (TP1/TP2/BE) při importu</label><select id="autoMergeLegs"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
-          <button class="btn primary" id="saveBreakEvenSettings" style="margin-top:14px">Uložit nastavení</button>
-        </details>
-      </div>
-      </div>
-
-      <div class="subsection" id="settingsTemplates">
-      <div class="settings-grid">
-        <details class="card settings-card" data-card="templates">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Šablony podle instrumentu</h3></summary>
-          <p class="sub">Pro daný instrument lze předvyplnit dodržení plánu, komentář, hodnotu bodu, velikost ticku, výchozí komisi a nejvyšší „rozumný“ SL v tickech (dál se hlásí „nepravděpodobně daleko“) — při ručním přidání i při automatickém importu.</p>
-          <div class="template-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.1fr auto;margin-top:12px;font-weight:700;color:var(--muted);font-size:12px">
-            <div>Instrument</div><div>Plán</div><div>Bod ($)</div><div>Tick</div><div>Komise ($/ks)</div><div title="Nejvyšší SL v tickech, který ještě nehlásí „nepravděpodobně daleko“. Prázdné = 40, 0 = nehlásit.">Max SL (t)</div><div>Komentář</div><div></div>
-          </div>
-          <div class="template-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 1.1fr auto">
-            <input id="tplNewInstrument" placeholder="např. MES">
-            <select id="tplNewPlan"><option value="">—</option><option value="ano">Ano</option><option value="ne">Ne</option></select>
-            <input id="tplNewPointValue" type="number" step="any" min="0" placeholder="5,00">
-            <input id="tplNewTickSize" type="number" step="any" min="0" placeholder="0,25" title="Velikost ticku – nejmenší pohyb ceny. Potřebná pro všechny tikové dopočty (SL v ticích, MFE/MAE z výstupu, po výstupu, vzdálenosti hladin).">
-            <input id="tplNewCommission" type="number" step="any" min="0" placeholder="1,90">
-            <input id="tplNewMaxSl" type="number" step="1" min="0" placeholder="40" title="Nejvyšší SL v tickech, který ještě nehlásí „nepravděpodobně daleko“. Prázdné = 40, 0 = nehlásit.">
-            <input id="tplNewComment" placeholder="Komentář">
-            <button class="btn primary" id="addTemplate" style="padding:8px 10px">＋</button>
-          </div>
-          <div class="sub" style="margin-top:8px">Pár běžných kontraktů má hodnotu bodu předvyplněnou automaticky, i bez šablony: ES $50, MES $5, NQ $20, MNQ $2, YM $5, MYM $0,50, RTY $50, M2K $5. Přidáním šablony pro daný instrument (i jen s vyplněným polem "Bod") si můžeš tuhle vestavěnou hodnotu přepsat vlastní. Komise ve výchozím stavu vestavěnou hodnotu nemá – dokud ji nevyplníš, nic se nemění. Sloupec <b>Tick</b> je velikost ticku (nejmenší pohyb ceny) – potřebují ji všechny tikové dopočty (SL v ticích, MFE/MAE z výstupu, po výstupu, vzdálenosti hladin). Vestavěně ji mají též kontrakty: ES/MES/NQ/MNQ 0,25, YM/MYM 1, RTY/M2K 0,1. U jiného instrumentu se NEHÁDÁ – bez vyplněné hodnoty zůstanou tikové dopočty prázdné.</div>
-          <div id="templateList" style="margin-top:12px"></div>
-          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
-            <label>Komise u nových importovaných obchodů (NinjaTrader / cTrader)</label>
-            <select id="useConnectorCommission">
-              <option value="ne">Použít komisi ze šablony instrumentu (výchozí)</option>
-              <option value="ano">Použít komisi nahlášenou konektorem</option>
-            </select>
-            <div class="sub" style="margin-top:6px">NinjaTrader posílá jen "Commission" a nezahrnuje další poplatky (Clearing, Exchange, IP, NFA fee), takže reálná komise může být vyšší, než co pošle konektor. Proto je výchozí chování bezpečnější: použije se komise ze šablony instrumentu (za kontrakt). Pokud šablona pro daný instrument komisi vyplněnou nemá, použije se hodnota od konektoru – s nulou se nepočítá, jinak by se obchod se ztrátou až po komisích tvářil v přehledu jako zisk. Přepnutím na "Použít komisi nahlášenou konektorem" se konektorová hodnota použije vždy, i když šablona existuje.</div>
-            <button class="btn" id="saveConnectorCommissionSetting" style="margin-top:10px">Uložit</button>
-          </div>
-          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
-            <label>Přepočítat komisi u už uložených obchodů</label>
-            <div class="sub" style="margin-top:2px">Projde všechny obchody v aktivním deníku a u instrumentů, které mají v šabloně vyplněnou komisi, přepočítá komisi (podle počtu kontraktů) i výsledný zisk/ztrátu. Obchody u instrumentů bez vyplněné komise v šabloně zůstanou beze změny. Nejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova).</div>
-            <button class="btn danger" id="recalcCommissionBtn" style="margin-top:10px">Přepočítat komisi v aktivním deníku</button>
-          </div>
-          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
-            <label>Doplnit směr (Long / Short) u starších obchodů</label>
-            <div class="sub" style="margin-top:2px">Obchody uložené ve starších verzích nemají zaznamenaný směr. Tenhle nástroj ho u nich jednorázově doplní podle vstupní a výstupní ceny a uloženého hrubého výsledku. <b>Zisk, ztráta, body ani výsledek se nijak nemění</b> – doplní se pouze směr. Obchody, u kterých směr určit nejde (chybějící ceny, stejná vstupní i výstupní cena, nulový hrubý výsledek), zůstanou bez směru a můžeš je doplnit ručně. Nejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova).</div>
-            <button class="btn danger" id="backfillSideBtn" style="margin-top:10px">Doplnit směr v aktivním deníku</button>
-            <div class="sub" id="backfillSideReport" style="margin-top:10px"></div>
-          </div>
-        </details>
-      </div>
-      </div>
-
-      <div class="subsection" id="settingsTaxonomy">
-      <div class="settings-grid">
-        <details class="card settings-card" data-card="taxonomy">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Číselníky kontextu obchodu</h3></summary>
-          <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volbu jde skrýt – skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových – nebo smazat; smazanou jde obnovit.</p>
-          <div id="taxonomyGroups"></div>
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
-            <h3 style="margin-top:0">Přenos číselníků</h3>
-            <p class="sub">Číselníky patří ke kartě deníku, takže backtest a živý deník mají každý svoje. Tady se dají zkopírovat do jiné karty nebo uložit do souboru a načíst na jiném počítači.</p>
-            <div class="mapping-row" style="margin-top:10px">
-              <select id="taxonomyCopyTarget"></select>
-              <button type="button" class="btn" id="taxonomyCopyBtn">Zkopírovat do karty</button>
-            </div>
-            <div class="mapping-row" style="margin-top:10px">
-              <button type="button" class="btn" id="taxonomyExportBtn">Exportovat do souboru</button>
-              <label class="btn" for="taxonomyImportInput" style="text-align:center;cursor:pointer">Importovat ze souboru</label>
-              <input type="file" id="taxonomyImportInput" accept="application/json,.json" style="display:none">
-            </div>
-            <div class="sub" id="taxonomyTransferNote" style="margin-top:8px"></div>
-          </div>
-        </details>
-      </div>
-      </div>
-
-      <div class="subsection" id="settingsBackup">
-      <div class="settings-grid">
-        <details class="card settings-card" data-card="aiExport">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Export pro AI analýzu / Claude Cowork</h3></summary>
-          <p class="sub">Vedle běžných dat udržuje appka automaticky ještě jednu "odlehčenou" kopii každého deníku – úplně stejná obchodní data (výsledek, body, komentář, denní plán, setup/scénář, psychologický checklist…), ale BEZ screenshotů. Ty totiž dělají soubor objemný; bez nich je i deník s velkým počtem obchodů v řádu stovek kB. Tahle kopie se aktualizuje sama při každém uložení obchodu.</p>
-          <div id="aiExportInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji umístění…</div>
-          <button class="btn primary" id="regenerateAiExports" style="margin-top:10px">🔄 Aktualizovat teď (pro všechny deníky)</button>
-          <div class="sub" style="margin-top:8px">Nasměruj Claude Cowork (nebo jiný nástroj) přímo na tuhle složku, ať vidí aktuální obchody napříč deníky bez nutnosti cokoliv ručně exportovat. Soubor "index.json" v této složce říká, který soubor patří kterému deníku podle názvu.</div>
-        </details>
-        <details class="card settings-card" data-card="dataLocation">
+      <div class="settings-sec" data-sec="data" id="setsec-data">
+        <div class="settings-sec-head"><h2>💾 Data a zálohy</h2><p class="sub">Kde mám data</p></div>
+        <div class="settings-grid">
+<details class="card settings-card" data-card="dataLocation">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Umístění dat (deníky, obchody, screenshoty)</h3></summary>
           <p class="sub">Ve výchozím stavu se data ukládají na systémovém disku (C:), stejně jako u většiny Windows aplikací. Pokud chceš mít data na jiném disku (např. kvůli místu na SSD vyhrazenému jen pro OS), lze umístění změnit – appka existující deníky i screenshoty přesune celé, nic se neztratí.</p>
           <div id="dataLocationInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji aktuální umístění…</div>
@@ -1370,7 +1378,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn" id="resetDataLocation" style="margin-top:10px;margin-left:8px">Vrátit na výchozí umístění</button>
           <div class="sub" style="margin-top:8px">Po změně se appka restartuje, ať se nové umístění projeví všude bezpečně.</div>
         </details>
-        <details class="card settings-card" data-card="imagesLocation">
+<details class="card settings-card" data-card="imagesLocation">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Složka obrázků (screenshoty)</h3></summary>
           <p class="sub">Screenshoty obchodů a dnů jsou obyčejné soubory v této složce, s čitelnými jmény podle obchodu, např. <b>2026-10-16_1428_MES_long_1.webp</b> nebo <b>2026-10-16_den_1.png</b>. V deníku je jen odkaz a v aplikaci jen malý náhled; kliknutím se obrázek otevře ve výchozím prohlížeči obrázků Windows. Složku můžeš dát kamkoli (jiný disk, synchronizovaná složka) – obrázky se do ní přesunou, odkazy v denících se nemění.</p>
           <div id="imagesLocationInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji umístění…</div>
@@ -1383,7 +1391,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn" id="restoreImagesFromBackup" type="button" style="display:none;margin-top:8px">♻️ Doplnit chybějící obrázky ze zálohy</button>
           <div class="sub" style="margin-top:8px">Podsložka <b>_nahledy</b> jsou jen zmenšeniny pro seznamy – jde kdykoli smazat, vytvoří se znovu. Soubor <b>_prejmenovani.json</b> pamatuje původní jména obrázků, ať je najdou i starší zálohy.</div>
         </details>
-        <details class="card settings-card" data-card="backup">
+<details class="card settings-card" data-card="backup">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Záloha a obnova</h3></summary>
           <p class="sub">Data se ukládají lokálně v tomto prohlížeči.</p>
           <button class="btn primary" id="updateBackup">💾 Aktualizovat zálohu na SSD</button>
@@ -1406,8 +1414,52 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <button class="btn danger" id="factoryReset" style="display:block;margin-top:10px">⚠️ Kompletní reset aplikace</button>
           <div class="sub" style="margin-top:8px">Smaže všechny deníky, obchody, nastavení i uloženou cestu k záloze.</div>
         </details>
+        <details class="card settings-card" data-card="aiExport">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Exporty</h3></summary>
+          <p class="sub">Vedle běžných dat udržuje appka automaticky ještě jednu "odlehčenou" kopii každého deníku – úplně stejná obchodní data (výsledek, body, komentář, denní plán, setup/scénář, psychologický checklist…), ale BEZ screenshotů. Ty totiž dělají soubor objemný; bez nich je i deník s velkým počtem obchodů v řádu stovek kB. Tahle kopie se aktualizuje sama při každém uložení obchodu.</p>
+          <div id="aiExportInfo" class="sub" style="margin-top:10px;word-break:break-all">Zjišťuji umístění…</div>
+          <button class="btn primary" id="regenerateAiExports" style="margin-top:10px">🔄 Aktualizovat teď (pro všechny deníky)</button>
+          <div class="sub" style="margin-top:8px">Nasměruj Claude Cowork (nebo jiný nástroj) přímo na tuhle složku, ať vidí aktuální obchody napříč deníky bez nutnosti cokoliv ručně exportovat. Soubor "index.json" v této složce říká, který soubor patří kterému deníku podle názvu.</div>
+          <div id="exportFeatures" style="margin-top:12px"></div>
+        </details>
+        <details class="card settings-card" data-card="tools">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Nástroje opravy dat</h3></summary>
+          <p class="sub">Jednorázové opravy uložených obchodů v aktivním deníku. Nejdřív si udělej zálohu (Data a zálohy → Záloha a obnova).</p>
+          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+            <label>Přepočítat komisi u už uložených obchodů</label>
+            <div class="sub" style="margin-top:2px">Projde všechny obchody v aktivním deníku a u instrumentů, které mají v šabloně vyplněnou komisi, přepočítá komisi (podle počtu kontraktů) i výsledný zisk/ztrátu. Obchody u instrumentů bez vyplněné komise v šabloně zůstanou beze změny. Nejdřív si prosím udělej zálohu (Nastavení → Data a zálohy → Záloha a obnova).</div>
+            <button class="btn danger" id="recalcCommissionBtn" style="margin-top:10px">Přepočítat komisi v aktivním deníku</button>
+          </div>
+          <div class="field" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+            <label>Doplnit směr (Long / Short) u starších obchodů</label>
+            <div class="sub" style="margin-top:2px">Obchody uložené ve starších verzích nemají zaznamenaný směr. Tenhle nástroj ho u nich jednorázově doplní podle vstupní a výstupní ceny a uloženého hrubého výsledku. <b>Zisk, ztráta, body ani výsledek se nijak nemění</b> – doplní se pouze směr. Obchody, u kterých směr určit nejde (chybějící ceny, stejná vstupní i výstupní cena, nulový hrubý výsledek), zůstanou bez směru a můžeš je doplnit ručně. Nejdřív si prosím udělej zálohu (Nastavení → Data a zálohy → Záloha a obnova).</div>
+            <button class="btn danger" id="backfillSideBtn" style="margin-top:10px">Doplnit směr v aktivním deníku</button>
+            <div class="sub" id="backfillSideReport" style="margin-top:10px"></div>
+          </div>
+        </details>
+        </div>
+      </div>
+      <div class="settings-sec" data-sec="app" id="setsec-app">
+        <div class="settings-sec-head"><h2>ℹ️ Aplikace</h2><p class="sub">Verze a aktualizace</p></div>
+        <div class="settings-grid">
+        <details class="card settings-card" data-card="update">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Aktualizace</h3></summary>
+          <p class="sub" style="margin-top:0">Aplikace si sama zjišťuje, jestli na GitHubu vyšla nová verze, a nabídne ji. Bez tvého potvrzení se nic nestahuje ani neinstaluje. Deníky, obchody ani nastavení se aktualizací nemění.</p>
+          <div id="updateInfo" class="sub" style="margin-top:10px">Zjišťuji verzi…</div>
+          <button class="btn" id="checkUpdates" style="margin-top:10px">🔄 Zkontrolovat aktualizace</button>
+          <button class="btn primary" id="installUpdate" style="margin-top:10px;margin-left:8px;display:none">Aktualizovat</button>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+            <label class="settings-check"><input type="checkbox" id="updateTestChannel"> Povolit testovací (pre-release) verze</label>
+            <div id="updateTestBox" style="display:none">
+              <button class="btn" id="checkTestUpdates" style="margin-top:10px;border:1px solid rgba(var(--yellow-rgb),.6)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--yellow)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Zkontrolovat aktualizace Test verze</button>
+              <p class="sub" id="updateTestWarning" style="color:var(--yellow);margin-top:8px"></p>
+            </div>
+          </div>
+        </details>
+        </div>
       </div>
       </div>
+    </div>
     </section>
   </main>
 </div>
@@ -1420,7 +1472,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
     <div class="modalhead"><h2 id="journalNameModalTitle">Nový deník</h2><button class="icon" id="closeJournalNameModal">✕</button></div>
     <div class="field"><label id="journalNameLabel">Název deníku</label><input id="journalNameInput" maxlength="60" placeholder="Např. NQ, ES nebo GC"></div>
     <div class="field"><label for="journalMode">Režim deníku</label><select id="journalMode"><option value="LIVE">Živý</option><option value="BACKTEST">Backtest</option></select><div class="sub">Živý: bez „Naživo bych to vzal?“. Backtest: bez stavu „vědomě vynechán“. Jde změnit i v Nastavení → Obecné → Deníky.</div></div>
-    <div class="field"><label for="journalTypeSelect">Typ deníku</label><select id="journalTypeSelect"><option value="FUTURES_INTRADAY">Futures intraday</option><option value="CFD_SWING">Swing · CFD</option></select><div class="sub">Swing · CFD: obchod trvá dny a končí po částech, R se počítá z cen. Otevřené pozice a obchody z cTraderu se načítají přes cTrader MCP (účet vybereš v Nastavení → Swing · CFD) nebo z cTrader cBota; NinjaTrader se pro swing nepoužívá. Bez intraday risk modulu. Změna typu nemění data obchodů.</div></div>
+    <div class="field"><label for="journalTypeSelect">Typ deníku</label><select id="journalTypeSelect"><option value="FUTURES_INTRADAY">Futures intraday</option><option value="CFD_SWING">Swing · CFD</option></select><div class="sub">Swing · CFD: obchod trvá dny a končí po částech, R se počítá z cen. Otevřené pozice a obchody z cTraderu se načítají přes cTrader MCP (účet vybereš v Nastavení → Instrumenty a účty → Swing · CFD) nebo z cTrader cBota; NinjaTrader se pro swing nepoužívá. Bez intraday risk modulu. Změna typu nemění data obchodů.</div></div>
     <div id="journalNameError" class="alert red"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="btn" id="cancelJournalName">Zrušit</button>
@@ -1639,11 +1691,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <details class="trade-section" data-card="levels">
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Hladiny</span><span class="sub trade-section-summary" id="levelsSummary"></span><span class="trade-section-missing" id="levelsMissing"></span></summary>
         <div class="formgrid">
-          <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
+          <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span> <button type="button" class="settings-gear" data-settings-link="taxonomyEditor" title="Upravit volby v Číselnících">⚙</button></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
           <div class="field full" id="nearLevelsField"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label>
-            <div class="tmap-box" id="tradeMapBox" style="display:none"><div class="tmap-bar"><span class="sub" id="tradeMapHidden"></span><button type="button" class="btn" id="tradeMapFull" onclick="toggleTradeMapFull()" title="Ukáže i hladiny mimo rozsah SL – poslední cíl (jen zobrazení)">Celý rozsah</button></div><div class="tmap" id="tradeMap"></div><div class="sub tmap-legend" id="tradeMapLegend"></div><div class="tmap-sentence" id="tradeMapSentence" title="Poloha hladin vůči SL, vstupu a poslednímu cíli – dopočet z cen, needituje se"></div><div class="sub" id="tradeMapSignal" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky" style="margin-top:4px"></div></div>
+            <div class="tmap-box" id="tradeMapBox" style="display:none"><div class="tmap-bar"><span class="sub" id="tradeMapHidden"></span><button type="button" class="settings-gear" data-settings-link="levelsMap" title="Nastavení Mapy obchodu">⚙</button><button type="button" class="btn" id="tradeMapFull" onclick="toggleTradeMapFull()" title="Ukáže i hladiny mimo rozsah SL – poslední cíl (jen zobrazení)">Celý rozsah</button></div><div class="tmap" id="tradeMap"></div><div class="sub tmap-legend" id="tradeMapLegend"></div><div class="tmap-sentence" id="tradeMapSentence" title="Poloha hladin vůči SL, vstupu a poslednímu cíli – dopočet z cen, needituje se"></div><div class="sub" id="tradeMapSignal" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky" style="margin-top:4px"></div></div>
             <div class="sr-list sr-list-plain open" id="nearLevelsList"><button type="button" class="sr-list-head" onclick="toggleLevelList()" aria-controls="nearLevelsListBody"><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Seznam hladin <span class="sub" id="nearLevelsCount"></span></button><div class="sr-list-body" id="nearLevelsListBody"><div class="sr-filter" id="nearLevelsFilter" style="display:none"></div>
-          <div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Přizpůsobení → Hladiny). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsLtaNote" style="margin-top:6px;display:none"></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div></div></div>
+          <div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="settings-gear" data-settings-link="levels" title="Nastavení hladin z LTA souborů a ze snímku trhu">⚙</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Hladiny a data trhu → Hladiny z LTA souborů). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsLtaNote" style="margin-top:6px;display:none"></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
           <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
@@ -1674,7 +1726,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <details class="trade-section" data-card="after">
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Po obchodu</span><span class="sub trade-section-summary" id="afterSummary"></span></summary>
         <div class="formgrid">
-          <div class="field full"><label>Screenshoty po obchodu – maximálně 3 obrázky</label><input id="screenshotsAfter" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Aplikace je doplní sama N minut po výstupu (Nastavení → Integrace). Tady je jde ručně přidat nebo odebrat.</div><div class="image-preview" id="imagePreviewAfter"></div></div>
+          <div class="field full"><label>Screenshoty po obchodu – maximálně 3 obrázky</label><input id="screenshotsAfter" type="file" accept="image/*" multiple><div class="sub" style="margin-top:4px">Aplikace je doplní sama N minut po výstupu (Nastavení → Připojení a zdroje dat). Tady je jde ručně přidat nebo odebrat.</div><div class="image-preview" id="imagePreviewAfter"></div></div>
         </div>
       </details>
       <div id="formAlert" class="alert red"></div>
@@ -1690,6 +1742,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <script src="points.js"></script>
 <script src="context.js"></script>
 <script src="trade-map.js"></script>
+<script src="settings-registry.js"></script>
 <script src="swing.js"></script>
 <script src="journals.js"></script>
 <script src="nt8import.js"></script>
@@ -2157,7 +2210,7 @@ function renderGroupStats(boxId,key,stats){
  };
  el.innerHTML=lines.join('')+table(stats.byReason,def.reasonLabel,def.reasonTitle)+(def.reason2Of?table(stats.byReason2,def.reason2Label,def.reason2Title):'');
 }
-// Karty formuláře obchodu (Nastavení → Přizpůsobení): každá jde skrýt a každá
+// Karty formuláře obchodu (Nastavení → Vzhled a zobrazení): každá jde skrýt a každá
 // má vlastní „Upozorňovat na nevyplněné" (štítek „Neúplné" na kartě obchodu
 // a „chybí N" v hlavičce karty). Platí pro celou aplikaci a pamatuje se.
 // Výchozí je vše zobrazené i s upozorněním.
@@ -2195,7 +2248,7 @@ function applyTradeCardVisibility(){
   card.style.display=tradeCardShown(card.dataset.card)?'':'none';
  });
 }
-// Pole kontextu (Nastavení → Přizpůsobení, kontext v3 A4): jednotlivá pole jdou
+// Pole kontextu (Nastavení → Vzhled a zobrazení, kontext v3 A4): jednotlivá pole jdou
 // skrýt a u každého zvlášť zapnout „Upozorňovat na nevyplněné" – stejný vzor
 // jako karty obchodu, jen o úroveň níž. Platí pro celou aplikaci a pamatuje se.
 // Výchozí: vše zobrazené; upozornění jen u trendu 30m a známky (jako dřív).
@@ -2261,7 +2314,7 @@ function dayContextMissingLabelsFor(t){
  if(!t?.date||(t.journalId&&t.journalId!==activeJournalId))return [];
  return dayContextMissingFieldsFor(t.date).map(k=>FJContext.DAY_CONTEXT_LABELS[k]);
 }
-// Co ukáže Přehled účtu po startu (Nastavení → Deníky): jen poslední aktivní
+// Co ukáže Přehled účtu po startu (Nastavení → Obecné → Deníky): jen poslední aktivní
 // deník (výchozí), nebo všechny viditelné. Platí pro celou aplikaci.
 const OVERVIEW_START_KEY='FJ_overviewStartJournal';
 function readOverviewStartMode(){try{return localStorage.getItem(OVERVIEW_START_KEY)===FJJournals.OVERVIEW_START.ALL?FJJournals.OVERVIEW_START.ALL:FJJournals.OVERVIEW_START.ACTIVE}catch{return FJJournals.OVERVIEW_START.ACTIVE}}
@@ -2534,6 +2587,33 @@ async function runSrLevelsMigration(){
 // – stejná používá čtení nepřevedeného deníku i exporty. Úprava se počítá
 // znovu až v zápisu nad aktuálním stavem: mezi zálohou a zápisem mohl přijít
 // import z konektoru.
+// VWAP v Hladinách na tick (4.8.103): řádky VWAP doplněné strojem (zdroj LTA,
+// konektor NT8 poslal průměr) se jednou zaokrouhlí na tick instrumentu. Záloha
+// jen když je co měnit; značka vwapTickVersion v souboru deníku. Ruční řádky
+// a swing záznamy se nemění.
+const VWAP_TICK_VERSION=1;
+async function runVwapTickMigration(){
+ const data=await ensureActiveJournalData();
+ if(Number(data.vwapTickVersion||0)>=VWAP_TICK_VERSION)return {skipped:true};
+ const cfg=typeof taxonomyConfig==='function'?taxonomyConfig():{};
+ const ltaKey=FJTaxonomy.registerLtaNames([FJLta.VWAP_NAME],cfg).keys[FJLta.VWAP_NAME];
+ const vwapKeys=[...new Set(['VWAP',ltaKey].filter(Boolean))];
+ const snap=t=>{
+  if(!t||t.kind==='SWING'||!Array.isArray(t.nearLevels))return {trade:t,changed:0};
+  const r=FJLta.snapVwapRows(t.nearLevels,{tickSize:getTickSizeForInstrument(t.instrument),vwapKeys});
+  return r.changed?{trade:{...t,nearLevels:r.rows},changed:r.changed}:{trade:t,changed:0};
+ };
+ const changed=(data.trades||[]).reduce((n,t)=>n+snap(t).changed,0);
+ if(changed){
+  const r=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-vwap-na-tick');
+  if(!r||r.ok!==true)throw new Error(r?.error||'Zálohu deníku před zaokrouhlením VWAP nelze vytvořit.');
+ }
+ await commitJournal(journal=>{
+  journal.trades=(Array.isArray(journal.trades)?journal.trades:[]).map(t=>snap(t).trade);
+  journal.vwapTickVersion=VWAP_TICK_VERSION;
+ });
+ return {changed};
+}
 async function runContextV3Migration(){
  const data=await ensureActiveJournalData();
  if(Number(data.contextVersion||0)>=FJContext.CONTEXT_VERSION)return {skipped:true};
@@ -2853,7 +2933,7 @@ function looksLikeStopLossSavedAsWin(t){
 }
 if($('backfillSideBtn'))$('backfillSideBtn').onclick=async()=>{
  const jName=journalProfiles.find(j=>j.id===activeJournalId)?.name||'aktivní deník';
- const ok=await showConfirm(`Projde obchody v deníku „${jName}", u kterých ještě není vyplněný směr, a doplní ho podle vstupní/výstupní ceny a uloženého hrubého výsledku.\n\nZisk, ztráta, body ani výsledek se NIJAK nemění – doplní se pouze směr.\n\nObchody, u kterých směr určit nejde (chybějící ceny, stejná vstupní i výstupní cena, nulový hrubý výsledek), zůstanou bez směru a doplníš je ručně.\n\nNejdřív si prosím udělej zálohu (Nastavení → Záloha a obnova). Pokračovat?`);
+ const ok=await showConfirm(`Projde obchody v deníku „${jName}", u kterých ještě není vyplněný směr, a doplní ho podle vstupní/výstupní ceny a uloženého hrubého výsledku.\n\nZisk, ztráta, body ani výsledek se NIJAK nemění – doplní se pouze směr.\n\nObchody, u kterých směr určit nejde (chybějící ceny, stejná vstupní i výstupní cena, nulový hrubý výsledek), zůstanou bez směru a doplníš je ručně.\n\nNejdřív si prosím udělej zálohu (Nastavení → Data a zálohy → Záloha a obnova). Pokračovat?`);
  if(!ok)return;
  // POZOR: modulové pole `trades` je klon (getAll dělá structuredClone), takže
  // úpravy v něm by se neuložily. Čte se z živých dat deníku a zapisuje se
@@ -3279,7 +3359,7 @@ function renderValueStatsBox(id,s,fmt,emptyText,missingLabel){
  const el=$(id); if(!el)return;
  const row=(label,val)=>`<div class="row"><span>${label}</span><b>${val}</b></div>`;
  const miss=(s.missing?`<div class="sub" style="margin-top:4px">${missingLabel}: ${s.missing}</div>`:'')
-  +(s.unitFallback?'<div class="sub" style="margin-top:4px">V ticích – některý instrument nemá známou velikost ticku (Nastavení → Šablony).</div>':'');
+  +(s.unitFallback?'<div class="sub" style="margin-top:4px">V ticích – některý instrument nemá známou velikost ticku (Nastavení → Instrumenty a účty → Šablony podle instrumentu).</div>':'');
  if(!s.count){el.innerHTML=`<div class="sub">${emptyText}</div>`+miss;return}
  const maxN=Math.max(...s.buckets.map(b=>b.count),1);
  el.innerHTML=
@@ -3972,7 +4052,8 @@ async function ltaRowsFor({instrument,instrumentFull,entryISO,entryPrice,vwap,co
  if(!s?.enabled||!window.desktopAPI?.ltaLevelsFor)return out;
  const res=await window.desktopAPI.ltaLevelsFor({root:normalizeInstrumentCode(instrument),instrumentFull:instrumentFull||'',entryISO});
  const levels=(res?.levels||[]).map(l=>({name:l.name,price:l.price}));
- const vw=FJLta.roundPrice(vwap);
+ // VWAP v čase vstupu je průměr – jako hladina na nejbližší tick instrumentu.
+ const vw=FJLta.roundToTick(FJLta.roundPrice(vwap),typeof getTickSizeForInstrument==='function'?getTickSizeForInstrument(instrument):null);
  if(s.vwapRow&&vw!=null&&vw>0&&!FJLta.isExcluded(FJLta.VWAP_NAME,s))levels.push({name:FJLta.VWAP_NAME,price:vw});
  out.source=res?.source||'none';
  out.count=levels.length;
@@ -4327,7 +4408,7 @@ let ltaFillToken=0;
 window.fillNearLevelsFromLta=async({auto=false,force=false}={})=>{
  const s=await ltaSettings(!auto);
  const market=await marketSettings();
- if(!s?.enabled){if(!auto)showToast('Import LTA levelů je vypnutý (Nastavení → Přizpůsobení → Hladiny).');return 0}
+ if(!s?.enabled){if(!auto)showToast('Import LTA levelů je vypnutý (Nastavení → Hladiny a data trhu → Hladiny z LTA souborů).');return 0}
  if(auto&&(!s.autoInForm||readLevelRows().length||$(NEAR_LEVELS_ID+'None')?.checked))return 0;
  const instrument=$('instrument')?.value||'';
  const entryPrice=Number($('entryPrice')?.value);
@@ -4531,18 +4612,18 @@ function contextPillsHTML(t){
  // Měkké validace: jen upozornění, nikdy neblokují uložení ani nic nemažou.
  // Chybějící kontext (dřív štítek „neúplný kontext" jen pro MFE/MAE
  // v backtestovém deníku) hlásí štítek „Neúplné" v titulku karty
- // (incompleteBadgeHTML) – zapíná se v Nastavení → Obecné.
+ // (incompleteBadgeHTML) – zapíná se v Nastavení → Vzhled a zobrazení → Karty obchodu.
  if(FJPoints.slTicksSuspicious(t.slTicks,findTemplate(t.instrument)?.maxSlTicks))parts.push(`<span class="pill context-pill post-exit-warn" title="SL nepravděpodobně daleko, překlep?">SL ${esc(distText(t.slTicks,t.instrument))}?</span>`);
  // Psychika (karta Psychika) má vlastní pilulku na konci; skrytá karta nebo
  // skrytá pole ji schovají, data zůstávají.
  const psych=typeof psychTradeParts==='function'&&(typeof tradeCardShown!=='function'||tradeCardShown('psych'))?psychTradeParts(t):[];
  const psychPill=psych.length?` <span class="pill context-pill" title="Psychika (1 nejhorší – 8 nejlepší)">Psychika ${esc(psych.join(' · '))}</span>`:'';
- // Skrytá karta Setup (Nastavení → Přizpůsobení) schová i své pilulky.
+ // Skrytá karta Setup (Nastavení → Vzhled a zobrazení) schová i své pilulky.
  if(typeof tradeCardShown==='function'&&!tradeCardShown('setup'))return parts.join(' ')+psychPill;
  if(t.setupCode)parts.push(`<span class="pill context-pill" title="Setup">${esc(FJTaxonomy.labelOf('SETUP',t.setupCode))}</span>`);
  if(t.setupCode2&&contextFieldShown('setupCode2'))parts.push(`<span class="pill context-pill" title="Setup – sekundární">+ ${esc(FJTaxonomy.labelOf('SETUP',t.setupCode2))}</span>`);
  if(t.trend)parts.push(`<span class="pill context-pill" title="Trend 1m">1m: ${esc(FJTaxonomy.labelOf('TREND',t.trend))}</span>`);
- // Skryté pole kontextu (Nastavení → Přizpůsobení → Pole kontextu) schová
+ // Skryté pole kontextu (Nastavení → Vzhled a zobrazení → Pole kontextu) schová
  // i svou pilulku; data u obchodu zůstávají.
  if(t.trendHtf&&contextFieldShown('trendHtf'))parts.push(`<span class="pill context-pill" title="Trend 30m">30m: ${esc(FJTaxonomy.labelOf('TREND_HTF',t.trendHtf))}</span>`);
  if(t.grade&&contextFieldShown('grade')){
@@ -4712,7 +4793,7 @@ if($('newsUrl')){
 // Štítek „Neúplné · N" v titulku karty: obchod nemá vyplněný kontext
 // (FJTaxonomy.missingContextKeys). Co chybí, říká tooltip – karta zůstane
 // kompaktní. Počítají se jen karty, které jsou zobrazené a mají zapnuté
-// „Upozorňovat na nevyplněné" (Nastavení → Přizpůsobení, tradeCardConfig).
+// „Upozorňovat na nevyplněné" (Nastavení → Vzhled a zobrazení, tradeCardConfig).
 function incompleteBadgeHTML(t){
  const labels=FJTaxonomy.missingForCards(t,typeof tradeCardConfig==='undefined'?{}:tradeCardConfig,undefined,
   typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig,
@@ -4759,7 +4840,7 @@ function levelPillsHTML(t,opts={}){
  if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + ')+testNo)}</span>`);
  // Hladiny v blízkosti se vypisují jen v detailu obchodu (karta Hladiny,
  // Mapa obchodu – 4.8.103). Tady nanejvýš jeden souhrnný řádek, ve výchozím
- // stavu vypnutý (Nastavení → Přizpůsobení → Hladiny → Zobrazení).
+ // stavu vypnutý (Nastavení → Vzhled a zobrazení → Seznam obchodů).
  const tick=getTickSizeForInstrument(t.instrument);
  if(typeof levelsSummaryOn==='function'&&levelsSummaryOn()){
   const sum=FJTradeMap.summaryCounts(t,{tickSize:tick});
@@ -4955,7 +5036,7 @@ function tradeTotalPoints(t){
 function tradeHTML(t){
  if(t?.sourceKind==='SWING'&&typeof swingOverviewRowHTML==='function')return swingOverviewRowHTML(t);
  const m=resultMeta(t.result);
- // Obsah skryté karty formuláře (Nastavení → Přizpůsobení) se neukazuje ani tady.
+ // Obsah skryté karty formuláře (Nastavení → Vzhled a zobrazení) se neukazuje ani tady.
  const shown=key=>typeof tradeCardShown!=='function'||tradeCardShown(key);
  const pnlVal=signed(t,'pnl');
  const sign=t.result==='breakeven'?'±':m.sign;
@@ -4995,7 +5076,7 @@ function tradeHTML(t){
  const hypo=hypotheticalGroup(t);
  const hypoBadge=hypo?`<span class="pill hypo-pill" title="Hypotetický obchod – co by to udělalo. Ve výchozím stavu mimo P/L a statistiky výkonu (přepínač „${hypo==='noFill'?'včetně no fill obchodů':'včetně vědomě vynechaných'}“).">hypoteticky</span>`:'';
  // Dokup: pozice má víc vstupů. Počítá se z nohou (FJPoints.entriesOf), nic
- // dalšího se neukládá; skrýt jde v Přizpůsobení → Pole kontextu.
+ // dalšího se neukládá; skrýt jde ve Vzhledu a zobrazení → Pole kontextu.
  const entries=(typeof contextFieldShown!=='function'||contextFieldShown('entries'))?FJPoints.entriesOf(t):[];
  const entriesRow=entries.length>1?`<div class="sub" style="margin-top:2px" title="Vstupy pozice. Cíl označený „dokup“ zavírá dokoupené kontrakty a jeho body se počítají od ceny dokupu.">Vstupy: ${entries.map((e,i)=>`${i?'dokup ':''}${e.contracts} @ ${FJPoints.roundPoints(e.price)}${i&&e.time?` (${esc(e.time)})`:''}`).join(' · ')}</div>`:'';
  const setupInfo=[];
@@ -5950,7 +6031,7 @@ function recomputePnlFromInputs(){
   if(dirSign===null && points!=null && contracts && pointValue)
    hint.innerHTML=`<span class="sub">Vyber <b>Směr obchodu</b> (Long/Short) a vyplň vstupní i výstupní cenu – teprve pak jde určit, jestli šla cena pro tebe, nebo proti, a dopočítat zisk/ztrátu. Můžeš ji vyplnit i ručně (u ztráty záporně).</span>`;
   else if(points!=null && contracts && !pointValue)
-   hint.innerHTML=`<span class="sub">Hodnota bodu pro „${esc($('instrument').value||'—')}" není známá – přidej ji do šablony instrumentu v Nastavení (karta Nastavení → Šablony podle instrumentu), nebo vyplň Zisk/ztrátu ručně.</span>`;
+   hint.innerHTML=`<span class="sub">Hodnota bodu pro „${esc($('instrument').value||'—')}" není známá – přidej ji do šablony instrumentu v Nastavení (karta Nastavení → Instrumenty a účty → Šablony podle instrumentu), nebo vyplň Zisk/ztrátu ručně.</span>`;
   else hint.innerHTML='';
  }
  updateResultBadge();
@@ -5978,8 +6059,8 @@ function updateResultBadge(){
  const r=classifyResult(Number(raw)||0), m=resultMeta(r);
  badge.textContent=m.label; badge.className='pill result-badge '+m.cls;
  badge.title=settings.breakEvenEnabled
-  ?`Práh Break Even: ±${money(Number(settings.breakEvenThreshold)||0)} (Nastavení → Break Even a slučování).`
-  :'Rozpoznávání Break Even je vypnuté (Nastavení → Break Even a slučování).';
+  ?`Práh Break Even: ±${money(Number(settings.breakEvenThreshold)||0)} (Nastavení → Instrumenty a účty → Výsledek a slučování obchodů).`
+  :'Rozpoznávání Break Even je vypnuté (Nastavení → Instrumenty a účty → Výsledek a slučování obchodů).';
  $('result').value=r;
 }
 function updateLegBadge(row){
@@ -6152,7 +6233,7 @@ function renderCourseHints(){
  const draft=postExitDraftFromForm();
  const tickSize=getTickSizeForInstrument(draft.instrument);
  if(!tickSize){
-  hint.innerHTML=`Velikost ticku pro „${esc(draft.instrument||'—')}" není známá – doplň ji v Nastavení → Šablony podle instrumentu. Bez ní se dopočty nedají spočítat.`;
+  hint.innerHTML=`Velikost ticku pro „${esc(draft.instrument||'—')}" není známá – doplň ji v Nastavení → Instrumenty a účty → Šablony podle instrumentu. Bez ní se dopočty nedají spočítat.`;
   return;
  }
  const d=FJPoints.postExitTickFields(draft,tickSize);
@@ -6318,7 +6399,7 @@ function renderTradeSections(){
  if(shots)comments.push(shots+(shots===1?' screenshot':shots<5?' screenshoty':' screenshotů'));
  if($('commentsSummary'))$('commentsSummary').textContent=comments.length?'— '+comments.join(' · '):'';
  // „chybí N" se řídí stejným nastavením karty jako štítek na kartě obchodu
- // (Upozorňovat na nevyplněné, Nastavení → Přizpůsobení). Kam pole patří,
+ // (Upozorňovat na nevyplněné, Nastavení → Vzhled a zobrazení). Kam pole patří,
  // rozhoduje FJTaxonomy.missingContextByCard.
  const cfg=typeof tradeCardConfig==='undefined'?{}:tradeCardConfig;
  const missing=FJTaxonomy.missingContextByCard(d,undefined,typeof contextFieldConfig==='undefined'?undefined:contextFieldConfig);
@@ -7133,6 +7214,11 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
  const target=$(b.dataset.section);if(target)target.classList.add('active');
  $('pageTitle').textContent=b.textContent.replace(/^[^\s]+\s/,'');
+ // Nastavení: naposledy otevřená sekce, „Integrace“ rovnou Připojení.
+ if(b.dataset.section==='settings'&&typeof showSettingsSection==='function'){
+  if(!b.dataset.keepReturn){settingsReturn=null;if($('settingsBack'))$('settingsBack').hidden=true}
+  showSettingsSection(b.dataset.settingsOpen||lastSettingsSection());
+ }
  $('addTradeBtn').style.display=(b.dataset.section==='journal'||b.dataset.section==='calendar')?'inline-block':'none';
  $('addSetupBtn').style.display=b.dataset.section==='journal'?'inline-block':'none';
  if(b.dataset.section==='accountOverview')setTimeout(initAccountOverview,60);
@@ -7147,6 +7233,92 @@ document.querySelectorAll('.subtab-bar').forEach(bar=>{
   if(btn.dataset.oninit && typeof window[btn.dataset.oninit]==='function')setTimeout(window[btn.dataset.oninit],60);
  });
 });
+// ---- Nastavení: sekce, hledání, přímé odkazy (4.8.103) ----
+// Rozložení a zařazení podle registru (app/settings-registry.js). Skupiny jsou
+// dosavadní karty – obsah, klíče a ukládání beze změny. Naposledy otevřená
+// sekce se pamatuje (stav UI, ne nastavení).
+const SETTINGS_SECTION_KEY='FJ_settingsSection';
+let settingsReturn=null;
+function lastSettingsSection(){try{return localStorage.getItem(SETTINGS_SECTION_KEY)||'general'}catch{return 'general'}}
+function showSettingsSection(key){
+ if(!FJSettings.SECTIONS.some(x=>x.key===key))key='general';
+ document.querySelectorAll('#settings .settings-sec').forEach(el=>el.classList.toggle('active',el.dataset.sec===key));
+ document.querySelectorAll('#settings [data-settings-sec]').forEach(b=>b.classList.toggle('active',b.dataset.settingsSec===key));
+ if($('settingsSectionSelect'))$('settingsSectionSelect').value=key;
+ try{localStorage.setItem(SETTINGS_SECTION_KEY,key)}catch{}
+}
+function settingsCard(group){return document.querySelector('#settings details.settings-card[data-card="'+group+'"]')}
+// Přímý odkaz z aplikace: otevře Nastavení na skupině (nebo položce), řádek
+// krátce zvýrazní. Zpět (tlačítko / Esc) vrací tam, odkud uživatel přišel –
+// i do rozpracovaného formuláře obchodu (ten se jen skryje, nic se neztratí).
+window.openSettings=(target)=>{
+ const r=FJSettings.resolve(target);if(!r)return false;
+ const from=document.querySelector('.section.active')?.id||null;
+ const modal=document.querySelector('.modal.open');
+ if(from!=='settings'||modal)settingsReturn={section:from,modal:modal?.id||null};
+ if(modal)modal.classList.remove('open');
+ const navBtn=document.querySelector('.nav button[data-section="settings"]:not([data-settings-open])');
+ if(navBtn&&from!=='settings'){navBtn.dataset.keepReturn='1';navBtn.click();delete navBtn.dataset.keepReturn}
+ showSettingsSection(r.section);
+ if($('settingsBack'))$('settingsBack').hidden=!settingsReturn;
+ const card=r.group?settingsCard(r.group):null;
+ if(card&&!card.open)card.open=true;
+ const el=(r.anchor&&$(r.anchor))||card;
+ if(el){
+  setTimeout(()=>{
+   const row=el.closest?.('.field,.settings-check,label,.mapping-row')||el;
+   row.scrollIntoView?.({block:'center',behavior:'smooth'});
+   row.classList.remove('settings-flash');void row.offsetWidth;row.classList.add('settings-flash');
+  },60);
+ }
+ return true;
+};
+function goBackFromSettings(){
+ const back=settingsReturn;settingsReturn=null;
+ if($('settingsBack'))$('settingsBack').hidden=true;
+ if(!back)return;
+ const btn=document.querySelector('.nav button[data-section="'+back.section+'"]');
+ if(btn&&back.section!=='settings')btn.click();
+ if(back.modal&&$(back.modal))$(back.modal).classList.add('open');
+}
+// Nadpis, jedna věta a štítek platnosti u každé skupiny (z registru).
+function decorateSettingsGroups(){
+ for(const g of FJSettings.GROUPS){
+  const card=settingsCard(g.id);const sum=card?.querySelector(':scope>summary');
+  if(!sum||sum.querySelector('.settings-group-text'))continue;
+  const h3=sum.querySelector('h3');
+  const wrap=document.createElement('span');wrap.className='settings-group-text';
+  if(h3){h3.textContent=g.title;wrap.appendChild(h3)}
+  const d=document.createElement('span');d.className='sub settings-group-desc';d.textContent=g.desc;wrap.appendChild(d);
+  sum.appendChild(wrap);
+  const sc=document.createElement('span');sc.className='settings-scope settings-scope-'+g.scope;sc.textContent=g.scope==='mixed'?'deník i aplikace':'platí '+FJSettings.SCOPE_LABEL[g.scope];
+  sc.title=g.scope==='journal'?'Uloží se do aktivního deníku – jiný deník má vlastní hodnotu.':g.scope==='app'?'Platí pro všechny deníky.':'Některé řádky platí pro aktivní deník, ostatní pro celou aplikaci.';
+  sum.appendChild(sc);
+ }
+}
+function renderSettingsSearch(){
+ const box=$('settingsSearchResults');const q=$('settingsSearch')?.value||'';
+ if(!box)return;
+ const res=FJSettings.search(q);
+ box.hidden=!q.trim();
+ box.innerHTML=res.length?res.map(r=>`<button type="button" data-settings-item="${esc(r.id)}"><b>${esc(r.name)}</b><span class="sub">${esc(r.sectionLabel)} › ${esc(r.groupTitle)} · dřív: ${esc(r.old)}</span></button>`).join(''):'<div class="sub" style="padding:6px 8px">Nic nenalezeno.</div>';
+ box.querySelectorAll('[data-settings-item]').forEach(b=>b.onclick=()=>openSettings(b.dataset.settingsItem));
+}
+(()=>{
+ decorateSettingsGroups();
+ document.querySelectorAll('#settings [data-settings-sec]').forEach(b=>b.onclick=()=>showSettingsSection(b.dataset.settingsSec));
+ $('settingsSectionSelect')?.addEventListener('change',e=>showSettingsSection(e.target.value));
+ $('settingsSearch')?.addEventListener('input',renderSettingsSearch);
+ $('settingsSearch')?.addEventListener('keydown',e=>{if(e.key==='Escape'){e.target.value='';renderSettingsSearch()}if(e.key==='Enter'){const f=$('settingsSearchResults')?.querySelector('[data-settings-item]');if(f)f.click()}});
+ $('settingsBackBtn')?.addEventListener('click',goBackFromSettings);
+ document.addEventListener('click',e=>{const a=e.target.closest?.('[data-settings-link]');if(a){e.preventDefault();e.stopPropagation();openSettings(a.dataset.settingsLink)}},true);
+ document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'||!settingsReturn||document.querySelector('.modal.open'))return;
+  if(!$('settings')?.classList.contains('active')||e.target?.id==='settingsSearch')return;
+  goBackFromSettings();
+ });
+ showSettingsSection(lastSettingsSection());
+})();
 // Karty v Nastavení jsou pod sebou a sbalitelné. Které jsou rozbalené, se
 // pamatuje (jen pohodlí v tomhle zařízení); výchozí je vše sbalené.
 const SETTINGS_OPEN_KEY='FJ_settingsOpenCards';
@@ -7166,7 +7338,7 @@ function readOpenSettingsCards(){try{const v=JSON.parse(localStorage.getItem(SET
   });
  });
 })();
-// Nastavení → Přizpůsobení → Karty obchodu a Pole kontextu: u každé položky
+// Nastavení → Vzhled a zobrazení → Karty obchodu a Pole kontextu: u každé položky
 // „Zobrazit" a „Upozorňovat na nevyplněné". Upozornění skryté položky nejde
 // zapnout – skrytá položka se nekontroluje.
 function renderToggleSettings({box,items,cfg,cls,set,shownText}){
@@ -7197,7 +7369,7 @@ function renderTradeCardSettings(){
  renderToggleSettings({box:$('tradeCardSettings'),items:FJTaxonomy.TRADE_CARDS,cfg:tradeCardConfig,cls:'trade-card',set:setTradeCardConfig,
   shownText:(label,on)=>`Karta „${label}“ je ${on?'zobrazená':'skrytá'}.`});
 }
-// ---- Nastavení → Přizpůsobení → LTA levely (4.8.99) ----
+// ---- Nastavení → Hladiny a data trhu → Hladiny z LTA souborů (4.8.99) ----
 async function renderLtaSettings(){
  const card=$('ltaSettingsCard'); if(!card||!window.desktopAPI?.ltaStatus)return;
  await ltaSettings(true);
@@ -7254,11 +7426,14 @@ async function renderLtaSettings(){
   miss.textContent=show?`Dny bez archivu (deník ten den neběžel, levely k obchodům z těch dnů nejsou): ${list.map(d=>d.split('-').reverse().map(Number).join('. ')).join(', ')}${a.missingCount>list.length?` a dalších ${a.missingCount-list.length}`:''}.`:'';
  }
 }
-// Nastavení → Přizpůsobení → Hladiny (4.8.103): jedna karta pro zobrazení
-// hladin (Mapa obchodu) a oba zdroje – LTA soubory (renderLtaSettings, beze
-// změny) a snímek trhu. Úložiště se nemění: LTA v lta-levels/settings.json,
-// snímek v market-data/settings.json – staré volby tu jsou tak, jak byly.
-const LEVELS_CARD_FEATURES=['snapshotLevels'];
+// Nastavení → Hladiny a data trhu (4.8.103, nové uspořádání Nastavení):
+// skupiny Data z NinjaTraderu, Hladiny z LTA souborů, Hladiny ze snímku trhu,
+// Signální svíčky a Mapa obchodu. Úložiště se nemění: LTA v
+// lta-levels/settings.json, snímek v market-data/settings.json.
+// Kde se který přepínač Dat trhu (FJMarket.FEATURES) kreslí – každý právě
+// jednou. snapshotLevels má vlastní přepínač (#levelsSnapshotOn).
+const MARKET_FEATURE_HOME={ltaExport:'ltaFeatures',ltaWarnings:'ltaFeatures',marketBars:'marketFeatures',snapshot:'marketFeatures',
+ signalBar:'mapFeatures',snapshotLevels:'levelsSnapshotOn',autoTest:'snapshotFeatures',csvColumns:'exportFeatures'};
 function renderLevelsViewSettings(){
  if(!$('levelsViewMap'))return;
  $('levelsViewMap').checked=levelsView.map;
@@ -7269,7 +7444,7 @@ async function renderLevelsSnapshotSection(settings){
  const box=$('levelsSnapshotSection');if(!box)return;
  const s=settings||await marketSettings();
  const on=$('levelsSnapshotOn');
- const why=s.enabled?FJMarket.blockedReason(s,'snapshotLevels'):'Zapni Data trhu a snímek trhu při vstupu (karta Data trhu).';
+ const why=s.enabled?FJMarket.blockedReason(s,'snapshotLevels'):'Zapni Data z NinjaTraderu a snímek trhu při vstupu (Hladiny a data trhu → Data z NinjaTraderu).';
  on.checked=s.features?.snapshotLevels===true;
  on.disabled=!!why;
  $('levelsSnapshotOnLabel').style.opacity=why?'.55':'';
@@ -7290,8 +7465,13 @@ async function renderLevelsSnapshotSection(settings){
  $('levelsViewBars')?.addEventListener('change',()=>setLevelsView({bars:Number($('levelsViewBars').value)}));
  $('levelsViewSummary')?.addEventListener('change',()=>setLevelsView({summaryLine:$('levelsViewSummary').checked}));
  $('levelsSnapshotOn')?.addEventListener('change',()=>saveMarketSettings({features:{snapshotLevels:$('levelsSnapshotOn').checked}}));
- const card=$('ltaSettingsCard');
- card?.addEventListener('toggle',()=>{if(card.open){renderLevelsViewSettings();renderLevelsSnapshotSection().catch(()=>{})}});
+ // Skupiny Hladin a dat trhu se vykreslí při otevření (stav z main procesu).
+ for(const id of ['ltaSettingsCard','levelsSnapshotCard','levelsMapCard']){
+  const card=$(id);
+  card?.addEventListener('toggle',()=>{if(card.open){renderLevelsViewSettings();renderLevelsSnapshotSection().catch(()=>{});renderMarketSettings().catch(()=>{})}});
+ }
+ const ai=document.querySelector('#settings details.settings-card[data-card="aiExport"]');
+ ai?.addEventListener('toggle',()=>{if(ai.open)renderMarketSettings().catch(()=>{})});
  // Bez main procesu (náhled v prohlížeči) se oddíl snímku nedá nastavit.
  if(!window.desktopAPI?.marketSettings&&$('levelsSnapshotSection'))$('levelsSnapshotSection').style.display='none';
 })();
@@ -7302,12 +7482,20 @@ async function renderMarketSettings(){
  if(!window.desktopAPI?.marketSettings){card.style.display='none';return}
  const s=await marketSettings(true);
  $('marketEnabled').checked=s.enabled;
- // Doplňování řádků ze snímku se zapíná v kartě Hladiny (LEVELS_CARD_FEATURES).
- $('marketFeatures').innerHTML=FJMarket.FEATURES.filter(f=>f.ready&&!LEVELS_CARD_FEATURES.includes(f.key)).map(f=>{
+ // Přepínače se kreslí ve svých skupinách (MARKET_FEATURE_HOME), stejný řádek
+ // a stejné uložení jako dřív. Bez hlavního vypínače jsou zešedlé s důvodem.
+ const homes={};
+ for(const f of FJMarket.FEATURES.filter(x=>x.ready)){
+  const home=MARKET_FEATURE_HOME[f.key]||'marketFeatures';
+  if(home==='levelsSnapshotOn')continue;
   const why=FJMarket.blockedReason(s,f.key);
-  return `<label class="settings-check" style="margin-top:8px${why?';opacity:.55':''}"${why?` title="${esc(why)}"`:''}><input type="checkbox" class="market-feature" data-key="${esc(f.key)}"${s.features[f.key]?' checked':''}${why?' disabled':''}> ${esc(f.label)} <span class="sub">— ${esc(f.desc)}${why&&s.enabled?` <b>${esc(why)}</b>`:''}</span></label>`;
- }).join('');
- document.querySelectorAll('#marketFeatures .market-feature').forEach(box=>box.onchange=()=>saveMarketSettings({features:{[box.dataset.key]:box.checked}}));
+  (homes[home]=homes[home]||[]).push(`<label class="settings-check" style="margin-top:8px${why?';opacity:.55':''}"${why?` title="${esc(why)}"`:''}><input type="checkbox" class="market-feature" data-key="${esc(f.key)}"${s.features[f.key]?' checked':''}${why?' disabled':''}> ${esc(f.label)} <span class="sub">— ${esc(f.desc)}${why&&s.enabled?` <b>${esc(why)}</b>`:''}</span></label>`);
+ }
+ for(const home of new Set(Object.values(MARKET_FEATURE_HOME))){
+  if(home==='levelsSnapshotOn'||!$(home))continue;
+  $(home).innerHTML=(homes[home]||[]).join('');
+  $(home).querySelectorAll('.market-feature').forEach(box=>box.onchange=()=>saveMarketSettings({features:{[box.dataset.key]:box.checked}}));
+ }
  let info='';
  if(FJMarket.isOn(s,'ltaExport')){
   const p=await window.desktopAPI.getAiExportInfo?.().catch(()=>null);
@@ -8871,7 +9059,7 @@ async function nt8BuildPreview(text){
   const r=await window.desktopAPI.captureManualReplay(parsed.payloads.filter(p=>p.pointValue));
   if(!r?.ok)throw new Error(r?.error||'Exekuce se nepodařilo zpracovat.');
   events=r.closed;open=r.open||[];skipped=r.skipped||[];
-  for(const p of noPv)errors.push({line:null,error:`${p.instrumentFull}: chybí hodnota bodu (doplň šablonu instrumentu v Nastavení → Šablony) – exekuce ${p.time.slice(0,10)} ${p.orderAction} ${p.quantity} @ ${p.price} vynechána.`});
+  for(const p of noPv)errors.push({line:null,error:`${p.instrumentFull}: chybí hodnota bodu (doplň šablonu instrumentu v Nastavení → Instrumenty a účty → Šablony podle instrumentu) – exekuce ${p.time.slice(0,10)} ${p.orderAction} ${p.quantity} @ ${p.price} vynechána.`});
  }else{
   const parsed=FJNt8Import.tradeEvents(table.rows,helpers);
   events=parsed.events;errors=parsed.errors;
@@ -9135,7 +9323,7 @@ async function refreshNinjaConnectorState(){
 // ---------- Automatické aktualizace ----------
 // Stav drží hlavní proces (main.js, sekce „Automatické aktualizace“), tady se
 // jen zobrazuje a nabízí. „Později“ platí do příštího spuštění aplikace –
-// verze pak zůstává dostupná v Nastavení → Obecné a v menu ikony u hodin.
+// verze pak zůstává dostupná v Nastavení → Aplikace → Aktualizace a v menu ikony u hodin.
 let updateState=null;
 let updateOfferReady=false;      // až po přihlášení, nabídka nesmí vyskočit dřív
 // sessionStorage: odložení přežije interní znovunačtení stránky (přepnutí
@@ -9462,7 +9650,7 @@ function defaultOverviewJournal(){return FJJournals.overviewStartJournal(overvie
 async function initAccountOverview(){
  overviewAllTrades=[];
  for(const p of visibleJournalProfiles())overviewAllTrades.push(...await readTradesForOverview(p));
- // Při prvním otevření se filtr nastaví podle Nastavení → Deníky (poslední
+ // Při prvním otevření se filtr nastaví podle Nastavení → Obecné → Deníky (poslední
  // aktivní deník / všechny). Potom se drží, co si uživatel vybral.
  const oldJ=accountOverviewInitialized?$('accountJournal').value:defaultOverviewJournal(),oldI=$('accountInstrument').value,oldS=$('accountSetup')?.value||'';
  accountOverviewInitialized=true;
@@ -9512,7 +9700,7 @@ function shiftAccountMonth(delta){
 function filteredOverviewTrades(){
  return performanceRecords(filteredOverviewRecords());
 }
-// „Další filtry" přehledu. Každý jde skrýt v Nastavení → Přizpůsobení → Filtry
+// „Další filtry" přehledu. Každý jde skrýt v Nastavení → Vzhled a zobrazení → Přehled účtu
 // přehledu; skrytý filtr se nepoužije, i když v něm zůstala hodnota.
 const OVERVIEW_FILTERS=[
  {key:'side',label:'Směr'},
@@ -9611,7 +9799,7 @@ function renderOverviewFilterSettings(){
  });
 }
 // Sekce (karty) Přehledu účtu – každá jde skrýt. Volby jsou na dvou místech
-// (přímo v přehledu a v Nastavení → Přizpůsobení → Přehled účtu), zdroj je
+// (přímo v přehledu a v Nastavení → Vzhled a zobrazení → Přehled účtu), zdroj je
 // jeden. Skrytí nic nemaže a nemění výpočty ani exporty.
 const OVERVIEW_SECTIONS=[
  {key:'kpi',label:'Pruh KPI (stav účtu, čistý zisk, win rate, PF)',group:'Nahoře a dole'},
@@ -9756,6 +9944,8 @@ async function startJournalApplication(){
   // Typ deníku (swing zadání §2): značka do souboru deníku, se zálohou. Selhání nic
   // neshodí – deník se otevře jako futures a zápis typu se zkusí při dalším otevření.
   try{await runJournalTypeMigration()}catch(e){showToast('Zápis typu deníku se nepodařil: '+e.message)}
+  // VWAP v Hladinách na tick – selhání nic neshodí, zkusí se při dalším otevření.
+  try{const r=await runVwapTickMigration();if(r?.changed)showToast(`Zaokrouhleno ${r.changed} ${r.changed===1?'řádek':r.changed<5?'řádky':'řádků'} VWAP v Hladinách na tick. Záloha deníku je v safety-backups.`)}catch(e){showToast('Zaokrouhlení VWAP na tick se nepodařilo: '+e.message)}
   await load();
   void initNewsCalendar();
  }

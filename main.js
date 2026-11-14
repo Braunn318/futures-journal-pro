@@ -639,6 +639,8 @@ function readJournal(id) {
     // Značka journalTypeVersion = migrace typu proběhla (runJournalTypeMigration).
     journalType: parsed.journalType === 'CFD_SWING' ? 'CFD_SWING' : (parsed.journalType === 'FUTURES_INTRADAY' ? 'FUTURES_INTRADAY' : undefined),
     journalTypeVersion: Number(parsed.journalTypeVersion) || 0,
+    // Značka zaokrouhlení VWAP v Hladinách na tick (runVwapTickMigration, 4.8.103).
+    vwapTickVersion: Number(parsed.vwapTickVersion) || 0,
     // Ručně zadané čekající příkazy (limitky) deníku – záložka Pozice/Příkazy.
     pendingOrders: Array.isArray(parsed.pendingOrders) ? parsed.pendingOrders : []
   };
@@ -1147,7 +1149,7 @@ function aiManifestEntry(j) {
   return { id: j?.id, name: j?.name, mode: j?.backtest === true ? 'BACKTEST' : 'LIVE', journalType: j?.journalType === 'CFD_SWING' ? 'CFD_SWING' : 'FUTURES_INTRADAY' };
 }
 // Manifest ai-export/index.json. `ltaLevels` (archiv LTA levelů v podsložce
-// lta-levels) jen se zapnutým exportem v Nastavení → Data trhu.
+// lta-levels) jen se zapnutým exportem v Nastavení → Hladiny a data trhu → Data z NinjaTraderu.
 function aiManifest(list) {
   const lta = ltaManifestInfo();
   const market = marketManifestInfo();

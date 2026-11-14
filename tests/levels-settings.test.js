@@ -34,20 +34,25 @@ function dom(ids) {
 
 // ------------------------------------------------------------- 7. převod
 
-test('7 karta Hladiny: jedna karta, staré volby LTA i snímku pod stejnými ID', () => {
-  const start = HTML.indexOf('<details class="card settings-card" data-card="levels" id="ltaSettingsCard">');
-  assert.ok(start > 0, 'karta Hladiny v Přizpůsobení');
-  const card = HTML.slice(start, HTML.indexOf('</details>', start));
-  assert.match(card, /<h3>Hladiny<\/h3>/);
-  for (const sub of ['Zobrazení', 'Z LTA souborů', 'Ze snímku trhu']) assert.ok(card.includes(`<h4 class="settings-sub">${sub}</h4>`), sub);
-  // LTA: všechna dosavadní pole beze změny ID (renderLtaSettings je plní dál).
+// Od nového uspořádání Nastavení (4.8.103) je karta Hladiny rozdělená do
+// skupin sekce Hladiny a data trhu; souhrnný řádek je ve Vzhledu a zobrazení.
+const settingsCardHtml = id => {
+  const start = HTML.indexOf(`settings-card" data-card="${id}"`);
+  assert.ok(start > 0, `skupina ${id}`);
+  return HTML.slice(start, HTML.indexOf('</details>', start));
+};
+
+test('7 hladiny v Nastavení: staré volby LTA, snímku a mapy pod stejnými ID, každá jednou', () => {
+  const lta = settingsCardHtml('levels');
+  assert.match(lta, /id="ltaSettingsCard"/);
   for (const id of ['ltaEnabled', 'ltaAutoInForm', 'ltaVwapRow', 'ltaArchive', 'ltaNearestCount', 'ltaRetentionDays', 'ltaFiles', 'ltaExcludePatterns'])
-    assert.ok(card.includes(`id="${id}"`), id);
-  // Snímek: N a typy jsou teď tady (a jen tady).
-  for (const id of ['levelsSnapshotOn', 'marketLevelsN', 'marketLevelTypes']) assert.ok(card.includes(`id="${id}"`), id);
-  assert.equal(HTML.split('id="marketLevelsN"').length, 2, 'N ze snímku jen jednou');
-  assert.equal(HTML.split('id="marketLevelTypes"').length, 2);
-  for (const id of ['levelsViewMap', 'levelsViewBars', 'levelsViewSummary']) assert.ok(card.includes(`id="${id}"`), id);
+    assert.ok(lta.includes(`id="${id}"`), id);
+  const snap = settingsCardHtml('levelsSnapshot');
+  for (const id of ['levelsSnapshotOn', 'marketLevelsN', 'marketLevelTypes']) assert.ok(snap.includes(`id="${id}"`), id);
+  const map = settingsCardHtml('levelsMap');
+  for (const id of ['levelsViewMap', 'levelsViewBars']) assert.ok(map.includes(`id="${id}"`), id);
+  assert.ok(settingsCardHtml('tradeList').includes('id="levelsViewSummary"'));
+  for (const id of ['marketLevelsN', 'marketLevelTypes', 'levelsViewSummary', 'ltaEnabled']) assert.equal(HTML.split(`id="${id}"`).length, 2, `${id} jen jednou`);
   assert.ok(!HTML.includes('data-card="ltaLevels"'), 'stará karta už není');
 });
 
@@ -70,7 +75,7 @@ test('7 oddíl Ze snímku trhu ukáže uložené N, vypnuté typy a zapnutí ste
   const off = FJMarket.cleanMarketSettings({ ...saved, enabled: false });
   await r.renderLevelsSnapshotSection(off);
   assert.equal(d.nodes.levelsSnapshotOn.disabled, true);
-  assert.match(d.nodes.levelsSnapshotWhy.innerHTML, /Zapni Data trhu/);
+  assert.match(d.nodes.levelsSnapshotWhy.innerHTML, /Zapni Data z NinjaTraderu/);
   assert.equal(off.levelsN, 5);
 });
 
@@ -81,9 +86,9 @@ test('7 rozbalená karta „LTA levely" zůstane rozbalená jako „Hladiny"', (
   assert.deepEqual([...migrateOpenSettingsCards(null)], []);
 });
 
-test('7 Data trhu: doplňování řádků ze snímku se zapíná v kartě Hladiny, ne dvakrát', () => {
-  assert.match(SRC, /const LEVELS_CARD_FEATURES=\['snapshotLevels'\];/);
-  assert.match(SRC, /FJMarket\.FEATURES\.filter\(f=>f\.ready&&!LEVELS_CARD_FEATURES\.includes\(f\.key\)\)/);
+test('7 Data trhu: doplňování řádků ze snímku se zapíná ve skupině Hladiny ze snímku, ne dvakrát', () => {
+  assert.match(SRC, /snapshotLevels:'levelsSnapshotOn'/, 'vlastní přepínač, v seznamu funkcí se nekreslí');
+  assert.match(SRC, /if\(home==='levelsSnapshotOn'\)continue;/);
   assert.match(SRC, /saveMarketSettings\(\{features:\{snapshotLevels:\$\('levelsSnapshotOn'\)\.checked\}\}\)/, 'stejný klíč, stejné úložiště');
 });
 

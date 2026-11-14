@@ -279,7 +279,7 @@ function renderPendingOrders(){
  const s=mcpSettings();
  const status=$('mcpOrdersStatus');
  if(status){
-  if(!s.enabled)status.innerHTML='Limitky z cTraderu jsou vypnuté (Integrace → cTrader → „Limitky z cTraderu přes MCP“).';
+  if(!s.enabled)status.innerHTML='Limitky z cTraderu jsou vypnuté (Nastavení → Připojení a zdroje dat → cTrader → „Limitky z cTraderu přes MCP“).';
   else if(mcpState.available===null)status.textContent='cTrader: načítám…';
   else if(!mcpState.available)status.innerHTML='<span title="Zapni v cTraderu Settings → Advanced → MCP server → Enable MCP server">cTrader nevypadá spuštěný (MCP server neodpovídá).</span>';
   else{const a=mcpState.account||{};status.textContent=`cTrader: ${mcpState.orders.length} limitek · aktivní účet ${a.broker||'?'} · ${a.currency||''} · zůstatek ${fmtNum(a.balance)} · načteno ${new Date(mcpState.fetchedAt).toLocaleTimeString('cs-CZ')}`}
@@ -812,7 +812,7 @@ let swingMcpSyncBusy=false;
 let swingMcpLast=null; // { at, ok, message, accounts, active }
 let swingMcpFirstSyncDone=false;
 const MCP_ACCOUNT_REASON={
- NO_ACCOUNT:'Vyber v Nastavení → Swing · CFD, který účet cTraderu patří tomuto deníku.',
+ NO_ACCOUNT:'Vyber v Nastavení → Instrumenty a účty → Swing · CFD, který účet cTraderu patří tomuto deníku.',
  NO_BALANCE:'cTrader nevrátil údaje o účtu.',
  UNKNOWN_ACTIVE:'Aktivní účet v cTraderu nejde poznat.',
  AMBIGUOUS:'Aktivní účet v cTraderu nejde jednoznačně poznat (víc účtů se stejným brokerem, měnou a zůstatkem).',
@@ -823,7 +823,7 @@ async function syncSwingFromMcp({manual=false}={}){
  if(swingMcpSyncBusy||!isSwingJournalActive())return null;
  const s=mcpSettings();
  if(!s.enabled||!window.desktopAPI?.ctraderSyncData){
-  swingMcpLast={at:new Date().toISOString(),ok:false,message:'Import z cTraderu přes MCP je vypnutý (Integrace → cTrader → „Limitky z cTraderu přes MCP“).'};
+  swingMcpLast={at:new Date().toISOString(),ok:false,message:'Import z cTraderu přes MCP je vypnutý (Nastavení → Připojení a zdroje dat → cTrader → „Limitky z cTraderu přes MCP“).'};
   renderSwingMcpStatus();if(manual)showToast(swingMcpLast.message);return null;
  }
  swingMcpSyncBusy=true;
@@ -908,7 +908,7 @@ function renderSwingImportNotice(){
  if(!box)return;
  const waiting=[...swingImportWaiting.entries()];
  box.style.display=waiting.length?'':'none';
- box.textContent=waiting.length?`Obchody z cTraderu čekají na import – doplň velikost lotu (jednotek v 1 lotu) pro ${waiting.map(([s,n])=>`${s} (${n})`).join(', ')} v Nastavení → Swing · CFD (s cTraderem přes MCP se doplní sama).`:'';
+ box.textContent=waiting.length?`Obchody z cTraderu čekají na import – doplň velikost lotu (jednotek v 1 lotu) pro ${waiting.map(([s,n])=>`${s} (${n})`).join(', ')} v Nastavení → Instrumenty a účty → Swing · CFD (s cTraderem přes MCP se doplní sama).`:'';
 }
 
 // ---------- Přehled účtu a Kalendář (swing zadání §5) ----------

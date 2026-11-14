@@ -283,7 +283,38 @@
     return Number.isFinite(n) ? Math.round(n * 1e6) / 1e6 : null;
   }
 
+  // Cena na nejbližší tick instrumentu (VWAP v čase vstupu je průměr – jako
+  // hladina se kreslí na tick). Bez platného ticku cena beze změny; výsledek
+  // na 6 míst, ať desetinný tick (0,1) nevyrobí 2051.2000000000003.
+  function roundToTick(v, tickSize) {
+    const n = Number(v);
+    if (v === null || v === undefined || v === '' || !Number.isFinite(n)) return null;
+    const t = Number(tickSize);
+    if (!Number.isFinite(t) || t <= 0) return n;
+    return Math.round(Math.round(n / t) * t * 1e6) / 1e6;
+  }
+
+  // Řádky Hladin s VWAP doplněným strojem (source 'lta', typ ve `vwapKeys`)
+  // a cenou mimo tick → na tick. Ruční řádky a ostatní hladiny se nemění
+  // (vrací se tentýž objekt). { rows, changed }.
+  function snapVwapRows(rows, { tickSize, vwapKeys } = {}) {
+    const keys = new Set(Array.isArray(vwapKeys) ? vwapKeys : []);
+    const t = Number(tickSize);
+    let changed = 0;
+    const out = (Array.isArray(rows) ? rows : []).map(r => {
+      if (!r || r.source !== 'lta' || !keys.has(r.level) || !(t > 0)) return r;
+      const p = Number(r.price);
+      if (!Number.isFinite(p)) return r;
+      const snapped = roundToTick(p, t);
+      if (snapped === p) return r;
+      changed++;
+      return { ...r, price: snapped };
+    });
+    return { rows: out, changed };
+  }
+
   return {
+    roundToTick, snapVwapRows,
     GROUP, KEY_PREFIX, VWAP_NAME, DEFAULT_SUBDIR, DEFAULT_SETTINGS,
     cleanSettings, normalizeRelPath, isExcluded, excludingPattern,
     parseLtaXml, levelName, instrumentRoot, contractMonth, levelsSignature,
