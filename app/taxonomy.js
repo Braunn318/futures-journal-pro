@@ -80,7 +80,10 @@
     LVN: 'LVN',
     // High / Low of Day – dosavadní denní maximum / minimum. Ve výchozím stavu
     // skrytá (DEFAULT_HIDDEN), uživatel si ji zapne v Nastavení → Číselníky.
-    HOD_LOD: 'High / Low dne'
+    HOD_LOD: 'High / Low dne',
+    // Mapa obchodu (4.8.103): VPOC právě běžící 30min svíčky ve chvíli vstupu
+    // (snímek trhu, konektor v9). Jen výchozí popisek – jde přejmenovat i skrýt.
+    VPOC_30M_CURRENT: 'VPOC 30M aktuální'
   };
 
   // Potvrzení z order flow. MULTI-SELECT.

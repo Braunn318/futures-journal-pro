@@ -11,7 +11,7 @@ using NinjaTrader.NinjaScript;
 #endregion
 
 // Futures Journal PRO – NinjaTrader 8 Execution + Position Sync Connector
-// FJ_CONNECTOR_VERSION: 8
+// FJ_CONNECTOR_VERSION: 9
 // (Zvyš při každé změně toho, co konektor posílá – aplikace podle toho pozná
 // zastaralou instalaci v NT a jednou nabídne přeinstalaci.)
 // Exekuce se posílají okamžitě. Úplný stav pozic se posílá při každé změně
@@ -55,7 +55,10 @@ namespace NinjaTrader.NinjaScript.AddOns
         // Verze 8: seznam sledovaných instrumentů si pamatuje (watch.txt), takže
         // živé ticky běží od spuštění NT8, i když deník ještě neběží; instrument
         // každé exekuce se sleduje hned.
-        private const string CONNECTOR_VERSION = "8";
+        // Verze 9: snímek nese i VPOC právě běžící 30min svíčky ve chvíli vstupu
+        // ("bar30mCurrent": začátek svíčky a VPOC z ticků od jejího začátku do
+        // vstupu) – jen když ticky celý ten úsek pokrývají.
+        private const string CONNECTOR_VERSION = "9";
         private static int marketPolling = 0;
         private Timer syncTimer;
         // NinjaTrader umí znovu vyvolat ExecutionUpdate pro fill, který už jednou
@@ -967,9 +970,20 @@ namespace NinjaTrader.NinjaScript.AddOns
                     .Append(Num(h.O)).Append(",").Append(Num(h.H)).Append(",").Append(Num(h.L)).Append(",").Append(Num(h.C)).Append(",")
                     .Append(Num(h.V)).Append(",[").Append(vpocs).Append("],[").Append(tested.ToString()).Append("]]");
             }
+            body.Append("]");
+            // Rozvíjející se 30min svíčka (konec po vstupu): VPOC z ticků od jejího
+            // začátku do vstupu, jen když je celý úsek pokrytý ticky.
+            if (halves.Count > 0)
+            {
+                BarAgg cur = halves[halves.Count - 1];
+                DateTime curStart = cur.End.AddMinutes(-30);
+                if (cur.End > entry && curStart <= entry && cur.Profile.Count > 0 && covered(curStart, entry))
+                    body.Append(",\"bar30mCurrent\":{\"start\":\"").Append(curStart.ToUniversalTime().ToString("o"))
+                        .Append("\",\"vpoc\":[").Append(VpocList(cur.Profile, ts, null, null, null)).Append("]}");
+            }
             var profile = new StringBuilder();
             AppendProfile(profile, dayProfile, ts);
-            body.Append("],\"day\":{\"profile\":[").Append(profile.ToString()).Append("],")
+            body.Append(",\"day\":{\"profile\":[").Append(profile.ToString()).Append("],")
                 .Append("\"high\":").Append(Num(high)).Append(",\"low\":").Append(Num(low))
                 .Append(vol > 0 ? ",\"vwap\":" + Num(pv / vol) : "").Append("},");
             bool complete = !hasGap && times.Count > 0 && coveredEnd >= entryFloor;

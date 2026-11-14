@@ -14,6 +14,7 @@ const assert = require('node:assert/strict');
 
 const { loadRenderer, inlineScripts, readRepoFile } = require('./helpers/extract');
 const FJTaxonomy = require('../app/taxonomy.js');
+const FJTradeMap = require('../app/trade-map.js');
 
 const SETTINGS = {
   templates: [{ instrument: 'MES', pointValue: 5, defaultCommission: 1.9 }],
@@ -198,10 +199,12 @@ test('shrnutí počítá i s order flow, které je ve stejné položce', () => {
 // Setup, Trend a stav naplnění zůstávají vidět, hladiny a order flow jdou pod
 // rozklikávací položku.
 
-function pills() {
+// `view` = Nastavení → Hladiny → Zobrazení (FJ_levelsView); bez něj výchozí
+// stav, tedy souhrnný řádek vypnutý.
+function pills(view) {
   return loadRenderer(['esc', 'formatLevelRow', 'contextPillsHTML', 'levelPillsHTML', 'targetTypesLabel', 'openTradeLevels', 'tradeLevelsBlockHTML',
-    'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown'],
-    { FJTaxonomy, settings: { templates: [] } });
+    'normalizeInstrumentCode', 'findTemplate', 'getTickSizeForInstrument', 'BUILTIN_TICK_SIZES', 'contextFieldShown', 'levelsSummaryOn'],
+    { FJTaxonomy, FJTradeMap, settings: { templates: [] }, levelsView: FJTradeMap.normalizeLevelsView(view) });
 }
 
 function contextTrade(overrides) {
@@ -226,30 +229,42 @@ test('na kartě zůstává vidět Setup a Trend, hladiny se sbalují', () => {
   assert.match(r.contextPillsHTML(contextTrade({ fillStatus: 'NO_FILL' })), /limitka se nenaplnila/);
 });
 
-test('sbalená část nese všechny tři skupiny a svůj počet', () => {
+// Mapa obchodu (4.8.103, ZADANI_DENIK_MAPA_OBCHODU §3): plný výpis hladin
+// v blízkosti je jen v detailu obchodu (karta Hladiny). Na kartě obchodu nic,
+// nebo jeden souhrnný řádek – ve výchozím stavu vypnutý.
+test('sbalená část nese hladinu vstupu a order flow; hladiny v blízkosti se tu nevypisují', () => {
   const { html, count } = pills().levelPillsHTML(contextTrade());
-  assert.equal(count, 3, 'hladina vstupu, hladiny v blízkosti a order flow');
+  assert.equal(count, 2, 'hladina vstupu a order flow');
   assert.match(html, /VPOC IB/, 'popisky z číselníku, ne uložené klíče');
-  assert.match(html, /Hladiny: VPOC 1M @ 7712\.5, VWAP @ 7698/);
+  assert.doesNotMatch(html, /Hladiny:/, 'výpis hladin mimo detail obchodu neexistuje');
+  assert.doesNotMatch(html, /VPOC 1M|7712\.5/);
   assert.match(html, /OF: Uzavření vůči VPOC v pořádku/);
   assert.doesNotMatch(html, /SR→/, 'dvě kolonky SR už nejsou');
 });
 
-test('karta ukáže u hladiny cenu, test / netest a vzdálenosti – bez štítku role', () => {
-  const { html } = pills().levelPillsHTML(contextTrade({
-    instrument: 'MES', side: 'long', entryPrice: 7700, slPrice: 7696, targetLevel1: { type: 'VAH', price: 7720 },
-    nearLevels: [{ level: 'VAH', price: 7712.5, testState: 'UNTESTED' }, { level: 'VAL', price: 7699 }]
-  }));
-  assert.match(html, /Hladiny: VAH @ 7712\.5 \(netest\) · \+50 t od vstupu · 66 t od SL · 30 t do cíle, VAL @ 7699 · −4 t od vstupu · 12 t od SL · 84 t do cíle/);
-  assert.match(html, /Nejbližší hladina ve směru: \+50 t \(3,13 R\) · SL 12 t za VAL · mezi SL a vstupem 1, před cílem 1/, 'řádek dopočtů');
-  assert.doesNotMatch(html, /v cestě|chrání|překážk/i, 'deník hladinám nepřisuzuje roli');
+const geoTrade = () => contextTrade({
+  instrument: 'MES', side: 'long', entryPrice: 7700, slPrice: 7696, targetLevel1: { type: 'VAH', price: 7720 },
+  nearLevels: [{ level: 'VAH', price: 7712.5, testState: 'UNTESTED' }, { level: 'VAL', price: 7699 }]
 });
 
-test('karta přečte i starý tvar (dva seznamy SR) – stejným převodem jako migrace', () => {
+test('karta obchodu: řádek dopočtů bez hladin, souhrnný řádek jen zapnutý – bez štítku role', () => {
+  const off = pills().levelPillsHTML(geoTrade()).html;
+  assert.doesNotMatch(off, /Hladiny:|Nejbližší hladina|SL 12 t za|mezi SL a vstupem/, 've výchozím stavu o hladinách nic');
+  const on = pills({ summaryLine: true }).levelPillsHTML(geoTrade());
+  assert.match(on.html, /Hladiny: 1 mezi SL a vstupem · 1 před cílem</);
+  assert.doesNotMatch(on.html, /7712\.5|VAL @|od vstupu/, 'jen počty, žádný výpis (cíl má vlastní pilulku)');
+  assert.equal(on.count, 4, 'hladina vstupu, souhrnný řádek, cíl 1 a OF');
+  assert.equal(pills().levelPillsHTML(geoTrade()).count, 3, 'bez souhrnného řádku o jednu méně');
+  assert.doesNotMatch(on.html, /v cestě|chrání|překážk/i, 'deník hladinám nepřisuzuje roli');
+});
+
+test('souhrnný řádek přečte i starý tvar (dva seznamy SR) – stejným převodem jako migrace', () => {
   const old = contextTrade({ srTarget: [{ level: 'VAH', price: 7712.5, ticksFromEntry: 10 }], srStopLoss: ['VWAP'] });
   delete old.nearLevels;
-  const { html } = pills().levelPillsHTML(old);
-  assert.match(html, /Hladiny: VAH @ 7712\.5, VWAP</);
+  assert.doesNotMatch(pills().levelPillsHTML(old).html, /Hladiny:/);
+  // Bez vstupu a směru nejde polohu určit – neříká se „0".
+  assert.match(pills({ summaryLine: true }).levelPillsHTML(old).html, /Hladiny: 0 mezi SL a vstupem · 0 před cílem · 2 bez polohy/);
+  assert.match(pills({ summaryLine: true }).levelPillsHTML({ ...contextTrade(), nearLevels: [], nearLevelsNone: true }).html, /Hladiny: žádná v blízkosti/);
 });
 
 test('obchod bez hladin sbalitelnou položku nedostane', () => {
@@ -273,7 +288,7 @@ test('rozbalený stav se pamatuje podle id obchodu, ne v DOM', () => {
 });
 
 test('hlavička sbalené položky říká, kolik pilulek skrývá', () => {
-  assert.match(pills().tradeLevelsBlockHTML(contextTrade()), /Hladiny <span class="sub">\(3\)<\/span>/);
+  assert.match(pills().tradeLevelsBlockHTML(contextTrade()), /Hladiny <span class="sub">\(2\)<\/span>/);
 });
 
 test('tlačítko dne nesmí zavřít celý den', () => {

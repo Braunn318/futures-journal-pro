@@ -3366,7 +3366,7 @@ ipcMain.handle('capture:ninjaConnectorStatus', async () => {
   try {
     const currentVersion = ninjaConnectorVersion(ninjaConnectorTemplateSource());
     const settings = readCaptureSettings();
-    const requiredVersion = marketOn('snapshot') ? SNAPSHOT_CONNECTOR_VERSION : marketOn('marketBars') ? MARKET_CONNECTOR_VERSION : NT_CONNECTOR_BASE_VERSION;
+    const requiredVersion = marketOn('snapshot') ? snapshotConnectorRequired(marketStore().getSettings()) : marketOn('marketBars') ? MARKET_CONNECTOR_VERSION : NT_CONNECTOR_BASE_VERSION;
     const status = await ninjaConnectorStatus({ documentsDir: app.getPath('documents'), currentVersion, requiredVersion, fsApi: fs, apiKey: settings._readFailed ? undefined : settings.apiKey });
     // Pamatuje si, že konektor kdy nainstalovaný byl – upozornění po
     // aktualizaci NT8 pak platí i tehdy, když ho aktualizace odstranila.
@@ -3598,6 +3598,16 @@ const NT_CONNECTOR_BASE_VERSION = 4;  // stačí bez Dat trhu (VWAP vstupu)
 // která u některých spojení – Tradovate – končila desítky minut před vstupem).
 // v8: seznam sledovaných instrumentů si konektor pamatuje (živé ticky od spuštění NT8).
 const SNAPSHOT_CONNECTOR_VERSION = 8;
+// v9 (4.8.103, Mapa obchodu): snímek nese i VPOC právě běžící 30min svíčky
+// (bar30mCurrent → řádek „VPOC 30M aktuální"). Snímky dál dostane i v8 (bez
+// toho pole); k přeinstalaci se vyzve, jen když se ten typ řádků doplňuje.
+const CURRENT30_CONNECTOR_VERSION = 9;
+function snapshotConnectorRequired(settings) {
+  const s = settings || {};
+  const FJMarketMain = require('./app/market-data.js');
+  const wantsCurrent30 = FJMarketMain.isOn(s, 'snapshotLevels') && s.levelTypes?.VPOC_30M_CURRENT !== false;
+  return wantsCurrent30 ? CURRENT30_CONNECTOR_VERSION : SNAPSHOT_CONNECTOR_VERSION;
+}
 const marketPoll = { at: null, version: null };
 let marketBatch = null;
 let marketBarsModule = null;
@@ -4181,7 +4191,15 @@ function initAutoUpdate() {
   }
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.logger = null;
+  // Do protokolu jen to podstatné: varování, chyby a průběh instalace
+  // (kontrola běží každých pár hodin – její info řádky by protokol zahltily).
+  const firstLine = msg => String(msg).split('\n')[0].slice(0, 300);
+  autoUpdater.logger = {
+    info: msg => { if (/install/i.test(String(msg))) logInfo('Aktualizace', firstLine(msg)); },
+    warn: msg => logInfo('Aktualizace – varování', firstLine(msg)),
+    error: msg => logError('Aktualizace', firstLine(msg)),
+    debug: () => {}
+  };
   // Jen první řádek: chyba sítě od GitHubu s sebou nese výpis hlaviček na
   // desítky řádků a kontrola se opakuje každých pár hodin. Vydání bez
   // instalátoru chyba není – to si zapisuje checkForUpdates, jednou.
@@ -4259,6 +4277,7 @@ function installUpdate() {
   // Zavření okna ho jinak jen schová (viz 'close' v createWindow) – aplikace
   // by zůstala běžet a instalátor by ji musel ukončit natvrdo.
   isQuitting = true;
+  logInfo('Aktualizace', `Instalace verze ${updateState.version || '?'} spuštěna (z ${app.getVersion()})`);
   // Tichá instalace do stávající složky, po ní se aplikace sama spustí.
   setImmediate(() => autoUpdater.quitAndInstall(true, true));
   return { ok: true };

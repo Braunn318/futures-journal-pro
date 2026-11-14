@@ -92,6 +92,15 @@
       bars30m.push(bar);
     }
     bars30m.sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+    // Rozvíjející se 30min svíčka v čase vstupu (konektor v9): začátek svíčky
+    // a VPOC z ticků od jejího začátku do vstupu. Starší konektor ji neposílá = null.
+    let bar30mCurrent = null;
+    const cur = p.bar30mCurrent;
+    if (cur && typeof cur === 'object') {
+      const start = iso(cur.start ?? cur.t);
+      const vpoc = priceList(cur.vpoc);
+      if (start && Date.parse(start) <= entry && vpoc.length) bar30mCurrent = { t: start, vpoc };
+    }
     const va = valueArea(p.day?.profile, pct);
     const snapshot = {
       v: VERSION,
@@ -104,6 +113,7 @@
       valueAreaPct: Number(pct) || DEFAULT_VA_PCT,
       bars1m: bars1m.slice(-BARS_1M),
       bars30m,
+      bar30mCurrent,
       day: { vpoc: va?.vpoc ?? null, vah: va?.vah ?? null, val: va?.val ?? null, high: price(p.day?.high), low: price(p.day?.low), vwap: price(p.day?.vwap) },
       prevDay: null
     };
@@ -158,12 +168,19 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
 
-  // Konec svíčky s offsetem −1 … −5 (ISO), podle času vstupu.
-  function signalBarEnd(snapshot, offset = -1) {
+  // Konec svíčky −k (ISO) podle času vstupu: −1 = svíčka, která skončila
+  // v minutě vstupu, −k = o k−1 minut dřív. Jediné pravidlo pro signální
+  // svíčku i pro svíčky Mapy obchodu (až −25).
+  function barEndAt(snapshot, offset = -1) {
     const floor = entryFloor(snapshot?.time);
     if (!Number.isFinite(floor)) return null;
-    const off = Math.max(-5, Math.min(-1, Math.round(Number(offset)) || -1));
+    const off = Math.max(-BARS_1M, Math.min(-1, Math.round(Number(offset)) || -1));
     return new Date(floor + (off + 1) * MINUTE).toISOString();
+  }
+
+  // Konec svíčky s offsetem −1 … −5 (ISO), podle času vstupu.
+  function signalBarEnd(snapshot, offset = -1) {
+    return barEndAt(snapshot, Math.max(-5, Math.min(-1, Math.round(Number(offset)) || -1)));
   }
 
   // Signální svíčka: offset −1 = svíčka, která skončila v minutě vstupu, až −5
@@ -208,6 +225,8 @@
   // `group` = kdy jsou data: DAY hned se snímkem, PREV až s předchozím dnem.
   const LEVEL_TYPES = Object.freeze([
     { key: 'VPOC_30M_UNTESTED', level: 'VPOC_30M', group: 'DAY', label: 'Netestovaný VPOC 30m' },
+    // Konektor v9: VPOC právě běžící 30min svíčky ve chvíli vstupu.
+    { key: 'VPOC_30M_CURRENT', level: 'VPOC_30M_CURRENT', group: 'DAY', label: 'VPOC 30M aktuální', connector: 9 },
     { key: 'DAY_VPOC', level: 'VPOC_DAY', group: 'DAY', label: 'VPOC dne' },
     { key: 'DAY_VAH', level: 'VAH', group: 'DAY', label: 'VAH dne' },
     { key: 'DAY_VAL', level: 'VAL', group: 'DAY', label: 'VAL dne' },
@@ -226,6 +245,7 @@
     const out = [];
     const add = (key, p) => { const pr = price(p); if (on(key) && pr != null) out.push({ type: key, level: LEVEL_TYPES.find(t => t.key === key).level, price: pr }); };
     for (const b of snapshot.bars30m || []) (b.vpoc || []).forEach((v, i) => { if (!b.vpocTested?.[i]) add('VPOC_30M_UNTESTED', v); });
+    for (const v of snapshot.bar30mCurrent?.vpoc || []) add('VPOC_30M_CURRENT', v);
     const d = snapshot.day || {};
     add('DAY_VPOC', d.vpoc); add('DAY_VAH', d.vah); add('DAY_VAL', d.val); add('SESSION_HIGH', d.high); add('SESSION_LOW', d.low);
     const p = snapshot.prevDay;
@@ -342,7 +362,7 @@
 
   return {
     VERSION, BARS_1M, DEFAULT_VA_PCT, LEVEL_TYPES,
-    valueArea, normalizeSnapshotPayload, snapshotCoverage, shouldReplaceSnapshot, signalBarEnd, signalBar, vpocTagMismatch,
+    valueArea, normalizeSnapshotPayload, snapshotCoverage, shouldReplaceSnapshot, barEndAt, signalBarEnd, signalBar, vpocTagMismatch,
     snapshotLevelCandidates, snapshotRows, autoTestStates, prevDayFromFile, entryIsoOf, applyMarketData
   };
 }));

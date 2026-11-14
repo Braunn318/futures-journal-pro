@@ -452,11 +452,20 @@
   // ve směru: +5 t (0,5 R) · SL 3 t za VAL · mezi SL a vstupem 2, před cílem 1".
   // Co nejde spočítat, se vynechá – nic se nedoplňuje odhadem.
   // `opts.levelName(i)` vrací popisek i-tého řádku hladin (číselník zná volající).
+  // `opts.omitLevels`: bez částí o hladinách v blízkosti (nejbližší ve směru,
+  // SL za hladinou, počty v úsecích) – ukazuje je Mapa obchodu a její řádek
+  // slovy (app/trade-map.js). Dopočty samotné se nemění.
   function derivedSummaryParts(d, opts = {}) {
     if (!d) return [];
     const dist = distFn(opts);
     const parts = [];
     const rows = Array.isArray(d.nearLevels) ? d.nearLevels : [];
+    if (opts.omitLevels) {
+      if (d.targetOnLevel === false) parts.push('cíl není hladina');
+      if (d.tradeNoInDay != null) parts.push(d.tradeNoInDay + '. obchod dne');
+      if (d.session) parts.push(SESSION_LABELS[d.session] || d.session);
+      return parts;
+    }
     if (d.nearestAheadTicks != null) {
       parts.push('Nejbližší hladina ve směru: ' + dist(d.nearestAheadTicks, true) + (d.nearestAheadR != null ? ' (' + cz(d.nearestAheadR) + ' R)' : ''));
     }

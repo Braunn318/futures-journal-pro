@@ -509,3 +509,16 @@ test('potvrzená aktualizace počká na doběhnutí kontroly a nezůstane bez od
   assert.ok(start.indexOf("updateState?.status==='checking'") < start.indexOf('downloadUpdate()'), 'před stažením');
   assert.match(start, /if\(updateState\?\.status!=='downloaded'\)\{showToast\(/, 'nespuštěná aktualizace se ohlásí');
 });
+
+test('4.8.102: instalátor ukončí appku podle jména, ale nikdy taskkill /T – zabil by i sebe', () => {
+  // Automatická aktualizace spouští instalátor jako potomka běžící appky;
+  // taskkill /T by ukončil celý strom včetně instalátoru (aktualizace pak
+  // prošla jen „na druhý pokus“).
+  const nsh = readRepoFile('build/installer.nsh');
+  const code = nsh.split(/\r?\n/).filter(line => !/^\s*;/.test(line)).join('\n');
+  assert.doesNotMatch(code, /taskkill[^\n']*\/T\b/i, 'taskkill bez /T');
+  assert.match(code, /taskkill \/F \/IM "Futures Journal PRO\.exe"/);
+  assert.match(code, /!macro customInit\s+!insertmacro fjKillRunningApp\s+!macroend/);
+  assert.match(code, /!macro customUnInit\s+!insertmacro fjKillRunningApp\s+!macroend/);
+  assert.equal(pkg().build.nsis.include, 'build/installer.nsh');
+});

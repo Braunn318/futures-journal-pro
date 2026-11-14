@@ -357,6 +357,38 @@ textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-c
 .dir-icon.up{color:var(--green)}.dir-icon.down{color:var(--red)}
 .sr-row .sr-dist{grid-column:1/-1;font-size:12px}
 .sr-row .sr-dist:empty{display:none}
+/* Mapa obchodu (4.8.103): graf hladin, Vstupu / SL / cílů a svíček snímku.
+   Zdroj hladiny = styl čáry (LTA plná, snímek čárkovaná, ruční tečkovaná). */
+.tmap-box{margin:2px 0 10px}
+.tmap-bar{display:flex;align-items:center;gap:8px;justify-content:flex-end;min-height:24px;margin-bottom:2px}
+.tmap-bar .btn{padding:2px 10px;font-size:12px}
+.tmap{width:100%;overflow:hidden}
+.tmap svg{display:block;width:100%;height:auto;font-family:inherit}
+.tmap .tl{cursor:pointer}
+.tmap .tl .hit{stroke:transparent;stroke-width:9}
+.tmap .tl.hl .vis,.tmap .tl:hover .vis{stroke-width:2.6}
+.tmap .tl.hl text,.tmap .tl:hover text{font-weight:700}
+.tmap .tc.sel{cursor:pointer}
+.tmap-legend{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;margin-top:4px}
+.tmap-legend svg{vertical-align:middle;margin-right:4px}
+.tmap-sentence{font-size:13px;margin-top:6px;line-height:1.45}
+.sr-list>.sr-list-head{cursor:pointer;font-size:13px;font-weight:700;margin:4px 0 6px;display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;color:var(--text)}
+.sr-list>.sr-list-head .chev{width:14px;height:14px;transition:transform .15s}
+.sr-list.open>.sr-list-head .chev{transform:rotate(90deg)}
+.sr-list:not(.open)>.sr-list-body{display:none}
+.sr-list.sr-list-plain>.sr-list-head{display:none}
+.sr-filter{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.sr-filter .chip{font-size:12px;padding:2px 10px}
+.sr-sep{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--muted);border-top:1px solid var(--line);padding-top:3px;margin-top:2px}
+.sr-sep.sr-sep-entry{color:var(--text);border-top:2px solid var(--text2)}
+.sr-sep.sr-sep-sl{color:var(--red);border-top-color:var(--red)}
+.sr-sep.sr-sep-target{color:var(--green);border-top-color:var(--green)}
+.sr-row .sr-src{display:none;font-size:13px;color:var(--muted);text-align:center;cursor:default}
+.sr-rows.map-on .sr-row{grid-template-columns:minmax(140px,2fr) 1fr minmax(90px,.8fr) 22px auto}
+.sr-rows.map-on .sr-row .sr-src{display:block;grid-column:4;grid-row:1}
+.sr-rows.map-on .sr-row .sr-remove{grid-column:5}
+.settings-card h4.settings-sub{margin:16px 0 2px;font-size:13px;font-weight:800;letter-spacing:.03em;color:var(--text2);border-top:1px solid var(--line);padding-top:10px}
+.sr-row.sr-hl{outline:2px solid rgba(var(--blue-rgb),.55);outline-offset:2px;border-radius:6px}
 .settings-check{display:flex;align-items:center;gap:8px;cursor:pointer}
 .settings-check input{width:auto}
 
@@ -1159,8 +1191,15 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <p class="sub" style="margin-top:10px">Ve výchozím stavu je vše kromě <b>Setup – sekundární</b> zobrazené a upozorňuje se jen na <b>Trend 30m</b> a <b>Známku</b>. <b>Test / netest u hladin</b> se hlásí, když některá ze zadaných hladin v blízkosti nemá vyplněno test / netest; <b>Kontext dne</b>, když dni obchodu chybí ranní kontext. <b>Řádek dopočtů</b> je jen výpočet z cen – nic se u něj nekontroluje.</p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned.</p>
         </details>
-        <details class="card settings-card" data-card="ltaLevels" id="ltaSettingsCard">
-          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>LTA levely</h3></summary>
+        <details class="card settings-card" data-card="levels" id="ltaSettingsCard">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Hladiny</h3></summary>
+          <p class="sub">Hladiny v blízkosti obchodu na jednom místě: jak se v kartě Hladiny zobrazují (Mapa obchodu) a odkud se doplňují – z LTA souborů a ze snímku trhu. Všechny řádky jsou jeden seznam „Hladiny v blízkosti“; ruční řádek se nikdy nepřepíše a vypnutí nic nemaže.</p>
+          <h4 class="settings-sub">Zobrazení</h4>
+          <p class="sub">Mapa obchodu = graf v kartě Hladiny: svíčky snímku, Vstup / SL / cíle a všechny hladiny (zdroj = styl čáry), pod ním jeden řádek slovy a sbalený seznam. Plný výpis hladin je jen v detailu obchodu; v seznamu obchodů, kartě dne, kalendáři a reportech nanejvýš souhrnný řádek.</p>
+          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="levelsViewMap"> Mapa obchodu v kartě Hladiny <span class="sub">— vypnuto = karta jako dřív</span></label>
+          <div class="formgrid" style="margin-top:8px"><div class="field"><label>Počet svíček v mapě <span class="sub">— ze snímku trhu; signální jde vybrat z posledních 5</span></label><select id="levelsViewBars"><option value="5">5</option><option value="10">10</option></select></div></div>
+          <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="levelsViewSummary"> Souhrnný řádek mimo detail obchodu <span class="sub">— „Hladiny: 2 mezi SL a vstupem · 2 před cílem“</span></label>
+          <h4 class="settings-sub">Z LTA souborů</h4>
           <p class="sub">Doplňuje do „Hladiny v blízkosti“ levely z LiveTradingAsistent (složka <code>CustomLevels</code> v NinjaTraderu): <b>N nejbližších nad a N pod cenou vstupu</b>, s cenou, bez test / netest. Typ řádku je doslovný název levelu z LTA – číselník <b>LTA Levels</b> (Nastavení → Číselníky) se zakládá sám; volbu tam jde přejmenovat, skrýt (pak se nedoplňuje) i smazat. Zadané řádky se nikdy nemažou ani nepřepisují a doplněné jde ručně upravit nebo odebrat.</p>
           <label class="settings-check" style="margin-top:12px"><input type="checkbox" id="ltaEnabled"> Import LTA levelů zapnutý</label>
           <label class="settings-check" style="margin-top:8px"><input type="checkbox" id="ltaAutoInForm"> Doplnit automaticky ve formuláři <span class="sub">— po vyplnění instrumentu a ceny vstupu, jen když je seznam prázdný</span></label>
@@ -1177,7 +1216,14 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <p class="sub" style="margin-top:6px">Vyloučený level se jen nedoplňuje (automaticky ani tlačítkem „Doplnit z LTA“). V archivu i v číselníku LTA Levels zůstává a ve formuláři ho jde vybrat ručně. Skrytá volba v Číselnících se navíc nenabízí vůbec.</p>
           <p class="sub" id="ltaArchiveInfo" style="margin-top:8px"></p>
           <p class="sub" id="ltaMissingDays" style="margin-top:4px;display:none"></p>
-          <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Do složky LTA se nikdy nic nezapisuje.</p>
+          <h4 class="settings-sub">Ze snímku trhu</h4>
+          <div id="levelsSnapshotSection">
+            <label class="settings-check" style="margin-top:8px" id="levelsSnapshotOnLabel"><input type="checkbox" id="levelsSnapshotOn"> Doplňovat řádky hladin ze snímku trhu <span class="sub" id="levelsSnapshotWhy"></span></label>
+            <div class="formgrid" style="margin-top:6px"><div class="field" id="marketLevelsNField"><label>Řádky ze snímku <span class="sub">— N nejbližších nad a N pod vstupem</span></label><input type="number" id="marketLevelsN" min="0" max="20" step="1"></div></div>
+            <div id="marketLevelTypes" style="margin-top:6px"></div>
+            <div class="sub" style="margin-top:4px">Typ řádku je volba číselníku Hladina vstupu (Nastavení → Číselníky) – jde přejmenovat i skrýt; skrytá volba se nedoplňuje. High / Low dne je ve výchozím stavu skrytá. Snímek trhu (konektor NT8, value area, živé ticky) se zapíná v kartě Data trhu.</div>
+          </div>
+          <p class="sub" style="margin-top:8px">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Do složky LTA se nikdy nic nezapisuje.</p>
         </details>
         <details class="card settings-card" data-card="marketData" id="marketDataCard">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Data trhu</h3></summary>
@@ -1196,10 +1242,8 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <div class="formgrid" style="margin-top:6px">
               <div class="field"><label>Value area <span class="sub">— % objemu dne pro VAH / VAL</span></label><input type="number" id="marketVaPct" min="50" max="95" step="1"></div>
               <div class="field"><label>Živé ticky <span class="sub">— konektor je sbírá sám od spuštění NT8 (nic se nezapíná, deník nemusí běžet). Instrumenty: kořeny oddělené čárkou, např. MES, ES; prázdné = automaticky podle obchodů</span></label><input type="text" id="marketLiveRoots" placeholder="automaticky"></div>
-              <div class="field" id="marketLevelsNField"><label>Řádky ze snímku <span class="sub">— N nejbližších nad a N pod vstupem</span></label><input type="number" id="marketLevelsN" min="0" max="20" step="1"></div>
             </div>
-            <div id="marketLevelTypes" style="margin-top:6px"></div>
-            <div class="sub" style="margin-top:4px">Typ řádku je volba číselníku Hladina vstupu (Nastavení → Číselníky) – jde přejmenovat i skrýt; skrytá volba se nedoplňuje. High / Low dne je ve výchozím stavu skrytá.</div>
+            <div class="sub" style="margin-top:4px">Řádky hladin ze snímku (N, typy): Nastavení → Přizpůsobení → Hladiny → Ze snímku trhu.</div>
           </div>
           <p class="sub" id="marketInfo" style="margin-top:8px"></p>
           <p class="sub">Platí pro celou aplikaci (všechny deníky) a uloží se hned. Archiv LTA levelů se nemaže, ani když jsou Data trhu vypnutá.</p>
@@ -1596,7 +1640,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Hladiny</span><span class="sub trade-section-summary" id="levelsSummary"></span><span class="trade-section-missing" id="levelsMissing"></span></summary>
         <div class="formgrid">
           <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
-          <div class="field full"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label><div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Přizpůsobení → LTA levely). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsLtaNote" style="margin-top:6px;display:none"></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div>
+          <div class="field full" id="nearLevelsField"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label>
+            <div class="tmap-box" id="tradeMapBox" style="display:none"><div class="tmap-bar"><span class="sub" id="tradeMapHidden"></span><button type="button" class="btn" id="tradeMapFull" onclick="toggleTradeMapFull()" title="Ukáže i hladiny mimo rozsah SL – poslední cíl (jen zobrazení)">Celý rozsah</button></div><div class="tmap" id="tradeMap"></div><div class="sub tmap-legend" id="tradeMapLegend"></div><div class="tmap-sentence" id="tradeMapSentence" title="Poloha hladin vůči SL, vstupu a poslednímu cíli – dopočet z cen, needituje se"></div><div class="sub" id="tradeMapSignal" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky" style="margin-top:4px"></div></div>
+            <div class="sr-list sr-list-plain open" id="nearLevelsList"><button type="button" class="sr-list-head" onclick="toggleLevelList()" aria-controls="nearLevelsListBody"><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Seznam hladin <span class="sub" id="nearLevelsCount"></span></button><div class="sr-list-body" id="nearLevelsListBody"><div class="sr-filter" id="nearLevelsFilter" style="display:none"></div>
+          <div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Přizpůsobení → Hladiny). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsLtaNote" style="margin-top:6px;display:none"></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div></div></div>
           <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
           <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
           <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
@@ -1642,6 +1689,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <script src="market-data.js"></script>
 <script src="points.js"></script>
 <script src="context.js"></script>
+<script src="trade-map.js"></script>
 <script src="swing.js"></script>
 <script src="journals.js"></script>
 <script src="nt8import.js"></script>
@@ -2165,6 +2213,25 @@ function setContextFieldConfig(next){
  renderAll();
 }
 function contextFieldShown(key){return typeof contextFieldConfig==='undefined'||FJTaxonomy.fieldShown(contextFieldConfig,key)}
+// Hladiny → Zobrazení (Mapa obchodu, 4.8.103): graf v kartě Hladiny, počet
+// svíček a souhrnný řádek mimo detail obchodu. Platí pro celou aplikaci,
+// pamatuje se v tomhle zařízení. Výchozí: mapa zapnutá, 5 svíček, souhrnný
+// řádek vypnutý. Vypnutá mapa = karta Hladiny jako dřív.
+const LEVELS_VIEW_KEY='FJ_levelsView';
+function readLevelsView(){
+ try{return FJTradeMap.normalizeLevelsView(JSON.parse(localStorage.getItem(LEVELS_VIEW_KEY)||'{}'))}
+ catch{return FJTradeMap.normalizeLevelsView({})}
+}
+let levelsView=readLevelsView();
+function levelsMapOn(){return typeof levelsView!=='undefined'&&levelsView?.map===true}
+function levelsSummaryOn(){return typeof levelsView!=='undefined'&&levelsView?.summaryLine===true}
+function setLevelsView(patch){
+ levelsView=FJTradeMap.normalizeLevelsView({...levelsView,...patch});
+ try{localStorage.setItem(LEVELS_VIEW_KEY,JSON.stringify(levelsView))}catch{}
+ if(typeof renderLevelsViewSettings==='function')renderLevelsViewSettings();
+ if(typeof applyLevelsView==='function')applyLevelsView();
+ renderAll();
+}
 // Skryté pole jen zmizí (display) – jeho prvky dál drží načtené hodnoty, takže
 // uložení obchodu data skrytého pole nesmaže. Prvek se k poli hlásí atributem
 // data-ctx-field (formulář obchodu, řádky hladin, tlačítko a box kontextu dne).
@@ -3843,6 +3910,7 @@ window.appendLevelRow=(row={})=>{
  el.innerHTML=`<select class="sr-level" aria-label="Typ hladiny"><option value="">— hladina —</option>${options.filter(o=>!ltaKeys.has(o.key)).map(optionHtml).join('')}${ltaOptions.length?`<optgroup label="LTA Levels">${ltaOptions.map(optionHtml).join('')}</optgroup>`:''}</select>`
   +'<input class="sr-price" type="number" step="any" placeholder="cena" aria-label="Cena hladiny">'
   +'<select class="sr-test" data-ctx-field="levelTestState" aria-label="Netest / test" title="Netest = cena se hladiny v seanci ještě nedotkla"><option value="">— test? —</option><option value="UNTESTED">netest</option><option value="TESTED">test</option></select>'
+  +'<span class="sr-src" aria-label="Zdroj hladiny"></span>'
   +'<button type="button" class="icon sr-remove" title="Odebrat hladinu">✕</button><div class="sub sr-dist"></div>';
  el.querySelector('.sr-level').value=row.level||'';
  el.querySelector('.sr-price').value=row.price!=null?row.price:'';
@@ -3855,13 +3923,22 @@ window.appendLevelRow=(row={})=>{
  const test=el.querySelector('.sr-test');
  if(row.testStateAuto&&row.testState){el.dataset.testAuto='1';test.classList.add('sr-test-auto');test.title='Doplněno ze svíček dne (cena se hladiny v seanci před vstupem dotkla = test). Jde přepsat ručně.'}
  // Ručně upravený typ nebo cena = ruční řádek; ručně zvolený test = ruční hodnota.
- const manual=()=>{delete el.dataset.source};
+ // Prázdný řádek z tlačítka „Přidat hladinu" je vidět i přes filtr zdroje.
+ if(!row.level&&row.price==null&&!row.legacySide)el.dataset.fresh='1';
+ const manual=()=>{delete el.dataset.source;if(typeof setRowSource==='function')setRowSource(el)};
  el.querySelector('.sr-level').addEventListener('change',()=>{manual();updateLevelsSummary()});
  // Vzdálenosti překreslí scheduleTradeSections (poslouchá celý #tradeForm).
  el.querySelector('.sr-price').addEventListener('input',()=>{manual();updateLevelsSummary()});
+ // Po dokončení změny ceny (ne při psaní) se seznam se zapnutou mapou přeřadí.
+ el.querySelector('.sr-price').addEventListener('change',()=>{if(typeof sortLevelList==='function'&&levelsMapOn())sortLevelList()});
  test.addEventListener('change',()=>{delete el.dataset.testAuto;test.classList.remove('sr-test-auto');test.title='Netest = cena se hladiny v seanci ještě nedotkla';updateLevelsSummary()});
- el.querySelector('.sr-remove').addEventListener('click',()=>{el.remove();updateLevelsSummary()});
+ el.querySelector('.sr-remove').addEventListener('click',()=>{el.remove();updateLevelsSummary();if(typeof applyLevelFilter==='function')applyLevelFilter()});
+ // Najetí na řádek zvýrazní jeho čáru v Mapě obchodu.
+ el.addEventListener('mouseenter',()=>{if(typeof highlightLevel==='function')highlightLevel(levelKey(rowFromElement(el)),true)});
+ el.addEventListener('mouseleave',()=>{if(typeof highlightLevel==='function')highlightLevel(levelKey(rowFromElement(el)),false)});
+ if(typeof setRowSource==='function')setRowSource(el);
  host.appendChild(el);
+ if(typeof applyLevelFilter==='function')applyLevelFilter();
  if(typeof applyContextFieldVisibility==='function')applyContextFieldVisibility();
  syncNearNoneControls();
  return el;
@@ -3983,8 +4060,14 @@ let formSignalBarOffset;
 const CLOSE_VS_VPOC_TEXT={ABOVE:'NAD',AT:'NA',BELOW:'POD'};
 function renderSignalBar(){
  const field=$('signalBarField');if(!field)return;
- if(!formSnapshot||!marketOn('signalBar')){field.style.display='none';return}
- field.style.display='';
+ // Zapnutá Mapa obchodu: svíčky kreslí mapa (karta Hladiny), dopočet
+ // signální svíčky je pod ní. Vypnutá = náhled v kartě Setup jako dřív.
+ const mapOn=typeof levelsMapOn==='function'&&levelsMapOn();
+ const infoEl=mapOn?$('tradeMapSignal'):$('signalBarInfo');
+ if(mapOn){field.style.display='none';if($('signalBarInfo'))$('signalBarInfo').textContent=''}
+ else if($('tradeMapSignal'))$('tradeMapSignal').textContent='';
+ if(!formSnapshot||!marketOn('signalBar')){field.style.display='none';if(infoEl)infoEl.textContent='';return}
+ if(!mapOn)field.style.display='';
  const hm=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?'':d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})};
  const byTime=new Map((formSnapshot.bars1m||[]).map(b=>[b.t,b]));
  const slots=[-5,-4,-3,-2,-1].map(o=>{const end=FJSnapshot.signalBarEnd(formSnapshot,o);return {o,end,b:end?byTime.get(end)||null:null}});
@@ -4003,20 +4086,224 @@ function renderSignalBar(){
   const vp=(b.vpoc||[]).map(v=>`<line x1="${x-11}" x2="${x+11}" y1="${y(v)}" y2="${y(v)}" stroke="var(--text)" stroke-width="2"/>`).join('');
   return `<g data-off="${o}" style="cursor:pointer"><title>Svíčka ${o} (${hm(end)}): O ${b.o} H ${b.h} L ${b.l} C ${b.c} · objem ${b.v} · VPOC ${(b.vpoc||[]).join(' / ')||'nezměřen'}${b.delta!=null?' · delta '+b.delta:''}</title><rect x="${x-W/2}" y="0" width="${W}" height="${H}" fill="transparent"/>${sel}<line x1="${x}" x2="${x}" y1="${y(b.h)}" y2="${y(b.l)}" stroke="${col}"/><rect x="${x-6}" y="${top}" width="12" height="${bh}" fill="${col}"/>${vp}${label}</g>`;
  }).join('');
- $('signalBarPreview').innerHTML=`<svg width="${W*slots.length}" height="${H+28}" role="img" aria-label="Pět minutových svíček před vstupem">${cols}</svg>`;
- $('signalBarPreview').querySelectorAll('g[data-off]').forEach(g=>g.addEventListener('click',()=>{formSignalBarOffset=Number(g.dataset.off);renderSignalBar()}));
+ if(!mapOn){
+  $('signalBarPreview').innerHTML=`<svg width="${W*slots.length}" height="${H+28}" role="img" aria-label="Pět minutových svíček před vstupem">${cols}</svg>`;
+  $('signalBarPreview').querySelectorAll('g[data-off]').forEach(g=>g.addEventListener('click',()=>{formSignalBarOffset=Number(g.dataset.off);renderSignalBar()}));
+ }else $('signalBarPreview').innerHTML='';
  // Díra v ticích: odkud chybí delta a VPOC (snímek se doplní opakovaným požadavkem).
  const cov=FJSnapshot.snapshotCoverage(formSnapshot);
  const gap=cov&&!cov.complete?`⚠️ Ticky z NT8 ${cov.gap?`chybí ${hm(cov.gap[0])}–${hm(cov.gap[1])}`:`jen do ${hm(cov.ticksUntil)||'?'}`} (vstup ${hm(formSnapshot.time)}) – delta a VPOC u novějších svíček chybí; snímek se doplní po zavření obchodu nebo přes „Doplnit svíčky…“, až je NT8 vydá. `:'';
  const sig=FJSnapshot.signalBar(formSnapshot,off);
- if(!sig){$('signalBarInfo').textContent=`${gap}Svíčka ${off} (${hm(FJSnapshot.signalBarEnd(formSnapshot,off))}) ve snímku chybí.`;return}
+ if(!sig){infoEl.textContent=`${gap}Svíčka ${off} (${hm(FJSnapshot.signalBarEnd(formSnapshot,off))}) ve snímku chybí.`;return}
  const vpocs=(sig.bar.vpoc||[]).join(' / ')||'—';
  const rel=sig.closeVsVpoc?`zavření ${CLOSE_VS_VPOC_TEXT[sig.closeVsVpoc]} VPOC ${vpocs}`:(sig.bar.vpoc||[]).length>1?`zavření mezi VPOC ${vpocs}`:'VPOC nezměřen';
  const vol=sig.volumeVsMedian20!=null?`objem ${sig.volumeVsMedian20.toFixed(2).replace('.',',')}× medián 20 předchozích`:'objem: na medián chybí 20 předchozích svíček';
  const delta=sig.bar.delta!=null?` · delta ${sig.bar.delta>0?'+':''}${sig.bar.delta}`:'';
  const formTrade={side:$('side')?.value,ofConfirm:typeof readChipGrid==='function'?readChipGrid('ofConfirm','OF_CONFIRM'):[]};
  const warn=FJSnapshot.vpocTagMismatch(formTrade,sig)?' · ⚠️ nesoulad se štítkem „Uzavření vůči VPOC v pořádku“ (štítek má přednost)':'';
- $('signalBarInfo').textContent=`${gap}Svíčka ${off} (${hm(sig.bar.t)}): ${rel} · ${vol}${delta}${warn}`;
+ infoEl.textContent=`${gap}${mapOn?'Signální svíčka':'Svíčka'} ${off} (${hm(sig.bar.t)}): ${rel} · ${vol}${delta}${warn}`;
+}
+// ---- Mapa obchodu (4.8.103, docs/ZADANI_DENIK_MAPA_OBCHODU.md) ----
+// Jeden graf v kartě Hladiny: vlevo svíčky snímku (OHLC + VPOC, signální
+// orámovaná), přes celou šířku Vstup / SL / cíle a všechny hladiny, pásma
+// SL → vstup a vstup → poslední cíl. Model počítá FJTradeMap.tradeMapModel
+// (app/trade-map.js), tady se jen kreslí. Nic se neukládá; sloučené popisky
+// jsou jen kreslení, řádky zůstávají.
+let tradeMapFull=false;
+const LEVELS_FILTER_KEY='FJ_levelsFilter';
+let levelsFilter=(()=>{try{return FJTradeMap.normalizeSourceFilter(JSON.parse(localStorage.getItem(LEVELS_FILTER_KEY)||'{}'))}catch{return FJTradeMap.normalizeSourceFilter({})}})();
+const LEVEL_SOURCE_TEXT={lta:{icon:'▬',label:'LTA',title:'Z LTA souborů (plná čára)'},snapshot:{icon:'┅',label:'snímek',title:'Ze snímku trhu (čárkovaná čára)'},manual:{icon:'┈',label:'ruční',title:'Ručně zadaná (tečkovaná čára)'}};
+const LEVEL_LINE_DASH={lta:'',snapshot:'6 4',manual:'1.5 3.5'};
+// Obchod z formuláře pro mapu: stejné hodnoty, jaké se uloží (SL a cíle
+// včetně dopočtu z výstupu), řádky hladin z formuláře, snímek a výběr svíčky.
+function formMapTrade(){
+ const d=postExitDraftFromForm();
+ const t={instrument:d.instrument,side:d.side,entryPrice:d.entryPrice,slPrice:d.slPrice,
+  nearLevels:readLevelRows(),nearLevelsNone:readNearNone(),
+  marketSnapshot:formSnapshot&&marketOn('signalBar')?formSnapshot:null,signalBarOffset:formSignalBarOffset};
+ for(let n=1;n<=formTargetFieldCount;n++)t['targetLevel'+n]={price:d['targetLevel'+n]?.price};
+ return t;
+}
+const levelKey=r=>String(r?.level||'')+'|'+Number(r?.price);
+function tradeMapSVG(m){
+ if(!m?.range)return '';
+ const H=m.heightPx,n=m.candles.length,cw=n>5?16:26;
+ const CW=n?n*cw+8:0,LE=CW+320,TX=LE+10,W=TX+320;
+ const span=m.range.max-m.range.min;
+ const y=p=>Math.round((m.range.max-p)/span*H*10)/10;
+ const clip=v=>Math.max(0,Math.min(H,v));
+ const out=[];
+ for(const b of m.bands){
+  const y1=clip(y(Math.max(b.from,b.to))),y2=clip(y(Math.min(b.from,b.to)));
+  const col=b.kind==='risk'?'var(--red-rgb)':'var(--green-rgb)';
+  out.push(`<rect x="0" y="${y1}" width="${LE}" height="${Math.max(0,y2-y1)}" fill="rgba(${col},.09)"/>`);
+ }
+ // Svíčky ve stejném cenovém měřítku jako čáry (mimo rozsah se oříznou).
+ m.candles.forEach((c,i)=>{
+  const x=i*cw+cw/2,b=c.bar;
+  const sel=c.signal?`<rect x="${x-cw/2+1}" y="1" width="${cw-2}" height="${H-2}" rx="3" fill="none" stroke="var(--text)" stroke-dasharray="3 2"/>`:'';
+  const tip=b?`Svíčka ${c.offset}: O ${b.o} H ${b.h} L ${b.l} C ${b.c} · objem ${b.v} · VPOC ${(b.vpoc||[]).join(' / ')||'nezměřen'}${b.delta!=null?' · delta '+b.delta:''}${c.selectable?' – klikem vyber jako signální':''}`:`Svíčka ${c.offset} ve snímku chybí`;
+  let body=`<text x="${x}" y="${H/2}" text-anchor="middle" font-size="11" fill="var(--muted)">–</text>`;
+  if(b){
+   const col=b.c>=b.o?'var(--green)':'var(--red)';
+   const top=clip(y(Math.max(b.o,b.c))),bh=Math.max(1,clip(y(Math.min(b.o,b.c)))-top);
+   body=`<line x1="${x}" x2="${x}" y1="${clip(y(b.h))}" y2="${clip(y(b.l))}" stroke="${col}"/><rect x="${x-cw*0.28}" y="${top}" width="${cw*0.56}" height="${bh}" fill="${col}"/>`
+    +(b.vpoc||[]).filter(v=>v>=m.range.min&&v<=m.range.max).map(v=>`<line x1="${x-cw*0.45}" x2="${x+cw*0.45}" y1="${y(v)}" y2="${y(v)}" stroke="var(--text)" stroke-width="2"/>`).join('');
+  }
+  out.push(`<g class="tc${c.selectable?' sel':''}" data-off="${c.offset}"><title>${esc(tip)}</title><rect x="${x-cw/2}" y="0" width="${cw}" height="${H}" fill="transparent"/>${sel}${body}<text x="${x}" y="${H+12}" text-anchor="middle" font-size="9" fill="var(--muted)">${c.offset}</text></g>`);
+ });
+ const color=l=>l.kind==='entry'?'var(--text)':l.kind==='sl'?'var(--red)':l.kind==='target'?'var(--green)':'var(--text2)';
+ m.lines.forEach((l,i)=>{
+  if(!l.visible)return;
+  const ly=y(l.price);
+  const isLevel=l.kind==='level';
+  const dash=isLevel?LEVEL_LINE_DASH[l.source]||'':'';
+  const attrs=isLevel?` data-key="${esc(levelKey(l))}" data-line="${i}"`:` data-line="${i}"`;
+  const tip=isLevel?`${l.name} @ ${l.price} · ${LEVEL_SOURCE_TEXT[l.source].title}${l.testState?' · '+(FJTaxonomy.TEST_STATE[l.testState]||''):''} – klikem upravit řádek`:`${l.name} @ ${l.price}`;
+  out.push(`<g class="tl tl-${l.kind}"${attrs}><title>${esc(tip)}</title><line class="hit" x1="${isLevel?0:CW}" x2="${LE}" y1="${ly}" y2="${ly}"/><line class="vis" x1="${isLevel?0:CW}" x2="${LE}" y1="${ly}" y2="${ly}" stroke="${color(l)}" stroke-width="${isLevel?1.3:2}"${dash?` stroke-dasharray="${dash}"`:''}/></g>`);
+ });
+ // Popisky vpravo; sloučený popisek má k čarám vodítka.
+ for(const lab of m.labels){
+  const ly=Math.max(9,Math.min(H+4,lab.ly+3.5));
+  const first=m.lines[lab.lines[0]];
+  const kinds=lab.kinds;
+  const col=kinds.length===1?color(first):'var(--text)';
+  const weight=kinds.some(k=>k!=='level')?' font-weight="700"':'';
+  for(const i of lab.lines){const l=m.lines[i];out.push(`<line x1="${LE}" x2="${TX-2}" y1="${y(l.price)}" y2="${ly-3.5}" stroke="var(--muted)" stroke-width=".6"/>`)}
+  const keys=lab.lines.map(i=>m.lines[i]).filter(l=>l.kind==='level').map(levelKey);
+  const testStyle=lab.lines.map(i=>m.lines[i]).some(l=>l.kind==='level'&&l.testStateAuto)?' font-style="italic"':'';
+  out.push(`<text class="tlab" x="${TX}" y="${ly}" font-size="11"${weight}${testStyle} fill="${col}"${keys.length?` data-keys="${esc(keys.join(','))}"`:''}>${esc(lab.text)}</text>`);
+ }
+ if(m.hiddenAbove)out.push(`<text x="${LE-4}" y="11" text-anchor="end" font-size="11" fill="var(--muted)">↑ ${m.hiddenAbove} další</text>`);
+ if(m.hiddenBelow)out.push(`<text x="${LE-4}" y="${H-4}" text-anchor="end" font-size="11" fill="var(--muted)">↓ ${m.hiddenBelow} další</text>`);
+ return `<svg viewBox="-2 -2 ${W+4} ${H+(n?18:6)}" role="img" aria-label="Mapa obchodu: hladiny vůči vstupu, Stop Lossu a cílům">${out.join('')}</svg>`;
+}
+function tradeMapLegendHTML(m){
+ const sw=(dash,col,w=1.3)=>`<svg width="26" height="8"><line x1="0" x2="26" y1="4" y2="4" stroke="${col}" stroke-width="${w}"${dash?` stroke-dasharray="${dash}"`:''}/></svg>`;
+ const used=new Set(m.lines.filter(l=>l.kind==='level').map(l=>l.source));
+ const parts=[`<span>${sw('', 'var(--text)',2)}Vstup</span>`,`<span>${sw('', 'var(--red)',2)}SL</span>`,`<span>${sw('', 'var(--green)',2)}Cíl</span>`];
+ for(const k of FJTradeMap.SOURCES)if(used.has(k))parts.push(`<span title="${esc(LEVEL_SOURCE_TEXT[k].title)}">${sw(LEVEL_LINE_DASH[k],'var(--text2)')}${esc(LEVEL_SOURCE_TEXT[k].label)}</span>`);
+ if(m.hasCandles)parts.push('<span>čárka ve svíčce = VPOC svíčky · orámovaná = signální</span>');
+ return parts.join('');
+}
+function renderTradeMap(){
+ const box=$('tradeMapBox');if(!box)return;
+ if(!levelsMapOn()){box.style.display='none';return}
+ const t=formMapTrade();
+ const tick=getTickSizeForInstrument(t.instrument);
+ const dist=levelDistOpts(tick).dist;
+ const labelOf=k=>FJTaxonomy.labelOf('NEAR_LEVEL',k);
+ const m=FJTradeMap.tradeMapModel(t,{tickSize:tick,full:tradeMapFull,bars:levelsView.bars,labelOf,dist,heightPx:240,maxHeightPx:560});
+ const hasAny=m.lines.length>0;
+ box.style.display=hasAny?'':'none';
+ if(!hasAny)return;
+ $('tradeMap').innerHTML=tradeMapSVG(m);
+ $('tradeMapLegend').innerHTML=tradeMapLegendHTML(m);
+ const hidden=m.hiddenAbove+m.hiddenBelow;
+ $('tradeMapHidden').textContent=hidden&&!tradeMapFull?`Mimo rozsah SL – cíl: ${hidden} ${hidden===1?'hladina':hidden<5?'hladiny':'hladin'}`:'';
+ const full=$('tradeMapFull');
+ if(full){full.style.display=hidden||tradeMapFull?'':'none';full.textContent=tradeMapFull?'Rozsah SL – cíl':'Celý rozsah';}
+ $('tradeMapSentence').textContent=FJTradeMap.summarySentence(t,{tickSize:tick,labelOf,dist});
+ wireTradeMap();
+}
+window.toggleTradeMapFull=()=>{tradeMapFull=!tradeMapFull;renderTradeMap()};
+// Seznam hladin pod grafem: sbalený / rozbalený (jen zobrazení).
+function setLevelListOpen(open){
+ const list=$('nearLevelsList');if(!list)return;
+ list.classList.toggle('open',!!open);
+ list.querySelector('.sr-list-head')?.setAttribute('aria-expanded',open?'true':'false');
+}
+window.toggleLevelList=()=>{const list=$('nearLevelsList');if(list)setLevelListOpen(!list.classList.contains('open'))};
+// Najetí na čáru zvýrazní řádek v seznamu a naopak; klik na čáru otevře
+// seznam a úpravu řádku; klik na svíčku −1 … −5 vybere signální svíčku.
+function levelRowEls(key){
+ return [...($(NEAR_LEVELS_ID)?.querySelectorAll('.sr-row')||[])].filter(el=>levelKey(rowFromElement(el))===key);
+}
+function highlightLevel(key,on){
+ document.querySelectorAll('#tradeMap g.tl[data-key]').forEach(g=>g.classList.toggle('hl',on&&g.dataset.key===key));
+ levelRowEls(key).forEach(el=>el.classList.toggle('sr-hl',on));
+}
+function wireTradeMap(){
+ const svg=$('tradeMap');if(!svg)return;
+ svg.querySelectorAll('g.tl[data-key]').forEach(g=>{
+  g.addEventListener('mouseenter',()=>highlightLevel(g.dataset.key,true));
+  g.addEventListener('mouseleave',()=>highlightLevel(g.dataset.key,false));
+  g.addEventListener('click',()=>{
+   const el=levelRowEls(g.dataset.key)[0];if(!el)return;
+   setLevelListOpen(true);
+   el.style.display='';
+   el.scrollIntoView?.({block:'nearest'});
+   el.querySelector('.sr-price')?.focus();
+  });
+ });
+ svg.querySelectorAll('g.tc.sel').forEach(g=>g.addEventListener('click',()=>{formSignalBarOffset=Number(g.dataset.off);renderSignalBar();renderTradeMap()}));
+}
+// Seznam pod grafem: řádky podle ceny shora dolů s oddělovači Vstup / SL /
+// Cíl n (FJTradeMap.ladder). Jen pořadí v DOM – uložené pořadí řádků
+// i data se nemění. Řadí se při načtení a po dokončení změny (change), ne
+// při psaní.
+function sortLevelList(){
+ const host=$(NEAR_LEVELS_ID);if(!host||typeof document.createElement!=='function')return;
+ host.querySelectorAll('.sr-sep').forEach(s=>s.remove());
+ host.classList.toggle('map-on',levelsMapOn());
+ if(!levelsMapOn()){applyLevelFilter();return}
+ const els=[...host.querySelectorAll('.sr-row')];
+ const active=document.activeElement;
+ const items=FJTradeMap.ladder(formMapTrade(),{rows:els.map(rowFromElement)});
+ const nodes=[];
+ const sepText=it=>(it.kind==='entry'?'Vstup':it.kind==='sl'?'SL':'Cíl '+it.n)+' · '+it.price;
+ for(const it of items){
+  if(it.kind==='level'){if(els[it.rowIndex])nodes.push(els[it.rowIndex]);continue}
+  if(!els.length)continue;
+  const s=document.createElement('div');s.className='sr-sep sr-sep-'+it.kind;s.textContent=sepText(it);nodes.push(s);
+ }
+ for(const el of els)if(!nodes.includes(el))nodes.push(el);
+ nodes.forEach(n=>host.appendChild(n));
+ if(active&&host.contains(active)&&typeof active.focus==='function')active.focus();
+ applyLevelFilter();
+}
+function setRowSource(el){
+ const src=el.querySelector('.sr-src');if(!src)return;
+ const k=FJTradeMap.sourceOf({source:el.dataset.source});
+ src.textContent=LEVEL_SOURCE_TEXT[k].icon;src.title=LEVEL_SOURCE_TEXT[k].title;
+}
+// Filtr zdroje (LTA / snímek / ruční) – jen zobrazení, pamatuje se. Řádek
+// přidaný ručně v tomhle otevření formuláře je vidět vždy.
+function applyLevelFilter(){
+ const host=$(NEAR_LEVELS_ID);if(!host)return;
+ const on=levelsMapOn();
+ const rows=[...host.querySelectorAll('.sr-row')];
+ const counts={lta:0,snapshot:0,manual:0};
+ rows.forEach(el=>{
+  const k=FJTradeMap.sourceOf({source:el.dataset.source});counts[k]++;
+  el.style.display=!on||el.dataset.fresh==='1'||levelsFilter[k]?'':'none';
+ });
+ const shown=rows.filter(el=>el.style.display!=='none').length;
+ if($('nearLevelsCount'))$('nearLevelsCount').textContent=rows.length?`(${shown<rows.length?shown+' z ':''}${rows.length})`:'';
+ const f=$('nearLevelsFilter');if(!f)return;
+ const used=FJTradeMap.SOURCES.filter(k=>counts[k]);
+ f.style.display=on&&used.length>1?'':'none';
+ f.innerHTML=used.map(k=>`<button type="button" class="chip${levelsFilter[k]?' on':''}" data-src="${k}" title="${esc(LEVEL_SOURCE_TEXT[k].title)} – jen zobrazení, řádky zůstávají">${LEVEL_SOURCE_TEXT[k].icon} ${esc(LEVEL_SOURCE_TEXT[k].label)} (${counts[k]})</button>`).join('');
+ f.querySelectorAll('button[data-src]').forEach(b=>b.onclick=()=>{
+  levelsFilter={...levelsFilter,[b.dataset.src]:!levelsFilter[b.dataset.src]};
+  try{localStorage.setItem(LEVELS_FILTER_KEY,JSON.stringify(levelsFilter))}catch{}
+  applyLevelFilter();
+ });
+}
+// Zapnutí / vypnutí mapy: graf, sbalený seznam, náhled svíček v kartě Setup.
+// `initial` = otevření formuláře (seznam se sbalí jen se zapnutou mapou).
+function applyLevelsView(initial=false){
+ const list=$('nearLevelsList');
+ const on=levelsMapOn();
+ if(list){
+  list.classList.toggle('sr-list-plain',!on);
+  if(!on)setLevelListOpen(true);
+  else if(initial)setLevelListOpen(false);
+ }
+ sortLevelList();
+ renderSignalBar();
+ renderTradeMap();
+ renderContextDerived();
 }
 // Poznámka u Hladin v blízkosti, proč se levely z LTA nedoplnily samy.
 let formLtaMeta;
@@ -4038,7 +4325,7 @@ let ltaFillToken=0;
 window.fillNearLevelsFromLta=async({auto=false,force=false}={})=>{
  const s=await ltaSettings(!auto);
  const market=await marketSettings();
- if(!s?.enabled){if(!auto)showToast('Import LTA levelů je vypnutý (Nastavení → Přizpůsobení → LTA levely).');return 0}
+ if(!s?.enabled){if(!auto)showToast('Import LTA levelů je vypnutý (Nastavení → Přizpůsobení → Hladiny).');return 0}
  if(auto&&(!s.autoInForm||readLevelRows().length||$(NEAR_LEVELS_ID+'None')?.checked))return 0;
  const instrument=$('instrument')?.value||'';
  const entryPrice=Number($('entryPrice')?.value);
@@ -4109,6 +4396,7 @@ function renderLevelRows(rows){
  const host=$(NEAR_LEVELS_ID); if(!host)return;
  host.innerHTML='';
  for(const r of FJTaxonomy.sanitizeNearLevels('NEAR_LEVEL',rows))appendLevelRow(r);
+ if(typeof sortLevelList==='function')sortLevelList();
 }
 function readLevelRows(){
  const host=$(NEAR_LEVELS_ID); if(!host)return [];
@@ -4134,7 +4422,8 @@ function updateLevelsSummary(){
   // Hladiny v blízkosti jsou řádky s cenou, ostatní dlaždice.
   if(id===NEAR_LEVELS_ID){
    const rows=readLevelRows();
-   if(rows.length)parts.push(label+': '+rows.map(r=>formatLevelRow(r)).join(', '));
+   // Se zapnutou Mapou obchodu jen počet – hladiny ukazuje graf a seznam v kartě.
+   if(rows.length)parts.push(label+': '+(typeof levelsMapOn==='function'&&levelsMapOn()?rows.length:rows.map(r=>formatLevelRow(r)).join(', ')));
    else if(readNearNone())parts.push(label+': žádná');
    continue;
   }
@@ -4466,13 +4755,14 @@ function levelPillsHTML(t,opts={}){
  const levels=FJTaxonomy.sanitizeMulti('ENTRY_LEVEL',t.entryLevels);
  const testNo=t.entryTestNo&&contextFieldShown('entryTestNo')?' · '+FJTaxonomy.labelOf('ENTRY_TEST_NO',t.entryTestNo):'';
  if(levels.length)parts.push(`<span class="pill context-pill" title="Hladina vstupu">${esc(levels.map(k=>FJTaxonomy.labelOf('ENTRY_LEVEL',k)).join(' + ')+testNo)}</span>`);
- // Hladiny v blízkosti: typ @ cena (test) · vzdálenosti v ticích. Vzdálenosti
- // jsou dopočet z cen (FJContext.levelGeometry) – nic z nich se neukládá
- // a žádná hladina tu nedostává roli. Obchod ve starém tvaru se čte převodem.
+ // Hladiny v blízkosti se vypisují jen v detailu obchodu (karta Hladiny,
+ // Mapa obchodu – 4.8.103). Tady nanejvýš jeden souhrnný řádek, ve výchozím
+ // stavu vypnutý (Nastavení → Přizpůsobení → Hladiny → Zobrazení).
  const tick=getTickSizeForInstrument(t.instrument);
- const near=FJTaxonomy.nearLevelsOf(t);
- if(near.length)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti (cena · od vstupu · od SL · do cíle)">Hladiny: ${esc(near.map(r=>formatLevelRow(r,FJContext.levelGeometry(r,t,tick),tick)).join(', '))}</span>`);
- else if(FJTaxonomy.nearLevelsNoneOf(t))parts.push('<span class="pill context-pill" title="Hladiny v blízkosti: žádná">Hladiny: žádná</span>');
+ if(typeof levelsSummaryOn==='function'&&levelsSummaryOn()){
+  const sum=FJTradeMap.summaryCounts(t,{tickSize:tick});
+  if(sum.text)parts.push(`<span class="pill context-pill" title="Hladiny v blízkosti: kolik jich leží mezi SL a vstupem a mezi vstupem a posledním cílem (výpis v detailu obchodu)">${esc(sum.text)}</span>`);
+ }
  for(const n of FJTaxonomy.targetLevelNumbers(t)){
   const target=FJTaxonomy.sanitizeTargetLevel(t['targetLevel'+n]);
   if(!target)continue;
@@ -4486,7 +4776,7 @@ function levelPillsHTML(t,opts={}){
  // počet říká, jestli má obchod co rozbalovat.
  const count=parts.length;
  const derived=count&&!opts.countOnly&&contextFieldShown('derivedRow')
-  ?FJContext.derivedSummaryParts(typeof tradeDerived==='function'?tradeDerived(t):FJContext.derivedFields(t,{tickSize:tick}),{...levelDistOpts(tick),levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',near[i]?.level)})
+  ?FJContext.derivedSummaryParts(typeof tradeDerived==='function'?tradeDerived(t):FJContext.derivedFields(t,{tickSize:tick}),{...levelDistOpts(tick),omitLevels:true})
   :[];
  if(derived.length)parts.push(`<span class="pill context-pill derived-pill" title="Dopočítáno z cen – needituje se">${esc(derived.join(' · '))}</span>`);
  return {html:parts.join(' '),count};
@@ -5397,7 +5687,9 @@ function openModal(t=null,{title}={}){
  // Signální svíčka (Data trhu, J3): výběr se uloží, jen když ho uživatel změní.
  formSnapshot=t?.marketSnapshot||null;
  formSignalBarOffset=t?.signalBarOffset;
- renderSignalBar();
+ // Mapa obchodu: výchozí rozsah, seznam sbalený (jen se zapnutou mapou).
+ if(typeof applyLevelsView==='function'){tradeMapFull=false;applyLevelsView(true)}
+ else renderSignalBar();
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
  updateConfluenceHint();
  // Karty formuláře se otevřou tak, jak je uživatel naposledy nechal.
@@ -5919,6 +6211,7 @@ function renderLevelDistances(){
   else note.textContent='';
  }
  renderContextDerived();
+ if(typeof renderTradeMap==='function')renderTradeMap();
 }
 // Pořadí v dni pro obchod otevřený ve formuláři – s datem a časem vstupu
 // z formuláře, jen u uloženého obchodu (nový ještě v deníku není). Počítá se
@@ -5951,7 +6244,8 @@ function renderContextDerived(){
  const order=formDayOrderFor(id,t.date,t.entryTime);
  const formTick=getTickSizeForInstrument(d.instrument);
  const derived=FJContext.derivedFields(t,{tickSize:formTick,dayOrder:order});
- const parts=FJContext.derivedSummaryParts(derived,{...levelDistOpts(formTick),levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',rows[i]?.level)});
+ // Se zapnutou Mapou obchodu hladiny popisuje její řádek slovy – tady zůstane zbytek.
+ const parts=FJContext.derivedSummaryParts(derived,{...levelDistOpts(formTick),levelName:i=>FJTaxonomy.labelOf('NEAR_LEVEL',rows[i]?.level),omitLevels:typeof levelsMapOn==='function'&&levelsMapOn()});
  box.textContent=parts.length?'Dopočet: '+parts.join(' · '):'';
 }
 // ---- Karty formuláře obchodu (SL / TP, Pohyb ceny, Setup, Hladiny, Komentáře) ----
@@ -6244,6 +6538,10 @@ const scheduleTradeSections=()=>{
  tradeSectionsFrame=requestAnimationFrame(()=>{tradeSectionsFrame=0;renderLevelDistances();renderTradeSections()});
 };
 ['input','change','click'].forEach(ev=>$('tradeForm')?.addEventListener(ev,scheduleTradeSections));
+// Oddělovače Vstup / SL / Cíl v seznamu hladin se posunou po dokončení změny ceny.
+$('tradeForm')?.addEventListener('change',e=>{
+ if(levelsMapOn()&&/^(entryPrice|slPrice|side|targetLevel\d+Price)$/.test(e.target?.id||''))sortLevelList();
+});
 document.querySelectorAll('#tradeForm details.trade-section').forEach(card=>card.addEventListener('toggle',()=>{
  const open=[...document.querySelectorAll('#tradeForm details.trade-section')].filter(c=>c.open).map(c=>c.dataset.card);
  try{localStorage.setItem(TRADE_SECTIONS_KEY,JSON.stringify(open))}catch{}
@@ -6850,7 +7148,12 @@ document.querySelectorAll('.subtab-bar').forEach(bar=>{
 // Karty v Nastavení jsou pod sebou a sbalitelné. Které jsou rozbalené, se
 // pamatuje (jen pohodlí v tomhle zařízení); výchozí je vše sbalené.
 const SETTINGS_OPEN_KEY='FJ_settingsOpenCards';
-function readOpenSettingsCards(){try{const v=JSON.parse(localStorage.getItem(SETTINGS_OPEN_KEY)||'[]');return Array.isArray(v)?v:[]}catch{return []}}
+// Karta „LTA levely“ je od 4.8.103 karta „Hladiny“ (data-card levels) – rozbalený stav se převezme.
+function migrateOpenSettingsCards(list){
+ const v=Array.isArray(list)?list:[];
+ return [...new Set(v.map(k=>k==='ltaLevels'?'levels':k))];
+}
+function readOpenSettingsCards(){try{const v=JSON.parse(localStorage.getItem(SETTINGS_OPEN_KEY)||'[]');return migrateOpenSettingsCards(v)}catch{return []}}
 (function initSettingsCards(){
  const open=new Set(readOpenSettingsCards());
  document.querySelectorAll('#settings details.settings-card').forEach(card=>{
@@ -6949,6 +7252,47 @@ async function renderLtaSettings(){
   miss.textContent=show?`Dny bez archivu (deník ten den neběžel, levely k obchodům z těch dnů nejsou): ${list.map(d=>d.split('-').reverse().map(Number).join('. ')).join(', ')}${a.missingCount>list.length?` a dalších ${a.missingCount-list.length}`:''}.`:'';
  }
 }
+// Nastavení → Přizpůsobení → Hladiny (4.8.103): jedna karta pro zobrazení
+// hladin (Mapa obchodu) a oba zdroje – LTA soubory (renderLtaSettings, beze
+// změny) a snímek trhu. Úložiště se nemění: LTA v lta-levels/settings.json,
+// snímek v market-data/settings.json – staré volby tu jsou tak, jak byly.
+const LEVELS_CARD_FEATURES=['snapshotLevels'];
+function renderLevelsViewSettings(){
+ if(!$('levelsViewMap'))return;
+ $('levelsViewMap').checked=levelsView.map;
+ $('levelsViewBars').value=String(levelsView.bars);
+ $('levelsViewSummary').checked=levelsView.summaryLine;
+}
+async function renderLevelsSnapshotSection(settings){
+ const box=$('levelsSnapshotSection');if(!box)return;
+ const s=settings||await marketSettings();
+ const on=$('levelsSnapshotOn');
+ const why=s.enabled?FJMarket.blockedReason(s,'snapshotLevels'):'Zapni Data trhu a snímek trhu při vstupu (karta Data trhu).';
+ on.checked=s.features?.snapshotLevels===true;
+ on.disabled=!!why;
+ $('levelsSnapshotOnLabel').style.opacity=why?'.55':'';
+ $('levelsSnapshotWhy').innerHTML=why?'— <b>'+esc(why)+'</b>':'— N nejbližších nad a pod vstupem z hodnot, které při vstupu spočítal konektor NT8';
+ if(document.activeElement!==$('marketLevelsN'))$('marketLevelsN').value=s.levelsN;
+ const ns=s.enabled&&window.desktopAPI?.captureNinjaConnectorStatus?await window.desktopAPI.captureNinjaConnectorStatus().catch(()=>null):null;
+ $('marketLevelTypes').innerHTML=FJSnapshot.LEVEL_TYPES.map(t=>{
+  const need=!t.connector?'':ns?.installed&&ns.installedVersion<t.connector
+   ?` <b>— vyžaduje konektor NT8 verze ${t.connector} (nainstalovaná ${esc(ns.installedVersion)}); přeinstaluj ho v Integrace → NinjaTrader</b>`
+   :` <span class="sub">— konektor NT8 verze ${t.connector}</span>`;
+  return `<label class="settings-check sub" style="margin-top:2px"><input type="checkbox" class="market-level-type" data-key="${esc(t.key)}"${s.levelTypes?.[t.key]===false?'':' checked'}> ${esc(t.label)} <span class="sub">→ ${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',t.level)||t.level)}</span>${need}</label>`;
+ }).join('');
+ document.querySelectorAll('#marketLevelTypes .market-level-type').forEach(b=>b.onchange=()=>saveMarketSettings({levelTypes:{[b.dataset.key]:b.checked}}));
+}
+(()=>{
+ renderLevelsViewSettings();
+ $('levelsViewMap')?.addEventListener('change',()=>setLevelsView({map:$('levelsViewMap').checked}));
+ $('levelsViewBars')?.addEventListener('change',()=>setLevelsView({bars:Number($('levelsViewBars').value)}));
+ $('levelsViewSummary')?.addEventListener('change',()=>setLevelsView({summaryLine:$('levelsViewSummary').checked}));
+ $('levelsSnapshotOn')?.addEventListener('change',()=>saveMarketSettings({features:{snapshotLevels:$('levelsSnapshotOn').checked}}));
+ const card=$('ltaSettingsCard');
+ card?.addEventListener('toggle',()=>{if(card.open){renderLevelsViewSettings();renderLevelsSnapshotSection().catch(()=>{})}});
+ // Bez main procesu (náhled v prohlížeči) se oddíl snímku nedá nastavit.
+ if(!window.desktopAPI?.marketSettings&&$('levelsSnapshotSection'))$('levelsSnapshotSection').style.display='none';
+})();
 // Nastavení → Data trhu: hlavní vypínač a přepínač pro každou hotovou funkci
 // (FJMarket.FEATURES, ready). Přepínač bez předpokladu je zešedlý s důvodem.
 async function renderMarketSettings(){
@@ -6956,7 +7300,8 @@ async function renderMarketSettings(){
  if(!window.desktopAPI?.marketSettings){card.style.display='none';return}
  const s=await marketSettings(true);
  $('marketEnabled').checked=s.enabled;
- $('marketFeatures').innerHTML=FJMarket.FEATURES.filter(f=>f.ready).map(f=>{
+ // Doplňování řádků ze snímku se zapíná v kartě Hladiny (LEVELS_CARD_FEATURES).
+ $('marketFeatures').innerHTML=FJMarket.FEATURES.filter(f=>f.ready&&!LEVELS_CARD_FEATURES.includes(f.key)).map(f=>{
   const why=FJMarket.blockedReason(s,f.key);
   return `<label class="settings-check" style="margin-top:8px${why?';opacity:.55':''}"${why?` title="${esc(why)}"`:''}><input type="checkbox" class="market-feature" data-key="${esc(f.key)}"${s.features[f.key]?' checked':''}${why?' disabled':''}> ${esc(f.label)} <span class="sub">— ${esc(f.desc)}${why&&s.enabled?` <b>${esc(why)}</b>`:''}</span></label>`;
  }).join('');
@@ -6979,10 +7324,6 @@ async function renderMarketSnapshotPanel(s){
  if(document.activeElement!==$('marketVaPct'))$('marketVaPct').value=s.valueAreaPct;
  if(document.activeElement!==$('marketLevelsN'))$('marketLevelsN').value=s.levelsN;
  if(document.activeElement!==$('marketLiveRoots'))$('marketLiveRoots').value=(s.liveTickRoots||[]).join(', ');
- const levels=FJMarket.isOn(s,'snapshotLevels');
- $('marketLevelsNField').style.display=levels?'':'none';
- $('marketLevelTypes').innerHTML=levels?FJSnapshot.LEVEL_TYPES.map(t=>`<label class="settings-check sub" style="margin-top:2px"><input type="checkbox" class="market-level-type" data-key="${esc(t.key)}"${s.levelTypes?.[t.key]===false?'':' checked'}> ${esc(t.label)} <span class="sub">→ ${esc(FJTaxonomy.labelOf('ENTRY_LEVEL',t.level)||t.level)}</span></label>`).join(''):'';
- document.querySelectorAll('#marketLevelTypes .market-level-type').forEach(box=>box.onchange=()=>saveMarketSettings({levelTypes:{[box.dataset.key]:box.checked}}));
  const notes=[];
  const ns=await window.desktopAPI?.captureNinjaConnectorStatus?.().catch(()=>null);
  const need=8;
@@ -7057,7 +7398,7 @@ async function saveMarketSettings(patch){
  // Manifest ai-export nese archiv jen se zapnutým exportem.
  window.desktopAPI?.writeAiExportManifest?.(journalProfiles);
  await renderMarketSettings();
- if($('ltaSettingsCard')?.open)await renderLtaSettings();
+ if($('ltaSettingsCard')?.open){await renderLtaSettings();await renderLevelsSnapshotSection(marketSettingsCache)}
 }
 (()=>{
  marketSettings(true).catch(()=>{});

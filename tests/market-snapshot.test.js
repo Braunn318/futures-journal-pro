@@ -389,8 +389,11 @@ test('main: požadavek na snímek jen se zapnutým snímkem; v5 a v6 dostanou je
 
 test('konektor v7: živé ticky jako graf, svíčky z minutové historie, pokrytí ticky, tick rule, jen do vstupu, jen čte', () => {
   const src = readRepoFile('CONNECTORS/NinjaTrader8/FuturesJournalCapture.cs');
-  assert.match(src, /FJ_CONNECTOR_VERSION:\s*8\b/);
-  assert.match(src, /CONNECTOR_VERSION = "8"/);
+  // v9 (Mapa obchodu): navíc VPOC běžící 30min svíčky (bar30mCurrent).
+  assert.match(src, /FJ_CONNECTOR_VERSION:\s*9\b/);
+  assert.match(src, /CONNECTOR_VERSION = "9"/);
+  assert.match(src, /bar30mCurrent\\":\{\\"start\\":/, 'v9 posílá rozvíjející se 30min svíčku');
+  assert.match(src, /cur\.End > entry && curStart <= entry && cur\.Profile\.Count > 0 && covered\(curStart, entry\)/, 'jen když ticky pokrývají úsek do vstupu');
   // v8: živé ticky od spuštění NT8 bez deníku
   assert.match(src, /LoadWatchFile\(\);\s*PollWatchList\(\);/, 'seznam ze souboru před prvním dotazem');
   assert.match(src, /watch\.txt/);
