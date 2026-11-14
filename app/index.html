@@ -1233,7 +1233,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
           <div id="marketBarsPanel" class="field full" style="margin:10px 0 0 22px;display:none"><label>Minutové svíčky dne</label>
             <div class="sub" id="marketBarsInfo"></div>
             <div class="sub" id="marketConnectorInfo" style="margin-top:4px"></div>
-            <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="marketBackfill">Doplnit svíčky pro dny s obchody a s archivem levelů</button><button type="button" class="btn" id="marketCancel" style="display:none">Přerušit</button><button type="button" class="btn" id="marketOpenFolder">Otevřít složku</button></div>
+            <div class="mapping-row" style="margin-top:6px"><button type="button" class="btn" id="marketBackfill" title="Svíčky dne pro dny s obchody a s archivem LTA levelů; snímek trhu pro obchody, které ho nemají (čas vstupu z obchodu), a VPOC 30M aktuální ke starším snímkům (konektor NT8 verze 9). Ruční řádky Hladin se nemění.">Doplnit svíčky a snímky pro dny s obchody</button><button type="button" class="btn" id="marketCancel" style="display:none">Přerušit</button><button type="button" class="btn" id="marketOpenFolder">Otevřít složku</button></div>
             <div class="sub" id="marketProgress" style="margin-top:4px"></div>
             <div class="sub" style="margin-top:4px">Svíčky se nikdy nemažou samy – smazat je jde jen ručně ve složce. Obchod se importuje vždy, i když svíčky nepřijdou (den pak zůstane bez svíček).</div>
           </div>
@@ -4013,7 +4013,8 @@ async function applyMarketDataToTrade(trade,config){
  if(!m.enabled||!trade||trade.kind==='SWING'||!trade.date||!trade.instrument)return none;
  const levels=FJMarket.isOn(m,'snapshotLevels');
  const autoTest=FJMarket.isOn(m,'autoTest');
- if(!trade.marketSnapshot&&!autoTest)return none;
+ // Obchod bez snímku: snímek mohl přijít zpětně (Doplnit svíčky a snímky…, bf-<id>).
+ if(!trade.marketSnapshot&&!autoTest&&!FJMarket.isOn(m,'snapshot'))return none;
  let files=null;
  try{files=await window.desktopAPI?.marketDataFor?.({root:normalizeInstrumentCode(trade.instrument),day:trade.date})}catch{files=null}
  const cfg=config||taxonomyConfig();
@@ -4022,7 +4023,8 @@ async function applyMarketDataToTrade(trade,config){
  const input=rows.length||Array.isArray(trade.nearLevels)?{...trade,nearLevels:rows}:{...trade};
  // Snímek téhož vstupu, který přišel později (opakovaný požadavek) – nahradí
  // uložený jen když je úplnější.
- const later=files?.ok&&trade.marketSnapshot?.executionId?files.snapshots?.[trade.marketSnapshot.executionId]:null;
+ const later=!files?.ok?null:trade.marketSnapshot?.executionId?files.snapshots?.[trade.marketSnapshot.executionId]||null
+  :FJMarket.isOn(m,'snapshot')?files.snapshots?.[FJSnapshot.backfillExecutionId(trade)]||null:null;
  const r=FJSnapshot.applyMarketData(input,{
   snapshot:later||null,
   levels,autoTest,types:m.levelTypes,n:m.levelsN,pct:m.valueAreaPct,
@@ -7353,7 +7355,8 @@ function renderMarketProgress(snap){
 }
 async function renderMarketBarsPanel(s){
  const panel=$('marketBarsPanel');if(!panel)return;
- const on=FJMarket.isOn(s,'marketBars');
+ // Panel s tlačítkem zpětného doplnění: svíčky dne nebo snímky obchodů.
+ const on=FJMarket.isOn(s,'marketBars')||FJMarket.isOn(s,'snapshot');
  panel.style.display=on?'':'none';
  if(!on||!window.desktopAPI?.marketStatus)return;
  const st=await window.desktopAPI.marketStatus().catch(()=>null);
@@ -7378,7 +7381,10 @@ async function renderMarketBarsPanel(s){
   const ids=(journalProfiles||[]).filter(j=>j?.journalType!=='CFD_SWING').map(j=>j.id);
   const r=await window.desktopAPI.marketBackfill(ids);
   if(!r?.ok){showToast('Doplnění svíček nejde spustit: '+(r?.error||''));return}
-  showToast(r.count?`Svíčky se doplní pro ${r.count} ${r.count===1?'den':r.count<5?'dny':'dní'} – konektor NT8 je stáhne postupně.`:'Všechny dny s obchody a s archivem levelů už svíčky mají.');
+  // Počet = dny se svíčkami + snímky (obchody bez snímku, snímky bez 30min svíčky).
+  const days=(r.count||0)-(r.snapshots||0),snaps=r.snapshots||0;
+  const parts=[days?`svíčky pro ${days} ${days===1?'den':days<5?'dny':'dní'}`:'',snaps?`${snaps} ${snaps===1?'snímek':snaps<5?'snímky':'snímků'} obchodů`:''].filter(Boolean);
+  showToast(parts.length?`Doplní se ${parts.join(' a ')} – konektor NT8 je stáhne postupně (ticky jsou v NT8 zhruba 120 obchodních dní zpět; starší den zůstane beze změny).`:'Všechny dny s obchody už svíčky mají a obchody snímek.');
   await renderMarketSettings();
  });
  $('marketCancel')?.addEventListener('click',async()=>{await window.desktopAPI.marketCancel();await renderMarketSettings()});

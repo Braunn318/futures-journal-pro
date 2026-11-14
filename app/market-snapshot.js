@@ -153,6 +153,9 @@
     if (!old) return true;
     if (old.executionId && neu.executionId && String(old.executionId) !== String(neu.executionId)) return false;
     const a = snapshotCoverage(old), b = snapshotCoverage(neu);
+    // Úplný snímek ze staršího konektoru (bez rozvíjející se 30min svíčky,
+    // v8) nahradí úplný snímek téhož vstupu z v9, který ji nese.
+    if (a.complete && b.complete && !old.bar30mCurrent && neu.bar30mCurrent) return true;
     if (a.complete) return false;
     if (b.complete) return true;
     const ua = Date.parse(a.ticksUntil), ub = Date.parse(b.ticksUntil);
@@ -323,6 +326,10 @@
     if (trade.marketSnapshot && opts.snapshot && shouldReplaceSnapshot(trade.marketSnapshot, opts.snapshot)) {
       next.marketSnapshot = { ...opts.snapshot, prevDay: opts.snapshot.prevDay || trade.marketSnapshot.prevDay || null };
       changed.push('snapshot');
+    } else if (!trade.marketSnapshot && opts.snapshot && opts.snapshot.executionId === backfillExecutionId(trade)) {
+      // Zpětně vyžádaný snímek (obchod bez snímku): připojí se jen ke svému obchodu.
+      next.marketSnapshot = { ...opts.snapshot, prevDay: opts.snapshot.prevDay || null };
+      changed.push('snapshot');
     }
     const snap = next.marketSnapshot;
     if (snap && !snap.prevDay && opts.prevFile && opts.prevComplete) {
@@ -337,18 +344,25 @@
       // Hladin nedávají – doplní se, až přijde úplný snímek.
       const dayReady = snapshotCoverage(next.marketSnapshot).complete;
       const groups = [...(dayReady ? ['DAY'] : []), ...(next.marketSnapshot.prevDay ? ['PREV'] : [])].filter(g => !applied.has(g));
-      if (groups.length) {
+      const cands = snapshotLevelCandidates(next.marketSnapshot, opts.types || {});
+      // Typy, které přibyly s novějším konektorem (LEVEL_TYPES `connector`),
+      // se do obchodu s už doplněnou skupinou DAY doplní zvlášť a jen jednou
+      // (značka 'DAY:<typ>'). Bez dat (starší snímek, vypnutý typ) se značka
+      // nedává – doplní se, až data přijdou.
+      const lateWithData = LEVEL_TYPES.filter(t => t.connector && t.group === 'DAY' && cands.some(c => c.type === t.key)).map(t => t.key);
+      const late = dayReady && applied.has('DAY') ? lateWithData.filter(k => !applied.has('DAY:' + k)) : [];
+      if (groups.length || late.length) {
         // N nejbližších se vybírá ze VŠECH typů (i z dřív doplněné skupiny),
         // doplní se jen ty z nových skupin – včerejšek, který dorazí později,
         // tak nepřidá řádky nad limit N.
-        const cands = snapshotLevelCandidates(next.marketSnapshot, opts.types || {});
         const groupOf = new Map(LEVEL_TYPES.map(t => [t.key, t.group]));
-        const fresh = new Set(cands.filter(c => groups.includes(groupOf.get(c.type))).map(c => c.level + '|' + c.price));
+        const fresh = new Set(cands.filter(c => groups.includes(groupOf.get(c.type)) || late.includes(c.type)).map(c => c.level + '|' + c.price));
         const seen = new Set(rows.map(r => r?.level + '|' + Number(r?.price)));
         const add = snapshotRows([], cands, next.entryPrice, opts.n ?? 3, opts.isHidden || (() => false))
           .filter(r => fresh.has(r.level + '|' + r.price) && !seen.has(r.level + '|' + r.price));
         if (add.length) { rows = rows.concat(add); changed.push('levels'); }
-        next.marketLevelsApplied = [...applied, ...groups];
+        const marks = (groups.includes('DAY') ? lateWithData : late).map(k => 'DAY:' + k);
+        next.marketLevelsApplied = [...applied, ...groups, ...marks];
         if (!changed.includes('levels')) changed.push('levelsApplied');
       }
     }
@@ -360,8 +374,51 @@
     return { trade: changed.length ? next : trade, changed };
   }
 
+  // ------------------------------------------------- zpětné snímky (4.8.103)
+  // Identifikátor požadavku na snímek pro obchod, který snímek nemá (vstup
+  // před sběrem, ruční obchod): odpověď se uloží pod ním a připojí se jen
+  // k tomuto obchodu (applyMarketData).
+  function backfillExecutionId(trade) {
+    return trade?.id ? 'bf-' + String(trade.id) : null;
+  }
+
+  // Které obchody potřebují snímek zpětně. Vrací požadavky pro frontu
+  // ({ type:'snapshot', executionId, root, instrumentFull, day, time }), od
+  // nejnovějšího dne:
+  //  - obchod bez snímku s datem, časem vstupu, instrumentem a cenou vstupu
+  //    (čas z obchodu přes opts.toIso – přesnost na minutu, není-li víc),
+  //  - úplný snímek bez rozvíjející se 30min svíčky, když ji chceme
+  //    (opts.current30: typ zapnutý a konektor >= 9).
+  // Neúplné snímky řeší opakovaný požadavek (marketRefreshSnapshot) – tady ne.
+  // Swing, setup bez vstupu a obchody bez času se nežádají.
+  function planSnapshotBackfill(trades, opts = {}) {
+    const toIso = typeof opts.toIso === 'function' ? opts.toIso : (date, time) => {
+      const d = new Date(`${date}T${time}`);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    };
+    const out = [];
+    const seen = new Set();
+    for (const t of Array.isArray(trades) ? trades : []) {
+      if (!t || t.kind === 'SWING' || t.recordType === 'SETUP_ONLY' || !t.instrument || !t.date) continue;
+      const snap = t.marketSnapshot;
+      let req = null;
+      if (!snap) {
+        if (!t.entryTime || price(t.entryPrice) == null || !t.id) continue;
+        const time = toIso(t.date, t.entryTime);
+        if (!time) continue;
+        req = { executionId: backfillExecutionId(t), root: t.instrument, instrumentFull: '', day: t.date, time, reason: 'backfill' };
+      } else if (opts.current30 && !snap.bar30mCurrent && snap.executionId && snap.time && snapshotCoverage(snap)?.complete) {
+        req = { executionId: String(snap.executionId), root: t.instrument, instrumentFull: snap.instrumentFull || '', day: t.date, time: snap.time, reason: 'backfill30' };
+      }
+      if (!req || seen.has(req.executionId)) continue;
+      seen.add(req.executionId);
+      out.push({ type: 'snapshot', ...req });
+    }
+    return out.sort((a, b) => b.day.localeCompare(a.day) || String(b.time).localeCompare(String(a.time)));
+  }
+
   return {
-    VERSION, BARS_1M, DEFAULT_VA_PCT, LEVEL_TYPES,
+    VERSION, BARS_1M, DEFAULT_VA_PCT, LEVEL_TYPES, backfillExecutionId, planSnapshotBackfill,
     valueArea, normalizeSnapshotPayload, snapshotCoverage, shouldReplaceSnapshot, barEndAt, signalBarEnd, signalBar, vpocTagMismatch,
     snapshotLevelCandidates, snapshotRows, autoTestStates, prevDayFromFile, entryIsoOf, applyMarketData
   };

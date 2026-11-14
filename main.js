@@ -3843,6 +3843,20 @@ ipcMain.handle('market:status', async () => {
     return { ok: true, files: marketBarsStore().status(), ...marketProgressSnapshot(), queue: marketQueue().progress(), requiredConnector: MARKET_CONNECTOR_VERSION, snapshotConnector: SNAPSHOT_CONNECTOR_VERSION };
   } catch (error) { logError('market:status', error); return { ok: false, error: error.message }; }
 });
+// Zpětné snímky (4.8.103): obchody bez snímku (čas vstupu z obchodu) a úplné
+// snímky bez rozvíjející se 30min svíčky – ty jen s konektorem v9 a zapnutým
+// typem „VPOC 30M aktuální“. Plán je FJSnapshot.planSnapshotBackfill; vrací
+// počet zařazených požadavků.
+function planBackfillSnapshots(trades, batch) {
+  if (!marketOn('snapshot')) return 0;
+  const s = marketSettingsNow() || {};
+  const current30 = marketOn('snapshotLevels') && s.levelTypes?.VPOC_30M_CURRENT !== false && Number(marketPoll.version) >= CURRENT30_CONNECTOR_VERSION;
+  let n = 0;
+  for (const req of FJSnapshot.planSnapshotBackfill(trades, { current30 })) {
+    if (marketQueue().enqueue(req, batch)) n++;
+  }
+  return n;
+}
 // Zpětné doplnění: dny s obchody (všechny futures deníky) a dny archivu LTA.
 ipcMain.handle('market:backfill', async (_event, journalIds) => {
   try {
@@ -3863,6 +3877,8 @@ ipcMain.handle('market:backfill', async (_event, journalIds) => {
       if (t?.kind === 'SWING' || !t?.marketSnapshot) continue;
       if (marketRefreshSnapshot(t.marketSnapshot, t.instrument, 'backfill', marketBatch)) snapshots++;
     }
+    // Obchody bez snímku a snímky bez 30min svíčky (konektor v9).
+    try { snapshots += planBackfillSnapshots(trades, marketBatch); } catch (error) { logError('Data trhu – zpětné snímky', error); }
     notifyMarketProgress();
     return { ok: true, batch: marketBatch, count: plan.length + snapshots, snapshots };
   } catch (error) { logError('market:backfill', error); return { ok: false, error: error.message }; }
