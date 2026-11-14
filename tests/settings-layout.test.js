@@ -175,3 +175,55 @@ test('štítek platnosti: každá skupina má platnost, deníkové položky jsou
   assert.equal(FJSettings.scopeOf('screenshots'), 'journal');
   assert.equal(FJSettings.scopeOf('distanceUnit'), 'app');
 });
+
+// --------------------------------------------------- 7 Obnovit výchozí
+
+test('7 Obnovit výchozí: jen prvky své skupiny a výchozí hodnoty z doby před dávkou', () => {
+  const FJLta = require('../app/lta-levels.js');
+  const FJMarket = require('../app/market-data.js');
+  const FJTradeMap = require('../app/trade-map.js');
+  const FJContext = require('../app/context.js');
+  const { settingsDefaults, NEWS_DEFAULTS } = loadRenderer(['settingsDefaults', 'NEWS_DEFAULTS'], { FJLta, FJMarket, FJTradeMap, FJContext });
+  const defs = settingsDefaults();
+  for (const [group, items] of Object.entries(defs)) {
+    assert.ok(FJSettings.GROUPS.some(g => g.id === group), `skupina ${group} v registru`);
+    for (const [itemId, spec] of Object.entries(items)) {
+      const it = FJSettings.ITEMS.find(i => i.id === itemId);
+      assert.ok(it, `položka ${itemId}`);
+      assert.equal(it.group, group, `${itemId} patří do ${group}`);
+      for (const id of Object.keys(spec.controls || {})) assert.ok(it.ids.includes(id), `${id} je prvek položky ${itemId} (nesahá jinam)`);
+      if (spec.save) assert.ok(groupSlice(group).includes(`id="${spec.save}"`), `tlačítko ${spec.save} je ve skupině ${group}`);
+      assert.ok(spec.controls || (typeof spec.changed === 'function' && typeof spec.reset === 'function'), itemId);
+    }
+  }
+  // Hodnoty = dosavadní výchozí stav.
+  assert.equal(defs.distanceUnit.distanceUnit.controls.distanceUnitSelect, 'ticks');
+  assert.equal(defs.tradeForm.gradeRetro.controls.gradeRetroGraceMinutes, '30');
+  assert.equal(defs.tradeList.summaryLine.controls.levelsViewSummary, false);
+  assert.equal(defs.levelsMap.mapOn.controls.levelsViewMap, true);
+  assert.equal(defs.levelsMap.mapBars.controls.levelsViewBars, '5');
+  assert.equal(defs.levels.ltaNearestCount.controls.ltaNearestCount, String(FJLta.DEFAULT_SETTINGS.nearestCount));
+  assert.equal(defs.levels.ltaRetention.controls.ltaRetentionDays, '0');
+  assert.equal(defs.levels.ltaEnabled.controls.ltaEnabled, true);
+  assert.equal(defs.levelsSnapshot.snapshotLevelsN.controls.marketLevelsN, String(FJMarket.DEFAULT_SETTINGS.levelsN));
+  assert.equal(defs.marketData.marketVa.controls.marketVaPct, '70');
+  assert.deepEqual(JSON.parse(JSON.stringify(defs.account.accountBasics.controls)), { startingBalance: '100000', usdCzkRate: '23' });
+  assert.deepEqual(JSON.parse(JSON.stringify(defs.breakEven.breakEven.controls)), { breakEvenEnabled: 'ne', breakEvenThreshold: '0', autoMergeLegs: 'ano' });
+  assert.equal(defs.newsCalendar.newsUrl.controls.newsUrl, NEWS_DEFAULTS.url);
+  assert.equal(defs.newsCalendar.newsBadges.controls.newsMinImpact, 'High');
+  assert.equal(defs.update.updateTest.controls.updateTestChannel, false);
+  // Hlavní vypínač a přepínače Dat trhu se resetem skupiny nemění.
+  for (const items of Object.values(defs)) for (const spec of Object.values(items)) {
+    assert.ok(!Object.keys(spec.controls || {}).some(id => ['marketEnabled', 'levelsSnapshotOn'].includes(id)));
+  }
+});
+
+test('Pokročilé, mapa dřív → teď a skupina Co je nového', () => {
+  const adv = FJSettings.ITEMS.filter(i => i.advanced).map(i => i.id);
+  for (const id of ['ltaFolder', 'ltaRetention', 'newsFeed', 'captureTools', 'dangerZone', 'updateTest']) assert.ok(adv.includes(id), id);
+  assert.ok(!adv.includes('ltaEnabled') && !adv.includes('marketEnabled'), 'běžná nastavení zůstávají vidět');
+  assert.ok(FJSettings.MOVES.length >= 8);
+  assert.ok(FJSettings.MOVES.some(([a]) => /Integrace/.test(a)));
+  assert.ok(groupSlice('whatsNew').includes('id="settingsMovesTable"'));
+  assert.match(SRC, /const SETTINGS_LAYOUT_NOTICE_KEY='FJ_settingsLayoutNoticeSeen';/, 'karta nového uspořádání se ukáže jednou');
+});

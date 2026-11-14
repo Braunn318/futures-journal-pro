@@ -364,6 +364,25 @@ textarea{min-height:100px;resize:vertical}.formgrid{display:grid;grid-template-c
 .settings-scope-journal{border-color:rgba(var(--blue-rgb),.6);color:var(--blue)}
 .settings-flash{animation:settingsFlash 1.6s ease}
 @keyframes settingsFlash{0%,40%{box-shadow:0 0 0 3px rgba(var(--blue-rgb),.75);border-radius:8px}100%{box-shadow:0 0 0 0 rgba(var(--blue-rgb),0)}}
+/* Jednotný řádek nastavení: prvek · název · pod ním jedna věta. */
+#settings .settings-check{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;row-gap:1px;align-items:start}
+#settings .settings-check>input{margin-top:3px}
+#settings .settings-check>:not(input){grid-column:2}
+#settings .settings-check>.sub{display:block;font-size:12px;line-height:1.4}
+#settings .settings-card .field>label{font-weight:700}
+#settings .settings-card .field>label .sub{display:block;font-weight:400;font-size:12px;margin-top:1px}
+.settings-advanced{margin-top:14px;border-top:1px dashed var(--line);padding-top:8px}
+.settings-advanced>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted)}
+.settings-advanced[open]>summary{margin-bottom:8px}
+.settings-reset{margin-top:14px;display:flex;justify-content:flex-end}
+.settings-reset .btn{font-size:12px;padding:5px 12px}
+.settings-dot{color:var(--blue);font-size:10px;margin-right:6px;vertical-align:2px;cursor:help}
+.settings-notice{margin-bottom:14px;border-color:rgba(var(--blue-rgb),.6)}
+.settings-notice[hidden]{display:none}
+.settings-notice-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.settings-notice-head h3{margin:0}
+.settings-moves{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.settings-moves td{padding:5px 8px;border-top:1px solid var(--line);vertical-align:top}
+.settings-moves td:first-child{color:var(--muted);width:50%}
 .settings-gear{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px}
 .settings-gear:hover{color:var(--blue);background:var(--panel2)}
 @media(max-width:1100px){#settings .settings-card .settings-grid{grid-template-columns:1fr}.settings-layout{grid-template-columns:1fr}.settings-nav{position:static}.settings-nav-list{display:none}.settings-nav-select{display:block;width:100%}}
@@ -953,6 +972,11 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       </aside>
       <div class="settings-body">
         <div class="settings-back" id="settingsBack" hidden><button type="button" class="btn" id="settingsBackBtn">← Zpět</button></div>
+        <div class="card settings-notice" id="settingsLayoutNotice" hidden>
+          <div class="settings-notice-head"><h3>Nastavení má nové uspořádání</h3><button type="button" class="icon" id="settingsLayoutNoticeClose" title="Zavřít (najdeš to v Aplikace → Co je nového)">✕</button></div>
+          <p class="sub">Sekce vlevo, nahoře hledání (najde i podle starého místa). Nic se nezměnilo ani nesmazalo – jen je to jinde:</p>
+          <div id="settingsLayoutNoticeTable"></div>
+        </div>
       <div class="settings-sec" data-sec="general" id="setsec-general">
         <div class="settings-sec-head"><h2>⚙️ Obecné</h2><p class="sub">Základ aplikace</p></div>
         <div class="settings-grid">
@@ -1455,6 +1479,10 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
               <p class="sub" id="updateTestWarning" style="color:var(--yellow);margin-top:8px"></p>
             </div>
           </div>
+        </details>
+        <details class="card settings-card" data-card="whatsNew">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Co je nového</h3></summary>
+          <div id="settingsMovesTable"></div>
         </details>
         </div>
       </div>
@@ -7296,6 +7324,164 @@ function decorateSettingsGroups(){
   sum.appendChild(sc);
  }
 }
+// ---- Nastavení: Pokročilé, Obnovit výchozí, nové uspořádání (4.8.103, krok 5) ----
+// Řádek položky v kartě: pole (.field), přepínač s popisem pod ním, nebo jen
+// tlačítko v řadě akcí. Přesouvá se celý řádek – obsluha zůstává.
+function settingsRowOf(el,card){
+ if(!el||!card||!card.contains(el))return [];
+ if(el.parentElement?.classList.contains('integration-actions'))return [el];
+ const field=el.closest('.field');
+ if(field&&card.contains(field)&&field!==card)return [field];
+ let n=el;while(n.parentElement&&n.parentElement!==card)n=n.parentElement;
+ if(n.tagName==='SUMMARY')return [];
+ const out=[n];const next=n.nextElementSibling;
+ if(next&&next.classList.contains('sub')&&!next.id)out.push(next);
+ return out;
+}
+// Položky označené v registru jako pokročilé jdou do sbalené části „Pokročilé“.
+function arrangeAdvancedSettings(){
+ for(const g of FJSettings.GROUPS){
+  const card=settingsCard(g.id);if(!card)continue;
+  const items=FJSettings.ITEMS.filter(i=>i.group===g.id&&i.advanced);
+  if(!items.length||card.querySelector(':scope>.settings-advanced'))continue;
+  const box=document.createElement('details');box.className='settings-advanced';box.dataset.advanced=g.id;
+  box.innerHTML='<summary>Pokročilé</summary>';
+  const body=document.createElement('div');box.appendChild(body);
+  let actions=null;
+  for(const it of items){
+   const rows=[];
+   for(const id of it.ids)for(const r of settingsRowOf($(id),card))if(!rows.includes(r))rows.push(r);
+   for(const r of rows){
+    if(r.tagName==='BUTTON'&&r.parentElement?.classList.contains('integration-actions')){
+     if(!actions){actions=document.createElement('div');actions.className='integration-actions';body.appendChild(actions)}
+     actions.appendChild(r);
+    }else body.appendChild(r);
+   }
+  }
+  card.appendChild(box);
+ }
+}
+// Výchozí hodnoty po skupinách = výchozí před touto dávkou (moduly a dosavadní
+// výchozí stav). Hodnota se nastaví do prvku a uloží jeho vlastní obsluhou
+// (change / tlačítko Uložit) – klíč i tvar uložení jsou tak stejné jako dřív.
+// { skupina: { položka: { controls:{id:hodnota}, save?:id } | { changed(), reset() } } }
+function settingsDefaults(){
+ const L=FJLta.DEFAULT_SETTINGS,M=FJMarket.DEFAULT_SETTINGS,V=FJTradeMap.DEFAULT_VIEW;
+ const lta=()=>typeof ltaStatusCache!=='undefined'?ltaStatusCache?.settings:null;
+ const mk=()=>typeof marketSettingsCache!=='undefined'?marketSettingsCache:null;
+ return {
+  distanceUnit:{distanceUnit:{controls:{distanceUnitSelect:'ticks'}}},
+  theme:{themeMode:{controls:{themeMode:'dark'},save:'saveTheme'}},
+  tradeCards:{tradeCards:{changed:()=>JSON.stringify(tradeCardConfig)!==JSON.stringify(FJTaxonomy.normalizeCardConfig({})),reset:()=>setTradeCardConfig({})}},
+  contextFields:{contextFields:{changed:()=>JSON.stringify(contextFieldConfig)!==JSON.stringify(FJTaxonomy.normalizeFieldConfig({})),reset:()=>setContextFieldConfig({})}},
+  tradeForm:{gradeRetro:{controls:{gradeRetroGraceMinutes:String(FJContext.gradeRetroGrace(null))}}},
+  tradeList:{summaryLine:{controls:{levelsViewSummary:V.summaryLine}}},
+  levelsMap:{mapOn:{controls:{levelsViewMap:V.map}},mapBars:{controls:{levelsViewBars:String(V.bars)}}},
+  overviewFilters:{
+   overviewFilters:{changed:()=>Object.values(overviewFilterConfig||{}).some(v=>v===false),reset:()=>{overviewFilterConfig={};try{localStorage.setItem(OVERVIEW_FILTERS_KEY,'{}')}catch{};applyOverviewFilterVisibility();renderOverviewFilterSettings();if(accountOverviewInitialized)applyAccountOverview()}},
+   overviewSections:{changed:()=>Object.values(overviewSectionConfig||{}).some(v=>v===false),reset:()=>{overviewSectionConfig={};try{localStorage.setItem(OVERVIEW_SECTIONS_KEY,'{}')}catch{};renderOverviewSectionSettings();applyOverviewSectionVisibility();if(accountOverviewInitialized)applyAccountOverview()}}
+  },
+  levels:{
+   ltaEnabled:{controls:{ltaEnabled:L.enabled}},ltaAutoInForm:{controls:{ltaAutoInForm:L.autoInForm}},ltaVwapRow:{controls:{ltaVwapRow:L.vwapRow}},
+   ltaNearestCount:{controls:{ltaNearestCount:String(L.nearestCount)}},ltaExclude:{controls:{ltaExcludePatterns:''}},
+   ltaArchive:{controls:{ltaArchive:L.archive}},ltaRetention:{controls:{ltaRetentionDays:String(L.retentionDays)}},
+   ltaFolder:{changed:()=>!!lta()?.folder,reset:()=>saveLtaSettings({folder:L.folder})},
+   ltaFiles:{changed:()=>!!(lta()?.disabledFiles?.length||lta()?.excludedNames?.length),reset:()=>saveLtaSettings({disabledFiles:[],excludedNames:[]})}
+  },
+  levelsSnapshot:{
+   snapshotLevelsN:{controls:{marketLevelsN:String(M.levelsN)}},
+   snapshotLevelTypes:{changed:()=>Object.keys(mk()?.levelTypes||{}).length>0,reset:()=>saveMarketSettings({levelTypes:Object.fromEntries(FJSnapshot.LEVEL_TYPES.map(t=>[t.key,true]))})}
+  },
+  marketData:{marketVa:{controls:{marketVaPct:String(M.valueAreaPct)}},marketLiveRoots:{controls:{marketLiveRoots:''}}},
+  account:{accountBasics:{controls:{startingBalance:'100000',usdCzkRate:'23'},save:'saveSettings'}},
+  risk:{risk:{controls:{riskMaxDailyDrawdown:'',riskMaxTotalDrawdown:'',riskMaxSlPerDay:'',riskMaxTradesPerDay:'',riskMaxProfitTradesPerDay:'',riskProfitTargetPerDay:''},save:'saveRiskSettings'}},
+  breakEven:{breakEven:{controls:{breakEvenEnabled:'ne',breakEvenThreshold:'0',autoMergeLegs:'ano'},save:'saveBreakEvenSettings'}},
+  captureStatus:{autoImport:{controls:{captureAutoImportSelect:'ano'}}},
+  ninjatrader:{ninjaConnector:{controls:{ntUpdateNoticeSelect:'ano'}}},
+  newsCalendar:{
+   newsButton:{controls:{newsShowButton:NEWS_DEFAULTS.showButton}},newsUrl:{controls:{newsUrl:NEWS_DEFAULTS.url}},
+   newsBadges:{controls:{newsBadges:NEWS_DEFAULTS.badges,newsCurrencies:NEWS_DEFAULTS.currencies,newsMinImpact:NEWS_DEFAULTS.minImpact}},
+   newsFeed:{controls:{newsFeedUrl:NEWS_DEFAULTS.feedUrl}}
+  },
+  backup:{backupImages:{controls:{backupImagesMirror:true,backupIncludeImages:false}}},
+  update:{updateTest:{controls:{updateTestChannel:false}}}
+ };
+}
+function settingsControlDiffers(id,value){
+ const el=$(id);if(!el)return false;
+ if(el.type==='checkbox')return el.checked!==(value===true);
+ const a=String(el.value??'').trim(),b=String(value??'').trim();
+ if(a!==''&&b!==''&&Number.isFinite(Number(a))&&Number.isFinite(Number(b)))return Number(a)!==Number(b);
+ return a!==b;
+}
+function settingsItemChanged(spec){
+ try{return spec.changed?!!spec.changed():Object.entries(spec.controls||{}).some(([id,v])=>settingsControlDiffers(id,v))}catch{return false}
+}
+// Tečka u položky změněné proti výchozí hodnotě.
+function renderSettingsDots(){
+ const defs=settingsDefaults();
+ document.querySelectorAll('#settings .settings-dot').forEach(d=>d.remove());
+ for(const [group,items] of Object.entries(defs)){
+  const card=settingsCard(group);if(!card)continue;
+  for(const [itemId,spec] of Object.entries(items)){
+   if(!settingsItemChanged(spec))continue;
+   const it=FJSettings.ITEMS.find(i=>i.id===itemId);
+   const firstId=Object.keys(spec.controls||{})[0]||it?.ids?.[0];
+   const row=settingsRowOf($(firstId),card)[0];
+   const target=row?.querySelector?.('label')||row;
+   if(!target)continue;
+   const dot=document.createElement('span');dot.className='settings-dot';dot.textContent='●';dot.title='Změněno proti výchozí hodnotě';
+   target.insertBefore(dot,target.firstChild);
+  }
+ }
+}
+let settingsDotsTimer=0;
+function scheduleSettingsDots(){clearTimeout(settingsDotsTimer);settingsDotsTimer=setTimeout(renderSettingsDots,350)}
+// Obnovit výchozí: jen daná skupina, s potvrzením.
+async function resetSettingsGroup(group){
+ const items=settingsDefaults()[group];if(!items)return;
+ const g=FJSettings.GROUPS.find(x=>x.id===group);
+ const names=Object.keys(items).map(id=>FJSettings.ITEMS.find(i=>i.id===id)?.name).filter(Boolean);
+ if(!(await showConfirm(`Vrátit skupinu „${g?.title||group}“ na výchozí hodnoty?\n\n${names.map(n=>'• '+n).join('\n')}\n\nOstatní nastavení se nemění.`,{title:'Obnovit výchozí',ok:'Obnovit výchozí'})))return;
+ for(const spec of Object.values(items)){
+  if(spec.reset){await spec.reset();continue}
+  for(const [id,v] of Object.entries(spec.controls||{})){
+   const el=$(id);if(!el)continue;
+   if(el.type==='checkbox'){if(el.checked===(v===true))continue;el.checked=v===true}
+   else{if(String(el.value)===String(v))continue;el.value=v}
+   if(!spec.save)el.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  if(spec.save){
+   const ctl=Object.keys(spec.controls||{})[0];
+   if(ctl&&$(ctl)?.tagName==='SELECT')$(ctl).dispatchEvent(new Event('change',{bubbles:true}));
+   $(spec.save)?.click();
+  }
+ }
+ showToast(`Skupina „${g?.title||group}“ vrácena na výchozí hodnoty.`);
+ scheduleSettingsDots();
+}
+function addSettingsResetButtons(){
+ for(const group of Object.keys(settingsDefaults())){
+  const card=settingsCard(group);if(!card||card.querySelector(':scope>.settings-reset'))continue;
+  const box=document.createElement('div');box.className='settings-reset';
+  box.innerHTML='<button type="button" class="btn" data-settings-reset="'+group+'" title="Vrátí jen tuto skupinu na výchozí hodnoty (s potvrzením)">Obnovit výchozí</button>';
+  box.querySelector('button').onclick=()=>resetSettingsGroup(group);
+  card.appendChild(box);
+ }
+}
+// Mapa „dřív → teď“: karta po aktualizaci (jednou) a Aplikace → Co je nového.
+const SETTINGS_LAYOUT_NOTICE_KEY='FJ_settingsLayoutNoticeSeen';
+function settingsMovesHTML(){
+ return '<table class="settings-moves"><tbody>'+FJSettings.MOVES.map(([a,b])=>`<tr><td>${esc(a)}</td><td>→ ${esc(b)}</td></tr>`).join('')+'</tbody></table>';
+}
+function renderSettingsMoves(){
+ if($('settingsMovesTable'))$('settingsMovesTable').innerHTML='<p class="sub">Nastavení dostalo nové uspořádání. Nic se nezměnilo ani nesmazalo – jen je to jinde. Hledání nahoře najde nastavení i podle starého místa.</p>'+settingsMovesHTML();
+ const box=$('settingsLayoutNotice');if(!box)return;
+ let seen=false;try{seen=localStorage.getItem(SETTINGS_LAYOUT_NOTICE_KEY)==='1'}catch{}
+ box.hidden=seen;
+ if(!seen&&$('settingsLayoutNoticeTable'))$('settingsLayoutNoticeTable').innerHTML=settingsMovesHTML();
+ if($('settingsLayoutNoticeClose'))$('settingsLayoutNoticeClose').onclick=()=>{try{localStorage.setItem(SETTINGS_LAYOUT_NOTICE_KEY,'1')}catch{};box.hidden=true};
+}
 function renderSettingsSearch(){
  const box=$('settingsSearchResults');const q=$('settingsSearch')?.value||'';
  if(!box)return;
@@ -7306,6 +7492,12 @@ function renderSettingsSearch(){
 }
 (()=>{
  decorateSettingsGroups();
+ arrangeAdvancedSettings();
+ addSettingsResetButtons();
+ renderSettingsMoves();
+ ['change','input'].forEach(ev=>$('settings')?.addEventListener(ev,scheduleSettingsDots));
+ document.querySelectorAll('#settings details.settings-card').forEach(c=>c.addEventListener('toggle',()=>{if(c.open)setTimeout(renderSettingsDots,900)}));
+ setTimeout(renderSettingsDots,2500);
  document.querySelectorAll('#settings [data-settings-sec]').forEach(b=>b.onclick=()=>showSettingsSection(b.dataset.settingsSec));
  $('settingsSectionSelect')?.addEventListener('change',e=>showSettingsSection(e.target.value));
  $('settingsSearch')?.addEventListener('input',renderSettingsSearch);

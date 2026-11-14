@@ -69,7 +69,23 @@
     { id: 'aiExport', section: 'data', title: 'Exporty', desc: 'Export pro Backtest Lab a AI a sloupce CSV.', scope: 'app' },
     { id: 'tools', section: 'data', title: 'Nástroje opravy dat', desc: 'Jednorázové opravy uložených obchodů v aktivním deníku.', scope: 'journal' },
 
-    { id: 'update', section: 'app', title: 'Aktualizace', desc: 'Kontrola a instalace nových verzí, i testovacích.', scope: 'app' }
+    { id: 'update', section: 'app', title: 'Aktualizace', desc: 'Kontrola a instalace nových verzí, i testovacích.', scope: 'app' },
+    { id: 'whatsNew', section: 'app', title: 'Co je nového', desc: 'Kam se nastavení přestěhovala při novém uspořádání (4.8.103).', scope: 'app' }
+  ]);
+
+  // Mapa „dřív → teď“ (karta „Nastavení má nové uspořádání“ a Aplikace → Co je nového).
+  const MOVES = Object.freeze([
+    ['Přizpůsobení → Jednotka, Vzhled, Karty obchodu, Pole kontextu, Přehled účtu', 'Vzhled a zobrazení'],
+    ['Pole kontextu → Známka „doplněno zpětně“', 'Vzhled a zobrazení → Formulář obchodu'],
+    ['Přizpůsobení → Hladiny → Souhrnný řádek', 'Vzhled a zobrazení → Seznam obchodů'],
+    ['Přizpůsobení → Hladiny, Data trhu', 'Hladiny a data trhu'],
+    ['Data trhu → Nové sloupce v CSV', 'Data a zálohy → Exporty'],
+    ['Obecné → Účet · Šablony · Řízení rizika · Break Even', 'Instrumenty a účty'],
+    ['Šablony → Přepočítat komisi, Doplnit směr', 'Data a zálohy → Nástroje opravy dat'],
+    ['🔌 Integrace (celá sekce)', 'Připojení a zdroje dat'],
+    ['Integrace → Přiřazení účtů', 'Instrumenty a účty → Přiřazení účtů k deníkům'],
+    ['Obecné → Kalendář zpráv', 'Připojení a zdroje dat → Kalendář zpráv'],
+    ['Obecné → Aktualizace aplikace', 'Aplikace → Aktualizace']
   ]);
 
   // Položky. `old` = kde to bylo před novým uspořádáním (hledání najde i podle
@@ -109,10 +125,10 @@
     { id: 'ltaVwapRow', group: 'levels', name: 'Přidat VWAP v čase vstupu', desc: 'VWAP z konektoru NT8 jako řádek Hladin.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaVwapRow'] },
     { id: 'ltaNearestCount', group: 'levels', name: 'Počet levelů nad a pod vstupem', desc: 'N + N nejbližších.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaNearestCount'] },
     { id: 'ltaFiles', group: 'levels', name: 'Soubory a levely', desc: 'Které soubory a názvy LTA se nečtou.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaFiles'] },
-    { id: 'ltaExclude', group: 'levels', name: 'Vyloučit názvy obsahující…', desc: 'Textové vzory názvů, které se nedoplňují.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaExcludePatterns'] },
-    { id: 'ltaArchive', group: 'levels', name: 'Ukládat verze levelů po dnech', desc: 'Archiv pro obchody zapsané později.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaArchive', 'ltaArchiveInfo', 'ltaMissingDays'] },
-    { id: 'ltaRetention', group: 'levels', name: 'Mazat archiv starší než (dní)', desc: '0 = nemazat.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaRetentionDays'] },
-    { id: 'ltaFolder', group: 'levels', name: 'Složka LTA', desc: 'Odkud se levely čtou (změnit, výchozí, otevřít, obnovit).', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaFolderInfo', 'ltaChooseFolder', 'ltaResetFolder', 'ltaOpenFolder', 'ltaRefresh'] },
+    { id: 'ltaExclude', group: 'levels', advanced: true, name: 'Vyloučit názvy obsahující…', desc: 'Textové vzory názvů, které se nedoplňují.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaExcludePatterns'] },
+    { id: 'ltaArchive', group: 'levels', advanced: true, name: 'Ukládat verze levelů po dnech', desc: 'Archiv pro obchody zapsané později.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaArchive', 'ltaArchiveInfo', 'ltaMissingDays'] },
+    { id: 'ltaRetention', group: 'levels', advanced: true, name: 'Mazat archiv starší než (dní)', desc: '0 = nemazat.', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaRetentionDays'] },
+    { id: 'ltaFolder', group: 'levels', advanced: true, name: 'Složka LTA', desc: 'Odkud se levely čtou (změnit, výchozí, otevřít, obnovit).', old: P + ' → Hladiny → Z LTA souborů', ids: ['ltaFolderInfo', 'ltaChooseFolder', 'ltaResetFolder', 'ltaOpenFolder', 'ltaRefresh'] },
     { id: 'snapshotLevelsOn', group: 'levelsSnapshot', name: 'Doplňovat řádky hladin ze snímku trhu', desc: 'VPOC, VAH / VAL, high / low dne a včerejška do Hladin.', old: P + ' → Hladiny → Ze snímku trhu', ids: ['levelsSnapshotSection', 'levelsSnapshotOnLabel', 'levelsSnapshotOn', 'levelsSnapshotWhy'] },
     { id: 'snapshotLevelsN', group: 'levelsSnapshot', name: 'Řádky ze snímku – N nad a N pod', desc: 'Kolik nejbližších hodnot ze snímku.', old: P + ' → Hladiny → Ze snímku trhu', ids: ['marketLevelsNField', 'marketLevelsN'] },
     { id: 'snapshotLevelTypes', group: 'levelsSnapshot', name: 'Typy řádků ze snímku', desc: 'VPOC 30M netest / aktuální, VPOC / VAH / VAL dne a včerejška, high / low.', old: P + ' → Hladiny → Ze snímku trhu', ids: ['marketLevelTypes'] },
@@ -124,7 +140,7 @@
     // 5 Instrumenty a účty
     { id: 'accountBasics', group: 'account', name: 'Počáteční stav, měna a kurz USD / CZK', desc: 'Základ equity tohoto deníku a přepočet do CZK.', old: 'Obecné → Účet', ids: ['startingBalance', 'currency', 'usdCzkRate', 'saveSettings'] },
     { id: 'templates', group: 'templates', name: 'Šablony podle instrumentu', desc: 'Plán, hodnota bodu, tick, komise, max. SL, komentář.', old: 'Šablony', ids: ['templateList', 'tplNewInstrument', 'tplNewPlan', 'tplNewPointValue', 'tplNewTickSize', 'tplNewCommission', 'tplNewMaxSl', 'tplNewComment', 'addTemplate'] },
-    { id: 'connectorCommission', group: 'templates', name: 'Komise u nových importovaných obchodů', desc: 'Ze šablony, nebo nahlášená konektorem.', old: 'Šablony', ids: ['useConnectorCommission', 'saveConnectorCommissionSetting'] },
+    { id: 'connectorCommission', group: 'templates', advanced: true, name: 'Komise u nových importovaných obchodů', desc: 'Ze šablony, nebo nahlášená konektorem.', old: 'Šablony', ids: ['useConnectorCommission', 'saveConnectorCommissionSetting'] },
     { id: 'risk', group: 'risk', name: 'Limity účtu', desc: 'Max. denní a celkový drawdown, limity obchodů, profit target za den.', old: 'Řízení rizika', ids: ['riskMaxDailyDrawdown', 'riskMaxTotalDrawdown', 'riskMaxSlPerDay', 'riskMaxTradesPerDay', 'riskMaxProfitTradesPerDay', 'riskProfitTargetPerDay', 'saveRiskSettings'] },
     { id: 'breakEven', group: 'breakEven', name: 'Break Even a slučování cílů', desc: 'Rozpoznávat Break Even, práh, slučovat TP1 / TP2 / BE.', old: 'Řízení rizika → Break Even a slučování obchodů', ids: ['breakEvenEnabled', 'breakEvenThreshold', 'autoMergeLegs', 'saveBreakEvenSettings'] },
     { id: 'accountMapping', group: 'accountMapping', name: 'Přiřazení účtů ke kartám', desc: 'Účet → deník, ruční přidání účtu, skryté účty.', old: 'Integrace → Přiřazení účtů', ids: ['captureNewAccount', 'captureAddAccount', 'captureMappingRows', 'captureSaveMappings', 'captureHiddenAccountsBox'] },
@@ -133,21 +149,24 @@
     { id: 'captureInfo', group: 'captureStatus', name: 'Stav služby, endpoint a API klíč', desc: 'Kam konektory posílají obchody.', old: 'Integrace → Stav a obecné', ids: ['captureStatusText', 'capturePendingCount', 'captureEndpoint', 'captureApiKey'] },
     { id: 'autoImport', group: 'captureStatus', name: 'Automatický import', desc: 'Import uzavřených obchodů z konektorů.', old: 'Integrace → Stav a obecné', ids: ['captureAutoImportSelect'] },
     { id: 'screenshots', group: 'captureStatus', name: 'Screenshoty u obchodů tohoto deníku', desc: 'Vypnuto, monitor nebo vybraná okna; co když okno chybí.', old: 'Integrace → Stav a obecné', scope: 'journal', ids: ['captureScreenshotMode', 'captureShotJournal', 'captureWindowsBox', 'captureWindowRules', 'captureWindowNew', 'captureWindowAdd', 'captureWindowLoad', 'captureWindowList', 'captureMissingBox', 'captureScreenshotMissing'] },
-    { id: 'afterShots', group: 'captureStatus', name: 'Screenshoty po výstupu', desc: 'Druhá sekce „Po obchodu“: kolik minut po výstupu a kolik snímků.', old: 'Integrace → Stav a obecné', scope: 'journal', ids: ['captureAfterEnabled', 'captureAfterMinutes', 'captureAfterMax'] },
-    { id: 'captureActions', group: 'captureStatus', name: 'Obnovit stav, testy, import, nový API klíč, fronta', desc: 'Akce a diagnostika příjmu obchodů.', old: 'Integrace → Stav a obecné', ids: ['captureRefresh', 'captureTestSequence', 'captureTestMultiTarget', 'captureTestScaleIn', 'captureImport', 'nt8ManualImportBtn', 'captureOpenConnectors', 'captureNewKey', 'captureClear'] },
+    { id: 'afterShots', group: 'captureStatus', advanced: true, name: 'Screenshoty po výstupu', desc: 'Druhá sekce „Po obchodu“: kolik minut po výstupu a kolik snímků.', old: 'Integrace → Stav a obecné', scope: 'journal', ids: ['captureAfterEnabled', 'captureAfterMinutes', 'captureAfterMax'] },
+    { id: 'captureActions', group: 'captureStatus', name: 'Obnovit stav, importovat nyní, ruční import z NT8', desc: 'Příjem obchodů z konektorů.', old: 'Integrace → Stav a obecné', ids: ['captureRefresh', 'captureImport', 'nt8ManualImportBtn'] },
+    { id: 'captureTools', group: 'captureStatus', name: 'Testy, složka konektorů, nový API klíč, vymazat frontu', desc: 'Diagnostika a údržba příjmu obchodů.', old: 'Integrace → Stav a obecné', advanced: true, ids: ['captureTestSequence', 'captureTestMultiTarget', 'captureTestScaleIn', 'captureOpenConnectors', 'captureNewKey', 'captureClear'] },
     { id: 'ninjaConnector', group: 'ninjatrader', name: 'Konektor NinjaTraderu', desc: 'Stav, upozornění po aktualizaci NT8, instalace.', old: 'Integrace → NinjaTrader', ids: ['ntConnectorState', 'ntUpdateNoticeSelect', 'captureInstallNinja', 'captureExportConnector'] },
     { id: 'ctraderCbot', group: 'ctrader', name: 'cTrader cBot a limitky přes MCP', desc: 'Test, stažení a aktualizace cBota; čtení čekajících příkazů.', old: 'Integrace → cTrader', ids: ['capCtrader', 'captureTestCTrader', 'captureExportCTrader', 'captureInstallCTrader'] },
     { id: 'tradingview', group: 'tradingview', name: 'TradingView – Pine Script a webhook relay', desc: 'Příprava skriptu, adresa Workeru, token, stažení alertů.', old: 'Integrace → TradingView', ids: ['capturePrepareTradingView', 'capturePrepareWorker', 'captureExportTradingView', 'captureExportTradingViewWorker', 'relayUrl', 'relayToken', 'relayEnabled', 'saveRelay', 'pollRelay'] },
-    { id: 'newsButton', group: 'newsCalendar', name: 'Tlačítko „📰 Kalendář zpráv“ v horní liště', desc: 'A adresa, kterou otevře.', old: 'Obecné → Kalendář zpráv', ids: ['newsShowButton', 'newsUrl'] },
-    { id: 'newsBadges', group: 'newsCalendar', name: 'Štítky „📰“ u dnů se zprávami', desc: 'Měny, dopad a zdroj dat štítků.', old: 'Obecné → Kalendář zpráv', ids: ['newsBadges', 'newsCurrencies', 'newsMinImpact', 'newsFeedUrl', 'newsRefreshBtn', 'newsStatus'] },
+    { id: 'newsButton', group: 'newsCalendar', name: 'Tlačítko „📰 Kalendář zpráv“ v horní liště', desc: 'Ukáže tlačítko, které otevře kalendář v prohlížeči.', old: 'Obecné → Kalendář zpráv', ids: ['newsShowButton'] },
+    { id: 'newsUrl', group: 'newsCalendar', name: 'Adresa, kterou tlačítko otevře', desc: 'Webová stránka kalendáře zpráv.', old: 'Obecné → Kalendář zpráv', advanced: true, ids: ['newsUrl'] },
+    { id: 'newsBadges', group: 'newsCalendar', name: 'Štítky „📰“ u dnů se zprávami', desc: 'Měny a dopad zpráv, obnovení.', old: 'Obecné → Kalendář zpráv', ids: ['newsBadges', 'newsCurrencies', 'newsMinImpact', 'newsRefreshBtn', 'newsStatus'] },
+    { id: 'newsFeed', group: 'newsCalendar', name: 'Zdroj dat štítků', desc: 'Týdenní JSON ve formátu ForexFactory.', old: 'Obecné → Kalendář zpráv', advanced: true, ids: ['newsFeedUrl'] },
 
     // 7 Data a zálohy
     { id: 'dataLocation', group: 'dataLocation', name: 'Umístění dat', desc: 'Změnit nebo vrátit složku dat (aplikace se restartuje).', old: 'Data a zálohy', ids: ['dataLocationInfo', 'changeDataLocation', 'resetDataLocation'] },
     { id: 'imagesLocation', group: 'imagesLocation', name: 'Složka obrázků', desc: 'Změnit, otevřít, vrátit; doplnit chybějící obrázky ze zálohy.', old: 'Data a zálohy', ids: ['imagesLocationInfo', 'changeImagesLocation', 'openImagesFolder', 'resetImagesLocation', 'imagesIntegrityInfo', 'restoreImagesFromBackup'] },
     { id: 'backupAll', group: 'backup', name: 'Záloha všech deníků', desc: 'Aktualizovat zálohu, obnovit, umístění zálohy.', old: 'Data a zálohy → Záloha a obnova', ids: ['updateBackup', 'restoreBackup', 'backupPathInfo', 'changeBackupPath'] },
-    { id: 'backupImages', group: 'backup', name: 'Obrázky v záloze', desc: 'Zrcadlo obrázků vedle zálohy, nebo obrázky přímo v souboru.', old: 'Data a zálohy → Záloha a obnova', ids: ['backupImagesMirror', 'backupImagesMirrorInfo', 'chooseBackupImagesDir', 'resetBackupImagesDir', 'backupIncludeImages'] },
+    { id: 'backupImages', group: 'backup', advanced: true, name: 'Obrázky v záloze', desc: 'Zrcadlo obrázků vedle zálohy, nebo obrázky přímo v souboru.', old: 'Data a zálohy → Záloha a obnova', ids: ['backupImagesMirror', 'backupImagesMirrorInfo', 'chooseBackupImagesDir', 'resetBackupImagesDir', 'backupIncludeImages'] },
     { id: 'backupJournal', group: 'backup', name: 'Záloha aktivního deníku (JSON)', desc: 'Stáhnout a nahrát zálohu jednoho deníku.', old: 'Data a zálohy → Záloha a obnova', scope: 'journal', ids: ['exportJson', 'importJson'] },
-    { id: 'dangerZone', group: 'backup', name: 'Smazat data deníku · Kompletní reset', desc: 'Nevratné akce.', old: 'Data a zálohy → Záloha a obnova', ids: ['clearAll', 'factoryReset'] },
+    { id: 'dangerZone', group: 'backup', advanced: true, name: 'Smazat data deníku · Kompletní reset', desc: 'Nevratné akce.', old: 'Data a zálohy → Záloha a obnova', ids: ['clearAll', 'factoryReset'] },
     { id: 'aiExport', group: 'aiExport', name: 'Export pro Backtest Lab a AI', desc: 'Odlehčená kopie deníků pro Backtest Lab a Claude Cowork.', old: 'Data a zálohy → Export pro AI analýzu', ids: ['aiExportInfo', 'regenerateAiExports'] },
     { id: 'csvColumns', group: 'aiExport', name: 'Nové sloupce v CSV', desc: 'Signální svíčka, objem a zdroj hladin na konec CSV (vyžaduje Data z NinjaTraderu).', old: P + ' → Data trhu', ids: ['exportFeatures'] },
     { id: 'recalcCommission', group: 'tools', name: 'Přepočítat komisi u uložených obchodů', desc: 'Podle šablon instrumentů v aktivním deníku.', old: 'Šablony', ids: ['recalcCommissionBtn'] },
@@ -155,7 +174,8 @@
 
     // 8 Aplikace
     { id: 'update', group: 'update', name: 'Zkontrolovat a nainstalovat aktualizaci', desc: 'Nová verze aplikace.', old: 'Obecné → Aktualizace aplikace', ids: ['updateInfo', 'checkUpdates', 'installUpdate'] },
-    { id: 'updateTest', group: 'update', name: 'Povolit testovací (pre-release) verze', desc: 'Nabízet i testovací verze.', old: 'Obecné → Aktualizace aplikace', ids: ['updateTestChannel', 'updateTestBox', 'checkTestUpdates', 'updateTestWarning'] }
+    { id: 'updateTest', group: 'update', advanced: true, name: 'Povolit testovací (pre-release) verze', desc: 'Nabízet i testovací verze.', old: 'Obecné → Aktualizace aplikace', ids: ['updateTestChannel', 'updateTestBox', 'checkTestUpdates', 'updateTestWarning'] },
+    { id: 'whatsNew', group: 'whatsNew', name: 'Nové uspořádání Nastavení', desc: 'Mapa „dřív → teď“.', old: 'Nové v 4.8.103', ids: ['settingsMovesTable'] }
   ]);
 
   const groupById = new Map(GROUPS.map(g => [g.id, g]));
@@ -202,5 +222,5 @@
 
   function groupsOf(section) { return GROUPS.filter(g => g.section === section); }
 
-  return { SECTIONS, GROUPS, ITEMS, INTERNAL_TERMS, SCOPE_LABEL, scopeOf, search, resolve, groupsOf, fold };
+  return { SECTIONS, GROUPS, ITEMS, MOVES, INTERNAL_TERMS, SCOPE_LABEL, scopeOf, search, resolve, groupsOf, fold };
 }));
