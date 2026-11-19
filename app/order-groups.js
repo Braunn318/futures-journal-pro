@@ -64,9 +64,17 @@
       firstSeenAt: nowIso, lastSeenAt: nowIso, state: 'PENDING'
     };
   }
-  function groupFromOrder(o, opts) {
+  // Bez idGen je id skupiny odvozené z prvního příkazu – zobrazení (bez zápisu) i pozdější
+  // zápis tak dají stejné id a tlačítka u řádku najdou uloženou skupinu.
+  function stableId(o, taken) {
+    const base = 'og_' + String(o.id).replace(/[^A-Za-z0-9_-]/g, '_');
+    let id = base, i = 2;
+    while (taken.has(id)) id = base + '_' + (i++);
+    return id;
+  }
+  function groupFromOrder(o, opts, taken) {
     const g = {
-      id: newId(opts), account: o.account == null ? null : String(o.account), symbol: sym(o.symbol),
+      id: opts && typeof opts.idGen === 'function' ? opts.idGen() : stableId(o, taken || new Set()), account: o.account == null ? null : String(o.account), symbol: sym(o.symbol),
       direction: o.direction === 'short' ? 'short' : 'long', orderType: o.orderType === 'STOP' ? 'STOP' : 'LIMIT',
       price: num(o.price), sl: num(o.sl), groupManual: false, members: [],
       context: {}, contextFilledAt: null, tradeId: null, resolution: null,
@@ -77,14 +85,14 @@
   const hasFill = g => (g.members || []).some(m => m.state === 'FILLED');
   // Do skupiny smí automatika přidat příkaz, jen dokud se o ní nic nerozhodlo.
   function isOpenGroup(g) {
-    return !!g && !g.tradeId && !g.resolution && !hasFill(g);
+    return !!g && !g.tradeId && !g.resolution && !hasFill(g) && (!(g.members || []).length || g.members.some(m => m.state === 'PENDING'));
   }
   function contextFilled(g) {
     const c = (g && g.context) || {};
-    return !!(g && g.contextFilledAt) && CONTEXT_FIELDS.some(k => {
+    return !!(g && g.contextFilledAt) && (CONTEXT_FIELDS.some(k => {
       const v = c[k];
       return Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && String(v).trim() !== '';
-    }) || Object.keys(c.targetLevels || {}).length > 0;
+    }) || Object.keys(c.targetLevels || {}).length > 0);
   }
   // Členové od TP nejbližšího k ceně vstupu (TP1, TP2 …); bez TP na konci.
   function sortMembers(g) {
@@ -112,7 +120,15 @@
       if (!sources.has(src)) continue;
       const order = { ...raw, source: src, account: src === 'CTRADER' ? (o.account != null ? String(o.account) : null) : null };
       liveIds.add(String(order.id));
-      const hit = memberIndex.get(String(order.id));
+      let hit = memberIndex.get(String(order.id));
+      if (hit && (sym(order.symbol) !== hit.g.symbol || (order.direction === 'short' ? 'short' : 'long') !== hit.g.direction
+        || (order.orderType === 'STOP' ? 'STOP' : 'LIMIT') !== hit.g.orderType)) {
+        // ruční limitka upravená na jiný symbol / směr / typ: do své skupiny už nepatří
+        hit.g.members = hit.g.members.filter(x => x !== hit.m);
+        hit.g.updatedAt = o.nowIso;
+        memberIndex.delete(String(order.id));
+        hit = null; changed = true;
+      }
       if (hit) {
         const { g, m } = hit;
         const snap = memberFromOrder(order, o.nowIso);
@@ -129,7 +145,7 @@
       const d = decimalsFor(o, order.symbol);
       const key = groupKeyOf(order, d);
       let g = out.find(x => isOpenGroup(x) && !x.groupManual && groupKeyOf(x, d) === key);
-      if (!g) { g = groupFromOrder(order, o); out.push(g); created++; }
+      if (!g) { g = groupFromOrder(order, o, new Set(out.map(x => x.id))); out.push(g); created++; }
       const m = memberFromOrder(order, o.nowIso);
       g.members.push(m);
       g.updatedAt = o.nowIso;
@@ -144,12 +160,16 @@
         m.state = 'GONE'; m.goneAt = o.nowIso; g.updatedAt = o.nowIso; changed = true;
       }
     }
-    return { groups: out, changed, created, added };
+    // skupina bez členů, bez kontextu a bez obchodu nemá co nést
+    const kept = out.filter(g => (g.members || []).length || g.tradeId || g.resolution || contextFilled(g));
+    if (kept.length !== out.length) changed = true;
+    return { groups: kept, changed, created, added };
   }
 
   function groupView(g) {
     const members = sortMembers(g);
-    const vols = members.map(m => num(m.volume));
+    const live = members.some(m => m.state !== 'GONE') ? members.filter(m => m.state !== 'GONE') : members;
+    const vols = live.map(m => num(m.volume));
     const total = vols.every(v => v != null) ? round(vols.reduce((s, v) => s + v, 0), 8) : null;
     const counts = { PENDING: 0, FILLED: 0, GONE: 0 };
     members.forEach(m => { counts[m.state] = (counts[m.state] || 0) + 1; });
@@ -349,14 +369,24 @@
     // pozice, o kterou stojí členové víc skupin = nejednoznačné
     const groupsOf = new Map();
     for (const w of wanted) for (const c of w.list) { if (!groupsOf.has(c.pid)) groupsOf.set(c.pid, new Set()); groupsOf.get(c.pid).add(w.g.id); }
+    // Uvnitř skupiny jednoznačně: kandidáti člena (po zúžení podle TP) tvoří množinu; člen se
+    // páruje, jen když na stejnou množinu připadá právě tolik členů jako pozic (zaměnitelné
+    // limitky téže skupiny). Jinak se nepáruje – pozice pak vznikne jako samostatný obchod.
     const claimed = new Set();
     let linked = 0;
-    for (const w of wanted.sort((a, b) => (num(a.m.tp) == null) - (num(b.m.tp) == null))) {
+    const narrowed = wanted.map(w => {
       const d = decimalsFor(opts, w.g.symbol);
-      const free = w.list.filter(c => !claimed.has(c.pid) && groupsOf.get(c.pid).size === 1);
-      if (!free.length) continue;
+      const free = w.list.filter(c => groupsOf.get(c.pid).size === 1);
       const tpHit = free.filter(c => c.tp != null && num(w.m.tp) != null && priceKey(c.tp, d) === priceKey(w.m.tp, d));
-      const pick = (tpHit.length ? tpHit : free).sort((a, b) => a.openMs - b.openMs || String(a.pid).localeCompare(String(b.pid)))[0];
+      const set = (tpHit.length ? tpHit : free).sort((a, b) => a.openMs - b.openMs || String(a.pid).localeCompare(String(b.pid)));
+      return { ...w, set, sig: w.g.id + '|' + set.map(c => c.pid).join(',') };
+    }).filter(w => w.set.length);
+    const perSig = new Map();
+    for (const w of narrowed) perSig.set(w.sig, (perSig.get(w.sig) || 0) + 1);
+    for (const w of narrowed) {
+      if (perSig.get(w.sig) !== w.set.length) continue;
+      const pick = w.set.find(c => !claimed.has(c.pid));
+      if (!pick) continue;
       claimed.add(pick.pid);
       w.m.state = 'FILLED';
       w.m.fill = { positionId: pick.pid, entryPrice: pick.entry, openedAt: isoToLocal(pick.openTime), openTime: pick.openTime, volume: num(w.m.volume) };
@@ -364,6 +394,23 @@
       linked++;
     }
     return { groups: out, changed: linked > 0, linked };
+  }
+
+  // Otevírací událost cBota (real-time, dřív než MCP synchronizace pozná zmizelou limitku):
+  // pozice, která může patřit čekajícímu členu skupiny, se má nechat na synchronizaci –
+  // jinak by vznikl samostatný obchod a skupina by si ji už nevzala.
+  function groupMayClaimEvent(groups, e, opts = {}) {
+    const symbol = sym(e && e.instrument), dir = e && e.side === 'short' ? 'short' : 'long';
+    const units = Math.abs(num(e && e.quantity) || 0), entry = num(e && e.entryPrice), ms = Date.parse((e && e.entryTime) || '');
+    if (!symbol || entry == null || !Number.isFinite(ms)) return false;
+    return (groups || []).some(g => unresolved(g) && g.symbol === symbol && g.direction === dir && (g.members || []).some(m => {
+      if (m.source !== 'CTRADER' || m.state === 'FILLED') return false;
+      const mu = num(m.volumeInUnits);
+      if (mu != null && Math.abs(mu - units) > EPS) return false;
+      const seen = Date.parse(m.firstSeenAt || '');
+      if (Number.isFinite(seen) && ms < seen - 60000) return false;
+      return fillMatches(g, { ...m, lastSeenAt: m.firstSeenAt, goneAt: new Date(ms).toISOString() }, { symbol, direction: dir, units, lots: null, entry, openMs: ms, tp: null, open: false }, decimalsFor(opts, symbol));
+    }));
   }
 
   // TP všech příkazů skupiny (od nejbližšího) s typem hladiny z kontextu.
@@ -484,7 +531,7 @@
 
 
   return {
-    linkFills, planGroupTrades, syncStage, draftFromGroup, recordGroupDecision, targetsOfGroup,
+    groupMayClaimEvent, linkFills, planGroupTrades, syncStage, draftFromGroup, recordGroupDecision, targetsOfGroup,
     applyGroupContext, markContextEdit, cleanContext, tradeContextSig,
     ORDER_GROUPS_VERSION, CONTEXT_FIELDS, groupKeyOf, planOrderGroups, groupView, sortMembers, isOpenGroup, contextFilled,
     canMerge, mergeGroups, splitGroup, migratePendingOrders

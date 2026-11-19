@@ -202,3 +202,58 @@ test('screenshoty kontextu skupiny se počítají jako odkaz (přejmenování u 
   assert.equal(og.base, null, 'skupina obrázky nepřejmenovává');
   assert.deepEqual(plain(og.record.context.images), ['fjimg://store/b.webp']);
 });
+
+// ---- nálezy kontroloru ----
+test('kontrola 1: bez idGen má nová skupina stabilní id (zobrazení = zápis)', () => {
+  const o = { decimalsOf: dec, account: '1234567', nowIso: T0 };
+  const a = G.planOrderGroups([], [order(1, 0.805), order(2, 0.799)], o).groups;
+  const b = G.planOrderGroups([], [order(1, 0.805), order(2, 0.799)], { ...o, nowIso: T1 }).groups;
+  assert.equal(a[0].id, b[0].id);
+});
+
+test('kontrola 2: nová limitka se nepřidá ke skupině, jejíž limitky všechny zmizely; zmizelé se nepočítají do objemu', () => {
+  let s = start();
+  s = sync(s, [], { positions: [], history: [] }, T1);           // obě zmizely, žádná pozice
+  s = sync(s, [order(3, 0.8050)], { positions: [], history: [] }, T2);
+  assert.equal(s.groups.length, 2, 'nová limitka = nová skupina');
+  assert.deepEqual(plain(s.groups[1].context), {}, 'bez starého kontextu');
+  // částečně zmizelá skupina: objem jen čekajících
+  let p = start();
+  p = sync(p, [order(2, 0.7990)], { positions: [], history: [] }, T1);
+  near(G.groupView(p.groups[0]).totalVolume, 0.075);
+  near(G.draftFromGroup(p.groups[0], true).volume, 0.075);
+});
+
+test('kontrola 3: ruční limitka upravená na jiný symbol / směr opustí svou skupinu', () => {
+  const m = (id, o) => ({ id, source: 'MANUAL', symbol: 'EURJPY', direction: 'long', orderType: 'LIMIT', price: 176.95, sl: 176.57, tp: 177.6, volume: 0.1, ...o });
+  const g = G.planOrderGroups([], [m('po_1'), m('po_2', { tp: 178.2 })], { sources: ['MANUAL'], nowIso: T0 }).groups;
+  assert.equal(g.length, 1);
+  const r = G.planOrderGroups(g, [m('po_1'), m('po_2', { tp: 178.2, symbol: 'GBPJPY' })], { sources: ['MANUAL'], nowIso: T1 }).groups;
+  assert.equal(r.length, 2);
+  assert.ok(r.every(x => x.members.every(mm => (mm.orderId === 'po_2') === (x.symbol === 'GBPJPY'))));
+});
+
+test('kontrola 6: člen se dvěma rovnocennými pozicemi téže skupiny se nepáruje', () => {
+  n = 300;
+  let s = { groups: [], trades: [] };
+  s = sync(s, [order(41, 0.805)], { positions: [], history: [] }, T0);
+  // dvě stejné pozice (např. jedna otevřená ručně), TP sedí na obě
+  s = sync(s, [], { positions: [pos(951, 0.805), pos(952, 0.805, { openTime: '2026-11-17T09:20:00.000Z' })], history: [] }, T1);
+  assert.ok(!s.groups[0].tradeId, 'nejednoznačné → nepárovat');
+  // dvě zaměnitelné limitky (stejné TP) a dvě pozice → spáruje obě
+  n = 400;
+  let z = { groups: [], trades: [] };
+  z = sync(z, [order(51, 0.805), order(52, 0.805)], { positions: [], history: [] }, T0);
+  z = sync(z, [], { positions: [pos(961, 0.805), pos(962, 0.805)], history: [] }, T1);
+  assert.equal(z.trades.length, 1);
+  assert.deepEqual(plain(z.trades[0].ctraderPositionIds).sort(), ['ctrader-961', 'ctrader-962']);
+});
+
+test('kontrola 5: otevírací událost cBota, kterou si může vzít čekající skupina, se pozná', () => {
+  const s = start();
+  const ev = { type: 'trade_opened', instrument: 'USDCHF', side: 'short', quantity: 7500, entryPrice: 0.8125, entryTime: '2026-11-17T09:12:00.000Z' };
+  assert.equal(G.groupMayClaimEvent(s.groups, ev, { decimalsOf: dec }), true);
+  assert.equal(G.groupMayClaimEvent(s.groups, { ...ev, quantity: 9000 }, { decimalsOf: dec }), false);
+  assert.equal(G.groupMayClaimEvent(s.groups, { ...ev, entryPrice: 0.8100 }, { decimalsOf: dec }), false, 'horší cena než limit');
+  assert.equal(G.groupMayClaimEvent(s.groups, { ...ev, entryTime: '2026-11-16T09:00:00.000Z' }, { decimalsOf: dec }), false, 'před zadáním limitky');
+});

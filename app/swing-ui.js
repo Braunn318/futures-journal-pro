@@ -392,7 +392,7 @@ async function runOrderGroupsMigration(){
  const data=await ensureActiveJournalData();
  const m=FJOrderGroups.migratePendingOrders(data,orderGroupOpts());
  if(m.skipped)return m;
- if((data.pendingOrders||[]).length){
+ if((data.pendingOrders||[]).length||(data.trades||[]).length||(data.orderGroups||[]).length){
   const r=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-seskupenim-limitek');
   if(!r||r.ok!==true)throw new Error(r?.error||'Zálohu deníku před seskupením limitek nelze vytvořit.');
  }
@@ -1049,6 +1049,9 @@ async function importSwingCtraderEventNow(journalId,e){
  if(!draft||!draft.positionId)return 'wait';
  let idx=data.trades.indexOf(FJSwing.findTradeByPosition(data.trades,draft.positionId));
  let trade=idx>=0?data.trades[idx]:null;
+ // pozice, kterou si může vzít čekající skupina limitek: počkat na MCP synchronizaci (ta ji spáruje
+ // do obchodu skupiny); jen se zapnutým MCP a nejvýš 15 min od otevření, pak import jako dřív
+ if(!trade&&mcpSettings().enabled&&Date.now()-Date.parse(e.entryTime||'')<15*60000&&FJOrderGroups.groupMayClaimEvent(data.orderGroups||[],e,{decimalsOf:sym=>FJSwing.findInstrument(sym,FJSwing.instrumentsOf((data.settings.find(x=>x?.key==='main')||{}).value||{}))?.priceDecimals??null}))return 'wait';
  const before=JSON.stringify(trade);
  if(!trade){
   const decision=swingPairDecisions.get(draft.positionId);
