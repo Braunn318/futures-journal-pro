@@ -478,6 +478,15 @@
     return String(same[0].login) === String(selected.login) ? { ok: true } : { ok: false, reason: 'OTHER_ACTIVE', active: same[0] };
   }
 
+  // Pozice cTraderu, které obchod drží: positionId + ctraderPositionIds[] (obchod ze skupiny
+  // limitek má jednu pozici za každou naplněnou limitku). Žádná pozice nesmí být ve dvou obchodech.
+  function tradePositionIds(t) {
+    return [...new Set([t && t.positionId, ...((t && Array.isArray(t.ctraderPositionIds)) ? t.ctraderPositionIds : [])].filter(Boolean))];
+  }
+  const isGroupTrade = t => !!(t && t.orderGroupId && Array.isArray(t.ctraderPositionIds) && t.ctraderPositionIds.length);
+  function findTradeByPosition(trades, pid) {
+    return (trades || []).find(t => isSwingRecord(t) && tradePositionIds(t).includes(pid)) || null;
+  }
   // Plán synchronizace: z obchodů deníku a dat MCP (positions, history) spočítá nový seznam
   // obchodů. Čistá funkce – nic nezapisuje. Pozice, ke které existuje ručně zadaný obchod
   // (findPairCandidate) a ještě není rozhodnuto (opts.decisions: positionId → id obchodu / 'NEW'),
@@ -490,7 +499,7 @@
     const tooOld = iso => fromMs != null && Number.isFinite(Date.parse(iso || '')) && Date.parse(iso) < fromMs;
     const rows = [...(trades || [])];
     const byPid = new Map();
-    rows.forEach((t, i) => { if (isSwingRecord(t) && t.positionId) byPid.set(t.positionId, i); });
+    rows.forEach((t, i) => { if (isSwingRecord(t)) for (const pid of tradePositionIds(t)) byPid.set(pid, i); });
     const open = new Map((data.positions || []).map(p => ['ctrader-' + p.id, p]));
     const hist = new Map();
     for (const h of data.history || []) {
@@ -513,7 +522,7 @@
         if (cand && !dec) { out.pairs.push({ positionId: pid, candidateId: cand.id, draft }); continue; }
         if (cand) { idx = rows.indexOf(cand); t = mergeImported({ ...cand, positionId: pid }, draft); }
         else { t = { ...draft, createdAt: nowIso }; if (rows.some(x => x && x.id === t.id)) t.id += '_' + nowIso.replace(/\D/g, '').slice(-8); }
-      } else if (pos) {
+      } else if (pos && !isGroupTrade(t)) {
         t = mergeImported(t, swingFromMcpPosition(pos));
       }
       for (const h of legsRows) {
@@ -522,7 +531,12 @@
         const leg = legFromMcpHistory(h, lot);
         if (leg) t = addLeg(t, leg).trade;
       }
-      if (pos) {
+      if (isGroupTrade(t)) {
+        // obchod skupiny limitek (víc pozic): vstup, objem a otevření drží skupina
+        // (app/order-groups.js planGroupTrades); SL / TP jen z první otevřené pozice
+        const primary = tradePositionIds(t).find(x => open.has(x));
+        if (pos && primary === pid) t = applyMcpPosition(t, pos, nowLocal).trade;
+      } else if (pos) {
         t = reconcileOpenVolume(t, pos).trade;
         t = applyMcpPosition(t, pos, nowLocal).trade;
       } else if ((t.exits || []).length && (t.importedFields || []).includes('volume')) {
@@ -586,6 +600,7 @@
   }
 
   return {
+    tradePositionIds, isGroupTrade, findTradeByPosition,
     swingLegRows, swingTradeRecord, planMcpSync, sameLeg, legFromMcpHistory, swingFromMcpPosition, swingFromMcpHistory, addLeg, reconcileOpenVolume, mcpActiveAccountCheck,
     IMPORT_FIELDS, swingFromCtraderEvent, mergeImported, applyCtraderClose, findPairCandidate, applyMcpPosition, dropEditedImportedFields,
     JOURNAL_TYPES, JOURNAL_TYPE_VERSION, JOURNAL_TYPE_LABELS, journalTypeOf, isSwingType, isSwingRecord,

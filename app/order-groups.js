@@ -16,10 +16,11 @@
 
 (function (root, factory) {
   const isNode = typeof module !== 'undefined' && module.exports;
-  const api = factory();
+  const swing = () => (isNode ? require('./swing.js') : root.FJSwing);
+  const api = factory(swing);
   if (isNode) module.exports = api;
   if (root) root.FJOrderGroups = api;
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (FJSwing) {
 
   const ORDER_GROUPS_VERSION = 1;
   const SEEN_REFRESH_MS = 15 * 60000; // lastSeenAt se přepisuje nejvýš jednou za 15 min (méně zápisů)
@@ -280,7 +281,210 @@
     return tradeContextSig(before) === tradeContextSig(after) ? after : { ...after, contextEditedAfterFill: true };
   }
 
+  // ---- naplnění a přenos do obchodu (§4) ----
+  const EPS = 1e-9;
+  const isoToLocal = iso => { const ms = Date.parse(iso || ''); return Number.isFinite(ms) ? FJSwing().berlinNowLocal(ms) : null; };
+  const pidsOfTrade = t => [t && t.positionId, ...((t && Array.isArray(t.ctraderPositionIds)) ? t.ctraderPositionIds : [])].filter(Boolean);
+  const unresolved = g => !g.resolution;
+
+  // Pozice z MCP (otevřené + historie) jako kandidáti naplnění: celkový objem v jednotkách
+  // (zbytek otevřené pozice + všechny zavírací dealy), vstup, čas otevření, TP.
+  function positionCandidates(data, opts) {
+    const out = new Map();
+    for (const p of (data && data.positions) || []) {
+      const pid = 'ctrader-' + p.id;
+      out.set(pid, { pid, symbol: sym(p.symbolName), direction: String(p.tradeSide).toLowerCase() === 'sell' ? 'short' : 'long',
+        units: num(p.volumeInUnits) || 0, lotSize: num(p.lotSize), entry: num(p.entryPrice), openMs: Date.parse(p.openTime || ''), openTime: p.openTime, tp: num(p.takeProfitPrice), open: true });
+    }
+    for (const h of (data && data.history) || []) {
+      const pid = 'ctrader-' + h.positionId;
+      const c = out.get(pid) || { pid, symbol: sym(h.symbolName), direction: String(h.side).toLowerCase() === 'sell' ? 'short' : 'long',
+        units: 0, lotSize: null, entry: num(h.entryPrice), openMs: Date.parse(h.openTime || ''), openTime: h.openTime, tp: null, open: false };
+      c.units += num(h.volume) || 0;
+      out.set(pid, c);
+    }
+    for (const c of out.values()) {
+      const lot = c.lotSize || (opts && typeof opts.lotSizeOf === 'function' ? num(opts.lotSizeOf(c.symbol)) : null);
+      c.lots = lot ? round(c.units / lot, 8) : null;
+    }
+    return [...out.values()];
+  }
+  function fillMatches(g, m, c, decimals) {
+    if (c.symbol !== g.symbol || c.direction !== g.direction || c.entry == null || !Number.isFinite(c.openMs)) return false;
+    const mu = num(m.volumeInUnits), mv = num(m.volume);
+    if (mu != null) { if (Math.abs(c.units - mu) > EPS) return false; }
+    else if (mv == null || c.lots == null || Math.abs(c.lots - mv) > EPS) return false;
+    const from = Date.parse(m.lastSeenAt || m.firstSeenAt || ''), to = Date.parse(m.goneAt || '');
+    if (!Number.isFinite(from) || !Number.isFinite(to) || c.openMs < from - 60000 || c.openMs > to + 60000) return false;
+    const price = num(m.price != null ? m.price : g.price);
+    if (price == null) return false;
+    // limitka se plní na své ceně nebo lepší, stop na své ceně nebo horší
+    const better = g.direction === 'long' ? c.entry <= price + EPS : c.entry >= price - EPS;
+    const worse = g.direction === 'long' ? c.entry >= price - EPS : c.entry <= price + EPS;
+    if (g.orderType === 'STOP' ? !worse : !better) return false;
+    if (c.open && c.tp != null && num(m.tp) != null && priceKey(c.tp, decimals) !== priceKey(m.tp, decimals)) return false;
+    return true;
+  }
+  // Zmizelé cTrader limitky → pozice. Konzervativně: pozice, která už je v obchodu (mimo
+  // obchod téže skupiny) nebo u jiného člena, se nebere; pozice, která pasuje na členy
+  // víc skupin, se nepáruje vůbec. Vrací kopie skupin.
+  function linkFills(groups, trades, data, opts = {}) {
+    const out = (groups || []).map(clone);
+    const cands = positionCandidates(data, opts);
+    if (!cands.length) return { groups: out, changed: false, linked: 0 };
+    const usedBy = new Map();
+    for (const t of trades || []) for (const pid of pidsOfTrade(t)) usedBy.set(pid, t);
+    for (const g of out) for (const m of g.members || []) if (m.fill && m.fill.positionId) usedBy.set(m.fill.positionId, { _member: true });
+    const ownTrade = (g, t) => t && !t._member && (t.id === g.tradeId || t.orderGroupId === g.id);
+    const wanted = [];
+    for (const g of out) {
+      if (!unresolved(g)) continue;
+      const d = decimalsFor(opts, g.symbol);
+      for (const m of g.members || []) {
+        if (m.source !== 'CTRADER' || m.state !== 'GONE' || m.fill) continue;
+        const list = cands.filter(c => (!usedBy.has(c.pid) || ownTrade(g, usedBy.get(c.pid))) && fillMatches(g, m, c, d));
+        if (list.length) wanted.push({ g, m, list });
+      }
+    }
+    // pozice, o kterou stojí členové víc skupin = nejednoznačné
+    const groupsOf = new Map();
+    for (const w of wanted) for (const c of w.list) { if (!groupsOf.has(c.pid)) groupsOf.set(c.pid, new Set()); groupsOf.get(c.pid).add(w.g.id); }
+    const claimed = new Set();
+    let linked = 0;
+    for (const w of wanted.sort((a, b) => (num(a.m.tp) == null) - (num(b.m.tp) == null))) {
+      const d = decimalsFor(opts, w.g.symbol);
+      const free = w.list.filter(c => !claimed.has(c.pid) && groupsOf.get(c.pid).size === 1);
+      if (!free.length) continue;
+      const tpHit = free.filter(c => c.tp != null && num(w.m.tp) != null && priceKey(c.tp, d) === priceKey(w.m.tp, d));
+      const pick = (tpHit.length ? tpHit : free).sort((a, b) => a.openMs - b.openMs || String(a.pid).localeCompare(String(b.pid)))[0];
+      claimed.add(pick.pid);
+      w.m.state = 'FILLED';
+      w.m.fill = { positionId: pick.pid, entryPrice: pick.entry, openedAt: isoToLocal(pick.openTime), openTime: pick.openTime, volume: num(w.m.volume) };
+      w.g.updatedAt = opts.nowIso || w.g.updatedAt;
+      linked++;
+    }
+    return { groups: out, changed: linked > 0, linked };
+  }
+
+  // TP všech příkazů skupiny (od nejbližšího) s typem hladiny z kontextu.
+  function targetsOfGroup(g) {
+    const tl = (g.context && g.context.targetLevels) || {};
+    return sortMembers(g).filter(m => num(m.tp) != null).map(m => ({ price: num(m.tp), levelType: tl[m.orderId] || '' }));
+  }
+  function contextCopy(g) {
+    const c = cleanContext(g.context || {});
+    const out = {};
+    for (const k of CONTEXT_FIELDS) out[k] = clone(c[k]);
+    return out;
+  }
+  function fillAggregate(g) {
+    const filled = (g.members || []).filter(m => m.state === 'FILLED' && m.fill);
+    let w = 0, wp = 0, vol = 0, first = null, firstMs = Infinity;
+    for (const m of filled) {
+      const v = num(m.fill.volume != null ? m.fill.volume : m.volume), p = num(m.fill.entryPrice);
+      if (v != null) vol += v;
+      if (v != null && p != null) { w += v; wp += v * p; }
+      const ms = Date.parse(m.fill.openTime || '');
+      if (Number.isFinite(ms) && ms < firstMs) { firstMs = ms; first = m.fill.openedAt; }
+    }
+    return { filled, pids: filled.map(m => m.fill.positionId).filter(Boolean), volume: filled.length ? round(vol, 8) : null, entryPrice: w > 0 ? round(wp / w, 8) : null, openedAt: first };
+  }
+  // Návrh obchodu ze skupiny (tlačítka Naplněno / Nenaplněno): celá skupina = jeden obchod
+  // nebo jeden SETUP_ONLY. Nic se neukládá – formulář se předvyplní a uživatel potvrdí.
+  function draftFromGroup(g, filled, nowLocal) {
+    const v = groupView(g);
+    const agg = fillAggregate(g);
+    const base = {
+      kind: 'SWING', source: 'MANUAL', symbol: g.symbol, direction: g.direction,
+      entryPrice: agg.entryPrice != null ? agg.entryPrice : num(g.price), volume: v.totalVolume, slInitial: num(g.sl),
+      targetsPlanned: targetsOfGroup(g), exits: [], slMoves: [],
+      ...contextCopy(g),
+      orderGroupId: g.id, contextFilledAt: g.contextFilledAt || null, ...(g.account != null ? { ctraderAccountId: String(g.account) } : {}),
+      orderPlacedAt: v.placedAt, orderPrice: num(g.price)
+    };
+    if (!g.contextFilledAt) delete base.contextFilledAt;
+    const now = nowLocal || FJSwing().berlinNowLocal();
+    if (filled) return { ...base, openedAt: agg.openedAt || now };
+    return { ...base, recordType: 'SETUP_ONLY', fillStatus: 'NO_FILL', openedAt: v.placedAt || now };
+  }
+  // Uložený obchod / SETUP_ONLY z návrhu skupiny → skupina ví, kam patří.
+  function recordGroupDecision(groups, groupId, trade, nowIso) {
+    return (groups || []).map(g => {
+      if (g.id !== groupId) return g;
+      const x = { ...clone(g), tradeId: trade.id, updatedAt: nowIso || new Date().toISOString() };
+      if (trade.recordType === 'SETUP_ONLY') x.resolution = 'NO_FILL';
+      return x;
+    });
+  }
+  // Naplněné členy skupin → jeden obchod za skupinu. Nový obchod nese kontext skupiny celý;
+  // existující (uložený tlačítkem Naplněno) jen dostane pozice a agregát do prázdných /
+  // importovaných polí. Zbylé limitky, které zmizely bez naplnění → cancelledOrders.
+  function planGroupTrades(trades, groups, opts = {}) {
+    const nowIso = opts.nowIso || new Date().toISOString();
+    const rows = [...(trades || [])];
+    const gs = (groups || []).map(clone);
+    let created = 0, updated = 0, changed = false;
+    for (const g of gs) {
+      if (!unresolved(g)) continue;
+      const agg = fillAggregate(g);
+      if (!agg.filled.length) continue;
+      const idx = rows.findIndex(t => t && ((g.tradeId && t.id === g.tradeId) || t.orderGroupId === g.id));
+      const before = idx >= 0 ? JSON.stringify(rows[idx]) : null;
+      let t;
+      if (idx < 0) {
+        const allCt = (g.members || []).every(m => m.source === 'CTRADER');
+        t = {
+          id: 'sw_og_' + String(g.id).replace(/[^A-Za-z0-9_-]/g, '_'), kind: 'SWING', source: allCt ? 'CTRADER' : 'MANUAL',
+          orderGroupId: g.id, ...(g.account != null ? { ctraderAccountId: String(g.account) } : {}),
+          positionId: undefined, ctraderPositionIds: [],
+          symbol: g.symbol, direction: g.direction, openedAt: agg.openedAt, entryPrice: agg.entryPrice, volume: agg.volume,
+          slInitial: num(g.sl), slMoves: [], targetsPlanned: targetsOfGroup(g), riskAmount: null, exits: [],
+          ...contextCopy(g), ...(g.contextFilledAt ? { contextFilledAt: g.contextFilledAt } : {}),
+          orderPlacedAt: groupView(g).placedAt, orderPrice: num(g.price),
+          importedFields: ['symbol', 'direction', 'openedAt', 'entryPrice', 'volume', 'slInitial', 'targetsPlanned'],
+          createdAt: nowIso
+        };
+        if (rows.some(x => x && x.id === t.id)) t.id += '_' + nowIso.replace(/\D/g, '').slice(-8);
+      } else {
+        t = { ...rows[idx], ctraderPositionIds: [...(rows[idx].ctraderPositionIds || [])], importedFields: [...(rows[idx].importedFields || [])] };
+        if (!t.orderGroupId) t.orderGroupId = g.id;
+      }
+      // pozice skupiny (žádná nesmí být v jiném obchodu)
+      const elsewhere = new Set(rows.filter((x, i) => i !== idx && x).flatMap(pidsOfTrade));
+      for (const pid of agg.pids) if (!elsewhere.has(pid) && !t.ctraderPositionIds.includes(pid)) t.ctraderPositionIds.push(pid);
+      if (!t.positionId && t.ctraderPositionIds.length) t.positionId = t.ctraderPositionIds[0];
+      if (t.positionId === undefined) delete t.positionId;
+      const imp = f => t[f] === null || t[f] === undefined || t[f] === '' || t.importedFields.includes(f);
+      for (const [f, v] of [['entryPrice', agg.entryPrice], ['volume', agg.volume], ['openedAt', agg.openedAt]]) {
+        if (v == null || !imp(f)) continue;
+        t[f] = v;
+        if (!t.importedFields.includes(f)) t.importedFields.push(f);
+      }
+      if (t.openedAt) t.date = FJSwing().swingListDate(t);
+      const withTp = sortMembers(g).filter(x => num(x.tp) != null);
+      const cancelled = sortMembers(g).filter(m => m.state === 'GONE')
+        .map(m => ({ orderId: m.orderId, label: num(m.tp) != null ? 'TP' + (withTp.indexOf(m) + 1) : 'bez TP', tp: num(m.tp), volume: num(m.volume) }));
+      if (cancelled.length) t.cancelledOrders = cancelled; else delete t.cancelledOrders;
+      if (JSON.stringify(t) === before) { if (g.tradeId !== t.id) { g.tradeId = t.id; changed = true; } continue; }
+      t.updatedAt = nowIso;
+      if (idx >= 0) { rows[idx] = t; updated++; } else { rows.push(t); created++; }
+      if (g.tradeId !== t.id) { g.tradeId = t.id; g.updatedAt = nowIso; }
+      changed = true;
+    }
+    return { trades: rows, groups: gs, created, updated, changed };
+  }
+  // Jedna synchronizace skupin: snímky příkazů → naplnění → obchody skupin. planMcpSync běží až
+  // nad výsledkem (pozice skupin už mají svůj obchod, takže se neptá na spárování).
+  function syncStage(groups, trades, liveOrders, data, opts = {}) {
+    const a = planOrderGroups(groups, liveOrders, opts);
+    const b = (opts.sources || ['MANUAL', 'CTRADER']).includes('CTRADER') ? linkFills(a.groups, trades, data, opts) : { groups: a.groups, changed: false, linked: 0 };
+    const c = planGroupTrades(trades, b.groups, opts);
+    return { groups: c.groups, trades: c.trades, changed: a.changed || b.changed || c.changed, linked: b.linked, created: c.created, updated: c.updated };
+  }
+
+
   return {
+    linkFills, planGroupTrades, syncStage, draftFromGroup, recordGroupDecision, targetsOfGroup,
     applyGroupContext, markContextEdit, cleanContext, tradeContextSig,
     ORDER_GROUPS_VERSION, CONTEXT_FIELDS, groupKeyOf, planOrderGroups, groupView, sortMembers, isOpenGroup, contextFilled,
     canMerge, mergeGroups, splitGroup, migratePendingOrders

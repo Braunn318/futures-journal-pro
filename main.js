@@ -941,6 +941,12 @@ function journalImageOwners(journal) {
   for (const t of Array.isArray(journal?.trades) ? journal.trades : []) {
     if (t && typeof t === 'object') out.push({ key: String(t.id || ''), record: t, base: imageBaseFor(t) });
   }
+  // Plánované obchody (skupiny limitek) drží screenshoty kontextu před vstupem. Jméno podle
+  // nich nedostávají (base null), ale počítají se jako odkaz – přejmenování u obchodu pak
+  // soubor skupiny nesmaže (docs/ZADANI_SWING_SLUCOVANI_PRIKAZU.md).
+  for (const g of Array.isArray(journal?.orderGroups) ? journal.orderGroups : []) {
+    if (g && typeof g === 'object') out.push({ key: `orderGroup:${g.id || ''}`, record: g, base: null });
+  }
   const notes = journal?.dayNotes && typeof journal.dayNotes === 'object' ? journal.dayNotes : {};
   for (const [date, note] of Object.entries(notes)) {
     if (note && typeof note === 'object') out.push({ key: `day:${date}`, record: note, base: imageBaseFor({ date, day: true }) });
