@@ -115,7 +115,7 @@ test('8 mapa vypnutá: náhled svíček a dopočty v kartě Setup / Hladiny jako
   // renderSignalBar s vypnutou mapou kreslí do #signalBarPreview a #signalBarInfo,
   // renderContextDerived nechá části o hladinách (omitLevels jen se zapnutou mapou).
   assert.match(SRC, /const infoEl=mapOn\?\$\('tradeMapSignal'\):\$\('signalBarInfo'\);/);
-  assert.match(SRC, /if\(!mapOn\)\{\n  \$\('signalBarPreview'\)\.innerHTML=/);
+  assert.match(SRC, /if\(!mapOn\)\{\r?\n  \$\('signalBarPreview'\)\.innerHTML=/);
   assert.match(SRC, /omitLevels:typeof levelsMapOn==='function'&&levelsMapOn\(\)\}\);/);
   const { derivedSummaryParts } = require('../app/context.js');
   const d = { nearLevels: [{ position: 'STOP_TO_ENTRY', fromStop: 3 }], nearestAheadTicks: 5, levelsStopToEntry: 1, levelsEntryToTarget: 0, stopBehindTicks: 3, tradeNoInDay: 2 };

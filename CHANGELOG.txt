@@ -12,6 +12,7 @@ Swing – plánovaný obchod ze skupiny limitek a kontext před vstupem (docs/ZA
 - New: swing formulář má nová pole Hladina vstupu, TF vstupu, Trend daily, Weekly a Důvod vstupu (volný text s nabídkou; číselníky přijdou s krokem 6 swing zadání).
 - Changed: deník nově ukládá orderGroups (+ značka orderGroupsVersion). Migrace: dosavadní ruční limitky se seskupí, záloha pred-seskupenim-limitek. Synchronizace z cTraderu čte i čekající limitky (get_pending_orders, jen čtení).
 - Fixed (v rámci dávky): screenshot kontextu skupiny se při přejmenování obrázků u obchodu nesmaže (skupiny jsou mezi vlastníky obrázků).
+- Fixed: test „8 mapa vypnutá“ (tests/levels-settings.test.js) přijme konec řádku LF i CRLF – padal jen kvůli CRLF v pracovní kopii.
 
 ## 4.8.103 - 2026-11-14
 Mapa obchodu – hladiny a signální svíčky v jednom grafu (docs/ZADANI_DENIK_MAPA_OBCHODU.md). Tvar dat nearLevels, AI export i CSV beze změny.
