@@ -2,6 +2,17 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.104 - 2026-11-19
+Swing – plánovaný obchod ze skupiny limitek a kontext před vstupem (docs/ZADANI_SWING_SLUCOVANI_PRIKAZU.md). Futures deník beze změny.
+- New: Pozice/Příkazy ve swing deníku ukazují jeden řádek za plánovaný obchod: limitky se stejným účtem, symbolem, směrem, typem, cenou vstupu a SL se seskupí samy (TP1 / TP2 … od nejbližšího, celkový objem s rozpadem 0,15 = 0,075 + 0,075, počet příkazů, zdroj, „kontext chybí / ✓ kontext“). ▸ rozbalí jednotlivé příkazy. Při jakékoli neshodě se automaticky neslučuje.
+- New: ruční „Sloučit vybrané“ (zaškrtnuté řádky; rozdílná cena / SL jen po potvrzení v aplikaci, rozdílný účet / symbol / směr nejde) a „Rozdělit“. Ručně sloučené / rozdělené skupiny automatika už nemění ani po synchronizaci z cTraderu.
+- New: „Kontext“ u skupiny = kontextová část swing formuláře (setup, hladina vstupu, TF vstupu, trend daily, weekly, známka, riziko, důvod vstupu, komentář, screenshoty, typ hladiny ke každému TP). Uloží se čas vyplnění; úprava po naplnění se označí („kontext upraven po naplnění“).
+- New: naplnění skupiny = jeden swing obchod: všechny pozice z jejích limitek (ctraderPositionIds), vstup = objemově vážený průměr, objem = součet, cíle = TP všech limitek, výstupy všech pozic jako nohy, kontext celý včetně screenshotů. Vazbu limitka → pozice cTrader nedává; deník ji páruje konzervativně (symbol, směr, objem, čas mezi posledním viděním a zmizením, cena na limitu nebo lepší, TP) a při nejednoznačnosti nepáruje.
+- New: částečné naplnění – obchod vznikne z toho, co se naplnilo, zbytek dál čeká ve skupině; zrušená zbylá limitka = poznámka „TP2 limitka zrušena“ u obchodu, ne další záznam. Naplněno / Nenaplněno působí na celou skupinu (jeden obchod / jeden setup bez vstupu), jen předvyplní formulář.
+- New: swing formulář má nová pole Hladina vstupu, TF vstupu, Trend daily, Weekly a Důvod vstupu (volný text s nabídkou; číselníky přijdou s krokem 6 swing zadání).
+- Changed: deník nově ukládá orderGroups (+ značka orderGroupsVersion). Migrace: dosavadní ruční limitky se seskupí, záloha pred-seskupenim-limitek. Synchronizace z cTraderu čte i čekající limitky (get_pending_orders, jen čtení).
+- Fixed (v rámci dávky): screenshot kontextu skupiny se při přejmenování obrázků u obchodu nesmaže (skupiny jsou mezi vlastníky obrázků).
+
 ## 4.8.103 - 2026-11-14
 Mapa obchodu – hladiny a signální svíčky v jednom grafu (docs/ZADANI_DENIK_MAPA_OBCHODU.md). Tvar dat nearLevels, AI export i CSV beze změny.
 - New: Mapa obchodu v kartě Hladiny. Vlevo svíčky ze snímku trhu (5 nebo 10, OHLC + čárka VPOC, signální orámovaná – klikem se vybírá jako dřív, jen −1 … −5). Přes celou šířku Vstup, SL, Cíl 1 … n a všechny hladiny bez ohledu na zdroj; zdroj = styl čáry (LTA plná, snímek čárkovaná, ruční tečkovaná) s legendou. Popisek vpravo: název · vzdálenost od vstupu (ticky / body podle přepínače) · test / netest. Podbarvená pásma SL → vstup a vstup → poslední cíl (jen poloha, žádná role).
