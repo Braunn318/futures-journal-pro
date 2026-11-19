@@ -273,7 +273,20 @@ function startMcpPolling(){
 }
 function stopMcpPolling(){if(mcpTimer){clearInterval(mcpTimer);mcpTimer=null}}
 function manualPendingOrders(){return (Array.isArray(db?.data?.pendingOrders)?db.data.pendingOrders:[]).map(o=>FJSwing.sanitizePendingOrder(o,o.placedAt)).filter(Boolean)}
+function renderMcpOrdersStatus(){
+ const s=mcpSettings();
+ const status=$('mcpOrdersStatus');
+ if(!status)return;
+ if(!s.enabled)status.innerHTML='Limitky z cTraderu jsou vypnuté (Nastavení → Připojení a zdroje dat → cTrader → „Limitky z cTraderu přes MCP“).';
+ else if(mcpState.available===null)status.textContent='cTrader: načítám…';
+ else if(!mcpState.available)status.innerHTML='<span title="Zapni v cTraderu Settings → Advanced → MCP server → Enable MCP server">cTrader nevypadá spuštěný (MCP server neodpovídá).</span>';
+ else{const a=mcpState.account||{};status.textContent=`cTrader: ${mcpState.orders.length} limitek · aktivní účet ${a.broker||'?'} · ${a.currency||''} · zůstatek ${fmtNum(a.balance)} · načteno ${new Date(mcpState.fetchedAt).toLocaleTimeString('cs-CZ')}${isSwingJournalActive()&&swingMcpAccountOk===false?' · účet nepatří tomuto deníku – limitky se jen ukazují, neukládají':''}`}
+}
 function renderPendingOrders(){
+ if(isSwingJournalActive())return renderOrderGroups();
+ renderPendingOrdersFlat();
+}
+function renderPendingOrdersFlat(){
  const target=$('pendingOrdersRows');
  if(!target)return;
  const s=mcpSettings();
@@ -326,8 +339,190 @@ function orderToTrade(o,filled){
 async function deletePendingOrder(o){
  if(!o)return;
  if(!(await showConfirm(`Smazat limitku ${o.symbol} @ ${fmtPrice(o.price,o.symbol)}?`,{title:'Smazat limitku',ok:'Smazat'})))return;
- await commitJournal(j=>{j.pendingOrders=(j.pendingOrders||[]).filter(x=>x?.id!==o.id)});
+ await commitJournal(j=>{j.pendingOrders=(j.pendingOrders||[]).filter(x=>x?.id!==o.id);planManualOrderGroups(j)});
  renderPendingOrders();
+}
+
+// ---------- plánované obchody = skupiny limitek (docs/ZADANI_SWING_SLUCOVANI_PRIKAZU.md) ----------
+// Výpočty v app/order-groups.js (FJOrderGroups). Skupiny se ukládají do deníku (orderGroups):
+// ruční limitky při každé změně seznamu, cTrader limitky při synchronizaci – a jen když je
+// v cTraderu aktivní účet deníku (swingMcpAccountOk). Zobrazení počítá skupiny znovu nad
+// aktuálními příkazy (stejná funkce), takže nová limitka je vidět hned, ještě před zápisem.
+let swingMcpAccountOk=null;
+const orderGroupsExpanded=new Set();
+const orderGroupsSelected=new Set();
+function orderGroupOpts(extra){
+ return {account:settings?.ctraderMcpAccount?.login??null,decimalsOf:s=>swingInstrumentOf(s)?.priceDecimals??null,nowIso:new Date().toISOString(),...extra};
+}
+function storedOrderGroups(){return Array.isArray(db?.data?.orderGroups)?db.data.orderGroups:[]}
+function mcpOrdersUsable(){return mcpSettings().enabled&&mcpState.available===true&&swingMcpAccountOk===true}
+function viewOrderGroups(){
+ const ct=mcpOrdersUsable();
+ return FJOrderGroups.planOrderGroups(storedOrderGroups(),[...manualPendingOrders(),...(ct?mcpState.orders:[])],orderGroupOpts({sources:ct?['MANUAL','CTRADER']:['MANUAL']})).groups;
+}
+// Limitky cTraderu, když je aktivní jiný účet: jen ukázat (seskupené), nic neukládat.
+function foreignOrderGroups(){
+ if(!mcpSettings().enabled||mcpState.available!==true||swingMcpAccountOk===true)return [];
+ let n=0;
+ return FJOrderGroups.planOrderGroups([],mcpState.orders,orderGroupOpts({account:'?',sources:['CTRADER'],idGen:()=>'tmp_'+(++n)})).groups.map(g=>({...g,transient:true}));
+}
+// Ruční limitky deníku → skupiny (uvnitř commitJournal, j = kopie deníku).
+function planManualOrderGroups(j){
+ if(!isSwingJournalActive())return;
+ const orders=(j.pendingOrders||[]).map(o=>FJSwing.sanitizePendingOrder(o,o.placedAt)).filter(Boolean);
+ const r=FJOrderGroups.planOrderGroups(j.orderGroups||[],orders,orderGroupOpts({sources:['MANUAL']}));
+ if(r.changed)j.orderGroups=r.groups;
+}
+// Migrace (§5): každý dosavadní ruční příkaz do skupiny podle §2.1. Záloha → zápis → značka.
+async function runOrderGroupsMigration(){
+ if(!isSwingJournalActive())return {skipped:true};
+ const data=await ensureActiveJournalData();
+ const m=FJOrderGroups.migratePendingOrders(data,orderGroupOpts());
+ if(m.skipped)return m;
+ if((data.pendingOrders||[]).length){
+  const r=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-seskupenim-limitek');
+  if(!r||r.ok!==true)throw new Error(r?.error||'Zálohu deníku před seskupením limitek nelze vytvořit.');
+ }
+ await commitJournal(j=>{
+  const again=FJOrderGroups.migratePendingOrders(j,orderGroupOpts());
+  if(again.skipped)return;
+  j.orderGroups=again.orderGroups;j.orderGroupsVersion=again.orderGroupsVersion;
+ });
+ return {created:m.created};
+}
+const GROUP_STATUS_PILL={
+ PENDING:'',
+ PARTIAL:'<span class="pill be" title="Část limitek se naplnila – obchod je v Deníku, zbytek dál čeká">částečně naplněno</span>',
+ FILLED:'<span class="pill">naplněno</span>',
+ GONE:'<span class="pill hypo-pill" title="Limitky už v cTraderu nejsou a pozice k nim se nenašla – zrušené / expirované, nebo naplněné mimo dohled deníku">limitky zmizely</span>'
+};
+function orderGroupVisible(g){
+ if(g.resolution)return false;
+ const v=FJOrderGroups.groupView(g);
+ return v.status==='PENDING'||v.status==='PARTIAL'||(v.status==='GONE'&&!g.tradeId);
+}
+function memberRowHTML(g,m,i,n){
+ const label=m.tp!=null?`TP${i+1}`:'bez TP';
+ const st=m.state==='FILLED'?'<span class="pill">naplněno</span>':m.state==='GONE'?'<span class="pill hypo-pill">zmizela</span>':'';
+ return `<tr class="order-member-row" data-member-of="${esc(g.id)}">
+  <td><span class="sub">└ ${esc(label)}</span> <span class="src-pill">${m.source==='CTRADER'?'cTrader':'ručně'}</span></td>
+  <td class="sub">${esc(m.note||'')} ${st}</td><td></td><td></td>
+  <td>${fmtPrice(m.price,g.symbol)}${m.price!==g.price?' <span class="neg" title="Jiná cena než skupina">≠</span>':''}</td>
+  <td>${fmtPrice(m.sl,g.symbol)}${m.sl!==g.sl?' <span class="neg" title="Jiný SL než skupina">≠</span>':''}</td>
+  <td>${fmtPrice(m.tp,g.symbol)}</td><td>${fmtNum(m.volume,4)}</td>
+  <td>${m.placedAt?fmtLocal(m.placedAt)+(m.placedAtApprox?' <span class="sub" title="Čas zadání cTrader nedává – poprvé viděno">≈</span>':''):'—'}</td>
+  <td>${m.expiresAt?fmtLocal(m.expiresAt):'—'}</td>
+  <td class="swing-actions">${m.source==='MANUAL'&&m.state==='PENDING'?`<button class="btn" data-order-edit="${esc(m.orderId)}">Upravit</button><button class="btn danger" data-order-del="${esc(m.orderId)}">🗑️</button>`:''}</td></tr>`;
+}
+function orderGroupRowHTML(g){
+ const v=FJOrderGroups.groupView(g);
+ const open=FJOrderGroups.isOpenGroup(g);
+ const tps=v.tps.length?v.tps.map((p,i)=>`<div><span class="sub">TP${i+1}</span> ${fmtPrice(p,g.symbol)}</div>`).join(''):'—';
+ const vol=v.totalVolume==null?'—':(v.count>1?`<b>${fmtNum(v.totalVolume,4)}</b><div class="sub">= ${v.volumes.map(x=>fmtNum(x,4)).join(' + ')}</div>`:fmtNum(v.totalVolume,4));
+ const ctx=g.transient?'':(v.contextFilled?'<span class="pill" title="Kontext před vstupem je vyplněný">✓ kontext</span>':'<span class="pill incomplete-pill" title="Kontext před vstupem chybí">kontext chybí</span>');
+ const exp=orderGroupsExpanded.has(g.id);
+ const actions=g.transient?'<span class="sub">jiný účet</span>':`
+   <button class="btn" data-group-context="${esc(g.id)}" title="Setup, důvod vstupu, screenshoty… – přenese se do obchodu">Kontext</button>
+   ${!g.tradeId?`<button class="btn" data-group-filled="${esc(g.id)}" title="Limitky skupiny se naplnily – předvyplní jeden swing obchod (uloží se až po potvrzení)">Naplněno</button>
+   <button class="btn" data-group-nofill="${esc(g.id)}" title="Limitky zmizely bez naplnění – předvyplní jeden setup bez vstupu za celou skupinu">Nenaplněno</button>`:''}
+   ${v.status==='GONE'?`<button class="btn" data-group-dismiss="${esc(g.id)}" title="Skrýt bez záznamu">Skrýt</button>`:''}
+   ${open&&v.count>1?`<button class="btn" data-group-split="${esc(g.id)}" title="Každá limitka jako samostatný plánovaný obchod">Rozdělit</button>`:''}`;
+ return `<tr class="order-group-row" data-group-id="${esc(g.id)}">
+  <td>${!g.transient&&open?`<input type="checkbox" class="order-group-select" data-group-select="${esc(g.id)}" ${orderGroupsSelected.has(g.id)?'checked':''} title="Vybrat ke sloučení">`:''}
+   <button class="btn" data-group-toggle="${esc(g.id)}" title="${exp?'Skrýt':'Ukázat'} jednotlivé příkazy" style="padding:0 6px">${exp?'▾':'▸'}</button>
+   ${v.sources.map(s=>`<span class="src-pill">${s==='CTRADER'?'cTrader':'ručně'}</span>`).join(' ')}</td>
+  <td><b>${esc(g.symbol)}</b> <span class="sub">${v.count} ${v.count===1?'příkaz':v.count<5?'příkazy':'příkazů'}</span>${g.groupManual?' <span class="sub" title="Seskupeno ručně – automatika na skupinu nesahá">ručně</span>':''}<div>${ctx} ${GROUP_STATUS_PILL[v.status]||''}${v.priceMismatch||v.slMismatch?` <span class="pill loss" title="Příkazy ve skupině mají rozdílnou ${v.priceMismatch?'cenu vstupu':''}${v.priceMismatch&&v.slMismatch?' a ':''}${v.slMismatch?'SL':''}">rozdílná ${v.priceMismatch?'cena':''}${v.priceMismatch&&v.slMismatch?' / ':''}${v.slMismatch?'SL':''}</span>`:''}</div></td>
+  <td>${dirPill(g.direction)}</td>
+  <td>${g.orderType==='STOP'?'Stop':'Limit'}</td>
+  <td>${fmtPrice(g.price,g.symbol)}</td>
+  <td>${fmtPrice(g.sl,g.symbol)}</td>
+  <td>${tps}</td>
+  <td>${vol}</td>
+  <td>${v.placedAt?fmtLocal(v.placedAt):'—'}</td>
+  <td>${v.expiresAt?fmtLocal(v.expiresAt):'—'}</td>
+  <td class="swing-actions">${actions}</td></tr>${exp?v.members.map((m,i)=>memberRowHTML(g,m,i,v.count)).join(''):''}`;
+}
+function ensureOrderGroupToolbar(){
+ if($('mergeOrderGroupsBtn')||!$('refreshOrdersBtn'))return;
+ const b=document.createElement('button');b.className='btn swing-only';b.id='mergeOrderGroupsBtn';b.textContent='Sloučit vybrané';
+ b.title='Vybrané plánované obchody (zaškrtnuté řádky) spojí do jednoho';
+ $('refreshOrdersBtn').insertAdjacentElement('beforebegin',b);
+ b.onclick=()=>void mergeSelectedOrderGroups();
+}
+function renderOrderGroups(){
+ const target=$('pendingOrdersRows');
+ if(!target)return;
+ ensureOrderGroupToolbar();
+ renderMcpOrdersStatus();
+ const groups=viewOrderGroups().filter(orderGroupVisible);
+ const foreign=foreignOrderGroups();
+ const all=[...groups,...foreign].sort((a,b)=>String(a.symbol).localeCompare(String(b.symbol))||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+ for(const id of [...orderGroupsSelected])if(!groups.some(g=>g.id===id))orderGroupsSelected.delete(id);
+ const mb=$('mergeOrderGroupsBtn');if(mb)mb.disabled=orderGroupsSelected.size<2;
+ target.innerHTML=all.length?all.map(orderGroupRowHTML).join(''):'<tr><td colspan="11" class="sub">Žádné čekající příkazy.</td></tr>';
+ const byGroup=id=>all.find(g=>g.id===id);
+ const manualById=id=>manualPendingOrders().find(o=>o.id===id);
+ target.querySelectorAll('[data-group-toggle]').forEach(b=>b.onclick=()=>{const id=b.dataset.groupToggle;orderGroupsExpanded.has(id)?orderGroupsExpanded.delete(id):orderGroupsExpanded.add(id);renderOrderGroups()});
+ target.querySelectorAll('[data-group-select]').forEach(cb=>cb.onchange=()=>{cb.checked?orderGroupsSelected.add(cb.dataset.groupSelect):orderGroupsSelected.delete(cb.dataset.groupSelect);const m=$('mergeOrderGroupsBtn');if(m)m.disabled=orderGroupsSelected.size<2});
+ target.querySelectorAll('[data-group-split]').forEach(b=>b.onclick=()=>void splitOrderGroupUi(b.dataset.groupSplit));
+ target.querySelectorAll('[data-group-context]').forEach(b=>b.onclick=()=>void openGroupContext(byGroup(b.dataset.groupContext)));
+ target.querySelectorAll('[data-group-filled]').forEach(b=>b.onclick=()=>void groupToTrade(byGroup(b.dataset.groupFilled),true));
+ target.querySelectorAll('[data-group-nofill]').forEach(b=>b.onclick=()=>void groupToTrade(byGroup(b.dataset.groupNofill),false));
+ target.querySelectorAll('[data-group-dismiss]').forEach(b=>b.onclick=()=>void dismissOrderGroup(byGroup(b.dataset.groupDismiss)));
+ target.querySelectorAll('[data-order-edit]').forEach(b=>b.onclick=()=>openOrderModal(manualById(b.dataset.orderEdit)));
+ target.querySelectorAll('[data-order-del]').forEach(b=>b.onclick=()=>void deletePendingOrder(manualById(b.dataset.orderDel)));
+}
+// Skupiny ze zobrazení uloží do deníku, pokud se liší (nové limitky ještě před synchronizací).
+async function persistViewedGroups(){
+ const view=viewOrderGroups();
+ if(JSON.stringify(view)===JSON.stringify(storedOrderGroups()))return;
+ await commitJournal(j=>{
+  const ct=mcpOrdersUsable();
+  const orders=[...(j.pendingOrders||[]).map(o=>FJSwing.sanitizePendingOrder(o,o.placedAt)).filter(Boolean),...(ct?mcpState.orders:[])];
+  const r=FJOrderGroups.planOrderGroups(j.orderGroups||[],orders,orderGroupOpts({sources:ct?['MANUAL','CTRADER']:['MANUAL']}));
+  if(r.changed)j.orderGroups=r.groups;
+ });
+}
+async function mergeSelectedOrderGroups(){
+ await persistViewedGroups();
+ const ids=[...orderGroupsSelected];
+ const picked=storedOrderGroups().filter(g=>ids.includes(g.id));
+ if(picked.length<2){showToast('Zaškrtni aspoň dva plánované obchody.');return}
+ const chk=FJOrderGroups.canMerge(picked);
+ const BLOCK={account:'Nejde sloučit: příkazy jsou z různých účtů.',symbol:'Nejde sloučit: rozdílný symbol.',direction:'Nejde sloučit: rozdílný směr.',
+  filled:'Nejde sloučit: některý z vybraných už má naplnění nebo rozhodnutí.',context:'Nejde sloučit: kontext je vyplněný u víc vybraných – kontext jednoho by se ztratil. Nech kontext jen u jednoho.',count:'Zaškrtni aspoň dva plánované obchody.'};
+ if(!chk.ok){showToast(BLOCK[chk.block]||'Nejde sloučit.');return}
+ if(chk.warn.includes('price')||chk.warn.includes('sl')||chk.warn.includes('orderType')){
+  const what=[chk.warn.includes('price')?'cena vstupu':'',chk.warn.includes('sl')?'SL':'',chk.warn.includes('orderType')?'typ příkazu':''].filter(Boolean).join(' / ');
+  const ok=await showConfirm(`Rozdílná ${what}. Sloučit přesto?\n\nSkupina si nechá cenu a SL ${picked.find(FJOrderGroups.contextFilled)?'skupiny s kontextem':'nejstarší skupiny'}; u jednotlivých příkazů zůstanou jejich vlastní.`,{title:'Sloučit plánované obchody',ok:'Sloučit přesto'});
+  if(!ok)return;
+ }
+ await commitJournal(j=>{j.orderGroups=FJOrderGroups.mergeGroups(j.orderGroups||[],ids,orderGroupOpts()).groups});
+ orderGroupsSelected.clear();
+ renderOrderGroups();
+ showToast('Sloučeno do jednoho plánovaného obchodu. Automatika ho už měnit nebude.');
+}
+async function splitOrderGroupUi(id){
+ await persistViewedGroups();
+ if(!storedOrderGroups().some(g=>g.id===id))return;
+ await commitJournal(j=>{j.orderGroups=FJOrderGroups.splitGroup(j.orderGroups||[],id,orderGroupOpts()).groups});
+ orderGroupsExpanded.delete(id);
+ renderOrderGroups();
+ showToast('Rozděleno – každý příkaz je samostatný plánovaný obchod. Synchronizace je znovu nesloučí.');
+}
+async function dismissOrderGroup(g){
+ if(!g)return;
+ if(!(await showConfirm(`Skrýt plánovaný obchod ${g.symbol} @ ${fmtPrice(g.price,g.symbol)}? Nic se nemaže, jen se přestane ukazovat (bez záznamu „nenaplněno“).`,{title:'Skrýt plánovaný obchod',ok:'Skrýt'})))return;
+ await persistViewedGroups();
+ await commitJournal(j=>{const x=(j.orderGroups||[]).find(y=>y.id===g.id);if(x){x.resolution='DISMISSED';x.updatedAt=new Date().toISOString()}});
+ renderOrderGroups();
+}
+async function openGroupContext(g){showToast('Kontext před vstupem přijde v dalším kroku.')}
+async function groupToTrade(g,filled){
+ if(!g)return;
+ const m=FJOrderGroups.sortMembers(g).find(x=>x.state==='PENDING')||FJOrderGroups.sortMembers(g)[0];
+ if(!m)return;
+ orderToTrade({id:m.orderId,source:m.source,symbol:g.symbol,direction:g.direction,orderType:g.orderType,price:m.price,sl:m.sl,tp:m.tp,volume:m.volume,placedAt:m.placedAt},filled);
 }
 
 function renderPositionsTab(){
@@ -388,6 +583,7 @@ async function saveOrderModal(){
   const list=Array.isArray(j.pendingOrders)?j.pendingOrders:(j.pendingOrders=[]);
   const i=list.findIndex(x=>x?.id===o.id);
   if(i>=0)list[i]=o;else list.push(o);
+  planManualOrderGroups(j);
  });
  $('orderModal').classList.remove('open');
  renderPendingOrders();
@@ -831,6 +1027,8 @@ async function syncSwingFromMcp({manual=false}={}){
   const r=await window.desktopAPI.ctraderSyncData(s.url);
   if(!r?.available){swingMcpLast={at:new Date().toISOString(),ok:false,message:'cTrader nevypadá spuštěný (MCP server neodpovídá).'};return null}
   const check=FJSwing.mcpActiveAccountCheck(settings.ctraderMcpAccount,r.balance,r.accounts);
+  swingMcpAccountOk=check.ok;
+  if(Array.isArray(r.orders))mcpState={available:true,orders:r.orders.map(FJSwing.pendingFromMcp).filter(Boolean),account:r.balance?{broker:r.balance.brokerName||null,currency:r.balance.depositAsset||null,balance:r.balance.balance??null}:mcpState.account,fetchedAt:r.fetchedAt||new Date().toISOString()};
   // okamžitý P/L jen pro účet, který patří deníku
   swingLivePositions=new Map(check.ok?(r.positions||[]).map(p=>['ctrader-'+p.id,{currentPrice:p.currentPrice,netProfit:p.netProfit,grossProfit:p.grossProfit,pips:p.pips,at:r.fetchedAt||new Date().toISOString()}]):[]);
   const active=(r.accounts||[]).find(a=>a.brokerTitle===r.balance?.brokerName&&a.currency===r.balance?.depositAsset&&Number(a.balance)===Number(r.balance?.balance))||null;
@@ -866,13 +1064,21 @@ async function syncSwingFromMcp({manual=false}={}){
   for(const sym of missing)swingImportWaiting.set(sym,(swingImportWaiting.get(sym)||0)+1);
   const incomplete=r.stats&&Number(r.stats.totalTrades)>(r.history||[]).length;
   let result={created:0,updated:0};
-  if(plan.created||plan.updated){
+  // plánované obchody: snímky cTrader limitek (jen když je známý seznam limitek)
+  const groupSources=Array.isArray(r.orders)?['MANUAL','CTRADER']:['MANUAL'];
+  const groupOrders=()=>[...manualPendingOrders(),...(Array.isArray(r.orders)?mcpState.orders:[])];
+  const groupPlan=FJOrderGroups.planOrderGroups(db.data.orderGroups||[],groupOrders(),orderGroupOpts({sources:groupSources}));
+  if(plan.created||plan.updated||groupPlan.changed){
    if(!swingSyncBackedUp){
     const b=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-synchronizaci-ctrader');
     if(!b||b.ok!==true){swingMcpLast={at:new Date().toISOString(),ok:false,message:'Zálohu deníku před synchronizací nejde vytvořit – nic se nezapsalo.'};return null}
     swingSyncBackedUp=true;
    }
-   result=await commitJournal(j=>{const p=FJSwing.planMcpSync(j.trades||[],r,opts());j.trades=p.trades;return {created:p.created,updated:p.updated}});
+   result=await commitJournal(j=>{
+    const g=FJOrderGroups.planOrderGroups(j.orderGroups||[],groupOrders(),orderGroupOpts({sources:groupSources}));
+    if(g.changed)j.orderGroups=g.groups;
+    const p=FJSwing.planMcpSync(j.trades||[],r,opts());j.trades=p.trades;return {created:p.created,updated:p.updated}
+   });
   }
   swingMcpLast={at:new Date().toISOString(),ok:true,accounts:r.accounts,active,
    message:`cTrader: nové ${result.created} · aktualizované ${result.updated} · otevřené pozice ${(r.positions||[]).length} · uzavření v historii ${(r.history||[]).length}${missing.length?` · čeká (chybí velikost lotu): ${missing.join(', ')}`:''}${incomplete?' · historie v cTraderu je neúplná – v TradeWatch → History nastav období „All“':''}`};
@@ -886,6 +1092,7 @@ async function syncSwingFromMcp({manual=false}={}){
   swingMcpSyncBusy=false;
   renderSwingMcpStatus();
   renderSwingPositions();
+  renderPendingOrders();
  }
 }
 function renderSwingMcpStatus(){

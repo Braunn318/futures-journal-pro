@@ -642,7 +642,11 @@ function readJournal(id) {
     // Značka zaokrouhlení VWAP v Hladinách na tick (runVwapTickMigration, 4.8.103).
     vwapTickVersion: Number(parsed.vwapTickVersion) || 0,
     // Ručně zadané čekající příkazy (limitky) deníku – záložka Pozice/Příkazy.
-    pendingOrders: Array.isArray(parsed.pendingOrders) ? parsed.pendingOrders : []
+    pendingOrders: Array.isArray(parsed.pendingOrders) ? parsed.pendingOrders : [],
+    // Plánované obchody = skupiny limitek (docs/ZADANI_SWING_SLUCOVANI_PRIKAZU.md) a značka
+    // jejich migrace (runOrderGroupsMigration v app/swing-ui.js).
+    orderGroups: Array.isArray(parsed.orderGroups) ? parsed.orderGroups : [],
+    orderGroupsVersion: Number(parsed.orderGroupsVersion) || 0
   };
   if (journal.journalType === undefined) delete journal.journalType;
   // Jednorázový přesun starých base64 obrázků do souborů. Proběhne při prvním

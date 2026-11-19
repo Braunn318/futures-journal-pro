@@ -136,12 +136,16 @@ async function fetchSyncData(url, opts) {
     const positions = await client.call('get_positions');
     const history = await client.call('get_order_history');
     const stats = await client.call('get_account_statistics').catch(() => null);
+    // Čekající limitky pro plánované obchody (skupiny). Selhání = null, ne prázdný seznam –
+    // prázdný seznam by znamenal „všechny limitky zmizely“.
+    const orders = await client.call('get_pending_orders').catch(() => null);
     return {
       available: true, fetchedAt: new Date().toISOString(), balance: balance || null,
       accounts: Array.isArray(accounts && accounts.accounts) ? accounts.accounts : [],
       positions: Array.isArray(positions && positions.positions) ? positions.positions : [],
       history: Array.isArray(history && history.trades) ? history.trades : [],
-      stats: stats || null
+      stats: stats || null,
+      orders: orders && Array.isArray(orders.orders) ? orders.orders : null
     };
   } catch (e) {
     const offline = /fetch failed|ECONNREFUSED|timeout|aborted/i.test(String(e && (e.cause && e.cause.code) || e.message));
