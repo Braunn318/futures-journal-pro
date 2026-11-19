@@ -83,7 +83,7 @@
     return !!(g && g.contextFilledAt) && CONTEXT_FIELDS.some(k => {
       const v = c[k];
       return Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && String(v).trim() !== '';
-    });
+    }) || Object.keys(c.targetLevels || {}).length > 0;
   }
   // Členové od TP nejbližšího k ceně vstupu (TP1, TP2 …); bez TP na konci.
   function sortMembers(g) {
@@ -235,7 +235,53 @@
     return { skipped: false, orderGroups: r.groups, orderGroupsVersion: ORDER_GROUPS_VERSION, created: r.created };
   }
 
+  // ---- kontext před vstupem (§3) ----
+  function cleanContext(raw) {
+    const c = {};
+    for (const k of CONTEXT_FIELDS) {
+      const v = raw ? raw[k] : undefined;
+      if (k === 'images') c.images = Array.isArray(v) ? v.filter(x => typeof x === 'string' && x) : [];
+      else if (k === 'riskAmount') c.riskAmount = num(v);
+      else if (k === 'grade') c.grade = ['A', 'B', 'C'].includes(v) ? v : '';
+      else c[k] = v == null ? '' : String(v);
+    }
+    const tl = raw && raw.targetLevels && typeof raw.targetLevels === 'object' ? raw.targetLevels : {};
+    c.targetLevels = {};
+    for (const [id, v] of Object.entries(tl)) if (String(v || '').trim()) c.targetLevels[id] = String(v).trim();
+    return c;
+  }
+  const ctxSig = c => JSON.stringify(cleanContext(c));
+  // Uloží kontext do skupiny. contextFilledAt = první uložení s aspoň jedním vyplněným
+  // polem (pak se nemění); změna po naplnění (obchod / naplněný člen) → contextEditedAfterFill.
+  function applyGroupContext(group, raw, nowIso) {
+    const g = clone(group);
+    const next = cleanContext(raw);
+    const changed = ctxSig(g.context || {}) !== JSON.stringify(next);
+    g.context = next;
+    const filled = contextFilled({ context: next, contextFilledAt: 'x' }) || Object.keys(next.targetLevels).length > 0;
+    if (filled && !g.contextFilledAt) g.contextFilledAt = nowIso;
+    if (!filled && !g.contextFilledAt) g.contextFilledAt = null;
+    if (changed) g.contextUpdatedAt = nowIso;
+    if (changed && g.contextFilledAt && (g.tradeId || hasFill(g))) g.contextEditedAfterFill = true;
+    g.updatedAt = nowIso;
+    return g;
+  }
+  // Kontextová pole obchodu (stejné názvy) + typy hladin cílů.
+  function tradeContextSig(t) {
+    const c = {};
+    for (const k of CONTEXT_FIELDS) c[k] = k === 'images' ? (Array.isArray(t && t.images) ? t.images : []) : k === 'riskAmount' ? num(t && t.riskAmount) : (t && t[k] != null ? String(t[k]) : '');
+    c.targetLevels = (Array.isArray(t && t.targetsPlanned) ? t.targetsPlanned : []).map(x => String((x && x.levelType) || ''));
+    return JSON.stringify(c);
+  }
+  // Obchod, který kontext zdědil ze skupiny (contextFilledAt): změna kontextu se označí.
+  function markContextEdit(before, after) {
+    if (!before || !before.contextFilledAt) return after;
+    if (before.contextEditedAfterFill) return { ...after, contextEditedAfterFill: true };
+    return tradeContextSig(before) === tradeContextSig(after) ? after : { ...after, contextEditedAfterFill: true };
+  }
+
   return {
+    applyGroupContext, markContextEdit, cleanContext, tradeContextSig,
     ORDER_GROUPS_VERSION, CONTEXT_FIELDS, groupKeyOf, planOrderGroups, groupView, sortMembers, isOpenGroup, contextFilled,
     canMerge, mergeGroups, splitGroup, migratePendingOrders
   };

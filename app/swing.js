@@ -37,6 +37,13 @@
   // Nabídka setupů z poznámek Forex – Swing (§6). Jen nabídka do pole, plné
   // uživatelské číselníky přijdou v kroku 6 swing zadání.
   const SWING_SETUP_SUGGESTIONS = ['4h profil – VA/VPOC na tupo', 'M2 daily', 'Gap jako SR', 'Třetí dotek', 'Výběr likvidity (protisvíce v trendu)', 'Jiný'];
+  // Nabídky dalších kontextových polí (§6). Volný text – nic se nevnucuje; číselníky přijdou krokem 6.
+  const SWING_CONTEXT_SUGGESTIONS = Object.freeze({
+    entryTf: ['5m', '15m', '1h', '4h', 'D'],
+    htfTrend: ['nahoru', 'dolů', 'range'],
+    weeklyCheck: ['OK', 'proti (výběžek, value proti)', 'nehodnoceno'],
+    levelType: ['VPOC 4h', 'VPOC D', 'VA hrana', 'Gap', 'Likvidita', 'Hrana M2', 'Výběžek profilu', 'Ruční výstup']
+  });
 
   function fx(symbol, pip) {
     const base = symbol.slice(0, 3), quote = symbol.slice(3, 6);
@@ -583,7 +590,7 @@
     IMPORT_FIELDS, swingFromCtraderEvent, mergeImported, applyCtraderClose, findPairCandidate, applyMcpPosition, dropEditedImportedFields,
     JOURNAL_TYPES, JOURNAL_TYPE_VERSION, JOURNAL_TYPE_LABELS, journalTypeOf, isSwingType, isSwingRecord,
     DEFAULT_CFD_INSTRUMENTS, ASSET_CLASSES, CURRENCIES, instrumentsOf, findInstrument, sanitizeInstrument, normalizeSymbol,
-    EXIT_REASONS, EXIT_REASON_LABELS, SL_MOVE_REASONS, SL_MOVE_REASON_LABELS, SWING_SETUP_SUGGESTIONS,
+    EXIT_REASONS, EXIT_REASON_LABELS, SL_MOVE_REASONS, SL_MOVE_REASON_LABELS, SWING_SETUP_SUGGESTIONS, SWING_CONTEXT_SUGGESTIONS,
     legPnlNet, status, swingDerived, exitsVolume, exitsVolumeError, slAt, swingMissing, MISSING_LABELS,
     splitLocal, instantOf, berlinNowLocal, swingListDate,
     ORDER_TYPES, sanitizePendingOrder, pendingFromMcp, draftFromPendingOrder
