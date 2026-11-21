@@ -257,3 +257,52 @@ test('kontrola 5: otevírací událost cBota, kterou si může vzít čekající
   assert.equal(G.groupMayClaimEvent(s.groups, { ...ev, entryPrice: 0.8100 }, { decimalsOf: dec }), false, 'horší cena než limit');
   assert.equal(G.groupMayClaimEvent(s.groups, { ...ev, entryTime: '2026-11-16T09:00:00.000Z' }, { decimalsOf: dec }), false, 'před zadáním limitky');
 });
+
+test('limitka s TP a limitka bez TP naplněné ve stejné minutě → obě pozice v jednom obchodu', () => {
+  n = 500;
+  let s = { groups: [], trades: [] };
+  s = sync(s, [order(61, 0.805), order(62, null)], { positions: [], history: [] }, T0);
+  s = sync(s, [], { positions: [pos(971, 0.805), pos(972, null)], history: [] }, T1);
+  assert.equal(s.trades.length, 1, 'žádný samostatný obchod pro pozici bez TP');
+  assert.deepEqual(plain(s.trades[0].ctraderPositionIds).sort(), ['ctrader-971', 'ctrader-972']);
+  near(s.trades[0].volume, 0.15);
+  assert.ok(!s.trades[0].cancelledOrders, 'nic není zrušené');
+  // třetí cizí pozice bez TP → limitka bez TP zůstane nespárovaná (nejednoznačné)
+  n = 600;
+  let z = { groups: [], trades: [] };
+  z = sync(z, [order(63, 0.805), order(64, null)], { positions: [], history: [] }, T0);
+  z = sync(z, [], { positions: [pos(981, 0.805), pos(982, null), pos(983, null, { openTime: '2026-11-17T09:20:00.000Z' })], history: [] }, T1);
+  const gt = z.trades.find(t => t.orderGroupId);
+  assert.deepEqual(plain(gt.ctraderPositionIds), ['ctrader-981']);
+  assert.equal(z.trades.length, 3);
+});
+
+test('Sloučit vybrané v Pozicích: samostatná pozice se přidá do obchodu skupiny', () => {
+  n = 700;
+  let s = { groups: [], trades: [] };
+  s = sync(s, [order(71, 0.805), order(72, null)], { positions: [], history: [] }, T0);
+  // stav jako ze starší verze: druhá pozice nespárovaná, vznikl samostatný obchod
+  s = sync(s, [], { positions: [pos(991, 0.805), pos(992, null, { openTime: '2026-11-17T09:20:00.000Z' }), pos(993, null, { openTime: '2026-11-17T09:30:00.000Z' })], history: [] }, T1);
+  const gt = s.trades.find(t => t.orderGroupId);
+  const lone = s.trades.find(t => t.positionId === 'ctrader-992');
+  assert.ok(gt && lone && !lone.orderGroupId);
+  s.trades = s.trades.map(t => (t.id === lone.id ? { ...t, swingSetup: 'z lone', comment: 'pozn' } : t));
+  const bad = G.mergeTradesIntoGroup(s.trades, s.groups, [lone.id, s.trades.find(t => t.positionId === 'ctrader-993').id]);
+  assert.deepEqual([bad.ok, bad.block], [false, 'noGroup']);
+  const r = G.mergeTradesIntoGroup(s.trades, s.groups, [lone.id, gt.id], { nowIso: T1 });
+  assert.ok(r.ok);
+  assert.equal(r.trades.length, 2);
+  const t = r.trades.find(x => x.id === gt.id);
+  assert.deepEqual(plain(t.ctraderPositionIds).sort(), ['ctrader-991', 'ctrader-992']);
+  near(t.volume, 0.15);
+  assert.equal(t.swingSetup, 'z lone', 'prázdné pole cíle se doplní');
+  assert.ok(!t.cancelledOrders);
+  assert.equal(r.groups.find(g => g.id === gt.orderGroupId).members.filter(m => m.state === 'FILLED').length, 2);
+  // další synchronizace nic nerozdělí a pozici 992 nezaloží znovu
+  const again = sync({ groups: r.groups, trades: r.trades }, [], { positions: [pos(991, 0.805), pos(992, null, { openTime: '2026-11-17T09:20:00.000Z' }), pos(993, null, { openTime: '2026-11-17T09:30:00.000Z' })], history: [] }, T1);
+  assert.equal(again.trades.length, 2);
+  near(again.trades.find(x => x.id === gt.id).volume, 0.15);
+  // druhá limitka už je obsazená → další pozici nejde přidat
+  const third = again.trades.find(x => x.positionId === 'ctrader-993');
+  assert.equal(G.mergeTradesIntoGroup(again.trades, again.groups, [third.id, gt.id]).block, 'noMember');
+});

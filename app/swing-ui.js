@@ -229,7 +229,16 @@ async function deleteSwing(id){
 // Okamžitý P/L otevřených pozic z cTraderu (get_positions při synchronizaci). Jen v paměti,
 // do deníku se neukládá; ruční pozice bez vazby na cTrader ho nemají.
 let swingLivePositions=new Map();
-function swingLiveOf(t){return t?.positionId?swingLivePositions.get(t.positionId)||null:null}
+// Obchod skupiny limitek drží víc pozic → P/L je součet všech jeho otevřených pozic.
+function swingLiveOf(t){
+ const list=(t?FJSwing.tradePositionIds(t):[]).map(pid=>swingLivePositions.get(pid)).filter(Boolean);
+ if(!list.length)return null;
+ if(list.length===1)return list[0];
+ const sum=k=>list.some(l=>l[k]!=null)?list.reduce((a,l)=>a+(Number(l[k])||0),0):null;
+ const pips=list.map(l=>l.pips).filter(v=>v!=null);
+ return {currentPrice:list[0].currentPrice,netProfit:sum('netProfit'),grossProfit:sum('grossProfit'),pips:pips.length?pips.reduce((a,v)=>a+v,0)/pips.length:null,at:list[0].at,count:list.length};
+}
+const swingPositionsSelected=new Set();
 function renderSwingPositions(){
  const target=$('swingOpenPositions');
  if(!target)return;
@@ -245,8 +254,10 @@ function renderSwingPositions(){
   const d=swingDerivedOf(t);
   const age=FJSwing.instantOf(t.openedAt);
   const days=age!=null?(Date.now()-age)/864e5:null;
+  const pids=FJSwing.tradePositionIds(t);
   return `<tr>
-   <td><b>${esc(t.symbol)}</b>${t.swingSetup?`<div class="sub">${esc(t.swingSetup)}</div>`:''}</td>
+   <td><input type="checkbox" data-swing-select="${esc(t.id)}" ${swingPositionsSelected.has(t.id)?'checked':''} title="Vybrat ke sloučení"></td>
+   <td><b>${esc(t.symbol)}</b>${t.orderGroupId?` <span class="src-pill" title="Obchod z plánovaného obchodu (skupiny limitek)">z limitek${pids.length>1?' · '+pids.length+' pozice':''}</span>`:''}${t.swingSetup?`<div class="sub">${esc(t.swingSetup)}</div>`:''}</td>
    <td>${dirPill(t.direction)}</td>
    <td>${fmtLocal(t.openedAt)}<div class="sub">${days!=null?fmtNum(days,1)+' d':''}</div></td>
    <td>${fmtPrice(t.entryPrice,t.symbol)}</td>
@@ -256,8 +267,39 @@ function renderSwingPositions(){
    ${(()=>{const l=swingLiveOf(t);return l?`<td>${fmtPrice(l.currentPrice,t.symbol)}</td><td class="${signCls(l.netProfit)}"><b>${fmtMoney(l.netProfit)}</b>${l.pips!=null?`<div class="sub">${fmtNum(l.pips,1)} pipů</div>`:''}</td>`:'<td>—</td><td>—</td>'})()}
    <td class="swing-actions"><button class="btn" data-swing-exit="${esc(t.id)}">＋ Výstup</button><button class="btn" data-swing-sl="${esc(t.id)}">Posunout SL</button><button class="btn" data-swing-edit="${esc(t.id)}">Upravit</button></td>
   </tr>`;
- }).join(''):'<tr><td colspan="10" class="sub">Žádná otevřená swing pozice. Novou otevřeš tlačítkem „＋ Otevřít pozici“.</td></tr>';
+ }).join(''):'<tr><td colspan="11" class="sub">Žádná otevřená swing pozice. Novou otevřeš tlačítkem „＋ Otevřít pozici“.</td></tr>';
  wireSwingButtons(target);
+ for(const id of [...swingPositionsSelected])if(!rows.some(t=>t.id===id))swingPositionsSelected.delete(id);
+ const mb=$('mergeSwingPositionsBtn');
+ if(mb){mb.disabled=swingPositionsSelected.size<2;mb.onclick=()=>void mergeSelectedSwingPositions()}
+ target.querySelectorAll('[data-swing-select]').forEach(cb=>cb.onchange=()=>{cb.checked?swingPositionsSelected.add(cb.dataset.swingSelect):swingPositionsSelected.delete(cb.dataset.swingSelect);if(mb)mb.disabled=swingPositionsSelected.size<2});
+}
+// „Sloučit vybrané" v Pozicích: pozice, kterou automatika nespárovala se skupinou limitek
+// (vznikla jako samostatný obchod), se ručně přidá do obchodu skupiny (FJOrderGroups.mergeTradesIntoGroup).
+async function mergeSelectedSwingPositions(){
+ const ids=[...swingPositionsSelected];
+ const picked=ids.map(findSwing).filter(Boolean);
+ if(picked.length<2){showToast('Zaškrtni aspoň dvě pozice.');return}
+ const BLOCK={count:'Zaškrtni aspoň dvě pozice.',setup:'Nejde sloučit: některý záznam je setup bez vstupu.',symbol:'Nejde sloučit: rozdílný symbol.',direction:'Nejde sloučit: rozdílný směr.',account:'Nejde sloučit: pozice jsou z různých účtů.',
+  noGroup:'Nejde sloučit: žádná z vybraných pozic není z plánovaného obchodu (skupiny limitek). Sloučit jde pozici do obchodu, který vznikl ze skupiny limitek.',twoGroups:'Nejde sloučit: vybrané pozice jsou ze dvou různých plánovaných obchodů.',
+  shape:'Nejde sloučit: přidávaná pozice už má výstup nebo víc pozic.',noMember:'Nejde sloučit: ve skupině limitek není nenaplněná limitka se stejným objemem, na kterou by pozice patřila.'};
+ const test=FJOrderGroups.mergeTradesIntoGroup(swingRows(),storedOrderGroups(),ids);
+ if(!test.ok){showToast(BLOCK[test.block]||'Nejde sloučit.');return}
+ const target=findSwing(test.targetId);
+ const others=picked.filter(t=>t.id!==test.targetId);
+ if(!(await showConfirm(`Přidat ${others.length===1?'pozici':others.length+' pozice'} ${others.map(t=>t.symbol+' '+fmtNum(t.volume,4)+' z '+fmtLocal(t.openedAt)).join(', ')} do obchodu ${target.symbol} z plánovaného obchodu?
+
+Vstup, objem a otevření se přepočítají ze skupiny, kontext obchodu zůstane (prázdná pole se doplní), samostatný záznam přidávané pozice zmizí.`,{title:'Sloučit pozice',ok:'Sloučit'})))return;
+ let res=null;
+ await commitJournal(j=>{
+  const r=FJOrderGroups.mergeTradesIntoGroup(j.trades||[],j.orderGroups||[],ids);
+  res=r;
+  if(r.ok){j.trades=r.trades;j.orderGroups=r.groups}
+ });
+ if(!res?.ok){showToast(BLOCK[res?.block]||'Nejde sloučit.');return}
+ swingPositionsSelected.clear();
+ await load();
+ showToast('Pozice sloučené do jednoho obchodu.');
 }
 
 // Ruční limitky deníku + limitky z cTraderu (MCP, jen čtení).

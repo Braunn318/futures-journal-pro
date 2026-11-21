@@ -646,15 +646,15 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
             <p class="sub swing-only">Otevřené swing pozice – zadané ručně a načtené z cTraderu (MCP nebo cBot), se SL a TP z cTraderu. Přidat výstup, posunout SL.</p>
           </div>
           <button class="btn danger futures-only" id="clearInvalidPositions">Vymazat neplatné pozice</button>
-          <span class="swing-only" style="display:flex;gap:8px;align-items:flex-start"><button class="btn" id="swingSyncNowBtn" title="Načte otevřené pozice a provedené obchody z běžícího cTraderu (MCP)">↻ Z cTraderu</button><button class="btn primary" id="addSwingPositionBtn">＋ Otevřít pozici</button></span>
+          <span class="swing-only" style="display:flex;gap:8px;align-items:flex-start"><button class="btn" id="mergeSwingPositionsBtn" disabled title="Zaškrtnuté pozice z téže skupiny limitek spojí do jednoho obchodu">Sloučit vybrané</button><button class="btn" id="swingSyncNowBtn" title="Načte otevřené pozice a provedené obchody z běžícího cTraderu (MCP)">↻ Z cTraderu</button><button class="btn primary" id="addSwingPositionBtn">＋ Otevřít pozici</button></span>
         </div>
         <div class="sub swing-only" id="swingMcpStatus" style="margin-top:8px"></div>
         <div class="alert swing-only" id="swingImportNotice" style="display:none;margin-top:12px"></div>
         <div class="swing-only" id="swingOpenPnl" style="display:none;margin-top:10px"></div>
         <div class="table-scroll swing-only" style="margin-top:16px">
           <table>
-            <thead><tr><th>Symbol</th><th>Směr</th><th>Otevřeno · věk</th><th>Vstup</th><th>SL při otevření</th><th>Objem</th><th>Riziko</th><th>Aktuální cena</th><th>Zisk / ztráta</th><th></th></tr></thead>
-            <tbody id="swingOpenPositions"><tr><td colspan="10" class="sub">Žádná otevřená swing pozice.</td></tr></tbody>
+            <thead><tr><th></th><th>Symbol</th><th>Směr</th><th>Otevřeno · věk</th><th>Vstup</th><th>SL při otevření</th><th>Objem</th><th>Riziko</th><th>Aktuální cena</th><th>Zisk / ztráta</th><th></th></tr></thead>
+            <tbody id="swingOpenPositions"><tr><td colspan="11" class="sub">Žádná otevřená swing pozice.</td></tr></tbody>
           </table>
         </div>
         <div class="table-scroll futures-only" style="margin-top:16px">

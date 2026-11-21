@@ -115,7 +115,7 @@ test('7: okamžitý P/L – pozice z cTraderu ukáže netProfit z poslední sync
   const ui = loadFromSource(readRepoFile('app/swing-ui.js'),
     ['swingLiveOf', 'renderSwingPositions', 'swingOpenPositions', 'swingRows', 'swingDerivedOf', 'swingInstruments', 'swingInstrumentOf', 'fmtLocal', 'fmtPrice', 'fmtNum', 'fmtMoney', 'swingCurrency', 'signCls', 'dirPill'], {
       FJSwing, esc: s => String(s ?? ''), settings: { swingCurrency: 'USD' }, db: { data: { trades: [imported, manual] } },
-      $: el, wireSwingButtons: () => {},
+      $: el, wireSwingButtons: () => {}, swingPositionsSelected: new Set(),
       swingLivePositions: new Map([['ctrader-501', { currentPrice: 0.97841, netProfit: 6.03, pips: 28.3, at: '2026-11-05T10:00:00.000Z' }]])
     });
   ui.renderSwingPositions();
@@ -126,4 +126,21 @@ test('7: okamžitý P/L – pozice z cTraderu ukáže netProfit z poslední sync
   assert.ok(manualRow.includes('<td>—</td><td>—</td>'), 'ruční pozice bez P/L');
   assert.ok(/Otevřený P\/L/.test(rows.swingOpenPnl.innerHTML));
   vm.runInContext('void 0', ui.__context);
+});
+
+test('7b: obchod skupiny limitek se dvěma pozicemi ukáže součet P/L obou pozic', () => {
+  const group = { ...OPEN_PARTIAL, id: 'g1', orderGroupId: 'og1', positionId: 'ctrader-601', ctraderPositionIds: ['ctrader-601', 'ctrader-602'], symbol: 'USDCHF', exits: [] };
+  const rows = {};
+  const el = id => (rows[id] = rows[id] || { innerHTML: '', style: {}, querySelectorAll: () => [] });
+  const ui = loadFromSource(readRepoFile('app/swing-ui.js'),
+    ['swingLiveOf', 'renderSwingPositions', 'swingOpenPositions', 'swingRows', 'swingDerivedOf', 'swingInstruments', 'swingInstrumentOf', 'fmtLocal', 'fmtPrice', 'fmtNum', 'fmtMoney', 'swingCurrency', 'signCls', 'dirPill'], {
+      FJSwing, esc: s => String(s ?? ''), settings: { swingCurrency: 'USD' }, db: { data: { trades: [group] } },
+      $: el, wireSwingButtons: () => {}, swingPositionsSelected: new Set(),
+      swingLivePositions: new Map([['ctrader-601', { currentPrice: 0.84012, netProfit: 1.72, pips: 1.2, at: '2026-11-21T10:00:00.000Z' }], ['ctrader-602', { currentPrice: 0.84012, netProfit: 1.71, pips: 1.2, at: '2026-11-21T10:00:00.000Z' }]])
+    });
+  ui.renderSwingPositions();
+  const html = rows.swingOpenPositions.innerHTML;
+  assert.ok(/3,43/.test(html), 'součet obou pozic');
+  assert.ok(/z limitek · 2 pozice/.test(html));
+  assert.ok(/data-swing-select="g1"/.test(html), 'výběr ke sloučení');
 });

@@ -11,6 +11,9 @@ Swing – plánovaný obchod ze skupiny limitek a kontext před vstupem (docs/ZA
 - New: částečné naplnění – obchod vznikne z toho, co se naplnilo, zbytek dál čeká ve skupině; zrušená zbylá limitka = poznámka „TP2 limitka zrušena“ u obchodu, ne další záznam. Naplněno / Nenaplněno působí na celou skupinu (jeden obchod / jeden setup bez vstupu), jen předvyplní formulář.
 - New: swing formulář má nová pole Hladina vstupu, TF vstupu, Trend daily, Weekly a Důvod vstupu (volný text s nabídkou; číselníky přijdou s krokem 6 swing zadání).
 - Changed: deník nově ukládá orderGroups (+ značka orderGroupsVersion). Migrace: dosavadní ruční limitky se seskupí, záloha pred-seskupenim-limitek. Synchronizace z cTraderu čte i čekající limitky (get_pending_orders, jen čtení).
+- Fixed (po test.1): limitka s TP a limitka bez TP ze stejné skupiny naplněné ve stejné minutě skončily jako dvě otevřené pozice – limitka bez TP měla za kandidáty obě pozice a zůstala nespárovaná. Párování teď jde v kolech: pozice obsazená v předchozím kole se vyřadí z kandidátů ostatních limitek téže skupiny (při skutečné nejednoznačnosti, např. další cizí pozici, se dál nepáruje).
+- New (po test.1): „Sloučit vybrané“ v Pozicích – zaškrtnutou samostatnou pozici přidá do obchodu ze skupiny limitek (obsadí nenaplněnou limitku se stejným objemem; vstup / objem se přepočítají ze skupiny, kontext obchodu zůstane, prázdná pole se doplní ze slučované pozice). Opraví i obchody rozdělené starší verzí.
+- Changed (po test.1): u obchodu ze skupiny limitek v Pozicích štítek „z limitek · n pozice“ a otevřený P/L = součet všech jeho pozic (dřív jen první).
 - Fixed (v rámci dávky): screenshot kontextu skupiny se při přejmenování obrázků u obchodu nesmaže (skupiny jsou mezi vlastníky obrázků).
 - Fixed: test „8 mapa vypnutá“ (tests/levels-settings.test.js) přijme konec řádku LF i CRLF – padal jen kvůli CRLF v pracovní kopii.
 
