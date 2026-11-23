@@ -141,7 +141,7 @@ test('instrumenty: výchozí lotSize (FX 100000, XAUUSD 100), uložený řádek 
 });
 
 // ---- tok v rozhraní: importSwingCtraderEvent (app/swing-ui.js) ----
-function uiEnv(journal, { confirm = true, mcpLot = null } = {}) {
+function uiEnv(journal, { confirm = true, mcpLot = null, details = null } = {}) {
   const store = { j1: structuredClone(journal) };
   const calls = { confirms: 0, writes: 0 };
   const globals = {
@@ -149,7 +149,7 @@ function uiEnv(journal, { confirm = true, mcpLot = null } = {}) {
     window: { desktopAPI: {
       readJournal: async id => ({ ok: true, data: structuredClone(store[id]) }),
       writeJournal: async (id, data) => { store[id] = structuredClone(data); calls.writes++; return { ok: true }; },
-      ctraderSymbolDetails: async () => (mcpLot ? { available: true, details: { lotSize: mcpLot } } : { available: false })
+      ctraderSymbolDetails: async (url, name) => { calls.asked = [...(calls.asked || []), name]; if (details) return details(name); return mcpLot ? { available: true, details: { lotSize: mcpLot } } : { available: false }; }
     } },
     localStorage: { getItem: () => JSON.stringify({ enabled: mcpLot != null }), setItem() {} },
     showConfirm: async () => { calls.confirms++; return confirm; },
@@ -157,7 +157,7 @@ function uiEnv(journal, { confirm = true, mcpLot = null } = {}) {
     swingPairPending: new Set(), swingPairDecisions: new Map(), swingImportWaiting: new Map(), swingImportChain: Promise.resolve()
   };
   const api = loadFromSource(readRepoFile('app/swing-ui.js'),
-    ['MCP_SETTINGS_KEY', 'mcpSettings', 'swingLotSizeFor', 'importSwingCtraderEvent', 'importSwingCtraderEventNow'], globals);
+    ['MCP_SETTINGS_KEY', 'mcpSettings', 'swingSymbolDetails', 'swingLotSizeFor', 'importSwingCtraderEvent', 'importSwingCtraderEventNow'], globals);
   return { api, store, calls };
 }
 
@@ -204,4 +204,15 @@ test('6: import – NT8 do swing deníku zůstane ve frontě, cTrader se zpracuj
   const skips = html.split("isSwingJournalId(journalId)&&e.source!=='ctrader')continue;").length - 1;
   assert.equal(skips, 2, 'importCapturedTrades a attachAfterShots přeskočí jen ne-cTrader zdroje');
   assert.ok(html.includes("importSwingCtraderEvent(journalId,e)"), 'cTrader události do swing deníku jdou přes swing import');
+});
+
+test('UI: detail symbolu se hledá původním zápisem z cTraderu (US100.cash ≠ US100.CASH)', async () => {
+  // cTrader rozlišuje velikost písmen: odpoví jen na přesný název
+  const details = name => (name === 'US100.cash' ? { available: true, details: { lotSize: 1 } } : { available: false });
+  const env = uiEnv({ trades: [], settings: [{ key: 'main', value: {} }] }, { mcpLot: 1, details });
+  const ev = { ...OPEN, instrument: 'US100.cash', positionId: 'ctrader-888', quantity: 0.2 };
+  assert.equal(await env.api.importSwingCtraderEvent('j1', ev), 'done');
+  assert.equal(env.calls.asked[0], 'US100.cash');
+  assert.equal(FJSwing.findInstrument('US100.CASH', FJSwing.instrumentsOf(env.store.j1.settings[0].value)).lotSize, 1);
+  assert.equal(env.store.j1.trades[0].volume, 0.2);
 });

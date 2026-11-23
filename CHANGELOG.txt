@@ -2,6 +2,9 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.105 - 2026-11-23
+- Fixed: swing deník – obchody indexů z cTraderu (např. US100.cash) čekaly s hláškou „čeká (chybí velikost lotu)“. cTrader rozlišuje velká a malá písmena v názvu symbolu a deník se ptal na US100.CASH; teď se ptá původním zápisem z cTraderu (pak ještě velkými písmeny). Velikost lotu se doplní do tabulky CFD instrumentů sama, obchod se načte bez zásahu.
+
 ## 4.8.104 - 2026-11-19
 Swing – plánovaný obchod ze skupiny limitek a kontext před vstupem (docs/ZADANI_SWING_SLUCOVANI_PRIKAZU.md). Futures deník beze změny.
 - New: Pozice/Příkazy ve swing deníku ukazují jeden řádek za plánovaný obchod: limitky se stejným účtem, symbolem, směrem, typem, cenou vstupu a SL se seskupí samy (TP1 / TP2 … od nejbližšího, celkový objem s rozpadem 0,15 = 0,075 + 0,075, počet příkazů, zdroj, „kontext chybí / ✓ kontext“). ▸ rozbalí jednotlivé příkazy. Při jakékoli neshodě se automaticky neslučuje.

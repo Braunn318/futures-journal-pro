@@ -1053,13 +1053,23 @@ let swingPairDecisions=new Map();
 let swingImportWaiting=new Map();
 let swingImportChain=Promise.resolve();
 // Velikost lotu symbolu: tabulka CFD instrumentů deníku, jinak cTrader MCP (doplní se do tabulky).
-async function swingLotSizeFor(data,symbol){
+// Detail symbolu z cTraderu: nejdřív původní zápis (cTrader rozlišuje velikost písmen,
+// např. US100.cash), když selže, ještě normalizovaný.
+async function swingSymbolDetails(url,raw,symbol){
+ const call=window.desktopAPI?.ctraderSymbolDetails;
+ if(!call)return null;
+ const first=raw||symbol;
+ const r=await call(url,first);
+ if(r?.available&&Number(r?.details?.lotSize)>0)return r;
+ return first!==symbol?call(url,symbol):r;
+}
+async function swingLotSizeFor(data,symbol,rawSymbol){
  const main=data.settings.find(s=>s?.key==='main');
  const inst=FJSwing.findInstrument(symbol,FJSwing.instrumentsOf(main?.value||{}));
  if(inst?.lotSize)return inst.lotSize;
  const s=mcpSettings();
  if(!s.enabled||!window.desktopAPI?.ctraderSymbolDetails)return null;
- const r=await window.desktopAPI.ctraderSymbolDetails(s.url,symbol);
+ const r=await swingSymbolDetails(s.url,rawSymbol,symbol);
  const lot=Number(r?.details?.lotSize);
  if(!r?.available||!(lot>0))return null;
  let entry=main;
@@ -1084,7 +1094,7 @@ async function importSwingCtraderEventNow(journalId,e){
  data.trades=Array.isArray(data.trades)?data.trades:[];
  data.settings=Array.isArray(data.settings)?data.settings:[];
  const symbol=FJSwing.normalizeSymbol(e.instrument);
- const lot=await swingLotSizeFor(data,symbol);
+ const lot=await swingLotSizeFor(data,symbol,String(e.instrument||'').trim());
  if(!lot){swingImportWaiting.set(symbol,(swingImportWaiting.get(symbol)||0)+1);return 'wait'}
  swingImportWaiting.delete(symbol);
  const draft=FJSwing.swingFromCtraderEvent(e,lot);
@@ -1184,10 +1194,13 @@ async function syncSwingFromMcp({manual=false}={}){
   // velikost lotu: tabulka CFD instrumentů → otevřená pozice → detail symbolu z cTraderu (uloží se do tabulky)
   const lots=new Map();
   for(const p of r.positions||[])if(Number(p.lotSize)>0)lots.set(FJSwing.normalizeSymbol(p.symbolName),Number(p.lotSize));
+  // cTrader rozlišuje velikost písmen (US100.cash ≠ US100.CASH) – ptát se původním zápisem
+  const rawName=new Map();
+  for(const x of [...(r.history||[]),...(r.positions||[])]){const k=FJSwing.normalizeSymbol(x?.symbolName);if(k&&!rawName.has(k))rawName.set(k,String(x.symbolName).trim())}
   const need=new Set((r.history||[]).map(h=>FJSwing.normalizeSymbol(h.symbolName)).filter(sym=>!swingInstrumentOf(sym)?.lotSize&&!lots.has(sym)));
   const added=[];
   for(const sym of need){
-   const d=await window.desktopAPI.ctraderSymbolDetails?.(s.url,sym);
+   const d=await swingSymbolDetails(s.url,rawName.get(sym),sym);
    const lot=Number(d?.details?.lotSize);
    if(d?.available&&lot>0){lots.set(sym,lot);const inst=swingInstrumentOf(sym);added.push({symbol:sym,lotSize:lot,pipSize:inst?.pipSize??(Number(d.details.pipSize)||null),priceDecimals:inst?.priceDecimals??(Number.isFinite(Number(d.details.digits))?Number(d.details.digits):null),assetClass:inst?.assetClass||'OTHER',baseCcy:inst?.baseCcy||'',quoteCcy:inst?.quoteCcy||''})}
   }
