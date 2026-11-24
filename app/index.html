@@ -1773,6 +1773,7 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <script src="settings-registry.js"></script>
 <script src="swing.js"></script>
 <script src="order-groups.js"></script>
+<script src="swing-merge.js"></script>
 <script src="journals.js"></script>
 <script src="nt8import.js"></script>
 <script>
@@ -10139,6 +10140,8 @@ async function startJournalApplication(){
   try{await runJournalTypeMigration()}catch(e){showToast('Zápis typu deníku se nepodařil: '+e.message)}
   // Skupiny limitek (swing – slučování příkazů): záloha → zápis → značka, jen swing deník.
   try{if(typeof runOrderGroupsMigration==='function'){const r=await runOrderGroupsMigration();if(r?.created)showToast(`Čekající limitky seskupeny do ${r.created} plánovaných obchodů. Záloha deníku je v safety-backups.`)}}catch(e){showToast('Seskupení limitek se nepodařilo: '+e.message)}
+  // Swing: pozice se stejným vstupem → jeden obchod (vypínatelné, se zálohou, vratné „Rozdělit“).
+  try{if(typeof runSwingAutoMerge==='function')await runSwingAutoMerge()}catch(e){showToast('Sloučení pozic se stejným vstupem se nepodařilo: '+e.message)}
   // VWAP v Hladinách na tick – selhání nic neshodí, zkusí se při dalším otevření.
   try{const r=await runVwapTickMigration();if(r?.changed)showToast(`Zaokrouhleno ${r.changed} ${r.changed===1?'řádek':r.changed<5?'řádky':'řádků'} VWAP v Hladinách na tick. Záloha deníku je v safety-backups.`)}catch(e){showToast('Zaokrouhlení VWAP na tick se nepodařilo: '+e.message)}
   await load();

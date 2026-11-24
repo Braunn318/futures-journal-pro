@@ -568,12 +568,7 @@
       const ms = FJSwing().instantOf(s.openedAt);
       m.state = 'FILLED';
       m.fill = { positionId: pid, entryPrice: num(s.entryPrice), openedAt: s.openedAt || null, openTime: ms != null ? new Date(ms).toISOString() : null, volume: num(s.volume), manual: true };
-      for (const k of CONTEXT_FIELDS) {
-        const empty = v => v == null || v === '' || (Array.isArray(v) && !v.length);
-        if (k === 'images') { const add = (s.images || []).filter(x => !(t.images || []).includes(x)); if (add.length) t.images = [...(t.images || []), ...add]; }
-        else if (k === 'comment' && !empty(s.comment) && !empty(t.comment) && s.comment !== t.comment) t.comment = t.comment + '\n' + s.comment;
-        else if (empty(t[k]) && !empty(s[k])) t[k] = clone(s[k]);
-      }
+      t = FJSwing().mergeTradeContext(t, s, CONTEXT_FIELDS);
       t.ctraderPositionIds = [...new Set([...pidsOfTrade(t), pid])];
     }
     g.updatedAt = nowIso;

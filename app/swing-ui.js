@@ -161,15 +161,17 @@ function swingCardHTML(t){
  const imgs=allImgs.length?`<div class="swing-imgs">${allImgs.map(r=>thumbImgHTML(r)).join('')}</div>`:'';
  return `<div class="swing-card" data-swing-id="${esc(t.id)}">
   <div class="swing-card-head">
-   <div><b>${esc(t.symbol||'—')}</b> ${dirPill(t.direction)} ${statusPill}
+   <div>${setup?'':`<input type="checkbox" data-swing-merge-select="${esc(t.id)}" ${swingTradesSelected.has(t.id)?'checked':''} title="Vybrat ke sloučení" style="margin-right:6px">`}<b>${esc(t.symbol||'—')}</b> ${dirPill(t.direction)} ${statusPill}
     ${missing.length?`<span class="pill incomplete-pill" title="Chybí: ${esc(missing.map(k=>FJSwing.MISSING_LABELS[k]).join(', '))}">⚠ Neúplné · ${missing.length}</span>`:''}
     ${d.volumeError?'<span class="pill loss" title="Součet objemů výstupů je větší než objem pozice">Objem výstupů &gt; objem</span>':''}
     ${t.source==='CTRADER'||String(t.positionId||'').startsWith('ctrader-')?'<span class="src-pill" title="Importováno z cTraderu">cTrader</span>':''}
     ${t.orderGroupId?`<span class="src-pill" title="Vzniklo z plánovaného obchodu (skupiny limitek)">z limitek${(t.ctraderPositionIds||[]).length>1?' · '+t.ctraderPositionIds.length+' pozice':''}</span>`:''}
+    ${!t.orderGroupId&&(t.mergedFrom||[]).length>1?`<span class="src-pill" title="${t.mergedAuto?'Automaticky sloučeno – pozice se stejným vstupem':'Ručně sloučené obchody'}">sloučeno · ${t.mergedFrom.length} ${t.mergedFrom.length<5?'pozice':'pozic'}</span>`:''}
     ${t.contextFilledAt?`<span class="src-pill" title="Kontext vyplněn před vstupem ${esc(new Date(t.contextFilledAt).toLocaleString('cs-CZ'))}">kontext před vstupem</span>`:''}
     ${t.contextEditedAfterFill?'<span class="pill be" title="Kontext byl upraven po naplnění – už to není čistě to, co bylo známé před vstupem">kontext upraven po naplnění</span>':''}</div>
    <div class="swing-actions">
     ${!setup&&d.status==='OPEN'?`<button class="btn" data-swing-exit="${esc(t.id)}">＋ Výstup</button><button class="btn" data-swing-sl="${esc(t.id)}">Posunout SL</button>`:''}
+    ${(t.mergedFrom||[]).length>1?`<button class="btn" data-swing-split="${esc(t.id)}" title="Vrátí sloučení zpět na samostatné obchody; automatika je pak znovu nespojí">Rozdělit</button>`:''}
     <button class="btn" data-swing-edit="${esc(t.id)}">Upravit</button>
     <button class="btn danger" data-swing-del="${esc(t.id)}">🗑️</button>
    </div>
@@ -202,16 +204,81 @@ function swingCardHTML(t){
   ${imgs}
  </div>`;
 }
+const swingTradesSelected=new Set();
+function ensureSwingTradeToolbar(){
+ if($('swingMergeBar')||!$('tradeList'))return;
+ const bar=document.createElement('div');bar.id='swingMergeBar';bar.className='swing-only';bar.style.cssText='display:flex;gap:8px;align-items:center;margin:0 0 10px';
+ bar.innerHTML='<button class="btn" id="mergeSwingTradesBtn" disabled title="Zaškrtnuté swing obchody (i uzavřené) spojí do jednoho">🔗 Sloučit vybrané</button><span class="sub">Zaškrtni obchody, které jsou jedna pozice rozdělená na víc (např. dvě pozice na stejné ceně). Pozice se stejným vstupem se slučují automaticky (Nastavení → Swing · CFD).</span>';
+ $('tradeList').insertAdjacentElement('beforebegin',bar);
+ $('mergeSwingTradesBtn').onclick=()=>void mergeSelectedSwingTrades();
+}
 function renderSwingTrades(){
  const target=$('tradeList');
  if(!target)return;
+ ensureSwingTradeToolbar();
  const q=($('search')?.value||'').toLowerCase();
  const rows=swingRows().filter(t=>!q||((t.symbol||'')+' '+(t.comment||'')+' '+(t.swingSetup||'')).toLowerCase().includes(q))
   .sort((a,b)=>String(b.openedAt||'').localeCompare(String(a.openedAt||'')));
+ for(const id of [...swingTradesSelected])if(!rows.some(t=>t.id===id))swingTradesSelected.delete(id);
  target.innerHTML=rows.length?rows.map(swingCardHTML).join(''):'<div class="empty">Zatím žádný swing obchod. „＋ Přidat obchod“ otevře novou pozici.</div>';
  wireSwingButtons(target);
+ const mb=$('mergeSwingTradesBtn');
+ if(mb)mb.disabled=swingTradesSelected.size<2;
+ target.querySelectorAll('[data-swing-merge-select]').forEach(cb=>cb.onchange=()=>{cb.checked?swingTradesSelected.add(cb.dataset.swingMergeSelect):swingTradesSelected.delete(cb.dataset.swingMergeSelect);if(mb)mb.disabled=swingTradesSelected.size<2});
+}
+const SWING_MERGE_BLOCK={count:'Zaškrtni aspoň dva obchody.',setup:'Nejde sloučit: některý záznam je setup bez vstupu.',symbol:'Nejde sloučit: rozdílný symbol.',direction:'Nejde sloučit: rozdílný směr.',account:'Nejde sloučit: obchody jsou z různých účtů.',
+ twoGroups:'Nejde sloučit: obchody jsou ze dvou různých plánovaných obchodů (skupin limitek).',samePosition:'Nejde sloučit: dva vybrané obchody drží stejnou pozici z cTraderu.'};
+// Obecné sloučení swing obchodů (i uzavřených, i bez skupiny limitek) – FJSwingMerge.mergeSwingTrades.
+async function mergeSwingTradesByIds(ids){
+ const picked=ids.map(findSwing).filter(Boolean);
+ const test=FJSwingMerge.mergeSwingTrades(swingRows(),ids);
+ if(!test.ok){showToast(SWING_MERGE_BLOCK[test.block]||'Nejde sloučit.');return false}
+ if(!(await showConfirm(`Sloučit ${picked.length} obchody do jednoho?\n\n${picked.map(t=>`${t.symbol} ${t.direction==='short'?'SHORT':'LONG'} ${fmtNum(t.volume,4)} z ${fmtLocal(t.openedAt)} @ ${fmtPrice(t.entryPrice,t.symbol)}`).join('\n')}\n\nObjem = součet, vstup = průměr vážený objemem, otevření = nejdřívější, výstupy se spojí. Kontext prvního obchodu zůstane, prázdná pole se doplní z ostatních. Jde vrátit tlačítkem „Rozdělit“.`,{title:'Sloučit obchody',ok:'Sloučit'})))return false;
+ let res=null;
+ await commitJournal(j=>{const r=FJSwingMerge.mergeSwingTrades(j.trades||[],ids);res=r;if(r.ok)j.trades=r.trades});
+ if(!res?.ok){showToast(SWING_MERGE_BLOCK[res?.block]||'Nejde sloučit.');return false}
+ await load();
+ showToast('Obchody sloučené do jednoho.');
+ return true;
+}
+async function mergeSelectedSwingTrades(){
+ const ids=[...swingTradesSelected];
+ if(ids.length<2){showToast('Zaškrtni aspoň dva obchody.');return}
+ if(await mergeSwingTradesByIds(ids))swingTradesSelected.clear();
+}
+async function splitSwingTradeUi(id){
+ const t=findSwing(id);if(!t)return;
+ if(!(await showConfirm(`Rozdělit ${t.symbol} z ${fmtLocal(t.openedAt)} zpět na ${(t.mergedFrom||[]).length} samostatné obchody?\n\nKaždý dostane svou pozici a své výstupy. Kontext doplněný po sloučení zůstane jen u prvního obchodu. Automatika tyto pozice znovu nespojí (ručně sloučit jdou).`,{title:'Rozdělit obchod',ok:'Rozdělit'})))return;
+ let res=null;
+ await commitJournal(j=>{const r=FJSwingMerge.splitSwingTrade(j.trades||[],id);res=r;if(r.ok)j.trades=r.trades});
+ if(!res?.ok){showToast('Obchod nejde rozdělit.');return}
+ await load();
+ showToast('Obchod rozdělen.');
+}
+// Automatické sloučení pozic se stejným vstupem (Nastavení → Swing · CFD). Záloha jednou za běh.
+let swingAutoMergeBackedUp=false,swingAutoMergeBusy=false;
+function swingMergeSettings(){return FJSwingMerge.settingsOf(settings)}
+function swingAutoMergeOpts(){const s=swingMergeSettings();return {windowMin:s.windowMin,decimalsOf:sym=>swingInstrumentOf(sym)?.priceDecimals??null,nowIso:new Date().toISOString()}}
+async function runSwingAutoMerge(){
+ if(swingAutoMergeBusy||!isSwingJournalActive()||!swingMergeSettings().autoMerge)return {merged:0};
+ swingAutoMergeBusy=true;
+ try{
+  const data=await ensureActiveJournalData();
+  const plan=FJSwingMerge.applyAutoMerge(data.trades||[],swingAutoMergeOpts());
+  if(!plan.changed)return {merged:0};
+  if(!swingAutoMergeBackedUp){
+   const b=await window.desktopAPI?.backupJournal?.(activeJournalId,'pred-sloucenim-pozic');
+   if(!b||b.ok!==true)throw new Error(b?.error||'Zálohu deníku před sloučením pozic nelze vytvořit.');
+   swingAutoMergeBackedUp=true;
+  }
+  let merged=0;
+  await commitJournal(j=>{const r=FJSwingMerge.applyAutoMerge(j.trades||[],swingAutoMergeOpts());if(r.changed){j.trades=r.trades;merged=r.merged}});
+  if(merged){await load();showToast(`Sloučeno ${merged} ${merged===1?'obchod':merged<5?'obchody':'obchodů'} se stejným vstupem do jednoho. Vrátit jde tlačítkem „Rozdělit“; záloha deníku je v safety-backups.`)}
+  return {merged};
+ }finally{swingAutoMergeBusy=false}
 }
 function wireSwingButtons(root){
+ root.querySelectorAll('[data-swing-split]').forEach(b=>b.onclick=()=>void splitSwingTradeUi(b.dataset.swingSplit));
  root.querySelectorAll('[data-swing-edit]').forEach(b=>b.onclick=()=>openSwingModal(findSwing(b.dataset.swingEdit)));
  root.querySelectorAll('[data-swing-exit]').forEach(b=>b.onclick=()=>openSwingModal(findSwing(b.dataset.swingExit),{focus:'exit'}));
  root.querySelectorAll('[data-swing-sl]').forEach(b=>b.onclick=()=>openSwingModal(findSwing(b.dataset.swingSl),{focus:'sl'}));
@@ -284,6 +351,8 @@ async function mergeSelectedSwingPositions(){
   noGroup:'Nejde sloučit: žádná z vybraných pozic není z plánovaného obchodu (skupiny limitek). Sloučit jde pozici do obchodu, který vznikl ze skupiny limitek.',twoGroups:'Nejde sloučit: vybrané pozice jsou ze dvou různých plánovaných obchodů.',
   shape:'Nejde sloučit: přidávaná pozice už má výstup nebo víc pozic.',noMember:'Nejde sloučit: ve skupině limitek není nenaplněná limitka se stejným objemem, na kterou by pozice patřila.'};
  const test=FJOrderGroups.mergeTradesIntoGroup(swingRows(),storedOrderGroups(),ids);
+ // bez skupiny limitek (nebo pozice už s výstupem) → obecné sloučení obchodů
+ if(!test.ok&&(test.block==='noGroup'||test.block==='shape'||test.block==='noMember')){if(await mergeSwingTradesByIds(ids)){swingPositionsSelected.clear();renderSwingPositions()}return}
  if(!test.ok){showToast(BLOCK[test.block]||'Nejde sloučit.');return}
  const target=findSwing(test.targetId);
  const others=picked.filter(t=>t.id!==test.targetId);
@@ -976,6 +1045,12 @@ function renderSwingSettings(){
     <button class="btn primary" type="button" id="swingMcpSyncNow">Synchronizovat teď</button>
    </div>
    <div class="sub" id="swingMcpAccountInfo" style="margin-top:6px"></div>
+   <h3 style="margin-top:14px">Slučování pozic se stejným vstupem</h3>
+   <div class="sub">Víc pozic z cTraderu se stejným účtem, symbolem, směrem a vstupní cenou, otevřených krátce po sobě, je jeden obchod. Deník je sloučí sám (i uzavřené, se zálohou); sloučení jde vrátit tlačítkem „Rozdělit“ a ručně slučovat jde v Deníku (🔗 Sloučit vybrané).</div>
+   <div class="swing-row" style="margin-top:8px">
+    <div class="field"><label>Slučovat automaticky</label><select id="swingAutoMerge"><option value="ano">Ano</option><option value="ne" ${swingMergeSettings().autoMerge?'':'selected'}>Ne</option></select></div>
+    <div class="field"><label>Okno otevření (min)</label><input id="swingMergeWindow" type="number" min="0" step="1" style="width:90px" value="${esc(String(swingMergeSettings().windowMin))}" title="Jak daleko od sebe smějí být otevření pozic"></div>
+   </div>
    <div class="field" style="max-width:240px;margin-top:12px"><label>Měna účtu</label><select id="swingCurrencySelect">${FJSwing.CURRENCIES.map(c=>`<option ${c===swingCurrency()?'selected':''}>${c}</option>`).join('')}</select><div class="sub">Peníze se do swing deníku opisují z výpisu brokera v této měně.</div></div>
    <h3 style="margin-top:14px">CFD instrumenty</h3>
    <div class="sub">Pip size stačí na pipy a R z cen; hodnota pipu ani ticku se nezadává. Velikost lotu (jednotek v 1 lotu) potřebuje jen import z cTraderu – objem posílá v jednotkách. Výchozí řádky jdou upravit; nic se nemaže.</div>
@@ -996,6 +1071,9 @@ function renderSwingSettings(){
     <button class="btn" type="button" id="cfdAdd">＋ Přidat</button>
    </div>`;
   $('swingCurrencySelect').onchange=e=>void persistSettings({swingCurrency:e.target.value});
+  const saveMerge=async patch=>{await persistSettings({swingMerge:{...swingMergeSettings(),...patch}});try{await runSwingAutoMerge()}catch(e){showToast('Sloučení pozic se nepodařilo: '+e.message)}};
+  $('swingAutoMerge').onchange=e=>void saveMerge({autoMerge:e.target.value==='ano'});
+  $('swingMergeWindow').onchange=e=>{const v=Number(e.target.value);void saveMerge({windowMin:Number.isFinite(v)&&v>=0?v:FJSwingMerge.DEFAULT_SETTINGS.windowMin})};
   $('swingMcpAccountSelect').onchange=async e=>{
    const a=(swingMcpLast?.accounts||[]).find(x=>String(x.login)===e.target.value);
    await persistSettings({ctraderMcpAccount:a?{login:String(a.login),broker:a.brokerTitle||'',brokerTitle:a.brokerTitle||'',currency:a.currency||'',isLive:a.isLive!==false}:null});
@@ -1246,6 +1324,7 @@ async function syncSwingFromMcp({manual=false}={}){
    message:`cTrader: nové ${result.created} · aktualizované ${result.updated} · otevřené pozice ${(r.positions||[]).length} · uzavření v historii ${(r.history||[]).length}${missing.length?` · čeká (chybí velikost lotu): ${missing.join(', ')}`:''}${incomplete?' · historie v cTraderu je neúplná – v TradeWatch → History nastav období „All“':''}`};
   if(result.created||result.updated)await load();
   if(manual||result.created||result.updated)showToast(swingMcpLast.message);
+  try{await runSwingAutoMerge()}catch(e){showToast('Sloučení pozic se stejným vstupem se nepodařilo: '+e.message)}
   return result;
  }catch(e){
   swingMcpLast={at:new Date().toISOString(),ok:false,message:'Synchronizace z cTraderu selhala: '+e.message};

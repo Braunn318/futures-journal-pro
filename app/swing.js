@@ -404,6 +404,10 @@
   function sameLeg(a, b) {
     if (!a || !b) return false;
     if (a.externalId && b.externalId && a.externalId === b.externalId) return true;
+    // dvě různá id ze stejného zdroje (dvě nohy z MCP, dva dealy cBota) = dvě nohy, i když se
+    // shodují časem, objemem a cenou (dvě pozice zavřené naráz u sloučeného obchodu)
+    const mcp = x => String(x).startsWith('mcp:');
+    if (a.externalId && b.externalId && mcp(a.externalId) === mcp(b.externalId)) return false;
     const ta = instantOf(a.closedAt), tb = instantOf(b.closedAt);
     return ta != null && tb != null && Math.abs(ta - tb) <= 60000
       && Math.abs((num(a.volume) || 0) - (num(b.volume) || 0)) < 1e-6
@@ -484,6 +488,22 @@
     return [...new Set([t && t.positionId, ...((t && Array.isArray(t.ctraderPositionIds)) ? t.ctraderPositionIds : [])].filter(Boolean))];
   }
   const isGroupTrade = t => !!(t && t.orderGroupId && Array.isArray(t.ctraderPositionIds) && t.ctraderPositionIds.length);
+  // Obchod, který drží víc pozic (skupina limitek nebo ručně / automaticky sloučené pozice,
+  // app/swing-merge.js): vstup, objem a otevření nedrží jedna pozice, SL / TP jen z první.
+  const isMultiPositionTrade = t => isGroupTrade(t) || tradePositionIds(t).length > 1;
+  // Kontext slučovaného obchodu do cíle: hodnota cíle vyhrává, prázdné pole se doplní,
+  // obrázky se přidají, komentář se spojí. Jediné pravidlo pro všechna slučování swing obchodů.
+  function mergeTradeContext(target, source, fields) {
+    const t = { ...target };
+    const empty = v => v == null || v === '' || (Array.isArray(v) && !v.length);
+    const copy = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+    for (const k of fields) {
+      if (k === 'images' || k === 'imagesAfter') { const add = (source[k] || []).filter(x => !(t[k] || []).includes(x)); if (add.length) t[k] = [...(t[k] || []), ...add]; }
+      else if (k === 'comment' && !empty(source.comment) && !empty(t.comment) && source.comment !== t.comment) t.comment = t.comment + '\n' + source.comment;
+      else if (empty(t[k]) && !empty(source[k])) t[k] = copy(source[k]);
+    }
+    return t;
+  }
   function findTradeByPosition(trades, pid) {
     return (trades || []).find(t => isSwingRecord(t) && tradePositionIds(t).includes(pid)) || null;
   }
@@ -522,7 +542,7 @@
         if (cand && !dec) { out.pairs.push({ positionId: pid, candidateId: cand.id, draft }); continue; }
         if (cand) { idx = rows.indexOf(cand); t = mergeImported({ ...cand, positionId: pid }, draft); }
         else { t = { ...draft, createdAt: nowIso }; if (rows.some(x => x && x.id === t.id)) t.id += '_' + nowIso.replace(/\D/g, '').slice(-8); }
-      } else if (pos && !isGroupTrade(t)) {
+      } else if (pos && !isMultiPositionTrade(t)) {
         t = mergeImported(t, swingFromMcpPosition(pos));
       }
       for (const h of legsRows) {
@@ -531,11 +551,17 @@
         const leg = legFromMcpHistory(h, lot);
         if (leg) t = addLeg(t, leg).trade;
       }
-      if (isGroupTrade(t)) {
-        // obchod skupiny limitek (víc pozic): vstup, objem a otevření drží skupina
-        // (app/order-groups.js planGroupTrades); SL / TP jen z první otevřené pozice
+      if (isMultiPositionTrade(t)) {
+        // obchod s víc pozicemi: vstup, objem a otevření drží skupina limitek
+        // (app/order-groups.js planGroupTrades) nebo sloučení (app/swing-merge.js);
+        // SL / TP jen z první otevřené pozice
         const primary = tradePositionIds(t).find(x => open.has(x));
         if (pos && primary === pid) t = applyMcpPosition(t, pos, nowLocal).trade;
+        // sloučené pozice (ne skupina) všechny zavřené → celý objem = součet nohou
+        if (!t.orderGroupId && !primary && (t.exits || []).length && (t.importedFields || []).includes('volume')) {
+          const total = round(exitsVolume(t), 8);
+          if (num(t.volume) !== total) t = { ...t, volume: total };
+        }
       } else if (pos) {
         t = reconcileOpenVolume(t, pos).trade;
         t = applyMcpPosition(t, pos, nowLocal).trade;
@@ -600,7 +626,7 @@
   }
 
   return {
-    tradePositionIds, isGroupTrade, findTradeByPosition,
+    tradePositionIds, isGroupTrade, isMultiPositionTrade, mergeTradeContext, findTradeByPosition,
     swingLegRows, swingTradeRecord, planMcpSync, sameLeg, legFromMcpHistory, swingFromMcpPosition, swingFromMcpHistory, addLeg, reconcileOpenVolume, mcpActiveAccountCheck,
     IMPORT_FIELDS, swingFromCtraderEvent, mergeImported, applyCtraderClose, findPairCandidate, applyMcpPosition, dropEditedImportedFields,
     JOURNAL_TYPES, JOURNAL_TYPE_VERSION, JOURNAL_TYPE_LABELS, journalTypeOf, isSwingType, isSwingRecord,
