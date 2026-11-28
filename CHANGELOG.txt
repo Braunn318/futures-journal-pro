@@ -2,6 +2,13 @@
 
 All notable changes are logged here (one file, newest first).
 
+## 4.8.106 - 2026-11-28
+Číselníky: vypnutí celého číselníku, vlastní číselníky a swing číselníky (krok 6 ZADANI_SWING_CFD). Data obchodů se nemažou ani nepřepisují.
+- Added: Nastavení → Číselníky – u každého číselníku přepínač „Používat“ (pro každý deník zvlášť). Vypnutý číselník se u obchodu nenabízí (pole ve formuláři zmizí); uložené hodnoty, statistiky i exporty zůstávají a uložení obchodu je nepřepíše. Ve swing deníku jsou intraday číselníky (Order flow, Absorpce, Trend 1m / 30m, hladiny, kontext dne, psychika …) ve výchozím stavu vypnuté, ve futures deníku swing číselníky – jen výchozí stav, ruční volba vždy vyhrává. „Skrýt vypnuté číselníky“ zkrátí seznam.
+- Added: karta „Vlastní číselníky“ – založení vlastního číselníku (jedna / víc voleb), přejmenování, smazání s obnovou. Volby se přidávají, přejmenovávají, skrývají a řadí jako u ostatních číselníků. U obchodu blok s dlaždicemi ve futures i swing formuláři (i v kontextu skupiny limitek – přenese se do obchodu), štítek na kartě obchodu, sloupec „Vlastní: …“ na konci CSV Deníku a Reportů (jen když nějaký vlastní číselník existuje) a v AI exportu `customContext` + `customContextLabels`. Uložení: `trade.customContext`, definice v `settings.taxonomy.__userGroups`.
+- Added: swing číselníky Swing – setup / typ hladiny / TF vstupu / trend daily / weekly check s dosavadními nabídkami. Nabídka v textových polích swing formuláře se teď bere z nich (přejmenovat, skrýt, přidat, pořadí). Pole zůstávají volný text a uložené obchody se nemění.
+- Changed: kopie / export / import číselníků přenáší i zapnutí a vlastní číselníky.
+
 ## 4.8.105 - 2026-11-24
 - Added: swing deník – pozice z cTraderu se stejným účtem, symbolem, směrem a vstupní cenou, otevřené do 5 minut od sebe, se automaticky sloučí do jednoho obchodu, i uzavřené a i bez skupiny limitek (např. dvě pozice EURJPY na 175,000). Objem = součet, vstup = průměr vážený objemem, otevření = nejdřívější, výstupy se spojí. Před prvním sloučením se udělá záloha deníku (safety-backups, „pred-sloucenim-pozic“). Vypnout a nastavit okno jde v Nastavení → Swing · CFD.
 - Added: swing deník – „🔗 Sloučit vybrané“ přímo v Deníku (zaškrtávátka u obchodů), funguje i pro uzavřené obchody. „Sloučit vybrané“ v Pozicích sloučí i pozice bez skupiny limitek.

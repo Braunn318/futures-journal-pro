@@ -25,7 +25,7 @@
   const DEFAULT_SETTINGS = Object.freeze({ autoMerge: true, windowMin: 5 });
   // Pole, která se při sloučení doplní do cíle, když je v něm prázdno.
   const CONTEXT_FIELDS = ['swingSetup', 'entryReason', 'entryTf', 'htfTrend', 'weeklyCheck', 'entryLevelType', 'grade', 'riskAmount',
-    'slInitial', 'targetsPlanned', 'currency', 'ctraderAccountId', 'ctraderAccount', 'contextFilledAt', 'images', 'imagesAfter', 'comment'];
+    'slInitial', 'targetsPlanned', 'currency', 'ctraderAccountId', 'ctraderAccount', 'contextFilledAt', 'images', 'imagesAfter', 'comment', 'customContext'];
   const OWN_FIELDS = ['entryPrice', 'volume', 'openedAt'];
 
   function num(value) {

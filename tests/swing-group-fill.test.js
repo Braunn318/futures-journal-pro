@@ -27,7 +27,7 @@ const hist = (id, close, closeTime, o = {}) => ({ positionId: id, symbolName: 'U
 const CONTEXT = {
   swingSetup: 'M2 daily', entryReason: 'odraz od VA hrany 4h', entryTf: '4h', htfTrend: 'dolů', weeklyCheck: 'OK',
   entryLevelType: 'VA hrana', grade: 'A', riskAmount: 240, images: ['fjimg://store/daily.webp', 'fjimg://store/h4.webp', 'fjimg://store/m15.webp'],
-  comment: 'čekám na test', targetLevels: { ct_1: 'VPOC 4h', ct_2: 'Gap' }
+  comment: 'čekám na test', customContext: { U_POTVRZENI: ['CUSTOM_SVICE', 'CUSTOM_OBJEM'], U_NALADA: 'CUSTOM_KLID' }, targetLevels: { ct_1: 'VPOC 4h', ct_2: 'Gap' }
 };
 
 // Jedna synchronizace jako v aplikaci: skupiny → naplnění → obchody skupin → planMcpSync.

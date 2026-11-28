@@ -197,6 +197,11 @@ canvas{width:100%;height:100%}
 .tax-row.hidden-option input{opacity:.5;font-style:italic}
 .tax-row .tax-key{font-size:10px;color:var(--muted);font-family:ui-monospace,Consolas,monospace}
 .tax-actions{display:flex;gap:4px}
+.tax-group>summary .tax-enable{float:right;font-weight:600;letter-spacing:0;font-size:13px;display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.tax-group.tax-off>summary{opacity:.55}
+.tax-scope{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-left:6px;color:var(--muted)}
+.tax-group-off{display:none!important}
+#userGroupsList .tax-row{grid-template-columns:1fr auto}
 .tax-actions button{padding:3px 8px;font-size:12px;min-width:auto}
 /* Směr obchodu je záměrně modrá/žlutá, ne zelená/červená – ta je v celé aplikaci
    vyhrazená pro zisk/ztrátu a směr je na výsledku nezávislý. */
@@ -1104,8 +1109,19 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
 <details class="card settings-card" data-card="taxonomy">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Číselníky kontextu obchodu</h3></summary>
           <p class="sub">Volby, které se nabízejí u obchodu – hladina vstupu, order flow potvrzení, setup a stav naplnění. Popisek jde kdykoli přejmenovat, protože v datech obchodu je uložený neměnný klíč, ne text. Volbu jde skrýt – skrytá se dál počítá do statistik a zůstává u obchodů, které ji mají, jen se nenabízí u nových – nebo smazat; smazanou jde obnovit.</p>
+          <label class="settings-check" style="margin:8px 0"><input type="checkbox" id="taxHideDisabled"> Skrýt vypnuté číselníky <span class="sub">— jen v tomto seznamu</span></label>
           <div id="taxonomyGroups"></div>
 </details>
+        <details class="card settings-card" data-card="taxonomyCustom">
+          <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Vlastní číselníky</h3></summary>
+          <p class="sub">Vlastní číselník s vlastními volbami. U obchodu se nabízí v bloku „Vlastní kontext“ (futures i swing formulář), v detailu jako štítek a jde do CSV a AI exportu. Volby přidáš, přejmenuješ, skryješ a seřadíš v kartě „Číselníky kontextu obchodu“ jako u ostatních. Smazaný číselník jde obnovit; hodnoty u obchodů zůstávají.</p>
+          <div class="mapping-row" style="margin-top:10px">
+            <input type="text" id="userGroupNew" placeholder="Název číselníku, např. Moje potvrzení" maxlength="120">
+            <select id="userGroupCardinality" aria-label="Kolik voleb u obchodu"><option value="single">Jedna volba</option><option value="multi">Víc voleb</option></select>
+            <button type="button" class="btn" id="userGroupAddBtn">Založit číselník</button>
+          </div>
+          <div id="userGroupsList" style="margin-top:10px"></div>
+        </details>
         <details class="card settings-card" data-card="taxonomyTransfer">
           <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Přenos číselníků</h3></summary>
             <p class="sub">Číselníky patří ke kartě deníku, takže backtest a živý deník mají každý svoje. Tady se dají zkopírovat do jiné karty nebo uložit do souboru a načíst na jiném počítači.</p>
@@ -1701,16 +1717,16 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <details class="trade-section" data-card="setup">
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Setup</span><span class="sub trade-section-summary" id="setupSummary"></span><span class="trade-section-missing" id="setupMissing"></span></summary>
         <div class="formgrid">
-          <div class="field"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
-          <div class="field" data-ctx-field="setupCode2"><label>Setup – sekundární <span class="sub">— volitelný druhý setup</span></label><select id="setupCode2"></select></div>
-          <div class="field"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
+          <div class="field" data-tax-group="SETUP"><label>Setup <span class="sub">— podle Strategy.md</span></label><select id="setupCode"></select></div>
+          <div class="field" data-ctx-field="setupCode2" data-tax-group="SETUP"><label>Setup – sekundární <span class="sub">— volitelný druhý setup</span></label><select id="setupCode2"></select></div>
+          <div class="field" data-tax-group="FILL_STATUS"><label>Stav naplnění</label><select id="fillStatus"></select><div class="sub" id="fillStatusHint"></div></div>
           <div class="field" id="missedByField" style="display:none"><label>Minuto o <span class="sub">— <span data-unit-t="ticků" data-unit-b="bodů" data-unit-for="instrument">ticků</span>, nepovinné</span></label><input id="missedByTicks" data-tick-input type="number" step="any" min="0" placeholder="o kolik cena limitku minula"></div>
           <div class="field" id="skippedReasonField" style="display:none"><label>Důvod vynechání <span class="sub">— jen u „vědomě vynechán“</span></label><select id="skippedReason"></select><input id="skippedReasonNote" placeholder="upřesnění textem (nepovinné)" style="margin-top:6px"></div>
-          <div class="field full"><label>Trend 1m <span class="sub">— trend na 1min grafu</span></label><div id="trend" class="chip-grid"></div></div>
-          <div class="field full" data-ctx-field="trendHtf"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
+          <div class="field full" data-tax-group="TREND"><label>Trend 1m <span class="sub">— trend na 1min grafu</span></label><div id="trend" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="trendHtf" data-tax-group="TREND_HTF"><label>Trend 30m <span class="sub">— trend na 30min grafu</span></label><div id="trendHtf" class="chip-grid"></div></div>
           <div class="field full" id="signalBarField" style="display:none"><label>Signální svíčka <span class="sub">— ze snímku trhu při vstupu; klikem vyber jinou (−1 = svíčka, která skončila v minutě vstupu)</span></label><div id="signalBarPreview"></div><div class="sub" id="signalBarInfo" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky"></div></div>
-          <div class="field full" data-ctx-field="grade"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
-          <div class="field full" data-ctx-field="entryTestNo"><label>Kolikátý test vstupní hladiny <span class="sub">— v seanci (1. test = netest)</span></label><div id="entryTestNo" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="grade" data-tax-group="GRADE"><label>Známka <span class="sub">— zadávej PŘED vstupem; pozdější změna se označí</span></label><div id="grade" class="chip-grid"></div><div class="sub" id="gradeNote"></div></div>
+          <div class="field full" data-ctx-field="entryTestNo" data-tax-group="ENTRY_TEST_NO"><label>Kolikátý test vstupní hladiny <span class="sub">— v seanci (1. test = netest)</span></label><div id="entryTestNo" class="chip-grid"></div></div>
           <div class="field"><label>Dodržen obchodní plán?</label><select id="planFollowed"><option value="ano">Ano</option><option value="ne">Ne</option></select></div>
           <div class="field" id="wouldSkipLiveField"><label>Naživo bych to vzal? <span class="sub">— jiná otázka než plán</span></label><select id="wouldSkipLive" title="„Ne“ = vzal jsem to jen kvůli měření (backtest), naživo bych to nevzal. Takový obchod je ve výchozím stavu mimo P/L a statistiky výkonu, do fill rate se počítá."><option value="ne">Ano</option><option value="ano">Ne – vzato jen kvůli měření</option></select><div class="sub" id="wouldSkipLiveNote"></div></div>
           <div class="field" id="wouldSkipReasonField" style="display:none"><label>Proč bych to naživo nevzal</label><select id="wouldSkipReason"></select></div>
@@ -1719,15 +1735,16 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
       <details class="trade-section" data-card="levels">
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Hladiny</span><span class="sub trade-section-summary" id="levelsSummary"></span><span class="trade-section-missing" id="levelsMissing"></span></summary>
         <div class="formgrid">
-          <div class="field full"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span> <button type="button" class="settings-gear" data-settings-link="taxonomyEditor" title="Upravit volby v Číselnících">⚙</button></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
+          <div class="field full" data-tax-group="ENTRY_LEVEL"><label>Hladina vstupu <span class="sub">— lze vybrat víc (konfluence)</span> <button type="button" class="settings-gear" data-settings-link="taxonomyEditor" title="Upravit volby v Číselnících">⚙</button></label><div id="entryLevels" class="chip-grid"></div><div class="sub" id="confluenceHint"></div></div>
           <div class="field full" id="nearLevelsField"><label>Hladiny v blízkosti <span class="sub">— typ, cena a test / netest; polohu vůči vstupu, Stop Lossu a cíli deník dopočítá sám</span></label>
             <div class="tmap-box" id="tradeMapBox" style="display:none"><div class="tmap-bar"><span class="sub" id="tradeMapHidden"></span><button type="button" class="settings-gear" data-settings-link="levelsMap" title="Nastavení Mapy obchodu">⚙</button><button type="button" class="btn" id="tradeMapFull" onclick="toggleTradeMapFull()" title="Ukáže i hladiny mimo rozsah SL – poslední cíl (jen zobrazení)">Celý rozsah</button></div><div class="tmap" id="tradeMap"></div><div class="sub tmap-legend" id="tradeMapLegend"></div><div class="tmap-sentence" id="tradeMapSentence" title="Poloha hladin vůči SL, vstupu a poslednímu cíli – dopočet z cen, needituje se"></div><div class="sub" id="tradeMapSignal" data-ctx-field="derivedRow" title="Dopočet ze snímku trhu – neukládá se, ukládá se jen výběr svíčky" style="margin-top:4px"></div></div>
             <div class="sr-list sr-list-plain open" id="nearLevelsList"><button type="button" class="sr-list-head" onclick="toggleLevelList()" aria-controls="nearLevelsListBody"><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Seznam hladin <span class="sub" id="nearLevelsCount"></span></button><div class="sr-list-body" id="nearLevelsListBody"><div class="sr-filter" id="nearLevelsFilter" style="display:none"></div>
           <div id="nearLevels" class="sr-rows"></div><div class="sr-actions"><button type="button" class="btn" id="nearLevelsAdd" onclick="appendLevelRow()">＋ Přidat hladinu</button><button type="button" class="settings-gear" data-settings-link="levels" title="Nastavení hladin z LTA souborů a ze snímku trhu">⚙</button><button type="button" class="btn" id="nearLevelsLta" onclick="fillNearLevelsFromLta()" title="Doplní N nejbližších levelů z LiveTradingAsistent nad a pod cenou vstupu (Nastavení → Hladiny a data trhu → Hladiny z LTA souborů). Zadané řádky zůstanou.">⤓ Doplnit z LTA</button><label class="sr-none"><input type="checkbox" id="nearLevelsNone"> žádná hladina v blízkosti</label></div><div class="sub" id="nearLevelsLtaNote" style="margin-top:6px;display:none"></div><div class="sub" id="nearLevelsNote" style="margin-top:6px"></div></div></div></div>
-          <div class="field full"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
-          <div class="field full" data-ctx-field="absLocation"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
-          <div class="field full"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
-          <div class="field full"><label>Cílová hladina 2 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel2Types" class="chip-grid"></div></div>
+          <div class="field full" data-tax-group="OF_CONFIRM"><label>Order flow potvrzení <span class="sub">— lze vybrat víc</span></label><div id="ofConfirm" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="absLocation" data-tax-group="ABS_LOCATION"><label>Absorpce – kde <span class="sub">— na extrému svíčky / pohybu, nebo uprostřed</span></label><div id="absLocation" class="chip-grid"></div></div>
+          <div id="customContextFields" style="display:contents"></div>
+          <div class="field full" data-tax-group="TARGET_LEVEL"><label>Cílová hladina 1 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel1Types" class="chip-grid"></div></div>
+          <div class="field full" data-tax-group="TARGET_LEVEL"><label>Cílová hladina 2 <span class="sub">— typ, lze vybrat víc (konfluence)</span></label><div id="targetLevel2Types" class="chip-grid"></div></div>
           <div id="targetLevelTypesExtra" style="display:contents"></div>
           <div class="field full sub" id="contextDerived" data-ctx-field="derivedRow" title="Dopočítáno z cen (hladiny, vstup, SL, cíl), data a času – needituje se a do obchodu se neukládá."></div>
         </div>
@@ -1736,9 +1753,9 @@ body{font-family:Inter,Segoe UI,Arial,sans-serif}
         <summary><svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="trade-section-title">Psychika</span><span class="sub trade-section-summary" id="psychSummary"></span><span class="trade-section-missing" id="psychMissing"></span></summary>
         <div class="formgrid">
           <div class="field full sub">Škála 1–8: 1 = nejhorší, 8 = nejlepší. Druhým kliknutím na tutéž hodnotu se volba zruší.</div>
-          <div class="field full" data-ctx-field="psychBefore"><label>Před vstupem</label><div id="psychBefore" class="chip-grid"></div></div>
-          <div class="field full" data-ctx-field="psychDuring"><label>V průběhu obchodu</label><div id="psychDuring" class="chip-grid"></div></div>
-          <div class="field full" data-ctx-field="psychAfter"><label>Po výstupu</label><div id="psychAfter" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="psychBefore" data-tax-group="PSYCH"><label>Před vstupem</label><div id="psychBefore" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="psychDuring" data-tax-group="PSYCH"><label>V průběhu obchodu</label><div id="psychDuring" class="chip-grid"></div></div>
+          <div class="field full" data-ctx-field="psychAfter" data-tax-group="PSYCH"><label>Po výstupu</label><div id="psychAfter" class="chip-grid"></div></div>
         </div>
       </details>
       <details class="trade-section" data-card="comments">
@@ -2707,6 +2724,8 @@ function fillSettings(){
  renderTemplateList();
  renderTaxonomyEditor();
  renderTaxonomyTransfer();
+ renderUserGroupsCard();
+ applyTaxonomyGroupVisibility();
  fillThemeSettingsUI();
 }
 async function persistSettings(patch){
@@ -3617,6 +3636,120 @@ async function saveTaxonomyConfig(next){
  await persistSettings({taxonomy:next});
  renderTaxonomyEditor();
  renderTaxonomyTransfer();
+ renderUserGroupsCard();
+ applyTaxonomyGroupVisibility();
+}
+// Typ aktivního deníku pro výchozí zapnutí číselníků (swing-ui.js se načítá
+// až po hlavním skriptu, proto přes typeof).
+function taxJournalType(){return typeof activeJournalType==='function'?activeJournalType():'FUTURES_INTRADAY'}
+function taxGroupOn(name){return FJTaxonomy.isGroupEnabled(name,undefined,taxJournalType())}
+// „Skrýt vypnuté" v editoru číselníků – jen UI stav.
+function taxHideDisabled(){try{return localStorage.getItem('FJ_taxHideDisabled')==='1'}catch{return false}}
+// Pole formuláře s číselníkem nesou data-tax-group: vypnutý číselník pole
+// skryje (data obchodu zůstávají – viz readTaxField). Vlastní číselníky
+// se vykreslují do #customContextFields (futures) / #swCustomContext (swing).
+function applyTaxonomyGroupVisibility(){
+ document.querySelectorAll('[data-tax-group]').forEach(el=>{
+  const groups=el.dataset.taxGroup.split(/\s+/).filter(Boolean);
+  el.classList.toggle('tax-group-off',!groups.some(taxGroupOn));
+ });
+}
+// Pole vypnutého číselníku se při uložení nečte z formuláře – obchod si
+// nechá svou uloženou hodnotu (vypnutí nikdy nemaže data).
+function taxFieldOff(id){const el=$(id);return !!el&&!!el.closest('.tax-group-off')}
+function readTaxField(id,prev,read){return taxFieldOff(id)?prev:read()}
+// Vlastní kontext (vlastní číselníky) – sdílené pro futures i swing formulář.
+function renderCustomContextFields(hostId,values){
+ const host=$(hostId);if(!host)return;
+ const groups=FJTaxonomy.userGroups().filter(g=>taxGroupOn(g.name));
+ const cc=values&&typeof values==='object'?values:{};
+ host.innerHTML=groups.map(g=>`<div class="field full"><label>${esc(g.label)}${g.cardinality==='multi'?' <span class="sub">— lze vybrat víc</span>':''}</label><div id="${hostId}-${esc(g.name)}" class="chip-grid" data-cc-group="${esc(g.name)}"></div></div>`).join('');
+ host.style.display=groups.length?'contents':'none';
+ for(const g of groups){
+  const id=`${hostId}-${g.name}`;
+  if(g.cardinality==='multi')renderChipGrid(id,g.name,Array.isArray(cc[g.name])?cc[g.name]:(cc[g.name]?[cc[g.name]]:[]));
+  else renderSingleChipGrid(id,g.name,Array.isArray(cc[g.name])?cc[g.name][0]:cc[g.name]);
+ }
+}
+// Čte jen vykreslené (zapnuté) skupiny; hodnoty vypnutých a smazaných skupin
+// i klíče, které číselník už nezná, zůstávají z uloženého obchodu.
+function readCustomContextFields(hostId,prev){
+ const out={...(prev&&typeof prev==='object'?prev:{})};
+ const host=$(hostId);
+ if(host)host.querySelectorAll('[data-cc-group]').forEach(el=>{
+  const name=el.dataset.ccGroup,g=FJTaxonomy.groupDef(name);if(!g)return;
+  const old=out[name];
+  const unknown=(Array.isArray(old)?old:(old?[old]:[])).filter(k=>!FJTaxonomy.isValidKey(name,k));
+  if(g.cardinality==='multi'){const v=[...readChipGrid(el.id,name),...unknown];if(v.length)out[name]=v;else delete out[name]}
+  else{const v=readSingleChipGrid(el.id,name)||unknown[0]||'';if(v)out[name]=v;else delete out[name]}
+ });
+ return FJTaxonomy.sanitizeCustomContext(out);
+}
+function customContextPills(t){
+ const cc=t&&t.customContext;if(!cc||typeof cc!=='object')return [];
+ return FJTaxonomy.userGroups().filter(g=>cc[g.name]&&!(Array.isArray(cc[g.name])&&!cc[g.name].length))
+  .map(g=>`<span class="pill context-pill" title="${esc(g.label)}">${esc(g.label)}: ${esc(FJTaxonomy.customContextText(t,g.name))}</span>`);
+}
+// Karta Nastavení → Číselníky → Vlastní číselníky: založit, přejmenovat,
+// smazat (obnovitelně). Volby se upravují v kartě Číselníky kontextu obchodu.
+function renderUserGroupsCard(){
+ const host=$('userGroupsList');if(!host)return;
+ const all=FJTaxonomy.userGroups(undefined,{includeRemoved:true});
+ const live=all.filter(g=>!g.removed),gone=all.filter(g=>g.removed);
+ host.innerHTML=(live.length?live.map(g=>`<div class="tax-row" data-ugroup="${esc(g.name)}">
+   <div><input type="text" class="ug-label" value="${esc(g.label)}" aria-label="Název číselníku"><div class="tax-key">${esc(g.name)} · ${g.cardinality==='multi'?'víc voleb':'jedna volba'} · ${FJTaxonomy.allKeys(g.name).length} voleb</div></div>
+   <div class="tax-actions"><button type="button" class="btn ug-edit">Upravit volby</button><button type="button" class="btn ug-delete">Smazat číselník</button></div>
+  </div>`).join(''):'<p class="sub">Zatím žádný vlastní číselník.</p>')
+  +(gone.length?`<p class="sub" style="margin-top:8px">Smazané: ${gone.map(g=>`<button type="button" class="btn ug-restore" data-ugroup="${esc(g.name)}" title="Obnovit smazaný číselník">${esc(g.label)} ↺</button>`).join(' ')}</p>`:'');
+ const patchGroup=async(name,fn)=>{
+  const cfg=taxonomyConfig();
+  const list=Array.isArray(cfg[FJTaxonomy.USER_GROUPS_KEY])?cfg[FJTaxonomy.USER_GROUPS_KEY]:[];
+  const i=list.findIndex(x=>x&&x.name===name);if(i<0)return;
+  list[i]=fn({...list[i]});cfg[FJTaxonomy.USER_GROUPS_KEY]=list;
+  await saveTaxonomyConfig(cfg);
+ };
+ host.querySelectorAll('.ug-label').forEach(input=>{
+  input.onchange=async()=>{
+   const name=input.closest('[data-ugroup]').dataset.ugroup,label=String(input.value||'').trim();
+   if(!label){renderUserGroupsCard();return}
+   await patchGroup(name,g=>({...g,label}));
+   showToast('Číselník přejmenován. Obchody se nemění – v datech je klíč.');
+  };
+ });
+ host.querySelectorAll('.ug-edit').forEach(btn=>btn.onclick=()=>{
+  const name=btn.closest('[data-ugroup]').dataset.ugroup;
+  if(!taxOpenGroups)taxOpenGroups=new Set();
+  taxOpenGroups.add(name);
+  const card=document.querySelector('details[data-card="taxonomy"]');if(card)card.open=true;
+  renderTaxonomyEditor();
+  document.querySelector(`#taxonomyGroups details[data-group="${CSS.escape(name)}"]`)?.scrollIntoView({block:'start',behavior:'smooth'});
+ });
+ host.querySelectorAll('.ug-delete').forEach(btn=>btn.onclick=async()=>{
+  const name=btn.closest('[data-ugroup]').dataset.ugroup,g=FJTaxonomy.groupDef(name);
+  const used=trades.filter(t=>t?.customContext&&t.customContext[name]!=null).length;
+  const ok=await showConfirm(`Smazat číselník „${g?.label||name}“?\n\nU obchodů se nenabízí, ale hodnoty, které obchody už mají (v tomto deníku: ${used}), zůstávají uložené a jdou dál do exportu. Číselník jde obnovit v seznamu „Smazané“.\n\nPokud ho jen nechceš teď používat, stačí v Číselnících vypnout „Používat“.`,{ok:'Smazat'});
+  if(!ok)return;
+  await patchGroup(name,x=>({...x,removed:true}));
+  showToast('Číselník smazán. Obnovíš ho v seznamu „Smazané“.');
+ });
+ host.querySelectorAll('.ug-restore').forEach(btn=>btn.onclick=async()=>{
+  await patchGroup(btn.dataset.ugroup,x=>{delete x.removed;return x});
+  showToast('Číselník obnoven.');
+ });
+}
+async function createUserGroup(){
+ const input=$('userGroupNew');const label=String(input?.value||'').trim();
+ if(!label){showToast('Napiš název nového číselníku.');return}
+ const cardinality=$('userGroupCardinality')?.value==='multi'?'multi':'single';
+ const cfg=taxonomyConfig();
+ const name=FJTaxonomy.userGroupName(label,cfg);
+ const list=Array.isArray(cfg[FJTaxonomy.USER_GROUPS_KEY])?cfg[FJTaxonomy.USER_GROUPS_KEY]:[];
+ cfg[FJTaxonomy.USER_GROUPS_KEY]=[...list,{name,label,cardinality}];
+ input.value='';
+ if(!taxOpenGroups)taxOpenGroups=new Set();
+ taxOpenGroups.add(name);
+ await saveTaxonomyConfig(cfg);
+ showToast(`Číselník „${label}“ založen – přidej mu volby v kartě Číselníky kontextu obchodu.`);
 }
 function taxonomyGroupPatch(cfg,group){
  if(!cfg[group]||typeof cfg[group]!=='object')cfg[group]={};
@@ -3648,7 +3781,11 @@ function renderTaxonomyEditor(){
  if(host.querySelector('details'))taxOpenGroups=new Set([...host.querySelectorAll('details[data-group][open]')].map(d=>d.dataset.group));
  else if(!taxOpenGroups)taxOpenGroups=new Set(['ENTRY_LEVEL']);
  const scrollTop=document.scrollingElement?.scrollTop;
- host.innerHTML=FJTaxonomy.GROUPS.map(group=>{
+ const jt=taxJournalType();
+ const hideOff=taxHideDisabled();
+ host.innerHTML=FJTaxonomy.allGroups().map(group=>{
+  const enabled=FJTaxonomy.isGroupEnabled(group.name,undefined,jt);
+  if(hideOff&&!enabled)return '';
   const keys=FJTaxonomy.allKeys(group.name);
   const aliases=FJTaxonomy.aliasesFor(group.name);
   // Odvozená skupina sdílí seznam voleb, takže se v ní nepřejmenovává ani
@@ -3672,8 +3809,11 @@ function renderTaxonomyEditor(){
     <div class="sub" style="font-size:11px">${hidden?'skrytá':''}${group.name==='TARGET_LEVEL'?`<label class="tax-is-level" title="Vypni u cíle, který není hladina (ruční výstup, trail, pevné RRR) – dopočet „cíl na hladině“ ho pak nebere jako hladinu."><input type="checkbox" class="tax-level"${FJTaxonomy.isLevelKey(key)?' checked':''}> je to hladina</label>`:''}</div>
    </div>`;
   }).join('');
-  return `<details style="margin-bottom:14px" data-group="${esc(group.name)}"${taxOpenGroups.has(group.name)?' open':''}>
-   <summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">${esc(group.label)} <span class="sub">(${keys.length} voleb)</span></summary>
+  const scopeTag=group.user?'vlastní':group.scope==='swing'?'swing':'';
+  return `<details class="tax-group${enabled?'':' tax-off'}" style="margin-bottom:14px" data-group="${esc(group.name)}"${taxOpenGroups.has(group.name)?' open':''}>
+   <summary style="cursor:pointer;font-weight:800;letter-spacing:.03em">${esc(group.label)} <span class="sub">(${keys.length} voleb)</span>${scopeTag?` <span class="tax-scope">${scopeTag}</span>`:''}<label class="tax-enable" title="Vypnutý číselník se u obchodu nenabízí (pole ve formuláři zmizí). Uložená data, statistiky ani exporty se nemění."><input type="checkbox" class="tax-enabled" data-group="${esc(group.name)}"${enabled?' checked':''}> Používat</label></summary>
+   ${!enabled?'<p class="sub" style="margin-top:8px">Vypnuto v tomto deníku – pole se u obchodu nenabízí. Data obchodů zůstávají.</p>':''}
+   ${group.storesLabel?'<p class="sub" style="margin-top:8px">Nabídka do textového pole swing formuláře. U obchodu se ukládá text – přejmenování volby uložené obchody nemění.</p>':''}
    ${sourceLabel?`<p class="sub" style="margin-top:8px">Používá stejný seznam voleb jako <b>${esc(sourceLabel)}</b> – hladina je hladina, ať je to hladina vstupu, nebo hladina v blízkosti. Přejmenovat volbu a přidat novou jde u „${esc(sourceLabel)}" a platí to pro obě kolonky. Skrýt a přeuspořádat si tady můžeš zvlášť.</p>`:''}
    <div style="margin-top:10px">${rows}</div>
    ${(()=>{
@@ -3691,6 +3831,29 @@ function renderTaxonomyEditor(){
  if(document.scrollingElement&&scrollTop!=null)document.scrollingElement.scrollTop=scrollTop;
 }
 function wireTaxonomyEditor(){
+ // Zapnutí celého číselníku. Ukládá se jen odchylka od výchozího stavu pro
+ // typ deníku – návrat na výchozí `enabled` smaže.
+ document.querySelectorAll('#taxonomyGroups .tax-enable').forEach(label=>{
+  label.onclick=e=>e.stopPropagation(); // klik nesmí rozbalit / sbalit skupinu
+ });
+ document.querySelectorAll('#taxonomyGroups .tax-enabled').forEach(box=>{
+  box.onchange=async()=>{
+   const group=box.dataset.group;
+   const cfg=taxonomyConfig();
+   const g=taxonomyGroupPatch(cfg,group);
+   delete g.enabled;
+   if(FJTaxonomy.groupEnabledByDefault(group,cfg,taxJournalType())!==box.checked)g.enabled=box.checked;
+   if(!Object.keys(g).length)delete cfg[group];
+   await saveTaxonomyConfig(cfg);
+   const label=FJTaxonomy.groupDef(group,cfg)?.label||group;
+   showToast(box.checked?`Číselník „${label}“ zapnut.`:`Číselník „${label}“ vypnut – u obchodu se nenabízí, data zůstávají.`);
+  };
+ });
+ const hideOff=$('taxHideDisabled');
+ if(hideOff){
+  hideOff.checked=taxHideDisabled();
+  hideOff.onchange=()=>{try{localStorage.setItem('FJ_taxHideDisabled',hideOff.checked?'1':'0')}catch{}renderTaxonomyEditor()};
+ }
  // Přejmenování: mění se POUZE popisek, klíč zůstává. Proto se dá popisek
  // upravit i u volby, která je už použitá ve stovkách obchodů.
  document.querySelectorAll('#taxonomyGroups .tax-label').forEach(input=>{
@@ -3710,7 +3873,9 @@ function wireTaxonomyEditor(){
    else if(value===FJTaxonomy.DEFAULT_ENUMS[group]?.[key])delete g.labels[key];
    else g.labels[key]=value;
    await saveTaxonomyConfig(cfg);
-   showToast('Popisek upraven. Uložené obchody se nemění – v datech je klíč, ne text.');
+   showToast(FJTaxonomy.groupDef(group)?.storesLabel
+    ?'Popisek upraven. Nabídka swing formuláře se změnila; uložené obchody mají text a zůstávají, jak byly.'
+    :'Popisek upraven. Uložené obchody se nemění – v datech je klíč, ne text.');
   };
  });
  // Skrytí: nikdy ne mazání. Smazaná volba by zneplatnila obchody, které ji
@@ -3853,6 +4018,8 @@ async function copyTaxonomyToJournal(targetId){
  const written=await window.desktopAPI.writeJournal(targetId,data);
  if(!written?.ok)throw new Error(written?.error||'Cílovou kartu deníku nelze uložit.');
 }
+$('userGroupAddBtn').onclick=()=>void createUserGroup();
+$('userGroupNew').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();void createUserGroup()}};
 $('taxonomyCopyBtn').onclick=async()=>{
  const targetId=$('taxonomyCopyTarget').value;
  if(!targetId)return;
@@ -4626,6 +4793,9 @@ function mergeContextFields(list){
    if(first)out[field.key]=first[field.key];
   }
  }
+ // Vlastní číselníky: multi = sjednocení, single = první vyplněná noha.
+ const cc=FJTaxonomy.sanitizeCustomContext(list.reduce((acc,t)=>FJTaxonomy.mergeCustomContext(acc,t?.customContext),{}));
+ if(Object.keys(cc).length)out.customContext=cc;
  const levels=out.entryLevels;
  if(levels)out.confluenceCount=FJTaxonomy.confluenceCount(levels);
  return out;
@@ -4661,6 +4831,8 @@ function contextPillsHTML(t){
   parts.push(`<span class="pill context-pill${flags.length?' grade-flag':''}" title="Známka${flags.length?' – '+esc(flags.join(', ')):''}">Známka ${esc(FJTaxonomy.labelOf('GRADE',t.grade))}${flags.length?' *':''}</span>`);
  }
  if(t.fillStatus&&t.fillStatus!=='FILLED')parts.push(`<span class="pill context-pill" title="Stav naplnění">${esc(FJTaxonomy.labelOf('FILL_STATUS',t.fillStatus))}</span>`);
+ // Vlastní číselníky (Nastavení → Číselníky → Vlastní číselníky).
+ if(typeof customContextPills==='function')parts.push(...customContextPills(t));
  return parts.join(' ')+psychPill;
 }
 // Psychika obchodu jako krátké části „před 6 · během 4 · po 7" – jen
@@ -5804,6 +5976,8 @@ function openModal(t=null,{title}={}){
  if(typeof applyLevelsView==='function'){tradeMapFull=false;applyLevelsView(true)}
  else renderSignalBar();
  renderChipGrid('ofConfirm','OF_CONFIRM',t&&t.ofConfirm);
+ renderCustomContextFields('customContextFields',t&&t.customContext);
+ applyTaxonomyGroupVisibility();
  updateConfluenceHint();
  // Karty formuláře se otevřou tak, jak je uživatel naposledy nechal.
  applyTradeSectionsOpenState();
@@ -6860,10 +7034,12 @@ $('tradeForm').addEventListener('submit',async e=>{
   // Kontextová pole (spec §4.2). Ukládají se klíče číselníku; neznámá
   // hodnota se zahazuje, ať se do breakdownu nedostane překlep. Všechna jsou
   // nepovinná a nesmí blokovat uložení obchodu.
-  obj.setupCode=FJTaxonomy.sanitizeSingle('SETUP',$('setupCode')?.value);
+  // Pole vypnutého číselníku (Nastavení → Číselníky → Používat) se nečte –
+  // obchod si nechá uloženou hodnotu (obj začíná jako kopie uloženého obchodu).
+  if(!taxFieldOff('setupCode'))obj.setupCode=FJTaxonomy.sanitizeSingle('SETUP',$('setupCode')?.value);
   // Skryté pole drží uloženou hodnotu dál (select se plní z obchodu).
-  obj.setupCode2=FJTaxonomy.sanitizeSingle('SETUP',$('setupCode2')?.value);
-  obj.fillStatus=FJTaxonomy.sanitizeSingle('FILL_STATUS',$('fillStatus')?.value);
+  if(!taxFieldOff('setupCode2'))obj.setupCode2=FJTaxonomy.sanitizeSingle('SETUP',$('setupCode2')?.value);
+  if(!taxFieldOff('fillStatus'))obj.fillStatus=FJTaxonomy.sanitizeSingle('FILL_STATUS',$('fillStatus')?.value);
   // Minutí limitky v ticích (vždy kladně) – jen u nenaplněného / vynechaného
   // setupu; u naplněného obchodu by tvrdilo, že limitka minula.
   const missedRaw=missedByApplies(obj.fillStatus)?tickInputValue('missedByTicks'):'';
@@ -6873,25 +7049,28 @@ $('tradeForm').addEventListener('submit',async e=>{
   // „Naživo bych nevzal“ je samostatná otázka, NE planFollowed. Bez příznaku
   // se důvod nedrží – visel by u obchodu, který se do výkonu počítá.
   applySkipLiveFromForm(obj,activeJournalMode(),$('wouldSkipLive')?.value,$('wouldSkipReason')?.value,skipLiveFieldShown(activeJournalMode(),formHadSkipLive));
-  obj.trend=readSingleChipGrid('trend','TREND');
-  obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
+  if(!taxFieldOff('trend'))obj.trend=readSingleChipGrid('trend','TREND');
+  if(!taxFieldOff('entryLevels'))obj.entryLevels=readChipGrid('entryLevels','ENTRY_LEVEL');
   // Hladiny v blízkosti: jeden seznam řádků; „žádná hladina v blízkosti" se
   // ukládá jen true a jen bez řádků. Starý tvar (dva seznamy SR) se tím
   // z obchodu odstraní.
   FJTaxonomy.setNearLevels(obj,readLevelRows(),readNearNone());
   if(formLtaMeta)obj.ltaMeta=formLtaMeta;
   if(formSignalBarOffset!==undefined){if(formSignalBarOffset===-1)delete obj.signalBarOffset;else obj.signalBarOffset=formSignalBarOffset}
-  obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
+  if(!taxFieldOff('ofConfirm'))obj.ofConfirm=readChipGrid('ofConfirm','OF_CONFIRM');
   obj.confluenceCount=FJTaxonomy.confluenceCount(obj.entryLevels);
+  // Vlastní číselníky: hodnoty vypnutých / smazaných skupin zůstávají.
+  {const cc=readCustomContextFields('customContextFields',existing?.customContext);if(Object.keys(cc).length)obj.customContext=cc;else delete obj.customContext}
   // Kontext v2 (A4): prázdné = nevyplněno, neukládá se nic.
   for(const [key,group] of NEW_SINGLE_FIELDS){
+   if(taxFieldOff(key))continue;
    const v=readSingleChipGrid(key,group);
    if(v)obj[key]=v;else delete obj[key];
   }
   // Pole zrušená v kontextu v3 se s uložením z obchodu odstraní.
   for(const key of FJTaxonomy.V3_REMOVED_KEYS)delete obj[key];
   // Známka: čas prvního zadání a příznak dodatečné změny (A4).
-  FJContext.applyGrade(obj,existing,readSingleChipGrid('grade','GRADE'),new Date().toISOString());
+  if(!taxFieldOff('grade'))FJContext.applyGrade(obj,existing,readSingleChipGrid('grade','GRADE'),new Date().toISOString());
 
   // Cena Stop Lossu: ruční zadání má vždy přednost. Když je prázdná a obchod
   // skončil na SL, odvodí se z ceny nohy, která na SL šla (NE z váženého
@@ -6956,7 +7135,9 @@ $('tradeForm').addEventListener('submit',async e=>{
    const el=$('targetLevel'+n+'Price');
    const isDerived=el?.dataset?.derived==='1';
    const price=isDerived?(derivedTargets[n-1]??''):el?.value;
-   const target=FJTaxonomy.sanitizeTargetLevel({types:readChipGrid('targetLevel'+n+'Types','TARGET_LEVEL'),price});
+   // Vypnutý číselník cílů: typy zůstávají z uloženého obchodu, cena se dál zadává.
+   const types=taxFieldOff('targetLevel'+n+'Types')?FJTaxonomy.storedTargetTypes(existing?.['targetLevel'+n]):readChipGrid('targetLevel'+n+'Types','TARGET_LEVEL');
+   const target=FJTaxonomy.sanitizeTargetLevel({types,price});
    if(target)obj['targetLevel'+n]=target;else delete obj['targetLevel'+n];
    if(isDerived&&target&&target.price!=null)obj['targetLevel'+n+'PriceDerived']=true;else delete obj['targetLevel'+n+'PriceDerived'];
   }
@@ -8167,17 +8348,29 @@ function journalCsvTable(rows,dayNoteOf,opts={}){
  const firstIdByDate=firstTradeIdPerDate(rows);
  const order=FJContext.dayOrder(rows);
  const extra=extraTargetCsvCount(rows);
- const out=[[...tradeCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra),...(opts.marketCsv?marketCsvHeader(count):[])]];
+ const custom=customCsvGroups([opts.config]);
+ const out=[[...tradeCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra),...(opts.marketCsv?marketCsvHeader(count):[]),...customCsvHeader(custom)]];
  for(const t of rows){
   const note=t.date?dayNoteOf(t.date):null;
   const isFirstOfDay=t.date&&firstIdByDate[t.date]===t.id;
   const dn=isFirstOfDay?(note||emptyDayNoteCells()):null;
   const tickSize=opts.tickSizeOf?.(t.instrument);
-  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra),...(opts.marketCsv?marketCsvCells(t,count):[])]);
+  out.push([...tradeCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:opts.config,dayOrder:order,mode:opts.mode,gradeRetroGraceMin:opts.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra),...(opts.marketCsv?marketCsvCells(t,count):[]),...customCsvCells(t,custom,opts.config)]);
  }
  return out;
 }
 function emptyDayNoteCells(){return {comment:'',preview:'',notes:''}}
+// Vlastní číselníky v CSV: sloupec na skupinu, úplně na konci a jen když
+// nějaký deník vlastní číselník má (bez nich je tabulka beze změny).
+// Hodnota = popisky voleb oddělené čárkou. Skupiny z víc deníků se slučují
+// podle jména (U_…); popisek sloupce z prvního deníku, který ji má.
+function customCsvGroups(configs){
+ const seen=new Map();
+ for(const c of configs)for(const g of FJTaxonomy.userGroups(c||{},{includeRemoved:true}))if(!seen.has(g.name))seen.set(g.name,g);
+ return [...seen.values()];
+}
+function customCsvHeader(groups){return groups.map(g=>'Vlastní: '+g.label)}
+function customCsvCells(t,groups,config){return groups.map(g=>FJTaxonomy.customContextText(t,g.name,config||{}))}
 // Export Reportů přes víc deníků. Pořadí v dni se počítá nad CELÝM deníkem
 // (allRows), ne nad vyfiltrovanými řádky – jinak by filtr data nebo
 // instrumentu změnil „kolikátý obchod dne". journals: { id: { mode, config,
@@ -8189,14 +8382,15 @@ function reportCsvTable(rows,allRows,dayNoteOf,journals={},opts={}){
  const orders={};
  for(const id of new Set(rows.map(t=>t.journalId)))orders[id]=FJContext.dayOrder((allRows||rows).filter(t=>t.journalId===id));
  const extra=extraTargetCsvCount(rows);
- const out=[[...reportCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra),...(opts.marketCsv?marketCsvHeader(count):[])]];
+ const custom=customCsvGroups(Object.values(journals).map(j=>j&&j.config));
+ const out=[[...reportCsvHeader(count),...contextCsvHeader(),...extraTargetCsvHeader(extra),...(opts.marketCsv?marketCsvHeader(count):[]),...customCsvHeader(custom)]];
  for(const t of rows){
   const key=t.journalId+'|'+t.date;
   const note=t.date?dayNoteOf(key):null;
   const dn=t.date&&first[key]===t?(note||{}):null;
   const j=journals[t.journalId]||{};
   const tickSize=FJPoints.tickSizeFor(t.instrument,j.templates);
-  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra),...(opts.marketCsv?marketCsvCells(t,count):[])]);
+  out.push([...reportCsvRow(t,dn,count,tickSize),...contextCsvCells(t,{tickSize,config:j.config||{},dayOrder:orders[t.journalId],mode:j.mode,gradeRetroGraceMin:j.gradeRetroGraceMin,dayContext:note?.dayContext,dayPsych:note?.psych}),...extraTargetCsvCells(t,extra),...(opts.marketCsv?marketCsvCells(t,count):[]),...customCsvCells(t,custom,j.config)]);
  }
  return out;
 }

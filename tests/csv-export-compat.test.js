@@ -39,7 +39,9 @@ const OLD_NAMES = ['signed', 'tradePointsTotal', 'displayPointsTotal', 'sideMeta
 const NEW_NAMES = [...OLD_NAMES.map(n => ({ srCsvCounts: 'levelCsvCount', srCsvHeader: 'levelCsvHeader', srCsvCells: 'levelCsvCells' })[n] || n),
   'CONTEXT_CSV_PSYCH', 'CONTEXT_CSV_DAY_PSYCH', 'CONTEXT_CSV_SKIPPED',
   // Cíle 3+ (TP3, TP4 …) – koncové sloupce jen u obchodů, které je mají.
-  'targetCountOf', 'extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells'];
+  'targetCountOf', 'extraTargetCsvCount', 'extraTargetCsvHeader', 'extraTargetCsvCells',
+  // Vlastní číselníky (4.8.106) – sloupce jen když deník nějaký má.
+  'customCsvGroups', 'customCsvHeader', 'customCsvCells'];
 const plain = v => JSON.parse(JSON.stringify(v));
 
 const REPLACED = /^SR→(TG|SL) \d+ /;

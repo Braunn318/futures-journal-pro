@@ -150,6 +150,11 @@ function swingDerivedOf(t){return FJSwing.swingDerived(t,swingInstrumentOf(t.sym
 function swingOpenPositions(){return swingRows().filter(t=>t.recordType!=='SETUP_ONLY'&&FJSwing.status(t)==='OPEN')}
 
 // ---------- seznam v Deníku ----------
+// Vlastní číselníky v kartě swing obchodu (popisky z číselníku deníku).
+function swingCustomContextKpis(t){
+ if(typeof FJTaxonomy==='undefined'||!t?.customContext)return '';
+ return FJTaxonomy.userGroups().map(g=>{const v=FJTaxonomy.customContextText(t,g.name);return v?`<span><span class="sub">${esc(g.label)}</span>${esc(v)}</span>`:''}).join('');
+}
 function swingCardHTML(t){
  const d=swingDerivedOf(t);
  const setup=t.recordType==='SETUP_ONLY';
@@ -196,6 +201,7 @@ function swingCardHTML(t){
    ${t.htfTrend?`<span><span class="sub">Trend daily</span>${esc(t.htfTrend)}</span>`:''}
    ${t.weeklyCheck?`<span><span class="sub">Weekly</span>${esc(t.weeklyCheck)}</span>`:''}
    ${d.slSlippagePips!=null?`<span><span class="sub">Skluz za SL</span>${fmtNum(d.slSlippagePips,1)} pipů</span>`:''}
+   ${swingCustomContextKpis(t)}
   </div>
   ${legsHtml}
   ${(t.cancelledOrders||[]).length?`<div class="sub" style="margin-top:6px">${t.cancelledOrders.map(c=>`${esc(c.label)} limitka zrušena${c.tp!=null?' ('+fmtPrice(c.tp,t.symbol)+')':''}`).join(' · ')}</div>`:''}
@@ -757,6 +763,14 @@ async function saveOrderModal(){
 }
 
 // ---------- modal: swing obchod (Otevřít pozici / Přidat výstup / Posunout SL) ----------
+// Nabídka swing pole z číselníku deníku (Nastavení → Číselníky → Swing – …):
+// viditelné popisky v pořadí číselníku. Vypnutý číselník nic nenabízí (pole je
+// skryté); bez FJTaxonomy (testy) zůstává dřívější nabídka z kódu.
+function swingDictLabels(group,fallback){
+ if(typeof FJTaxonomy==='undefined'||!FJTaxonomy.groupDef(group))return fallback||[];
+ if(typeof taxGroupOn==='function'&&!taxGroupOn(group))return [];
+ return FJTaxonomy.visibleOptions(group).map(o=>o.label);
+}
 function ensureSymbolList(){
  let dl=$('swingSymbolList');
  if(!dl){dl=document.createElement('datalist');dl.id='swingSymbolList';document.body.appendChild(dl)}
@@ -764,14 +778,15 @@ function ensureSymbolList(){
  let sl=$('swingSetupList');
  if(!sl){sl=document.createElement('datalist');sl.id='swingSetupList';document.body.appendChild(sl)}
  const used=[...new Set(swingRows().map(t=>t.swingSetup).filter(Boolean))];
- sl.innerHTML=[...new Set([...FJSwing.SWING_SETUP_SUGGESTIONS,...used])].map(s=>`<option value="${esc(s)}">`).join('');
+ sl.innerHTML=[...new Set([...swingDictLabels('SWING_SETUP',FJSwing.SWING_SETUP_SUGGESTIONS),...used])].map(s=>`<option value="${esc(s)}">`).join('');
  // nabídky kontextu (§6) + dřív použité hodnoty z obchodů a skupin
  const ctxRows=[...swingRows(),...storedOrderGroups().map(g=>g.context||{})];
  const lists={swingEntryTfList:['entryTf','entryTf'],swingHtfTrendList:['htfTrend','htfTrend'],swingWeeklyList:['weeklyCheck','weeklyCheck'],swingLevelTypeList:['levelType','entryLevelType']};
+ const dictOf={entryTf:'SWING_ENTRY_TF',htfTrend:'SWING_HTF_TREND',weeklyCheck:'SWING_WEEKLY',levelType:'SWING_LEVEL_TYPE'};
  for(const [id,[sugg,key]] of Object.entries(lists)){
   let el=$(id);if(!el){el=document.createElement('datalist');el.id=id;document.body.appendChild(el)}
   const usedVals=ctxRows.flatMap(t=>key==='entryLevelType'?[t.entryLevelType,...(t.targetsPlanned||[]).map(x=>x?.levelType),...Object.values(t.targetLevels||{})]:[t[key]]).filter(v=>v&&String(v).trim());
-  el.innerHTML=[...new Set([...FJSwing.SWING_CONTEXT_SUGGESTIONS[sugg],...usedVals])].map(v=>`<option value="${esc(v)}">`).join('');
+  el.innerHTML=[...new Set([...swingDictLabels(dictOf[sugg],FJSwing.SWING_CONTEXT_SUGGESTIONS[sugg]),...usedVals])].map(v=>`<option value="${esc(v)}">`).join('');
  }
 }
 const reasonOptions=(list,labels,val)=>['',...list].map(k=>`<option value="${k}" ${k===(val||'')?'selected':''}>${k?esc(labels[k]):'—'}</option>`).join('');
@@ -824,17 +839,18 @@ function ensureSwingModal(){
   <div class="swing-section sw-pos-only"><h3>Posuny SL <button class="btn" type="button" id="swAddSl">＋ posun SL</button></h3><div class="swing-rows" id="swSlMoves"></div></div>
   <div class="swing-section"><h3>Kontext <span class="sub" id="swContextStamp"></span></h3>
    <div class="swing-grid">
-    <div class="field"><label>Setup</label><input id="swSetup" list="swingSetupList" autocomplete="off"></div>
-    <div class="field"><label>Hladina vstupu</label><input id="swEntryLevel" list="swingLevelTypeList" autocomplete="off" placeholder="VPOC 4h, VA hrana…"></div>
-    <div class="field"><label>TF vstupu</label><input id="swEntryTf" list="swingEntryTfList" autocomplete="off" placeholder="4h"></div>
-    <div class="field"><label>Trend daily</label><input id="swHtfTrend" list="swingHtfTrendList" autocomplete="off" placeholder="nahoru / dolů / range"></div>
-    <div class="field"><label>Weekly</label><input id="swWeeklyCheck" list="swingWeeklyList" autocomplete="off" placeholder="OK / proti / nehodnoceno"></div>
+    <div class="field" data-tax-group="SWING_SETUP"><label>Setup</label><input id="swSetup" list="swingSetupList" autocomplete="off"></div>
+    <div class="field" data-tax-group="SWING_LEVEL_TYPE"><label>Hladina vstupu</label><input id="swEntryLevel" list="swingLevelTypeList" autocomplete="off" placeholder="VPOC 4h, VA hrana…"></div>
+    <div class="field" data-tax-group="SWING_ENTRY_TF"><label>TF vstupu</label><input id="swEntryTf" list="swingEntryTfList" autocomplete="off" placeholder="4h"></div>
+    <div class="field" data-tax-group="SWING_HTF_TREND"><label>Trend daily</label><input id="swHtfTrend" list="swingHtfTrendList" autocomplete="off" placeholder="nahoru / dolů / range"></div>
+    <div class="field" data-tax-group="SWING_WEEKLY"><label>Weekly</label><input id="swWeeklyCheck" list="swingWeeklyList" autocomplete="off" placeholder="OK / proti / nehodnoceno"></div>
     <div class="field"><label>Známka</label><select id="swGrade"><option value="">—</option><option>A</option><option>B</option><option>C</option></select></div>
     <div class="field sw-group-only"><label>Riziko (peníze)</label><input id="swGroupRisk" type="number" step="any" min="0" title="Kolik stojí plný SL všech limitek skupiny podle platformy brokera"></div>
     <div class="field sw-pos-only"><label>MAE (pipy)</label><input id="swMae" type="number" step="any"></div>
     <div class="field sw-pos-only"><label>MFE (pipy)</label><input id="swMfe" type="number" step="any"></div>
     <div class="field sw-pos-only"><label>Nejdéle v mínusu (dny)</label><input id="swDaysAgainst" type="number" step="any" min="0"></div>
    </div>
+   <div class="swing-grid" id="swCustomContext" style="display:none"></div>
    <div class="field"><label>Důvod vstupu</label><textarea id="swEntryReason" rows="2"></textarea></div>
    <div class="field"><label>Komentář</label><textarea id="swComment" rows="3"></textarea></div>
    <div class="field"><label>Screenshoty (daily + 4h při vstupu; vložení Ctrl+V)</label><input id="swImageInput" type="file" accept="image/*" multiple><div class="swing-imgs" id="swImages"></div></div>
@@ -866,6 +882,7 @@ function ensureSwingModal(){
  },true);
 }
 let swingEditImages=[];
+let swingEditCustom={}; // uložený customContext otevřeného obchodu / skupiny
 let swingFromOrder=null;
 let swingGroupEdit=null; // id skupiny limitek, když formulář edituje jen její kontext před vstupem
 // Návrh nového obchodu (z limitky): pole, která formulář nemá (orderPlacedAt, orderPrice, fillStatus), se uloží s ním.
@@ -899,6 +916,9 @@ function readContextInputs(){
  const c={};
  for(const [id,k] of SW_CONTEXT_INPUTS)c[k]=(k==='comment'||k==='entryReason')?$(id).value:$(id).value.trim();
  c.grade=['A','B','C'].includes($('swGrade').value)?$('swGrade').value:'';
+ // Vlastní číselníky: vypnuté / smazané skupiny si nechají uloženou hodnotu.
+ const cc=typeof readCustomContextFields==='function'?readCustomContextFields('swCustomContext',swingEditCustom):(swingEditCustom||{});
+ c.customContext=cc; // prázdné {} smaže readSwingForm
  c.images=[...swingEditImages];
  return c;
 }
@@ -926,6 +946,13 @@ function openSwingModal(t,{focus,fromOrder,title,group}={}){
  $('swExits').innerHTML=(x.exits||[]).slice().sort((a,b)=>String(a.closedAt).localeCompare(String(b.closedAt))).map(exitRowHTML).join('');
  $('swSlMoves').innerHTML=(x.slMoves||[]).map(slRowHTML).join('');
  swingEditImages=[...(x.images||[])];
+ swingEditCustom=x.customContext&&typeof x.customContext==='object'?{...x.customContext}:{};
+ if(typeof renderCustomContextFields==='function'){
+  renderCustomContextFields('swCustomContext',swingEditCustom);
+  // swing mřížka: blok je grid, ne display:contents
+  if($('swCustomContext').style.display!=='none')$('swCustomContext').style.display='';
+ }
+ if(typeof applyTaxonomyGroupVisibility==='function')applyTaxonomyGroupVisibility();
  renderSwingImages();wireRows();updatePipBox();
  $('swError').style.display='none';
  $('swingModal').classList.add('open');
@@ -960,6 +987,7 @@ function readSwingForm(){
   maePips:numOrNull($('swMae').value), mfePips:numOrNull($('swMfe').value), maxDaysAgainst:numOrNull($('swDaysAgainst').value),
   currency:swingCurrency()
  };
+ if(!out.customContext||!Object.keys(out.customContext).length)delete out.customContext;
  if(recordType){out.recordType='SETUP_ONLY';out.fillStatus=out.fillStatus||'NO_FILL'}else{delete out.recordType;if(out.fillStatus==='NO_FILL')delete out.fillStatus}
  out.date=FJSwing.swingListDate(out);
  // nohy z cTraderu si drží svůj původ a id dealu (formulář je nemá)

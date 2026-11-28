@@ -203,8 +203,25 @@
   const DAY_VALUE_MIGRATION = { HIGHER: 'Výš', LOWER: 'Níž', OVERLAP: 'Překryv' };
   const DAY_NEWS = { NONE: 'Bez zpráv', CPI: 'CPI', FOMC: 'FOMC', NFP: 'NFP', OTHER: 'Jiné zprávy' };
 
+  // Swingový kontext (ZADANI_SWING_CFD §6, krok 6). Pole swing obchodu jsou
+  // VOLNÝ TEXT – číselník je jen nabídka (datalist). U obchodu se ukládá text
+  // popisku, ne klíč (`storesLabel` v GROUPS), takže přejmenování volby
+  // uložené obchody nemění. Výchozí volby = dřívější FJSwing.SWING_*_SUGGESTIONS.
+  const SWING_SETUP = {
+    PROFILE_4H: '4h profil – VA/VPOC na tupo', M2_DAILY: 'M2 daily', GAP_SR: 'Gap jako SR',
+    THIRD_TOUCH: 'Třetí dotek', LIQUIDITY_GRAB: 'Výběr likvidity (protisvíce v trendu)', OTHER: 'Jiný'
+  };
+  const SWING_ENTRY_TF = { M5: '5m', M15: '15m', H1: '1h', H4: '4h', D: 'D' };
+  const SWING_HTF_TREND = { UP: 'nahoru', DOWN: 'dolů', RANGE: 'range' };
+  const SWING_WEEKLY = { OK: 'OK', AGAINST: 'proti (výběžek, value proti)', NOT_RATED: 'nehodnoceno' };
+  const SWING_LEVEL_TYPE = {
+    VPOC_4H: 'VPOC 4h', VPOC_D: 'VPOC D', VA_EDGE: 'VA hrana', GAP: 'Gap', LIQUIDITY: 'Likvidita',
+    M2_EDGE: 'Hrana M2', PROFILE_TAIL: 'Výběžek profilu', MANUAL_EXIT: 'Ruční výstup'
+  };
+
   const DEFAULT_ENUMS = { SETUP, ENTRY_LEVEL, OF_CONFIRM, TREND, FILL_STATUS, TARGET_LEVEL, SKIP_REASON,
-    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, GRADE, DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS, PSYCH };
+    TREND_HTF, ABS_LOCATION, ENTRY_TEST_NO, GRADE, DAY_OPEN, DAY_TYPE, DAY_VALUE_MIGRATION, DAY_NEWS, PSYCH,
+    SWING_SETUP, SWING_ENTRY_TF, SWING_HTF_TREND, SWING_WEEKLY, SWING_LEVEL_TYPE };
 
   // Výchozí skryté klíče (uživatel je zobrazí tlačítkem Zobrazit). PDH/PDL
   // a ONH/ONL jsou skryté i u vstupu – Adam je nepoužívá. High / Low dne
@@ -254,10 +271,132 @@
     { name: 'DAY_VALUE_MIGRATION', label: 'Kontext dne – migrace value', cardinality: 'single' },
     { name: 'DAY_NEWS', label: 'Kontext dne – zprávy', cardinality: 'single' },
     // `fixed`: pevná škála – přejmenovat, skrýt a přeřadit jde, přidat ne.
-    { name: 'PSYCH', label: 'Psychika (škála 1–8, obchod i den)', cardinality: 'single', fixed: true }
-  ];
+    { name: 'PSYCH', label: 'Psychika (škála 1–8, obchod i den)', cardinality: 'single', fixed: true },
+    // Swingový kontext – nabídka do textových polí swing formuláře.
+    { name: 'SWING_SETUP', label: 'Swing – setup', cardinality: 'single', scope: 'swing', storesLabel: true },
+    { name: 'SWING_LEVEL_TYPE', label: 'Swing – typ hladiny (vstup i cíle)', cardinality: 'single', scope: 'swing', storesLabel: true },
+    { name: 'SWING_ENTRY_TF', label: 'Swing – TF vstupu', cardinality: 'single', scope: 'swing', storesLabel: true },
+    { name: 'SWING_HTF_TREND', label: 'Swing – trend daily', cardinality: 'single', scope: 'swing', storesLabel: true },
+    { name: 'SWING_WEEKLY', label: 'Swing – weekly check', cardinality: 'single', scope: 'swing', storesLabel: true }
+  ].map(g => Object.freeze({ scope: 'futures', ...g }));
 
   const GROUP_BY_NAME = Object.fromEntries(GROUPS.map(g => [g.name, g]));
+
+  // ------------------------------------------ zapnutí skupin a vlastní skupiny
+  //
+  // Skupina (celý číselník) jde v deníku vypnout: `config[GROUP].enabled`
+  // (true / false). Uloží se jen ruční přepnutí – bez hodnoty platí výchozí
+  // podle `scope` a typu deníku (futures skupiny ve futures deníku, swing
+  // skupiny ve swing deníku, vlastní skupiny vždy). Vypnutí NIC nemaže:
+  // skryje pole ve formuláři, data obchodů, statistiky i exporty zůstávají.
+  //
+  // Vlastní skupiny (číselníky, které si uživatel založí): `config.__userGroups`
+  // = [{ name: 'U_…', label, cardinality: 'single'|'multi', removed? }]. Volby
+  // jsou běžné vlastní volby (`config[name].custom`). Hodnota u obchodu:
+  // `trade.customContext[name]` (klíč nebo pole klíčů).
+  const USER_GROUPS_KEY = '__userGroups';
+  const USER_GROUP_RE = /^U_[A-Z0-9_]{1,40}$/;
+  const JOURNAL_SCOPE = { FUTURES_INTRADAY: 'futures', CFD_SWING: 'swing' };
+
+  function userGroupList(config) {
+    const source = config || activeConfig;
+    const list = source && Array.isArray(source[USER_GROUPS_KEY]) ? source[USER_GROUPS_KEY] : [];
+    return list.filter(g => g && typeof g === 'object' && USER_GROUP_RE.test(g.name) && !GROUP_BY_NAME[g.name])
+      .map(g => ({ name: g.name, label: cleanLabel(g.label) || g.name, cardinality: g.cardinality === 'multi' ? 'multi' : 'single', scope: 'user', user: true, ...(g.removed ? { removed: true } : {}) }));
+  }
+
+  // Vestavěné skupiny + vlastní (bez smazaných, pokud `includeRemoved`).
+  function allGroups(config, { includeRemoved = false } = {}) {
+    return [...GROUPS, ...userGroupList(config).filter(g => includeRemoved || !g.removed)];
+  }
+
+  function userGroups(config, opts) {
+    return allGroups(config, opts).filter(g => g.user);
+  }
+
+  function groupDef(name, config) {
+    return GROUP_BY_NAME[name] || userGroupList(config).find(g => g.name === name) || null;
+  }
+
+  function isGroupEnabled(name, config, journalType) {
+    const def = groupDef(name, config);
+    if (!def || def.removed) return false;
+    const own = groupConfig(name, config).enabled;
+    if (typeof own === 'boolean') return own;
+    if (def.user) return true;
+    return def.scope === (JOURNAL_SCOPE[journalType] || 'futures');
+  }
+
+  // Výchozí stav (bez ručního přepnutí) – editor podle něj pozná, kdy uložit
+  // `enabled` a kdy ho naopak smazat.
+  function groupEnabledByDefault(name, config, journalType) {
+    const def = groupDef(name, config);
+    if (!def || def.removed) return false;
+    return def.user ? true : def.scope === (JOURNAL_SCOPE[journalType] || 'futures');
+  }
+
+  // Jméno nové vlastní skupiny z popisku: U_<SLUG>, unikátní i proti smazaným.
+  function userGroupName(label, config) {
+    const slug = String(label || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32) || 'CISELNIK';
+    const taken = new Set([...GROUPS.map(g => g.name), ...userGroupList(config).map(g => g.name)]);
+    return uniqueKey('U_' + slug, taken);
+  }
+
+  // Hodnoty vlastních skupin u obchodu. Známá skupina: single = klíč, multi =
+  // pole klíčů v pořadí číselníku. Neznámá / smazaná skupina nebo klíč, který
+  // číselník nezná, se NEZAHAZUJE – data obchodu se nikdy tiše nemažou.
+  function sanitizeCustomContext(value, config) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const out = {};
+    for (const [name, raw] of Object.entries(value)) {
+      if (!USER_GROUP_RE.test(name)) continue;
+      const def = groupDef(name, config);
+      const list = (Array.isArray(raw) ? raw : [raw]).filter(k => typeof k === 'string' && k);
+      if (!list.length) continue;
+      if (def && def.cardinality === 'multi') {
+        const known = allKeys(name, config);
+        out[name] = [...known.filter(k => list.includes(k)), ...[...new Set(list)].filter(k => !known.includes(k))];
+      } else if (def) out[name] = list[0];
+      else out[name] = Array.isArray(raw) ? [...new Set(list)] : list[0];
+    }
+    return out;
+  }
+
+  // Sloučení dvou obchodů / nohou: multi = sjednocení, single = první neprázdná.
+  function mergeCustomContext(a, b) {
+    const out = {};
+    for (const src of [a, b]) {
+      if (!src || typeof src !== 'object') continue;
+      for (const [name, v] of Object.entries(src)) {
+        const cur = out[name];
+        const empty = x => x == null || x === '' || (Array.isArray(x) && !x.length);
+        if (empty(cur)) { if (!empty(v)) out[name] = Array.isArray(v) ? [...v] : v; }
+        else if (Array.isArray(cur) && Array.isArray(v)) out[name] = [...new Set([...cur, ...v])];
+      }
+    }
+    return out;
+  }
+
+  // Popisky pro export: { skupina: { label, cardinality, options: {klíč: popisek} } }.
+  function customContextLabels(config) {
+    const out = {};
+    for (const g of userGroups(config, { includeRemoved: true })) {
+      out[g.name] = { label: g.label, cardinality: g.cardinality, ...(g.removed ? { removed: true } : {}),
+        options: Object.fromEntries([...allKeys(g.name, config), ...removedKeys(g.name, config)].map(k => [k, labelOf(g.name, k, config)])) };
+    }
+    return out;
+  }
+
+  // Čitelná hodnota vlastní skupiny (CSV, štítky).
+  function customContextText(trade, name, config) {
+    const v = trade && trade.customContext && trade.customContext[name];
+    const list = (Array.isArray(v) ? v : [v]).filter(k => typeof k === 'string' && k);
+    // v pořadí číselníku, neznámé klíče na konci
+    const known = allKeys(name, config);
+    const ordered = [...known.filter(k => list.includes(k)), ...list.filter(k => !known.includes(k))];
+    return ordered.map(k => labelOf(name, k, config)).join(', ');
+  }
 
   // Skupina, ze které se berou volby a jejich popisky.
   function vocabularyOf(group) {
@@ -1087,10 +1226,22 @@
   function sanitizeConfig(raw) {
     const out = {};
     if (!raw || typeof raw !== 'object') return out;
-    for (const group of GROUPS) {
+    // Vlastní skupiny: platné jméno, bez kolize s vestavěnou, bez duplicit.
+    const seenUser = new Set();
+    const users = [];
+    for (const u of Array.isArray(raw[USER_GROUPS_KEY]) ? raw[USER_GROUPS_KEY] : []) {
+      if (!u || typeof u !== 'object' || !USER_GROUP_RE.test(u.name) || GROUP_BY_NAME[u.name] || seenUser.has(u.name)) continue;
+      const label = cleanLabel(u.label);
+      if (!label) continue;
+      seenUser.add(u.name);
+      users.push({ name: u.name, label, cardinality: u.cardinality === 'multi' ? 'multi' : 'single', ...(u.removed === true ? { removed: true } : {}) });
+    }
+    if (users.length) out[USER_GROUPS_KEY] = users;
+    for (const group of [...GROUPS, ...users]) {
       const g = raw[group.name];
       if (!g || typeof g !== 'object') continue;
       const clean = {};
+      if (typeof g.enabled === 'boolean') clean.enabled = g.enabled;
       const defaults = DEFAULT_ENUMS[vocabularyOf(group.name)] || {};
 
       const custom = {};
@@ -1204,17 +1355,20 @@
   // uživatel ví, co přepisuje, ještě než to potvrdí.
   function describeConfig(config) {
     const clean = sanitizeConfig(config);
-    return GROUPS.map(group => {
+    const users = (clean[USER_GROUPS_KEY] || []).filter(u => !u.removed);
+    const head = users.length ? ['Vlastní číselníky: ' + users.map(u => u.label).join(', ')] : [];
+    return head.concat([...GROUPS, ...users].map(group => {
       const g = clean[group.name];
       if (!g) return null;
       const parts = [];
+      if (typeof g.enabled === 'boolean') parts.push(g.enabled ? 'zapnuto' : 'vypnuto');
       if (g.labels) parts.push(Object.keys(g.labels).length + '× přejmenováno');
       if (g.custom) parts.push(Object.keys(g.custom).length + '× vlastní volba');
       if (g.hidden && g.hidden.length) parts.push(g.hidden.length + '× skryto');
       if (g.order) parts.push('vlastní pořadí');
       if (g.isLevel) parts.push(Object.keys(g.isLevel).length + '× „je to hladina"');
       return parts.length ? group.label + ': ' + parts.join(', ') : null;
-    }).filter(Boolean);
+    }).filter(Boolean));
   }
 
   return {
@@ -1227,6 +1381,10 @@
     sanitizeNearLevels, nearLevelsFromLegacy, nearLevelsOf, nearLevelsNoneOf, setNearLevels,
     convertLegacyNear, stripRemovedV3, tradeToV3, migrateConfigV3, V3_REMOVED_KEYS,
     ENUMS: DEFAULT_ENUMS, DEFAULT_ENUMS, DEFAULT_ALIASES, GROUPS, GROUP_BY_NAME, vocabularyOf, extraGroupsOf, TRADE_CONTEXT_FIELDS,
+    SWING_SETUP, SWING_ENTRY_TF, SWING_HTF_TREND, SWING_WEEKLY, SWING_LEVEL_TYPE,
+    // zapnutí skupin a vlastní číselníky
+    USER_GROUPS_KEY, USER_GROUP_RE, allGroups, userGroups, groupDef, isGroupEnabled, groupEnabledByDefault, userGroupName,
+    sanitizeCustomContext, mergeCustomContext, customContextLabels, customContextText,
     // LTA Levels
     registerLtaNames, ltaKeyFor,
     // konfigurace

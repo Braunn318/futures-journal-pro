@@ -44,6 +44,7 @@
     { id: 'overviewFilters', section: 'display', title: 'Přehled účtu', desc: 'Které filtry a karty Přehled účtu ukazuje.', scope: 'app' },
 
     { id: 'taxonomy', section: 'dictionaries', title: 'Volby číselníků', desc: 'Setupy, hladiny, LTA Levels, order flow, typy cílů a další: přejmenovat, skrýt, přidat, pořadí.', scope: 'journal' },
+    { id: 'taxonomyCustom', section: 'dictionaries', title: 'Vlastní číselníky', desc: 'Založit vlastní číselník s vlastními volbami – u obchodu v bloku Vlastní kontext, v detailu i v exportech.', scope: 'journal' },
     { id: 'taxonomyTransfer', section: 'dictionaries', title: 'Přenos číselníků', desc: 'Zkopírovat číselníky do jiného deníku, export a import souboru.', scope: 'journal' },
 
     { id: 'marketData', section: 'levels', title: 'Data z NinjaTraderu', desc: 'Hlavní vypínač a sběr svíček dne a snímku trhu z NinjaTraderu.', scope: 'app' },
@@ -111,6 +112,8 @@
 
     // 3 Číselníky
     { id: 'taxonomyEditor', group: 'taxonomy', name: 'Volby číselníků', desc: 'Setupy, hladiny, LTA Levels, order flow, typy cílů, trend, kontext dne, psychika …', old: 'Číselníky', ids: ['taxonomyGroups'] },
+    { id: 'taxonomyEnable', group: 'taxonomy', name: 'Používat číselník', desc: 'Vypnout / zapnout celý číselník v deníku (např. Order flow ve swing deníku). Data obchodů zůstávají.', old: 'nové (4.8.106)', ids: ['taxHideDisabled'] },
+    { id: 'taxonomyCustom', group: 'taxonomyCustom', name: 'Vlastní číselníky', desc: 'Založit, přejmenovat, smazat (obnovitelně) vlastní číselník.', old: 'nové (4.8.106)', ids: ['userGroupNew', 'userGroupCardinality', 'userGroupAddBtn', 'userGroupsList'] },
     { id: 'taxonomyTransfer', group: 'taxonomyTransfer', name: 'Přenos číselníků', desc: 'Zkopírovat do jiného deníku, export a import souboru.', old: 'Číselníky', ids: ['taxonomyCopyTarget', 'taxonomyCopyBtn', 'taxonomyExportBtn', 'taxonomyImportInput', 'taxonomyTransferNote'] },
 
     // 4 Hladiny a data trhu

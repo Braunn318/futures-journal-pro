@@ -25,7 +25,19 @@
   const ORDER_GROUPS_VERSION = 1;
   const SEEN_REFRESH_MS = 15 * 60000; // lastSeenAt se přepisuje nejvýš jednou za 15 min (méně zápisů)
   // Kontext před vstupem (§3) – stejná pole jako u swing obchodu, stejné názvy.
-  const CONTEXT_FIELDS = ['swingSetup', 'entryReason', 'entryTf', 'htfTrend', 'weeklyCheck', 'entryLevelType', 'grade', 'riskAmount', 'images', 'comment'];
+  const CONTEXT_FIELDS = ['swingSetup', 'entryReason', 'entryTf', 'htfTrend', 'weeklyCheck', 'entryLevelType', 'grade', 'riskAmount', 'images', 'comment', 'customContext'];
+  // Vlastní číselníky (trade.customContext): { U_…: 'KLÍČ' | ['KLÍČ', …] }. Jen
+  // tvar, ne číselník – neznámý klíč se nezahazuje (data se nemažou).
+  function cleanCustomContext(v) {
+    const out = {};
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+    for (const [name, raw] of Object.entries(v)) {
+      if (!/^U_[A-Z0-9_]{1,40}$/.test(name)) continue;
+      if (Array.isArray(raw)) { const list = [...new Set(raw.filter(k => typeof k === 'string' && k))]; if (list.length) out[name] = list; }
+      else if (typeof raw === 'string' && raw) out[name] = raw;
+    }
+    return out;
+  }
 
   function num(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
@@ -91,6 +103,7 @@
     const c = (g && g.context) || {};
     return !!(g && g.contextFilledAt) && (CONTEXT_FIELDS.some(k => {
       const v = c[k];
+      if (k === 'customContext') return Object.keys(cleanCustomContext(v)).length > 0;
       return Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && String(v).trim() !== '';
     }) || Object.keys(c.targetLevels || {}).length > 0);
   }
@@ -264,6 +277,7 @@
       if (k === 'images') c.images = Array.isArray(v) ? v.filter(x => typeof x === 'string' && x) : [];
       else if (k === 'riskAmount') c.riskAmount = num(v);
       else if (k === 'grade') c.grade = ['A', 'B', 'C'].includes(v) ? v : '';
+      else if (k === 'customContext') { const cc = cleanCustomContext(v); if (Object.keys(cc).length) c.customContext = cc; }
       else c[k] = v == null ? '' : String(v);
     }
     const tl = raw && raw.targetLevels && typeof raw.targetLevels === 'object' ? raw.targetLevels : {};
@@ -290,7 +304,7 @@
   // Kontextová pole obchodu (stejné názvy) + typy hladin cílů.
   function tradeContextSig(t) {
     const c = {};
-    for (const k of CONTEXT_FIELDS) c[k] = k === 'images' ? (Array.isArray(t && t.images) ? t.images : []) : k === 'riskAmount' ? num(t && t.riskAmount) : (t && t[k] != null ? String(t[k]) : '');
+    for (const k of CONTEXT_FIELDS) c[k] = k === 'images' ? (Array.isArray(t && t.images) ? t.images : []) : k === 'riskAmount' ? num(t && t.riskAmount) : k === 'customContext' ? cleanCustomContext(t && t.customContext) : (t && t[k] != null ? String(t[k]) : '');
     c.targetLevels = (Array.isArray(t && t.targetsPlanned) ? t.targetsPlanned : []).map(x => String((x && x.levelType) || ''));
     return JSON.stringify(c);
   }
@@ -427,7 +441,7 @@
   function contextCopy(g) {
     const c = cleanContext(g.context || {});
     const out = {};
-    for (const k of CONTEXT_FIELDS) out[k] = clone(c[k]);
+    for (const k of CONTEXT_FIELDS) if (c[k] !== undefined) out[k] = clone(c[k]);
     return out;
   }
   function fillAggregate(g) {

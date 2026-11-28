@@ -499,6 +499,18 @@
     const copy = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
     for (const k of fields) {
       if (k === 'images' || k === 'imagesAfter') { const add = (source[k] || []).filter(x => !(t[k] || []).includes(x)); if (add.length) t[k] = [...(t[k] || []), ...add]; }
+      else if (k === 'customContext') {
+        // Vlastní číselníky: po skupinách – prázdná skupina se doplní, u víc
+        // voleb se sjednotí; vyplněná jedna volba cíle zůstává.
+        const src = source.customContext && typeof source.customContext === 'object' ? source.customContext : null;
+        if (!src) continue;
+        const cc = { ...(t.customContext && typeof t.customContext === 'object' ? t.customContext : {}) };
+        for (const [name, v] of Object.entries(src)) {
+          if (empty(cc[name])) { if (!empty(v)) cc[name] = copy(v); }
+          else if (Array.isArray(cc[name]) && Array.isArray(v)) cc[name] = [...new Set([...cc[name], ...v])];
+        }
+        if (Object.keys(cc).length) t.customContext = cc;
+      }
       else if (k === 'comment' && !empty(source.comment) && !empty(t.comment) && source.comment !== t.comment) t.comment = t.comment + '\n' + source.comment;
       else if (empty(t[k]) && !empty(source[k])) t[k] = copy(source[k]);
     }

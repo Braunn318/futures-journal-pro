@@ -6,6 +6,7 @@ const crypto = require('crypto');
 // Dopočty kontextu obchodu (kontext v2, A3) – tytéž čisté funkce jako
 // v rendereru, pro AI export. Modul je dual (script src i require).
 const FJContext = require('./app/context.js');
+const FJTaxonomy = require('./app/taxonomy.js');
 const FJPoints = require('./app/points.js');
 const FJSnapshot = require('./app/market-snapshot.js');
 
@@ -1146,8 +1147,12 @@ function writeAiExportMirror(id, data) {
     // který ještě nebyl otevřen, by jinak export nesl kolonky SR proti targetu
     // / S/L vedle obchodů s „Hladinami v blízkosti".
     const taxonomy = FJContext.migrateConfigV3(mainSettings.taxonomy || {});
+    // Vlastní číselníky (trade.customContext): popisky skupin a voleb, ať
+    // nástroj čtoucí export nemusí skládat taxonomy sám. Jen když nějaké jsou.
+    const customLabels = FJTaxonomy.customContextLabels(taxonomy);
+    const customContextLabels = Object.keys(customLabels).length ? { customContextLabels: customLabels } : {};
     const temp = `${aiExportPath(id)}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify({ journalId: id, ...(data?.journalType === 'CFD_SWING' ? { journalType: 'CFD_SWING' } : {}), updatedAt: new Date().toISOString(), taxonomy, trades, dayNotes }, null, 2), 'utf8');
+    fs.writeFileSync(temp, JSON.stringify({ journalId: id, ...(data?.journalType === 'CFD_SWING' ? { journalType: 'CFD_SWING' } : {}), updatedAt: new Date().toISOString(), taxonomy, ...customContextLabels, trades, dayNotes }, null, 2), 'utf8');
     fs.renameSync(temp, aiExportPath(id));
   } catch (error) {
     logError('writeAiExportMirror', error);
