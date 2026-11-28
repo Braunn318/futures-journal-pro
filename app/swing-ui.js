@@ -70,7 +70,21 @@ async function changeActiveJournalType(nextType){
  .swing-card-head b{font-size:15px}
  .swing-kpis{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:13px}
  .swing-kpis span .sub{display:block;font-size:11px}
- .swing-legs{margin-top:8px;font-size:12px}
+ .swing-card+.swing-card{margin-top:10px}
+ .swing-groups{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px;align-items:start}
+ @media (max-width:1100px){.swing-groups{grid-template-columns:repeat(2,minmax(0,1fr))}}
+ @media (max-width:640px){.swing-groups{grid-template-columns:minmax(0,1fr)}}
+ .swing-group{border:1px solid rgba(var(--tint-rgb),.16);border-radius:10px;overflow:hidden}
+ .swing-group-title{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text2);background:rgba(var(--tint-rgb),.05);padding:4px 10px;border-bottom:1px solid rgba(var(--tint-rgb),.12)}
+ .swing-group-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:hidden}
+ .swing-cell{padding:6px 10px;border-top:1px solid rgba(var(--tint-rgb),.09);border-left:1px solid rgba(var(--tint-rgb),.09);margin:-1px 0 0 -1px;font-size:13px;min-width:0;overflow-wrap:anywhere}
+ .swing-cell.wide,.swing-cell:last-child:nth-child(odd){grid-column:span 2}
+ .swing-cell .sub{display:block;font-size:11px}
+ .swing-summary{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:13px}
+ .swing-card.collapsed .swing-card-body{display:none}
+ .swing-card:not(.collapsed) .swing-summary{display:none}
+ .swing-toggle{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;padding:0 6px 0 0;width:20px}
+ .swing-legs{margin-top:10px;font-size:12px}
  .swing-legs td,.swing-legs th{padding:3px 8px}
  .swing-rows{display:grid;gap:6px;margin-top:6px}
  .swing-row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end}
@@ -153,9 +167,21 @@ function swingOpenPositions(){return swingRows().filter(t=>t.recordType!=='SETUP
 // Vlastní číselníky v kartě swing obchodu (popisky z číselníku deníku).
 function swingCustomContextKpis(t){
  if(typeof FJTaxonomy==='undefined'||!t?.customContext)return '';
- return FJTaxonomy.userGroups().map(g=>{const v=FJTaxonomy.customContextText(t,g.name);return v?`<span><span class="sub">${esc(g.label)}</span>${esc(v)}</span>`:''}).join('');
+ return FJTaxonomy.userGroups().map(g=>{const v=FJTaxonomy.customContextText(t,g.name);return v?swingCell(g.label,esc(v)):''}).join('');
 }
-function swingCardHTML(t){
+// Buňka a skupina karty obchodu; prázdná skupina se nevykreslí.
+function swingCell(label,valueHtml,wide){return `<div class="swing-cell${wide?' wide':''}"><span class="sub">${esc(label)}</span>${valueHtml}</div>`}
+function swingGroup(title,cells){const body=cells.filter(Boolean).join('');return body?`<div class="swing-group"><div class="swing-group-title">${esc(title)}</div><div class="swing-group-body">${body}</div></div>`:''}
+// Sbalení karet v Deníku: globální stav + výjimky jednotlivých karet (stav UI, localStorage).
+const SWING_EXPANDED_KEY='FJ_swingCardsExpanded',SWING_TOGGLED_KEY='FJ_swingCardsToggled',SWING_SHOW_SETUPS_KEY='FJ_swingShowSetups';
+function swingLsGet(k){try{return localStorage.getItem(k)}catch{return null}}
+function swingLsSet(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch{}}
+function swingCardsExpandedAll(){return swingLsGet(SWING_EXPANDED_KEY)!=='0'}
+function swingCardsToggled(){try{const v=JSON.parse(swingLsGet(SWING_TOGGLED_KEY)||'[]');return new Set(Array.isArray(v)?v.map(String):[])}catch{return new Set()}}
+function saveSwingCardsToggled(set){swingLsSet(SWING_TOGGLED_KEY,set.size?JSON.stringify([...set]):null)}
+function swingCardCollapsed(id,toggled){return swingCardsExpandedAll()===(toggled||swingCardsToggled()).has(String(id))}
+function swingShowSetups(){return swingLsGet(SWING_SHOW_SETUPS_KEY)==='1'}
+function swingCardHTML(t,toggled){
  const d=swingDerivedOf(t);
  const setup=t.recordType==='SETUP_ONLY';
  const missing=FJSwing.swingMissing(t);
@@ -164,9 +190,16 @@ function swingCardHTML(t){
  const legsHtml=legs.length?`<table class="swing-legs"><thead><tr><th>Výstup</th><th>Cena</th><th>Objem</th><th>Důvod</th><th>P/L</th><th>Swap</th><th>Komise</th><th>Netto</th></tr></thead><tbody>${legs.map(e=>{const n=FJSwing.legPnlNet(e);return `<tr><td>${fmtLocal(e.closedAt)}${e.source==='CTRADER'?' <span class="src-pill">cTrader</span>':''}</td><td>${fmtPrice(e.price,t.symbol)}</td><td>${fmtNum(e.volume,4)}</td><td>${esc(FJSwing.EXIT_REASON_LABELS[e.reason]||'—')}</td><td class="${signCls(e.pnl)}">${fmtMoney(e.pnl)}</td><td class="${signCls(e.swap)}">${fmtMoney(e.swap)}</td><td class="${signCls(e.commission)}">${fmtMoney(e.commission)}</td><td class="${signCls(n)}"><b>${fmtMoney(n)}</b></td></tr>`}).join('')}</tbody></table>`:'';
  const allImgs=[...(t.images||[]),...(t.imagesAfter||[])];
  const imgs=allImgs.length?`<div class="swing-imgs">${allImgs.map(r=>thumbImgHTML(r)).join('')}</div>`:'';
- return `<div class="swing-card" data-swing-id="${esc(t.id)}">
+ const collapsed=swingCardCollapsed(t.id,toggled);
+ const summary=[
+  `${fmtLocal(t.openedAt)}${d.closedAt?' → '+fmtLocal(d.closedAt):''}`,
+  legs.length?`Netto <b class="${signCls(d.pnlNetTotal)}">${fmtMoney(d.pnlNetTotal)}</b>`:'',
+  d.rPrice!=null?`<b class="${signCls(d.rPrice)}">${fmtNum(d.rPrice,2)} R</b>`:'',
+  t.swingSetup?`<span class="sub">${esc(t.swingSetup)}</span>`:''
+ ].filter(Boolean).map(x=>`<span>${x}</span>`).join('');
+ return `<div class="swing-card${collapsed?' collapsed':''}" data-swing-id="${esc(t.id)}">
   <div class="swing-card-head">
-   <div>${setup?'':`<input type="checkbox" data-swing-merge-select="${esc(t.id)}" ${swingTradesSelected.has(t.id)?'checked':''} title="Vybrat ke sloučení" style="margin-right:6px">`}<b>${esc(t.symbol||'—')}</b> ${dirPill(t.direction)} ${statusPill}
+   <div><button type="button" class="swing-toggle" data-swing-toggle="${esc(t.id)}" title="${collapsed?'Rozbalit detail':'Sbalit detail'}" aria-expanded="${collapsed?'false':'true'}">${collapsed?'▸':'▾'}</button>${setup?'':`<input type="checkbox" data-swing-merge-select="${esc(t.id)}" ${swingTradesSelected.has(t.id)?'checked':''} title="Vybrat ke sloučení" style="margin-right:6px">`}<b>${esc(t.symbol||'—')}</b> ${dirPill(t.direction)} ${statusPill}
     ${missing.length?`<span class="pill incomplete-pill" title="Chybí: ${esc(missing.map(k=>FJSwing.MISSING_LABELS[k]).join(', '))}">⚠ Neúplné · ${missing.length}</span>`:''}
     ${d.volumeError?'<span class="pill loss" title="Součet objemů výstupů je větší než objem pozice">Objem výstupů &gt; objem</span>':''}
     ${t.source==='CTRADER'||String(t.positionId||'').startsWith('ctrader-')?'<span class="src-pill" title="Importováno z cTraderu">cTrader</span>':''}
@@ -181,53 +214,78 @@ function swingCardHTML(t){
     <button class="btn danger" data-swing-del="${esc(t.id)}">🗑️</button>
    </div>
   </div>
-  <div class="swing-kpis">
-   <span><span class="sub">Otevřeno</span>${fmtLocal(t.openedAt)}</span>
-   ${d.closedAt?`<span><span class="sub">Uzavřeno</span>${fmtLocal(d.closedAt)}</span>`:''}
-   <span><span class="sub">Vstup</span>${fmtPrice(t.entryPrice,t.symbol)}</span>
-   <span><span class="sub">Objem</span>${fmtNum(t.volume,4)}${d.status==='OPEN'&&legs.length?` (zbývá ${fmtNum(d.remainingVolume,4)})`:''}</span>
-   <span><span class="sub">SL při otevření / aktuální</span>${fmtPrice(t.slInitial,t.symbol)} / ${fmtPrice(d.currentSl,t.symbol)}</span>
-   <span><span class="sub">SL (pipy)</span>${fmtNum(d.slPips,1)}</span>
-   ${!setup?`<span><span class="sub">Držení</span>${fmtNum(d.holdingDays,1)} d · ${d.nightsHeld??'—'} nocí</span>`:''}
-   ${d.pipsPerUnit!=null?`<span><span class="sub">Pipy / jednotku</span>${fmtNum(d.pipsPerUnit,1)}</span>`:''}
-   <span><span class="sub">R z ceny</span><b class="${signCls(d.rPrice)}">${d.rPrice!=null?fmtNum(d.rPrice,2)+' R':'—'}</b></span>
-   ${legs.length?`<span><span class="sub">Netto</span><b class="${signCls(d.pnlNetTotal)}">${fmtMoney(d.pnlNetTotal)}</b></span>`:''}
-   ${d.rMoney!=null?`<span><span class="sub">R z peněz</span>${fmtNum(d.rMoney,2)} R</span>`:''}
-   ${t.riskAmount!=null?`<span><span class="sub">Riziko</span>${fmtMoney(t.riskAmount)}</span>`:''}
-   ${t.swingSetup?`<span><span class="sub">Setup</span>${esc(t.swingSetup)}</span>`:''}
-   ${t.grade?`<span><span class="sub">Známka</span>${esc(t.grade)}</span>`:''}
-   ${t.entryLevelType?`<span><span class="sub">Hladina vstupu</span>${esc(t.entryLevelType)}</span>`:''}
-   ${t.entryTf?`<span><span class="sub">TF vstupu</span>${esc(t.entryTf)}</span>`:''}
-   ${t.htfTrend?`<span><span class="sub">Trend daily</span>${esc(t.htfTrend)}</span>`:''}
-   ${t.weeklyCheck?`<span><span class="sub">Weekly</span>${esc(t.weeklyCheck)}</span>`:''}
-   ${d.slSlippagePips!=null?`<span><span class="sub">Skluz za SL</span>${fmtNum(d.slSlippagePips,1)} pipů</span>`:''}
-   ${swingCustomContextKpis(t)}
+  <div class="swing-summary">${summary}</div>
+  <div class="swing-card-body">
+  <div class="swing-groups">
+   ${swingGroup('Čas',[
+    swingCell('Otevřeno',fmtLocal(t.openedAt)),
+    d.closedAt?swingCell('Uzavřeno',fmtLocal(d.closedAt)):'',
+    !setup?swingCell('Držení',`${fmtNum(d.holdingDays,1)} d · ${d.nightsHeld??'—'} nocí`,true):''])}
+   ${swingGroup('Vstup a riziko',[
+    swingCell('Vstup',fmtPrice(t.entryPrice,t.symbol)),
+    swingCell('Objem',`${fmtNum(t.volume,4)}${d.status==='OPEN'&&legs.length?` (zbývá ${fmtNum(d.remainingVolume,4)})`:''}`),
+    swingCell('SL při otevření / aktuální',`${fmtPrice(t.slInitial,t.symbol)} / ${fmtPrice(d.currentSl,t.symbol)}`),
+    swingCell('SL (pipy)',fmtNum(d.slPips,1)),
+    t.riskAmount!=null?swingCell('Riziko',fmtMoney(t.riskAmount)):'',
+    d.slSlippagePips!=null?swingCell('Skluz za SL',`${fmtNum(d.slSlippagePips,1)} pipů`):''])}
+   ${swingGroup('Výsledek',[
+    legs.length?swingCell('Netto',`<b class="${signCls(d.pnlNetTotal)}">${fmtMoney(d.pnlNetTotal)}</b>`):'',
+    swingCell('R z ceny',`<b class="${signCls(d.rPrice)}">${d.rPrice!=null?fmtNum(d.rPrice,2)+' R':'—'}</b>`),
+    d.rMoney!=null?swingCell('R z peněz',`${fmtNum(d.rMoney,2)} R`):'',
+    d.pipsPerUnit!=null?swingCell('Pipy / jednotku',fmtNum(d.pipsPerUnit,1)):''])}
+   ${swingGroup('Kontext',[
+    t.swingSetup?swingCell('Setup',esc(t.swingSetup)):'',
+    t.grade?swingCell('Známka',esc(t.grade)):'',
+    t.entryLevelType?swingCell('Hladina vstupu',esc(t.entryLevelType)):'',
+    t.entryTf?swingCell('TF vstupu',esc(t.entryTf)):'',
+    t.htfTrend?swingCell('Trend daily',esc(t.htfTrend)):'',
+    t.weeklyCheck?swingCell('Weekly',esc(t.weeklyCheck)):'',
+    swingCustomContextKpis(t)])}
   </div>
   ${legsHtml}
   ${(t.cancelledOrders||[]).length?`<div class="sub" style="margin-top:6px">${t.cancelledOrders.map(c=>`${esc(c.label)} limitka zrušena${c.tp!=null?' ('+fmtPrice(c.tp,t.symbol)+')':''}`).join(' · ')}</div>`:''}
   ${t.entryReason?`<div class="sub" style="margin-top:6px;white-space:pre-line"><b>Důvod vstupu:</b> ${esc(t.entryReason)}</div>`:''}
   ${t.comment?`<div class="sub" style="margin-top:6px;white-space:pre-line">${esc(t.comment)}</div>`:''}
   ${imgs}
+  </div>
  </div>`;
 }
 const swingTradesSelected=new Set();
 function ensureSwingTradeToolbar(){
  if($('swingMergeBar')||!$('tradeList'))return;
- const bar=document.createElement('div');bar.id='swingMergeBar';bar.className='swing-only';bar.style.cssText='display:flex;gap:8px;align-items:center;margin:0 0 10px';
- bar.innerHTML='<button class="btn" id="mergeSwingTradesBtn" disabled title="Zaškrtnuté swing obchody (i uzavřené) spojí do jednoho">🔗 Sloučit vybrané</button><span class="sub">Zaškrtni obchody, které jsou jedna pozice rozdělená na víc (např. dvě pozice na stejné ceně). Pozice se stejným vstupem se slučují automaticky (Nastavení → Swing · CFD).</span>';
+ const bar=document.createElement('div');bar.id='swingMergeBar';bar.className='swing-only';bar.style.cssText='display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 10px';
+ bar.innerHTML=`<span style="display:flex;gap:6px"><button class="btn" id="swingExpandAllBtn" title="Rozbalí detail všech obchodů">▾ Rozbalit vše</button><button class="btn" id="swingCollapseAllBtn" title="Sbalí detail všech obchodů na jeden řádek">▸ Sbalit vše</button></span>
+  <label class="sub" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="swingShowSetups"> Zobrazit nenaplněné setupy</label>
+  <span style="display:flex;gap:8px;align-items:center;flex:1 1 360px"><button class="btn" id="mergeSwingTradesBtn" disabled title="Zaškrtnuté swing obchody (i uzavřené) spojí do jednoho">🔗 Sloučit vybrané</button><span class="sub">Zaškrtni obchody, které jsou jedna pozice rozdělená na víc (např. dvě pozice na stejné ceně). Pozice se stejným vstupem se slučují automaticky (Nastavení → Swing · CFD).</span></span>`;
  $('tradeList').insertAdjacentElement('beforebegin',bar);
  $('mergeSwingTradesBtn').onclick=()=>void mergeSelectedSwingTrades();
+ const setAll=open=>{swingLsSet(SWING_EXPANDED_KEY,open?'1':'0');swingLsSet(SWING_TOGGLED_KEY,null);renderSwingTrades()};
+ $('swingExpandAllBtn').onclick=()=>setAll(true);
+ $('swingCollapseAllBtn').onclick=()=>setAll(false);
+ $('swingShowSetups').onchange=e=>{swingLsSet(SWING_SHOW_SETUPS_KEY,e.target.checked?'1':null);renderSwingTrades()};
 }
+// Deník swing deníku = jen uzavřené obchody (FJSwing.journalListRows). Otevřené pozice
+// a limitky jsou v Pozice/Příkazy; nenaplněné setupy přepínačem.
 function renderSwingTrades(){
  const target=$('tradeList');
  if(!target)return;
  ensureSwingTradeToolbar();
- const q=($('search')?.value||'').toLowerCase();
- const rows=swingRows().filter(t=>!q||((t.symbol||'')+' '+(t.comment||'')+' '+(t.swingSetup||'')).toLowerCase().includes(q))
-  .sort((a,b)=>String(b.openedAt||'').localeCompare(String(a.openedAt||'')));
+ const showSetups=swingShowSetups();
+ const cb=$('swingShowSetups');if(cb)cb.checked=showSetups;
+ const rows=FJSwing.journalListRows(swingRows(),{showSetups,query:$('search')?.value||''});
  for(const id of [...swingTradesSelected])if(!rows.some(t=>t.id===id))swingTradesSelected.delete(id);
- target.innerHTML=rows.length?rows.map(swingCardHTML).join(''):'<div class="empty">Zatím žádný swing obchod. „＋ Přidat obchod“ otevře novou pozici.</div>';
+ const toggled=swingCardsToggled();
+ const ids=new Set(swingRows().map(t=>String(t.id)));
+ if([...toggled].some(id=>!ids.has(id))){for(const id of [...toggled])if(!ids.has(id))toggled.delete(id);saveSwingCardsToggled(toggled)}
+ target.innerHTML=rows.length?rows.map(t=>swingCardHTML(t,toggled)).join(''):'<div class="empty">Zatím žádný uzavřený swing obchod. Otevřené pozice a limitky jsou v Pozice/Příkazy.</div>';
  wireSwingButtons(target);
+ target.querySelectorAll('[data-swing-toggle]').forEach(b=>b.onclick=()=>{
+  const id=String(b.dataset.swingToggle),set=swingCardsToggled();
+  set.has(id)?set.delete(id):set.add(id);saveSwingCardsToggled(set);
+  const card=b.closest('.swing-card'),collapsed=swingCardCollapsed(id,set);
+  card?.classList.toggle('collapsed',collapsed);
+  b.textContent=collapsed?'▸':'▾';b.title=collapsed?'Rozbalit detail':'Sbalit detail';b.setAttribute('aria-expanded',collapsed?'false':'true');
+ });
  const mb=$('mergeSwingTradesBtn');
  if(mb)mb.disabled=swingTradesSelected.size<2;
  target.querySelectorAll('[data-swing-merge-select]').forEach(cb=>cb.onchange=()=>{cb.checked?swingTradesSelected.add(cb.dataset.swingMergeSelect):swingTradesSelected.delete(cb.dataset.swingMergeSelect);if(mb)mb.disabled=swingTradesSelected.size<2});
@@ -1050,7 +1108,8 @@ async function saveSwingModal(){
  swingFromOrder=null;swingDraftBase=null;
  $('swingModal').classList.remove('open');
  await load();
- showToast(t.recordType==='SETUP_ONLY'?'Setup bez vstupu uložen.':'Swing obchod uložen.');
+ showToast(t.recordType==='SETUP_ONLY'?(swingShowSetups()?'Setup bez vstupu uložen.':'Setup bez vstupu uložen – v Deníku se ukáže s „Zobrazit nenaplněné setupy“.')
+  :FJSwing.status(t)==='OPEN'?'Pozice uložena – otevřené pozice jsou v Pozice/Příkazy, do Deníku přejde po uzavření.':'Swing obchod uložen.');
 }
 
 // ---------- Nastavení: měna a CFD instrumenty, cTrader MCP ----------

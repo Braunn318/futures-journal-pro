@@ -637,7 +637,19 @@
     };
   }
 
+  // Seznam v Deníku swing deníku: jen uzavřené obchody (otevřené pozice a limitky jsou
+  // v Pozice/Příkazy), nenaplněné setupy jen s opts.showSetups. Řazení od nejnovějšího otevření.
+  function journalListRows(rows, opts) {
+    const o = opts || {};
+    const q = String(o.query || '').toLowerCase();
+    return (rows || []).filter(isSwingRecord)
+      .filter(t => t.recordType === 'SETUP_ONLY' ? o.showSetups === true : status(t) === 'CLOSED')
+      .filter(t => !q || ((t.symbol || '') + ' ' + (t.comment || '') + ' ' + (t.swingSetup || '')).toLowerCase().includes(q))
+      .sort((a, b) => String(b.openedAt || '').localeCompare(String(a.openedAt || '')));
+  }
+
   return {
+    journalListRows,
     tradePositionIds, isGroupTrade, isMultiPositionTrade, mergeTradeContext, findTradeByPosition,
     swingLegRows, swingTradeRecord, planMcpSync, sameLeg, legFromMcpHistory, swingFromMcpPosition, swingFromMcpHistory, addLeg, reconcileOpenVolume, mcpActiveAccountCheck,
     IMPORT_FIELDS, swingFromCtraderEvent, mergeImported, applyCtraderClose, findPairCandidate, applyMcpPosition, dropEditedImportedFields,
